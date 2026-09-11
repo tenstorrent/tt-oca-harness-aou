@@ -1,0 +1,180 @@
+// SPDX-License-Identifier: CC-BY-4.0
+ifndef::aou-imagesdir[]
+:imagesdir: assets
+endif::[]
+ifdef::aou-imagesdir[]
+:imagesdir: {aou-imagesdir}
+endif::[]
+
+[[aou-8-ppa]]
+== 8. PPA
+
+[[aou-81-performance]]
+=== 8.1. Performance
+
+Performance evaluation is conducted in both 512-bit local die and 512-bit remote die environments. The initial latency is measured from the AXI input of the local AOU_CORE to the AXI output of the remote AOU_CORE.
+
+[[table-8]]
+
+[cols=",",options="header",]
+|==========================================
+|AXI Channel |AoU Latency on B2B connection
+|Read Request (AR) |9
+|Read Data \(R) |11
+|Write Request (AW) |12
+|Write Data (W) |12
+|Write Response (B) |10
+|Misc |9
+|==========================================
+
+_Table 8. AOU_CORE Initial Latency (Cycles)_
+
+The reason of two additional latency for AW and W CH is from WLAST signal generator, and data width converter.
+
+[caption=""]
+.Figure 29. Initial Latency of AOU_CORE with UCIe (Cycle)
+[[figure-29]]
+image::image28.png[Figure 29. Initial Latency of AOU_CORE with UCIe (Cycle)]
+
+[caption=""]
+.Figure 30. AoU Bandwidth Efficiency with Respect to UCIe FDI Latency
+[[figure-30]]
+image::image29.png[Figure 30. AoU Bandwidth Efficiency with Respect to UCIe FDI Latency]
+
+The results of efficiency measurements for read and write operations with varying burst lengths are presented. For write operations, two cases were evaluated. Normal Write and Write Full, where no write strobe bits are transmitted. The measured values and the corresponding expected values are as follows.
+
+[[table-9]]
+
+[cols="a,a,a,a,a,a"]
+|===
+a|Data transfer
+efficiency
+a|
+a|Uni-direction transfer
+a|
+a|Bi-direction transfer
+a|
+
+a|AXI burst length
+a|Data type
+a|Measured
+a|AoU limit by spec
+a|Measured
+a|AoU limit by spec
+
+a|16 burst
+a|Read data
+a|85.3%*
+a|85.7%
+a|85.3%
+a|84.6%
+
+a|
+a|Write data
+a|79.0%
+a|79.0%
+a|78.5%
+a|78.7%
+
+a|
+a|WriteFull data**
+a|84.2%
+a|84.6%
+a|84.2%
+a|84.2%
+
+a|1 Burst
+a|Read data
+a|85.3%
+a|85.7%
+a|71.9%
+a|70.6%
+
+a|
+a|Write data
+a|66.7%
+a|66.7%
+a|63.3%
+a|63.1%
+
+a|
+a|WriteFull data
+a|70.3%
+a|70.6%
+a|67.0%
+a|66.7%
+
+|===
+
+_Table 9. AOU_CORE Data Transfer Efficiency_
+
+* 0.4% performance drop is not from IP, but just from transfer data size. If the transfer data size is the multiples of 6 burst such 132 beats, it shows the same performance number with the limit in AoU spec. Everything is the same case. Note that the efficiency is measured with 128/(cycle_from_1st_valid_to_last_valid + 1), where 1 is the hidden bubble right before the first valid. It is indispensable since AoU data message size can not covered in a single 64B chunk, unlike local AXI bus.
+
+[[aou-82-power]]
+=== 8.2. Power
+
+TBD
+
+[[aou-83-area]]
+=== 8.3. Area
+
+[caption=""]
+.Figure 31. Area of 1 RP AOU
+[[figure-31]]
+image::image30.png[Figure 31. Area of 1 RP AOU]
+
+The area for each 1 RP AOU submodule is shown in the figure above.
+
+Among them, the RX_W_FIFO and RX_R_FIFO, which store write data and read data respectively, occupy the largest portion of the AOU area. These FIFOs are currently implemented as register-based FIFOs.
+
+FIFO Depths : TX = 2 entries / RX = 88 entries for R/W data, and 44 entries for AW/AR/B. The 88-entry default for R/W data applies when [.monospaced]#++FDI_CONFIG++# selects a non-1024b interface; the 1024b configurations ([.monospaced]#++FDI_CFG_SP_128B++# / [.monospaced]#++FDI_CFG_TP_64B_128B++#) default to 140 entries, which proportionally increases the R/W FIFO area component. The Expected R/W data for 128GBs/s is 176 entries.
+
+*v0.4 AOU_CORE*
+
+With 2 RP, each AXI bandwidth is 512 bit and 256 bit, AOU_CORE area was 197k um^2.
+
+The FIFO depth of the two RPs are identical.
+
+[[table-10]]
+
+[cols=",",options="header",]
+|=============================
+|AoU Area (um^2) |64GB/s
+|1RP
+|(AXI : 512bit) |97K
+|2RP
+|(AXI : 256bit & 512bit) |197K
+|=============================
+
+_Table 10. AOU_CORE Area (measured at an ++FDI_CFG_SP_64B++-equivalent configuration; numbers will scale up for ++FDI_CFG_*_128B++ configurations due to the 88 \-> 140 R/W FIFO depth bump.)_
+
+ifndef::release[]
+[[appendix-a-records-of-changes]]
+== Appendix A. Records of Changes
+
+[[table-11]]
+
+[width="100%",cols="20%,20%,20%,20%,20%",options="header",]
+|======================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
+|Version |Date |Author |Reviewer |Description of Change
+|v0.1 |2025/08/20 |Soyoung Min, Jaeyun Lee, Hojun Lee |Kwanho Kim |Initial version.
+|v0.2 |2025/09/19 |Soyoung Min, Jaeyun Lee, Hojun Lee |Kwanho Kim |256, 512, 1024 datawidth verification finished. Early response feature added.
+| |2026/04/09 |Brad Erwin | |Expand explanation of early response feature
+| |2026/04/22 |Tenstorrent | |Refresh with 128B FDI support documentation. New [.monospaced]#++FDI_CONFIG++# parameter (single integer with named constants in [.monospaced]#++RTL/packet_def_pkg.sv++#). FDI ports renamed from [.monospaced]#++_32B++#/[.monospaced]#++_64B++# to [.monospaced]#++_0++#/[.monospaced]#++_1++#; second-PHY ports and [.monospaced]#++I_PHY_TYPE++# are gated by the [.monospaced]#pass:c[+define+TWO_PHY]# build flag. New [.monospaced]#++AOU_TOP++# wrapper introduced (adds [.monospaced]#++AOU_FDI_BRINGUP_CTRL++# for turn-key FDI bringup). New [.monospaced]#++RX_*_FIFO_RS_EN++# parameters control per-channel RX-FIFO output register-slices. [.monospaced]#++RP*_RX_W_FIFO_DEPTH++# / [.monospaced]#++RP*_RX_R_FIFO_DEPTH++# defaults are now FDI-config aware (140 entries for 1024b configurations, 88 otherwise). [.monospaced]#++RP_COUNT++# default changed from 2 to 1.
+|======================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
+
+_Table 11. Record of Changes_
+endif::release[]
+
+[[appendix-b-referenced-documents]]
+== Appendix B. Referenced Documents
+
+[[table-12]]
+
+[width="99%",cols="28%,50%,22%",options="header",]
+|===================================================================================
+|Document Name |Document Location and/or URL |Issuance Date
+|AXI-over-UCIe (AoU) Specification, Revision 0.7 |https://openchipletatlas.org |2025
+|===================================================================================
+
+_Table 12. Referenced Documents_

@@ -1,0 +1,16 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant RD as Remote Die
+    participant LA as Local AOU
+    participant SW as Local SW
+
+    Note over LA: AXI error on manager interface
+    Note over LA: FIFO push (ID, ADDR, RESP)
+    SW->>LA: Set ERROR_INFO_ACCESS_EN = 1
+    SW->>LA: Configure DEBUG_UPPER/LOWER_ADDR
+    RD->>LA: AR to DEBUG_ADDR
+    LA-->>RD: R (FIFO head: ID + ADDR + RESP)
+    RD->>LA: AW + W to DEBUG_ADDR (dummy write)
+    LA-->>RD: B (OKAY, head entry popped)
+    Note over RD: Repeat AR then AW+W for remaining entries

@@ -1,0 +1,18 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant LM as Local AXI Manager
+    participant LA as Local AOU
+    participant RA as Remote AOU
+    participant RS as Remote AXI Subordinate
+
+    LM->>LA: AW (AWCACHE[0]=1) + W (WLAST)
+    LA-->>LM: B (early, BRESP=OKAY)
+    LA->>RA: WriteReq + WriteData (via FDI)
+    RA->>RS: AW + W
+    RS-->>RA: B (BRESP=SLVERR)
+    RA->>LA: WriteResp message (via FDI)
+    Note over LA: Detects BRESP[1]=1 on consumed response
+    Note over LA: Captures BID and BRESP in SFR
+    LA->>LM: INT_EARLY_RESP_ERR interrupt
+    Note over LM: SW reads SFR, then writes 1 to WRITE_RESP_ERR to clear

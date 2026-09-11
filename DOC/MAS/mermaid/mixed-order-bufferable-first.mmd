@@ -1,0 +1,24 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant LM as Local AXI Manager
+    participant LA as Local AOU
+    participant RA as Remote AOU
+    participant RS as Remote AXI Subordinate
+
+    LM->>LA: AW0 (AWCACHE[0]=1, ID=X) + W0
+    Note over LA: TXN0: same_id_tr_cnt=0, early_go=1
+    LA-->>LM: B0 (early OKAY, ID=X)
+    LM->>LA: AW1 (AWCACHE[0]=0, ID=X) + W1
+    Note over LA: TXN1: bufferable=0, waits for actual B
+    LA->>RA: WriteReq0 + WriteData0
+    LA->>RA: WriteReq1 + WriteData1
+    RA->>RS: AW0 + W0
+    RS-->>RA: B0 (OKAY)
+    RA->>LA: WriteResp0
+    Note over LA: TXN0 actual B consumed silently (bufferable, out=1)
+    RA->>RS: AW1 + W1
+    RS-->>RA: B1 (OKAY)
+    RA->>LA: WriteResp1
+    Note over LA: TXN1 actual B forwarded (non-bufferable)
+    LA-->>LM: B1 (actual OKAY, ID=X)

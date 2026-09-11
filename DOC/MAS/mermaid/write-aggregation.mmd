@@ -1,0 +1,18 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant S as Splitter Output
+    participant AGG as Aggregator
+    participant M as AXI Manager
+
+    S->>AGG: AW (AWSIZE=256b, AWLEN=15)
+    Note over AGG: Promote AWSIZE=1024b, AWLEN=3
+    S->>AGG: W beat 0 (256b)
+    S->>AGG: W beat 1 (256b)
+    S->>AGG: W beat 2 (256b)
+    S->>AGG: W beat 3 (256b, OR-merge complete)
+    AGG->>M: AW (AWSIZE=1024b, AWLEN=3)
+    AGG->>M: W beat 0 (1024b merged)
+    Note over AGG: Repeat for remaining 3 merged beats
+    M-->>AGG: B response
+    AGG-->>S: B response (forwarded)

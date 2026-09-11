@@ -1,0 +1,63 @@
+// SPDX-License-Identifier: CC-BY-4.0
+ifndef::aou-imagesdir[]
+:imagesdir: assets
+endif::[]
+ifdef::aou-imagesdir[]
+:imagesdir: {aou-imagesdir}
+endif::[]
+ifndef::aou-software-xref[]
+:aou-software-xref: software-operation.adoc
+endif::[]
+
+[[aou-4-interrupt]]
+== 4. Interrupt
+
+[[table-4]]
+
+[width="100%",cols="34%,33%,33%",options="header",]
+|=================================================================================================================================
+|Interrupt Name |Access |Description
+|INT_ACTIVATE_START |W1C |Asserted when activation of the AoU Protocol layer is required.
+|INT_DEACTIVATE_START |W1C |Asserted when deactivation of the AOU Protocol layer is required.
+|INT_SI0_ID_MISMATCH |W1C |Asserted when AXI subordinate port received with an AXI ID response that does not match any transaction
+|INT_MI0_ID_MISMATCH |W1C |Asserted when AXI manager port received with an AXI ID response that does not match any transaction
+|INT_EARLY_RESP_ERR |W1C |Asserted when B response error occurs on early responded B response
+|INT_REQ_LINKRESET |W1C |Asserted when AOU_CORE encounters AOU SPEC protocol violation. Request link to go LinkReset.
+|=================================================================================================================================
+
+_Table 4. Interrupt Sources_
+
+* *INT_ACTIVATE_START*
+
+An interrupt that occurs when activation of the AoU Protocol layer is required. The interrupt can be cleared by writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_ACTIVATE_START SFR. For details, please refer to the Interrupt description in xref:{aou-software-xref}#aou-73-activation-deactivation-flow[Section 7.3] "Activation & Deactivation Flow".
+
+* *INT_DEACTIVATE_START*
+
+An interrupt that occurs when deactivation of the AoU Protocol layer is required. The interrupt can be cleared by writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_DEACTIVATE_START SFR. For details, please refer to the Interrupt description in xref:{aou-software-xref}#aou-73-activation-deactivation-flow[Section 7.3] "Activation & Deactivation Flow".
+
+* *INT_SI0_ID_MISMATCH*
+
+An interrupt that occurs on the AXI Subordinate Interface when a B or R channel response is received with an ID that was not previously issued as a request. For details on ID mismatch detection, see xref:aou-374-id-ordering[Section 3.7.4].
+
+Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.AXI_SLV_ID_MISMATCH_ERR++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.AXI_SLV_ID_MISMATCH_ERR.SLV_BRESP_ERR++# / [.monospaced]#++SLV_RRESP_ERR++#.
+
+* *INT_MI0_ID_MISMATCH*
+
+An interrupt that occurs on the AXI Manager Interface when a B or R channel response is received with an ID that was not previously issued as a request. This is detected by the xref:aou-36-axi-transaction-splitter[AXI Transaction Splitter] destination table.
+
+Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.ERROR_INFO++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.ERROR_INFO.SPLIT_BID_MISMATCH_ERR++# / [.monospaced]#++SPLIT_RID_MISMATCH_ERR++#.
+
+* *INT_EARLY_RESP_ERR*
+
+An interrupt that occurs when, due to the xref:aou-37-write-early-response-controller[Write Early Response] feature, a B response has already been sent through the AXI Subordinate Interface, and a subsequent actual B response arrives with an error. For details, see xref:aou-373-transaction-flow----error-case[Section 3.7.3].
+
+Software can check the ID and error type of the transaction in which the error occurred by reading [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE.WRITE_RESP_ERR++#.
+
+* *INT_REQ_LINKRESET*
+
+An interrupt that occurs when AOU_CORE receives an AoU protocol violation. Refer to xref:{aou-software-xref}#aou-723-linkreset-error-reporting[Section 7.2.3] LinkReset Error Reporting. When AOU_CORE receives a protocol violation, software must perform a software reset of AOU_CORE and re-enter the activation sequence.
+
+[[aou-5-error]]
+== 5. Error
+
+*TBD*
