@@ -58,8 +58,8 @@ See sections below for detailed documentation, integration guidance, and tool re
 
 ## Documentation
 
-- **[Integration Guide](DOC/integration_guide/integration_guide.md)** -- comprehensive guide for `AOU_TOP` and `AOU_CORE_TOP` covering module interfaces, parameter list (including `FDI_CONFIG`), register map, activation flow, debugging, verification, timing constraints, power intent, and library cell replacement.
-- **[Micro-Architecture Specification](DOC/MAS/aou_core_mas.md)** -- AOU_CORE block-level architectural specification (datapaths, FIFO sizing, credit management, area, internal flows).
+- **[Integration Guide](DOC/integration_guide/integrator.adoc)** -- comprehensive guide for `AOU_TOP` and `AOU_CORE_TOP` covering module interfaces, parameter list (including `FDI_CONFIG`), register map, activation flow, debugging, verification, timing constraints, power intent, and library cell replacement.
+- **[Micro-Architecture Specification](DOC/MAS/index.adoc)** -- AOU_CORE block-level architectural specification (datapaths, FIFO sizing, credit management, area, internal flows).
 - **[CSR Documentation](DOC/csr/README.md)** -- register map outputs (Markdown, C header, interactive HTML browser, IP-XACT, UVM model).
 - **Interactive HTML Register Browser** -- generated in `DOC/csr/html/` (see Tool Requirements below to generate).
 
@@ -113,10 +113,10 @@ tests, watchdog tuning, and the harness layout.
 
 For integrators bringing AOU_TOP or AOU_CORE_TOP into a chip design:
 
-- **[Integration Guide, Section 8](DOC/integration_guide/integration_guide.md#8-ip-integration-collateral)** covers all integration collateral: generated outputs, timing constraints (SDC), power intent (UPF), and library cell replacement guidance.
+- **[Integration Guide, Section 8](DOC/integration_guide/integrator.adoc#aou-ig-ip-integration-collateral)** covers all integration collateral: generated outputs, timing constraints (SDC), power intent (UPF), and library cell replacement guidance.
 - **Timing constraints**: `INTEG/constraints/aou_core_top.sdc` (1 GHz core, 100 MHz APB).
 - **Power intent**: `INTEG/constraints/aou_core_top.upf` (single always-on domain).
-- **Library cells** in `RTL/LIB/` are behavioral reference models that must be replaced with process-appropriate implementations before synthesis. See [integration guide Section 8.7](DOC/integration_guide/integration_guide.md#87-library-cell-replacement) for details.
+- **Library cells** in `RTL/LIB/` are behavioral reference models that must be replaced with process-appropriate implementations before synthesis. See [integration guide Section 8.7](DOC/integration_guide/integrator.adoc#aou-ig-library-cell-replacement) for details.
 
 ## License
 
