@@ -1,0 +1,22 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant LM as Local AXI Manager
+    participant LA as Local AOU
+    participant RA as Remote AOU
+
+    LM->>LA: AW0 + W0 (bufferable)
+    LA-->>LM: B0 (early OKAY)
+    LM->>LA: AW1 + W1 (bufferable)
+    LA-->>LM: B1 (early OKAY)
+    Note over LM,LA: ... writes continue ...
+    LM->>LA: AW31 + W31 (bufferable)
+    LA-->>LM: B31 (early OKAY)
+    Note over LA: Table full (r_aw_cnt == WR_MO_CNT)
+    LM-xLA: AW32 + W32 (stalled, AWREADY=0)
+    Note over LA: FDI TX continues draining queued writes to remote
+    RA-->>LA: WriteResp for TXN0
+    Note over LA: TXN0 entry freed, r_aw_cnt decrements
+    LA->>LM: AWREADY reasserted
+    LM->>LA: AW32 + W32 (accepted)
+    LA-->>LM: B32 (early OKAY)

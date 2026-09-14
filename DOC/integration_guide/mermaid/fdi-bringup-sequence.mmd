@@ -1,0 +1,22 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant LP as LP (AOU_FDI_BRINGUP_CTRL)
+    participant PL as PL (D2D Adapter)
+
+    Note over LP: ST_RESET
+    LP->>LP: Wait for pl_state_sts == RESET
+    PL->>LP: pl_inband_pres = 1
+    Note over LP: ST_WAIT_PRESENCE
+    LP->>LP: Wait for activate trigger or pl_clk_req
+    Note over LP: ST_WAKE_ASSERT
+    LP->>PL: lp_wake_req = 1
+    Note over LP: ST_WAKE_WAIT_ACK
+    PL->>LP: pl_wake_ack = 1
+    Note over LP: ST_REQ_ACTIVE
+    LP->>PL: lp_state_req = ACTIVE
+    PL->>LP: pl_state_sts = ACTIVE
+    PL->>LP: pl_rx_active_req = 1
+    LP->>PL: lp_rx_active_sts = 1
+    Note over LP: ST_ACTIVE
+    LP->>LP: O_INT_FSM_IN_ACTIVE = 1 → protocol activation begins
