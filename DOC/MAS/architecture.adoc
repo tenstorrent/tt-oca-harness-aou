@@ -243,6 +243,8 @@ The [.monospaced]#++MAX_AxBURSTLEN++# value must be of the form 2^n - 1. Legal v
 
 These SFRs must be configured before activation and must not be changed during normal operation.
 
+The SFR enforces the 2^n - 1 constraint in hardware. A write of any value other than 0, 1, 3, 7, 15, 31, 63, 127, or 255 to [.monospaced]#++MAX_AWBURSTLEN++# or [.monospaced]#++MAX_ARBURSTLEN++# is stored as [.monospaced]#++0xF++# (16 beats, the reset value). Software can confirm the accepted value by reading the field back.
+
 [[aou-37-write-early-response-controller]]
 === 3.7. Write Early Response Controller
 

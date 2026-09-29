@@ -172,8 +172,8 @@ addrmap aou_core {
         name = "AXI Split Transaction RP0";
         desc = "Maximum AXI burst lengths for split transactions on Resource Plane 0.";
         field { sw = r; } reserved_31_16[31:16] = 0;
-        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP0."; } max_awburstlen[15:8] = 0xF;
-        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP0."; } max_arburstlen[7:0] = 0xF;
+        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP0. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_awburstlen[15:8] = 0xF;
+        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP0. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_arburstlen[7:0] = 0xF;
     } axi_split_tr_rp0 @ 0x0020;
 
     reg {
@@ -232,8 +232,8 @@ addrmap aou_core {
         name = "AXI Split Transaction RP1";
         desc = "Maximum AXI burst lengths for split transactions on Resource Plane 1.";
         field { sw = r; } reserved_31_16[31:16] = 0;
-        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP1."; } max_awburstlen[15:8] = 0xF;
-        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP1."; } max_arburstlen[7:0] = 0xF;
+        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP1. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_awburstlen[15:8] = 0xF;
+        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP1. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_arburstlen[7:0] = 0xF;
     } axi_split_tr_rp1 @ 0x0038;
 
     reg {
@@ -292,8 +292,8 @@ addrmap aou_core {
         name = "AXI Split Transaction RP2";
         desc = "Maximum AXI burst lengths for split transactions on Resource Plane 2.";
         field { sw = r; } reserved_31_16[31:16] = 0;
-        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP2."; } max_awburstlen[15:8] = 0xF;
-        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP2."; } max_arburstlen[7:0] = 0xF;
+        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP2. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_awburstlen[15:8] = 0xF;
+        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP2. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_arburstlen[7:0] = 0xF;
     } axi_split_tr_rp2 @ 0x0050;
 
     reg {
@@ -352,8 +352,8 @@ addrmap aou_core {
         name = "AXI Split Transaction RP3";
         desc = "Maximum AXI burst lengths for split transactions on Resource Plane 3.";
         field { sw = r; } reserved_31_16[31:16] = 0;
-        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP3."; } max_awburstlen[15:8] = 0xF;
-        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP3."; } max_arburstlen[7:0] = 0xF;
+        field { sw = rw; desc = "Maximum AXI write burst length for split transactions on RP3. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_awburstlen[15:8] = 0xF;
+        field { sw = rw; desc = "Maximum AXI read burst length for split transactions on RP3. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats)."; } max_arburstlen[7:0] = 0xF;
     } axi_split_tr_rp3 @ 0x0068;
 
     reg {

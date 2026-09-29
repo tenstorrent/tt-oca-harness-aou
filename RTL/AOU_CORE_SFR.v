@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // *****************************************************************************
 //  Copyright (c) 2026 BOS Semiconductors
+//  Copyright (c) 2026 Tenstorrent USA Inc
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -730,11 +731,28 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     end
 end
 
+// MAX_AxBURSTLEN must be 2^n - 1 (0, 1, 3, 7, 15, 31, 63, 127, 255) because
+// the transaction splitter derives its sub-burst count with a shift. Any other
+// written value is replaced by 0xF (16 beats, the reset value) so an illegal
+// configuration cannot reach the splitter.
+function [7:0] f_max_axburstlen;
+    input [7:0] i_val;
+    begin
+        case (i_val)
+            8'd0, 8'd1, 8'd3, 8'd7, 8'd15,
+            8'd31, 8'd63, 8'd127, 8'd255:
+                f_max_axburstlen = i_val;
+            default:
+                f_max_axburstlen = 8'hF;
+        endcase
+    end
+endfunction
+
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp0_max_awburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP0_ADDR)) begin
-        r_axi_split_tr_rp0_max_awburstlen <= I_PWDATA[15:8];
+        r_axi_split_tr_rp0_max_awburstlen <= f_max_axburstlen(I_PWDATA[15:8]);
     end
 end
 
@@ -742,7 +760,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp0_max_arburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP0_ADDR)) begin
-        r_axi_split_tr_rp0_max_arburstlen <= I_PWDATA[7:0];
+        r_axi_split_tr_rp0_max_arburstlen <= f_max_axburstlen(I_PWDATA[7:0]);
     end
 end
 
@@ -885,7 +903,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp1_max_awburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP1_ADDR)) begin
-        r_axi_split_tr_rp1_max_awburstlen <= I_PWDATA[15:8];
+        r_axi_split_tr_rp1_max_awburstlen <= f_max_axburstlen(I_PWDATA[15:8]);
     end
 end
 
@@ -893,7 +911,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp1_max_arburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP1_ADDR)) begin
-        r_axi_split_tr_rp1_max_arburstlen <= I_PWDATA[7:0];
+        r_axi_split_tr_rp1_max_arburstlen <= f_max_axburstlen(I_PWDATA[7:0]);
     end
 end
 
@@ -1036,7 +1054,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp2_max_awburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP2_ADDR)) begin
-        r_axi_split_tr_rp2_max_awburstlen <= I_PWDATA[15:8];
+        r_axi_split_tr_rp2_max_awburstlen <= f_max_axburstlen(I_PWDATA[15:8]);
     end
 end
 
@@ -1044,7 +1062,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp2_max_arburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP2_ADDR)) begin
-        r_axi_split_tr_rp2_max_arburstlen <= I_PWDATA[7:0];
+        r_axi_split_tr_rp2_max_arburstlen <= f_max_axburstlen(I_PWDATA[7:0]);
     end
 end
 
@@ -1187,7 +1205,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp3_max_awburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP3_ADDR)) begin
-        r_axi_split_tr_rp3_max_awburstlen <= I_PWDATA[15:8];
+        r_axi_split_tr_rp3_max_awburstlen <= f_max_axburstlen(I_PWDATA[15:8]);
     end
 end
 
@@ -1195,7 +1213,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_split_tr_rp3_max_arburstlen <= 8'hF;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SPLIT_TR_RP3_ADDR)) begin
-        r_axi_split_tr_rp3_max_arburstlen <= I_PWDATA[7:0];
+        r_axi_split_tr_rp3_max_arburstlen <= f_max_axburstlen(I_PWDATA[7:0]);
     end
 end
 

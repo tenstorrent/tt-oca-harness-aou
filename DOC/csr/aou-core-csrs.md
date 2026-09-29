@@ -434,11 +434,11 @@ Don't override. Generated from: aou_core
 
 #### max_arburstlen field
 
-<p>Maximum AXI read burst length for split transactions on RP0.</p>
+<p>Maximum AXI read burst length for split transactions on RP0. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 #### max_awburstlen field
 
-<p>Maximum AXI write burst length for split transactions on RP0.</p>
+<p>Maximum AXI write burst length for split transactions on RP0. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 ### error_info_rp0 register
 
@@ -589,11 +589,11 @@ Don't override. Generated from: aou_core
 
 #### max_arburstlen field
 
-<p>Maximum AXI read burst length for split transactions on RP1.</p>
+<p>Maximum AXI read burst length for split transactions on RP1. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 #### max_awburstlen field
 
-<p>Maximum AXI write burst length for split transactions on RP1.</p>
+<p>Maximum AXI write burst length for split transactions on RP1. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 ### error_info_rp1 register
 
@@ -744,11 +744,11 @@ Don't override. Generated from: aou_core
 
 #### max_arburstlen field
 
-<p>Maximum AXI read burst length for split transactions on RP2.</p>
+<p>Maximum AXI read burst length for split transactions on RP2. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 #### max_awburstlen field
 
-<p>Maximum AXI write burst length for split transactions on RP2.</p>
+<p>Maximum AXI write burst length for split transactions on RP2. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 ### error_info_rp2 register
 
@@ -899,11 +899,11 @@ Don't override. Generated from: aou_core
 
 #### max_arburstlen field
 
-<p>Maximum AXI read burst length for split transactions on RP3.</p>
+<p>Maximum AXI read burst length for split transactions on RP3. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 #### max_awburstlen field
 
-<p>Maximum AXI write burst length for split transactions on RP3.</p>
+<p>Maximum AXI write burst length for split transactions on RP3. Legal values are 2^n - 1: 0, 1, 3, 7, 15, 31, 63, 127, 255. Any other written value is stored as 0xF (16 beats).</p>
 
 ### error_info_rp3 register
 
