@@ -735,7 +735,7 @@ end
 // the transaction splitter derives its sub-burst count with a shift. Any other
 // written value is replaced by 0xF (16 beats, the reset value) so an illegal
 // configuration cannot reach the splitter.
-function [7:0] f_max_axburstlen;
+function automatic [7:0] f_max_axburstlen;
     input [7:0] i_val;
     begin
         case (i_val)
