@@ -234,7 +234,7 @@ For details on the ACTIVATE and DEACTIVATE SFRs, please refer to xref:aou-73-act
 * The *MAX_AWBURSTLEN* and *MAX_ARBURSTLEN* register fields define the maximum burst length that the splitter may issue to the local bus.
 * The splitter inside *AOU_CORE* issues AXI transfers with burst lengths less than or equal to the configured values (*MAX_AWBURSTLEN*, *MAX_ARBURSTLEN*).
 * If *AOU_CORE* receives a larger burst length from the remote die, the splitter divides it into smaller bursts based on MAX_AxBURSTLEN.
-* Since Splitter only supports maximum burst lengths in the form of 2^n, the field must be configured with one of the following: 1, 3, 5, 7, 15, 31, 63, 127 or 255.
+* Since the splitter only supports maximum burst lengths of the form 2^n - 1, the field must be configured with one of the following: 0, 1, 3, 7, 15, 31, 63, 127 or 255. The SFR stores 15 if any other value is written; read the field back to confirm the accepted value.
 
 *ACTIVATE_STATE_ENABLED/DISABLED*
 

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // *****************************************************************************
 //  Copyright (c) 2026 BOS Semiconductors
+//  Copyright (c) 2026 Tenstorrent USA Inc
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -559,7 +560,8 @@ always @ (*) begin
         31:  w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 5;
         63:  w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 6;
         127: w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 7;
-        255: w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 8;
+        // 256-beat sub-burst covers any AXI burst: no additional sub-bursts.
+        255: w_arch_split_tr_cnt = {LEN_WD{1'b0}};
         default: w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 0;
     endcase
 end
@@ -574,7 +576,8 @@ always @ (*) begin
         31:  w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 5;
         63:  w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 6;
         127: w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 7;
-        255: w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 8;
+        // 256-beat sub-burst covers any AXI burst: no additional sub-bursts.
+        255: w_awch_split_tr_cnt = {LEN_WD{1'b0}};
         default: w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 0;
     endcase
 end
