@@ -84,8 +84,8 @@ This section gives information about operation guide for the AOU_CORE.
 | | |RP0_DEST |[1:0] |RW |0x0
 |PRIOR_RP_AXI |0x0018 | | | |
 | | |Rsvd |[31:28] |RO |0x0
-| | |AXI_QOS_TO_NP |[27:24] |RW |0xA
-| | |AXI_QOS_TO_HP |[23:20] |RW |0x5
+| | |AXI_QOS_TO_NP |[27:24] |RW |0x5
+| | |AXI_QOS_TO_HP |[23:20] |RW |0xA
 | | |Rsvd |[19:18] |RO |0x0
 | | |RP3_PRIOR |[17:16] |RW |0x3
 | | |Rsvd |[15:14] |RO |0x0

@@ -365,8 +365,8 @@ Don't override. Generated from: aou_core
 |15:14|reserved_15_14|   r  | 0x0 |  — |
 |17:16|   rp3_prior  |  rw  | 0x3 |  — |
 |19:18|reserved_19_18|   r  | 0x0 |  — |
-|23:20| axi_qos_to_hp|  rw  | 0x5 |  — |
-|27:24| axi_qos_to_np|  rw  | 0xA |  — |
+|23:20| axi_qos_to_hp|  rw  | 0xA |  — |
+|27:24| axi_qos_to_np|  rw  | 0x5 |  — |
 |31:28|reserved_31_28|   r  | 0x0 |  — |
 
 #### arb_mode field

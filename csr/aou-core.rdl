@@ -139,8 +139,8 @@ addrmap aou_core {
         name = "Priority RP AXI";
         desc = "QoS thresholds, per-RP priority levels, and arbitration mode.";
         field { sw = r; } reserved_31_28[31:28] = 0;
-        field { sw = rw; desc = "AXI QoS to normal priority boundary. In AXI QoS arbitration mode (arb_mode=2), AXI QoS values at or above this threshold are treated as normal priority. Values below this threshold are treated as low priority."; } axi_qos_to_np[27:24] = 0xA;
-        field { sw = rw; desc = "AXI QoS to high priority boundary. In AXI QoS arbitration mode (arb_mode=2), AXI QoS values at or above this threshold are treated as high priority. Values between axi_qos_to_hp and axi_qos_to_np are treated as normal priority."; } axi_qos_to_hp[23:20] = 0x5;
+        field { sw = rw; desc = "AXI QoS to normal priority boundary. In AXI QoS arbitration mode (arb_mode=2), AXI QoS values at or above this threshold are treated as normal priority. Values below this threshold are treated as low priority."; } axi_qos_to_np[27:24] = 0x5;
+        field { sw = rw; desc = "AXI QoS to high priority boundary. In AXI QoS arbitration mode (arb_mode=2), AXI QoS values at or above this threshold are treated as high priority. Values between axi_qos_to_hp and axi_qos_to_np are treated as normal priority."; } axi_qos_to_hp[23:20] = 0xA;
         field { sw = r; } reserved_19_18[19:18] = 0;
         field { sw = rw; desc = "Priority level for Resource Plane 3."; } rp3_prior[17:16] = 0x3;
         field { sw = r; } reserved_15_14[15:14] = 0;

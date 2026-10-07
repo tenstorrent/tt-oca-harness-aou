@@ -661,7 +661,7 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_prior_rp_axi_axi_qos_to_np <= 4'hA;
+        r_prior_rp_axi_axi_qos_to_np <= 4'h5;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_PRIOR_RP_AXI_ADDR)) begin
         r_prior_rp_axi_axi_qos_to_np <= I_PWDATA[27:24];
     end
@@ -669,7 +669,7 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_prior_rp_axi_axi_qos_to_hp <= 4'h5;
+        r_prior_rp_axi_axi_qos_to_hp <= 4'hA;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_PRIOR_RP_AXI_ADDR)) begin
         r_prior_rp_axi_axi_qos_to_hp <= I_PWDATA[23:20];
     end
