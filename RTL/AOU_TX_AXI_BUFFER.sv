@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // *****************************************************************************
 //  Copyright (c) 2026 BOS Semiconductors
+//  Copyright (c) 2026 Tenstorrent USA Inc
 //
 //  Licensed under the Apache License, Version 2.0 (the "License");
 //  you may not use this file except in compliance with the License.
@@ -418,10 +419,10 @@ assign w_aou_ar_port_qos = {w_aou_rp_port_qos[3], w_aou_rp_port_qos[2], w_aou_rp
 
 always_comb begin
     for (int unsigned i = 0; i < RP_CNT ; i++) begin
-        w_aou_aw_axi_qos[i] = (I_AOU_TX_S_AXI_AWQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
-                              (I_AOU_TX_S_AXI_AWQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
-        w_aou_ar_axi_qos[i] = (I_AOU_TX_S_AXI_ARQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
-                              (I_AOU_TX_S_AXI_ARQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
+        w_aou_aw_axi_qos[i] = (I_AOU_TX_S_AXI_AWQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
+                              (I_AOU_TX_S_AXI_AWQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
+        w_aou_ar_axi_qos[i] = (I_AOU_TX_S_AXI_ARQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
+                              (I_AOU_TX_S_AXI_ARQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
     end
 end
 

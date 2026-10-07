@@ -365,8 +365,8 @@ Don't override. Generated from: aou_core
 |15:14|reserved_15_14|   r  | 0x0 |  — |
 |17:16|   rp3_prior  |  rw  | 0x3 |  — |
 |19:18|reserved_19_18|   r  | 0x0 |  — |
-|23:20| axi_qos_to_hp|  rw  | 0x5 |  — |
-|27:24| axi_qos_to_np|  rw  | 0xA |  — |
+|23:20| axi_qos_to_hp|  rw  | 0xA |  — |
+|27:24| axi_qos_to_np|  rw  | 0x5 |  — |
 |31:28|reserved_31_28|   r  | 0x0 |  — |
 
 #### arb_mode field
@@ -391,11 +391,11 @@ Don't override. Generated from: aou_core
 
 #### axi_qos_to_hp field
 
-<p>AXI QoS to high priority boundary. In AXI QoS arbitration mode (arb_mode=2), AXI QoS values at or above this threshold are treated as high priority. Values between axi_qos_to_hp and axi_qos_to_np are treated as normal priority.</p>
+<p>AXI QoS to high priority boundary. In AXI QoS arbitration mode (arb_mode=2) this threshold is tested before axi_qos_to_np. A QoS value at or above this threshold is high priority, including when it is also at or above axi_qos_to_np. A value at or above axi_qos_to_np and below this threshold is normal priority. This field must be greater than axi_qos_to_np; otherwise the normal tier is empty and every value at or above this threshold is high.</p>
 
 #### axi_qos_to_np field
 
-<p>AXI QoS to normal priority boundary. In AXI QoS arbitration mode (arb_mode=2), AXI QoS values at or above this threshold are treated as normal priority. Values below this threshold are treated as low priority.</p>
+<p>AXI QoS to normal priority boundary. In AXI QoS arbitration mode (arb_mode=2) the classifier tests axi_qos_to_hp first: a QoS value at or above axi_qos_to_hp is high priority. Otherwise a value at or above this threshold is normal priority, and a value below it is low priority. axi_qos_to_hp must be greater than this field. If it is not, the normal tier is empty.</p>
 
 ### prior_timer register
 
