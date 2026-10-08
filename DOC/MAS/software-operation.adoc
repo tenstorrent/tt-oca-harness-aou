@@ -217,7 +217,7 @@ For details on the ACTIVATE and DEACTIVATE SFRs, please refer to xref:aou-73-act
 
 *AOU_INIT.ACTIVATE_START*
 
-* After link-up is completed, AOU_CORE can send or receive an ActivateReq message.
+* After link-up is completed, AOU_CORE can send or receive an ActivateReq message to complete the first activation handshake. A further ActivateReq once the FSM is ENABLED is an invalid activation message; see xref:aou-723-linkreset-error-reporting[Section 7.2.3].
 
 * AoU Activation Request can only be triggered by AOU_INIT.ACTIVATE_START, and it is allowed to be set before and after the completion of the UCIe Link-up.
 
@@ -316,7 +316,16 @@ All LinkReset-related SFR fields reside in [.monospaced]#++LP_LINKRESET++# (0x00
 
 *Activate/Deactivate Ack Timeout.* After sending an ActivateReq or DeactivateReq message, a counter begins. If the remote die does not return an Acknowledge within 2^([.monospaced]#++ACK_TIME_OUT_VALUE++# + 18) core clock cycles, the timeout fires. [.monospaced]#++ACK_TIME_OUT_VALUE++# [13:11] is 3 bits wide with a default of 4, giving a default timeout of 2^22 = ~4M cycles. The sticky error bits are [.monospaced]#++ACT_ACK_ERR++# [7] and [.monospaced]#++DEACT_ACK_ERR++# [6], both W1C.
 
-*Invalid ACTMSG.* The activation FSM ([.monospaced]#++AOU_ACTIVATION_CTRL++#) checks each received activation opcode against the current state. If the opcode is not permitted in the current state, [.monospaced]#++INVALID_ACTMSG_ERR++# [1] is set and the offending 4-bit opcode is captured in [.monospaced]#++INVALID_ACTMSG_INFO++# [5:2]. Clear via W1C.
+*Invalid ACTMSG.* The activation FSM ([.monospaced]#++AOU_ACTIVATION_CTRL++#) checks each received activation opcode against the current state. An opcode that is not permitted sets [.monospaced]#++INVALID_ACTMSG_ERR++# [1] and captures the offending 4-bit opcode in [.monospaced]#++INVALID_ACTMSG_INFO++# [5:2]. Clear via W1C.
+
+[cols="1,2",options="header"]
+|===
+|State |Permitted opcodes
+|DISABLED, ACTIVATE |ActivateReq and ActivateAck. DeactivateReq and DeactivateAck are invalid.
+|ENABLED, DEACTIVATE |DeactivateReq and DeactivateAck. ActivateReq and ActivateAck are invalid.
+|===
+
+An ActivateReq or ActivateAck received after the activate handshake has completed ([.monospaced]#++ENABLED++#), or while deactivation is in progress ([.monospaced]#++DEACTIVATE++#), means the remote die no longer agrees on link state: a bug, a local reset, or a similar loss of state. The request is not a new activation. The local die still sends ActivateAck to acknowledge receipt, and it requests LinkReset. Software resets AOU_CORE ([.monospaced]#++AOU_CON0.AOU_SW_RESET++#) and both dies run activation again, as described in xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6].
 
 *MsgCredit Timeout.* After the local die receives ActivateAck, it expects a CreditGrant message from the remote die indicating the number of resource planes. If no CreditGrant arrives within 2^([.monospaced]#++MSGCREDIT_TIME_OUT_VALUE++# + 18) core clock cycles, [.monospaced]#++MSGCREDIT_ERR++# [0] is set. [.monospaced]#++MSGCREDIT_TIME_OUT_VALUE++# [10:8] defaults to 4. Clear via W1C.
 
@@ -374,7 +383,7 @@ There is no dependency between the activation of the local die and the remote di
 [[figure-24]]
 image::image23.png[Figure 24. Independent Activation Flow]
 
-Regardless of its own activation state, a die must send an ActivateAck in response to an ActivateReq from the other die, to acknowledge receipt of the request.
+Regardless of its own activation state, a die must send an ActivateAck in response to an ActivateReq from the other die, to acknowledge receipt of the request. Acknowledging the request does not make it legal once the activate handshake has completed. If the local activation FSM is [.monospaced]#++ENABLED++#, or is in [.monospaced]#++DEACTIVATE++#, that ActivateReq is also [.monospaced]#++INVALID_ACTMSG++# (see xref:aou-723-linkreset-error-reporting[Section 7.2.3]). It means the remote die has lost the activation state, for example because of a bug or a local reset. The local die requests LinkReset. Software resets AOU_CORE and both dies run activation again so they share one state. Sending ActivateAck does not start a second handshake.
 
 [[aou-731-credit-management-type]]
 ==== 7.3.1. Credit Management Type
@@ -469,7 +478,7 @@ To meet satisfy the condition in the local diepass:[']s sequence 10.1, no backpr
 ** When AOU_CON0.CREDIT_MANAGE = 1, this interrupt can also be asserted if a new request arrives after the remote die has sent a DeactivateReq.
 2.  There is a response to be received (I_SLV_BUS_CLEANY_COMPLETE == 0)
 ** When AOU_CON0.CREDIT_MANAGE = 0, this interrupt can be asserted if the local die issues new AXI requests after the remote die has sent a DeactivateReq.
-3.  An ActivateReq message is received from the remote die.
+3.  An ActivateReq message is received from the remote die, and the activation handshake has not yet completed (the FSM is DISABLED or ACTIVATE). An ActivateReq received while ENABLED is [.monospaced]#++INVALID_ACTMSG++# and requests LinkReset (xref:aou-723-linkreset-error-reporting[Section 7.2.3]), not this interrupt.
 
 *INT_DEACTIVATE_START*
 
