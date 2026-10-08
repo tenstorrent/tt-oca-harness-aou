@@ -1402,13 +1402,21 @@ bringup FSM.
 [[aou-ig-verification-testbench]]
 == 7 Verification Testbench
 
-The verification flow is built on https://www.cocotb.org/[cocotb] and
+The default lightweight verification flow is built on https://www.cocotb.org/[cocotb] and
 https://github.com/alexforencich/cocotbext-axi[[.monospaced]#++cocotbext-axi++#]. All
 verification IP is fetched from PyPI at install time -- no commercial
 VIP is required and no AXI VIP source is vendored into this repository.
 The default simulator is https://verilator.org/[Verilator] (open
 source); Synopsys VCS is supported transparently for users with a
 commercial license.
+
+An optional SystemVerilog/UVM flow is available under
+[.monospaced]#++VERIF/uvm/++#. It adds reusable verification components and a
+deterministic multi-RP AXI smoke using Verilator as its first-class
+open-source simulator. It complements the cocotb loopback, FDI-width, and
+CSR-reset tests. Future UVM CSR tests should use the RAL package generated
+from [.monospaced]#++csr/aou-core.rdl++# by the existing
+[.monospaced]#++scripts/gen_collateral.sh++# flow.
 
 The harness ([.monospaced]#++VERIF/aou_cocotb_top.sv++#) instantiates two [.monospaced]#++AOU_CORE_TOP++#
 cores back-to-back via their 32B (256b) single-PHY FDI interfaces. Each

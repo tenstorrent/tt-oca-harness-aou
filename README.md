@@ -81,13 +81,18 @@ bash scripts/gen_collateral.sh
 
 ## Running Verification
 
-The repository ships a single open-source verification flow built on
+The default lightweight open-source verification flow uses
 [cocotb](https://www.cocotb.org/) +
 [`cocotbext-axi`](https://github.com/alexforencich/cocotbext-axi). All
 verification IP is fetched from PyPI at install time -- no commercial
 VIP and no vendored AXI VIP source. The default simulator is Verilator
 (open source); Synopsys VCS is supported transparently for users with
 a commercial license.
+
+An optional SystemVerilog/UVM smoke flow under `VERIF/uvm/` adds reusable
+verification components and deterministic multi-RP functional testing. It
+uses Verilator as its first-class open-source simulator and complements the
+existing cocotb loopback, FDI-width, and CSR-reset tests.
 
 ```bash
 cd VERIF

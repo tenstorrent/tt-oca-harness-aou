@@ -17,7 +17,8 @@
 # *****************************************************************************
 #
 # cocotb Makefile for the AOU_CORE_TOP FDI loopback + CSR reset readback
-# testbench. This is the only verification flow shipped with this repo.
+# testbench. This is the default Python/cocotb flow. An optional UVM smoke
+# flow is provided under VERIF/uvm/.
 #
 # Usage:
 #   make                       # Verilator (default), 8 parallel C++ compile jobs
