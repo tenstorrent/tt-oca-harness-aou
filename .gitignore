@@ -5,3 +5,9 @@ INTEG/ipxact/gen/
 INTEG/ipxact/schema/
 INTEG/uvm/
 logs/
+# Optional Verilator/UVM flow
+VERIF/uvm/.deps/
+VERIF/uvm/build/
+
+# Cocotb per-configuration JUnit results
+VERIF/results_*.xml
