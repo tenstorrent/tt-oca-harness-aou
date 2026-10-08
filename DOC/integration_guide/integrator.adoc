@@ -1006,7 +1006,15 @@ state, at which point credited messages can be transmitted.
 
 Regardless of its own activation state, a die must send an ActivateAck
 in response to an ActivateReq from the other die, to acknowledge receipt
-of the request.
+of the request. Acknowledging the request does not make it legal once
+the activate handshake has completed. If the local activation FSM is
+ENABLED, or is in DEACTIVATE, that ActivateReq is also an invalid
+activation message (see
+[.monospaced]#++DOC/MAS/software-operation.adoc++# section 7.2.3). It
+means the remote die has lost the activation state, for example because
+of a bug or a local reset. The local die requests LinkReset. Software
+resets AOU_CORE and both dies run activation again so they share one
+state. Sending ActivateAck does not start a second handshake.
 
 [[aou-ig-credit-management-type]]
 === 6.1 Credit Management Type
@@ -1161,7 +1169,11 @@ DeactivateReq. There is a response to be received
 (I_SLV_BUS_CLEANY_COMPLETE == 0) When AOU_CON0.CREDIT_MANAGE is set to
 0, this interrupt can be asserted if the local die issues new AXI
 requests after the remote die has sent a DeactivateReq. An ActivateReq
-message is received from the remote die.
+message is received from the remote die while the activation handshake
+has not yet completed (DISABLED or ACTIVATE). An ActivateReq received
+while ENABLED is an invalid activation message and requests LinkReset,
+not this interrupt. See
+[.monospaced]#++DOC/MAS/software-operation.adoc++# section 7.2.3.
 
 |INT_DEACTIVATE_START |When AOU_CON0.CREDIT_MANAGE is set to 0, if the
 interrupt is detected, the master IP must stop sending new request
