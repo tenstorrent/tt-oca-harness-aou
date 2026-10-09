@@ -209,3 +209,10 @@ slow or your scenario legitimately needs more time.
   in scope.
 - Cocotb's VPI-bridged simulation is throughput-limited compared to
   native SV testbenches; for very large regressions plan accordingly.
+
+## Optional SystemVerilog UVM smoke
+
+`VERIF/uvm/` contains a separate Verilator/UVM smoke flow. It complements the
+Python/cocotb tests above and does not replace their loopback, FDI-width, or
+CSR-reset coverage. See [`VERIF/uvm/README.md`](uvm/README.md) for setup and
+usage.
