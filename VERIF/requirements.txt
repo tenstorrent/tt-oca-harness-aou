@@ -14,4 +14,4 @@ pytest-xdist>=3.8.0
 # CSR reset readback test parses csr/aou-core.rdl directly via the same
 # parser the peakrdl-* tools use. Pinned to the major version we exercise
 # in scripts/gen_collateral.sh.
-systemrdl-compiler>=1.32.2
+systemrdl-compiler>=1.33.0
