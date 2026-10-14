@@ -395,10 +395,14 @@ xref:aou-ig-tiel_dft_modescan-usage[Section 3.13.1].
 [.monospaced]#++I_PRESETN++# is the APB-clock reset. It resets only the
 APB-clock side of the asynchronous APB bridge. Configuration, activation
 state, AXI traffic, and the FDI link stay as they are. Assert
-[.monospaced]#++I_PRESETN++# or [.monospaced]#++I_RESETN++# only while the
+[.monospaced]#++I_PRESETN++# or [.monospaced]#++I_RESETN++# only after the
 APB master is idle ([.monospaced]#++PSEL++# low, with no access waiting on
-[.monospaced]#++PREADY++#). A write still sitting in the bridge can complete
-after the reset and change a register that the reset just cleared.
+[.monospaced]#++PREADY++#) and the bridge's request/done handshake has fully
+returned to idle in both clock domains. Keep both clocks running and
+[.monospaced]#++PSEL++# low while allowing the handshake to drain before an
+independent reset; master-visible completion alone is insufficient.
+A write still sitting in the bridge can complete after the reset and
+change a register that the reset just cleared.
 
 At power-on, hold both resets asserted while [.monospaced]#++I_CLK++# and
 [.monospaced]#++I_PCLK++# are running. Start APB or AXI traffic only after
