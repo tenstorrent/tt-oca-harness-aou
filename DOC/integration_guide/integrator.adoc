@@ -367,10 +367,42 @@ supported by the design: [.monospaced]#++AOU_RX_CORE_IN_MUX++# requires
 |==============================================================
 |Signal |Direction |Width |Description
 |I_CLK |input |1 |Core system clock (AOU_CORE and AOU_FIFO_RP).
-|I_RESETN |input |1 |Active-low asynchronous reset.
+|I_RESETN |input |1 |Active-low asynchronous reset for the core clock domain. See xref:aou-ig-reset-domains[Section 3.1.1].
 |I_PCLK |input |1 |APB clock (slave side of async bridge).
-|I_PRESETN |input |1 |APB domain reset.
+|I_PRESETN |input |1 |Active-low reset for the APB-clock side of the async bridge. See xref:aou-ig-reset-domains[Section 3.1.1].
 |==============================================================
+
+[[aou-ig-reset-domains]]
+==== 3.1.1 Reset domains
+
+[.monospaced]#++I_RESETN++# and [.monospaced]#++I_PRESETN++# are independent.
+Each may be asserted or released on its own.
+
+[.monospaced]#++I_RESETN++# is the core-clock reset. It returns the protocol
+engine, the configuration registers, and the activation state to their
+reset values. The activation FSM comes out of reset
+[.monospaced]#++DISABLED++#. It clears the RX FIFOs. On
+[.monospaced]#++AOU_TOP++#, it returns the FDI bringup controller to Reset,
+so the link must be trained again. In-flight AXI transactions and an FDI
+flit already in progress are abandoned. Software reprograms the
+configuration registers, brings the link up, and runs activation again.
+[.monospaced]#++AOU_SW_RESET++# is the software reset used in the LinkReset
+sequence
+(xref:../MAS/software-operation.adoc#aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6]).
+Scan muxing of that path is described in
+xref:aou-ig-tiel_dft_modescan-usage[Section 3.13.1].
+
+[.monospaced]#++I_PRESETN++# is the APB-clock reset. It resets only the
+APB-clock side of the asynchronous APB bridge. Configuration, activation
+state, AXI traffic, and the FDI link stay as they are. Assert
+[.monospaced]#++I_PRESETN++# or [.monospaced]#++I_RESETN++# only while the
+APB master is idle ([.monospaced]#++PSEL++# low, with no access waiting on
+[.monospaced]#++PREADY++#). A write still sitting in the bridge can complete
+after the reset and change a register that the reset just cleared.
+
+At power-on, hold both resets asserted while [.monospaced]#++I_CLK++# and
+[.monospaced]#++I_PCLK++# are running. Start APB or AXI traffic only after
+both resets have been released.
 
 [[aou-ig-apb-slave-interface]]
 === 3.2 APB Slave Interface

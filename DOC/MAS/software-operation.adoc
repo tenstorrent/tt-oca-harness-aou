@@ -8,6 +8,9 @@ endif::[]
 ifndef::aou-architecture-xref[]
 :aou-architecture-xref: architecture.adoc
 endif::[]
+ifndef::aou-integration-xref[]
+:aou-integration-xref: ../integration_guide/integrator.adoc
+endif::[]
 
 [[aou-7-software-operation-guide]]
 == 7. Software operation guide
@@ -519,3 +522,4 @@ Same as PM entry, before doing UCIE state transition, AOU_CORE need to Disabled 
 If AOU_CORE faces uncorrectable error (ex. AOU SPEC violation), AOU_CORE sends LinkReset to CPU and D2D adapter. LinkReset indicates that an error has occurred which requires the Link to go down.
 
 While handling LinkReset, SW needs to do AOU_CORE SW reset by setting AOU_CON0.AOU_SW_RESET.
+Asserting [.monospaced]#++I_RESETN++# returns the configuration registers to the same reset values as [.monospaced]#++AOU_SW_RESET++#, and on [.monospaced]#++AOU_TOP++# it also returns the FDI bringup controller to Reset (xref:{aou-integration-xref}#aou-ig-reset-domains[Section 3.1.1]).
