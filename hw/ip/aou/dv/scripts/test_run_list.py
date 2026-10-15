@@ -147,7 +147,9 @@ class RunListControl(unittest.TestCase):
         if gated:
             os.makedirs(self.gate)
             self.gates.append(self.gate)
+        # run_list starts $MAKE before gmake or make; point it at the fake.
         env = dict(os.environ, PATH=self.bin + os.pathsep + os.environ["PATH"], FAKE_BIN=self.bin,
+                   MAKE=os.path.join(self.bin, "make"),
                    FAKE_EVENTS=self.events, FAKE_SLEEP=str(sleep), FAKE_PEND=str(pend),
                    FAKE_BMOD_LOG=self.bmod_log, FAKE_HOOKS="1" if hooks else "",
                    FAKE_XPASS="1" if xpass else "", FAKE_ARGS=self.args_log, FAKE_GATE=self.gate,

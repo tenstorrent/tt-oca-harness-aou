@@ -170,6 +170,15 @@ several RPs or a particular width name theirs.
 `scripts/get_ocah_lib.sh` into the ignored `.deps/` directory. Every simulator
 compiles that same UVM source rather than its bundled UVM.
 
+On macOS, the system `make` (3.81) is too old: the flow needs GNU Make 4, Verilator
+(the version in `.github/tool-versions.env`), and lz4 for FST waves, found through
+`pkg-config`. Homebrew is a quick way to get them
+(`brew install make verilator lz4 pkgconf`); its GNU Make is `gmake`, so run
+`gmake` wherever this file says `make`. Any other installation works too. On
+Darwin the Makefile adds the SDK's `malloc/` directory for uvm-core's
+`<malloc.h>`; without `pkg-config`, or to use other paths, set `VL_HOST_CFLAGS`
+and `VL_HOST_LDFLAGS`.
+
 `SIM=verilator`, `SIM=vcs`, `SIM=xcelium` or `SIM=questa` selects the simulator.
 The default is VCS when `vcs` is on PATH, otherwise Verilator. Verilator and VCS
 are the supported flows; Xcelium has a basic build and run without coverage, and

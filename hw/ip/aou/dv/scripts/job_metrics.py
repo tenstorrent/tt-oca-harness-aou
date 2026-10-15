@@ -3,9 +3,10 @@
 # SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 """Append one JSON line describing a finished build or run to the metrics file.
 
-The output file holds the job's output, `/usr/bin/time -v` statistics (peak RSS)
-and, for an LSF job, LSF's resource usage summary (CPU, run time, host). For a
-local run the caller also passes the wall time it measured.
+The output file holds the job's output, `/usr/bin/time -v` (or BSD `-l`)
+statistics (peak RSS) and, for an LSF job, LSF's resource usage summary (CPU,
+run time, host). For a local run the caller also passes the wall time it
+measured.
 """
 
 import argparse
@@ -32,6 +33,10 @@ def parse_lsf(path):
         m = re.search(pattern, text)
         if m:
             out[key] = float(m.group(1))
+    # BSD time -l (macOS) reports peak RSS in bytes.
+    m = re.search(r"^\s*(\d+)\s+maximum resident set size", text, re.M)
+    if m and "max_rss_kb" not in out:
+        out["max_rss_kb"] = float(m.group(1)) / 1024
     m = re.search(r"executed on host\(s\) <(?:\d+\*)?([^>]+)>", text)
     if m:
         out["host"] = m.group(1)
