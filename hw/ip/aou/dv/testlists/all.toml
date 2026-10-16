@@ -33,7 +33,7 @@ tests = [
 # datapath area (real AXI traffic: sizes, bursts, strobes, unaligned, outstanding,
 # packing, random traffic both ways, attributes, channel ordering), on the default
 # target; the datapath scenarios pinned to 4x512-sp64 are left to the nightly.
-# Sized for a GitHub-hosted runner on Verilator (the workflow caps seeds with --reseed).
+# Sized for a GitHub-hosted runner on Verilator (the workflow runs every configured seed).
 [[groups]]
 name = "ci"
 expected_count = 43
