@@ -28,6 +28,61 @@ tests = [
   "aou_fdi_t1_bringup_test",
 ]
 
+# Pull-request gate (.github/workflows/uvm-smoke.yml): smoke, the short lists g1a,
+# g1b and t1_api (bring-up, link events, low-power, injection, both resets) and the
+# datapath area (real AXI traffic: sizes, bursts, strobes, unaligned, outstanding,
+# packing, random traffic both ways, attributes, channel ordering), on the default
+# target; the datapath scenarios pinned to 4x512-sp64 are left to the nightly.
+# Sized for a GitHub-hosted runner on Verilator (the workflow caps seeds with --reseed).
+[[groups]]
+name = "ci"
+expected_count = 43
+tests = [
+  "aou_sanity_test",
+  "aou_t1_slice_test",
+  "aou_t1_deact_test",
+  "aou_t1_remote_act_test",
+  "aou_fdi_t1_bringup_test",
+  "aou_fdi_t1_bringup_spec_test",
+  "aou_fdi_t1_linkerror_spec_test",
+  "aou_fdi_t1_linkdown_spec_test",
+  "aou_t1_link_event_test",
+  "aou_t1_lp_mode_test",
+  "aou_t1_inject_test",
+  "aou_t1_sw_reset_test",
+  "aou_t1_hard_reset_test",
+  "aou_dp_size_test.dp_size-0_1_2_3_4_5_6",
+  "aou_dp_size_test.dp_size-7.remote_bytes-128.dp_dir-r2l",
+  "aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r",
+  "aou_dp_burst_test.dp_len-1_3_7_15",
+  "aou_dp_burst_test.dp_len-31_63_255",
+  "aou_dp_wstrb_test.dp_strb-full",
+  "aou_dp_wstrb_test.dp_strb-partial",
+  "aou_dp_wstrb_test.dp_strb-sparse",
+  "aou_dp_wstrb_test.dp_strb-zero",
+  "aou_dp_unaligned_test",
+  "aou_dp_b_zero_test",
+  "aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-100",
+  "aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-0",
+  "aou_dp_outstanding_test.dp_batch-4.dp_wr_pct-50",
+  "aou_dp_outstanding_test.dp_batch-16.dp_ids-unique",
+  "aou_dp_outstanding_test.dp_batch-16.dp_ids-same",
+  "aou_dp_outstanding_test.dp_batch-16.dp_ids-high",
+  "aou_dp_packing_test.dp_pack-wresp",
+  "aou_dp_packing_test.dp_pack-crossflit",
+  "aou_dp_packing_test.dp_pack-granule",
+  "aou_dp_random_test.dp_dir-r2l",
+  "aou_dp_random_test.dp_dir-both",
+  "aou_dp_random_test.dp_dir-both.dp_profile-stall",
+  "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64",
+  "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.1x512-sp64",
+  "aou_attr_test",
+  "aou_attr_test.attr_excl-1",
+  "aou_attr_test.attr_excl-1.attr_early-1",
+  "aou_chan_test.chan-wfirst",
+  "aou_chan_test.chan-ilv",
+]
+
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"

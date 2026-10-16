@@ -1574,7 +1574,8 @@ Each run ends with a verdict ([.monospaced]#++PASS++#, [.monospaced]#++XFAIL++# 
 non-zero unless every run is PASS or XFAIL. Builds and runs go through LSF
 when [.monospaced]#++bsub++# is available ([.monospaced]#++LSF=0++# runs on the current
 host). CI runs [.monospaced]#++make check-config++#, builds the T1 and register
-benches on Verilator and runs the [.monospaced]#++smoke++# group of each.
+benches on Verilator and runs the T1 bench's [.monospaced]#++ci++# group (smoke, the
+short lists and the datapath area) and the register bench's [.monospaced]#++smoke++#.
 
 [[aou-ig-ip-integration-collateral]]
 == 8. IP Integration Collateral

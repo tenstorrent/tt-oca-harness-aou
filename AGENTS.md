@@ -36,7 +36,8 @@ layout and the collateral flow (`scripts/gen_collateral.sh`).
   before working there, and [hw/ip/aou/dv/docs/DECISIONS.md](hw/ip/aou/dv/docs/DECISIONS.md)
   before changing its structure or policy.
 - There is no other testbench. The GitHub workflow `uvm-smoke.yml` runs the UVM
-  smoke group on Verilator as the check-in qualification.
+  bench's `ci` group (smoke, the short lists and the datapath area) on Verilator
+  as the check-in qualification.
 
 ## Bugs
 

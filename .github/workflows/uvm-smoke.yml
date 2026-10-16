@@ -2,10 +2,11 @@
 # Copyright (c) 2026 Tenstorrent USA Inc
 #
 # Builds the UVM testbench in hw/ip/aou/dv/ on Verilator (the pin in
-# .github/tool-versions.env) and runs its smoke group: the sanity test of
-# each bench and a register readback. This is the check-in qualification;
-# the full regression (every CONFIG, every testlist) runs on VCS through
-# the Makefile and scripts/run_list.py, see hw/ip/aou/dv/README.md.
+# .github/tool-versions.env) and runs the T1 bench's `ci` group (smoke, the
+# short lists g1a, g1b and t1_api, and the datapath area's AXI traffic
+# scenarios; testlists/all.toml) and the register bench's smoke. This is the check-in qualification; the full
+# regression (every CONFIG, every testlist) runs on VCS through the Makefile
+# and scripts/run_list.py, see hw/ip/aou/dv/README.md.
 #
 # The heavy steps are gated by a `detect` job (dorny/paths-filter): when no
 # simulation-relevant path changed, the job still reports success so a
@@ -97,13 +98,13 @@ jobs:
           make build SIM=verilator TB=t1 JOBS=$(nproc) LSF=0
           make build SIM=verilator TB=reg JOBS=$(nproc) LSF=0
 
-      - name: Run the smoke group
+      - name: Run the ci group (T1) and the smoke group (registers)
         if: needs.detect.outputs.sim == 'true'
         working-directory: hw/ip/aou/dv
         run: |
           set -o pipefail
-          python3 scripts/run_list.py --sim verilator --tb t1 --items smoke --reseed 1 -j 2 --rid ci 2>&1 | tee "$GITHUB_WORKSPACE/smoke_t1.log"
-          python3 scripts/run_list.py --sim verilator --tb reg --items smoke --reseed 1 -j 2 --rid ci 2>&1 | tee "$GITHUB_WORKSPACE/smoke_reg.log"
+          python3 scripts/run_list.py --sim verilator --tb t1 --items ci -j "$(nproc)" --rid ci 2>&1 | tee "$GITHUB_WORKSPACE/smoke_t1.log"
+          python3 scripts/run_list.py --sim verilator --tb reg --items smoke --reseed 1 -j "$(nproc)" --rid ci 2>&1 | tee "$GITHUB_WORKSPACE/smoke_reg.log"
 
       - name: Upload run logs
         if: always() && needs.detect.outputs.sim == 'true'

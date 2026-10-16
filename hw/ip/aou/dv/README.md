@@ -51,7 +51,7 @@ make check-config                            # sim configs, testlists, rules, RA
 make lint                                    # check-config, then Verible and Verilator lint
 ```
 
-`--items` takes a scenario name or a testlist group (`smoke`, the areas `g1a`,
+`--items` takes a scenario name or a testlist group (`smoke`, `ci`, the areas `g1a`,
 `g1b`, `t1_api`, `fdi`, `datapath`, `features`, `stress`, `link`, `errors`,
 `err_int`, `lifecycle`, `matrix`, `perf`, `assertions`, and `functional`,
 `all`); `--tb reg` selects the register bench and its testlist. `make help`
@@ -270,7 +270,7 @@ are tuned from.
 (`testlists/*.toml`; default: the bench's aggregate, `testlists/all.toml` for
 T1) through `make run`, at most `-j` at a time, and writes
 `out/<build>/results.csv` (one `results_<list>.csv` per included list with
-`--per-list`). `--items <group|scenario>...` picks groups (`smoke`, `g1a`,
+`--per-list`). `--items <group|scenario>...` picks groups (`smoke`, `ci`, `g1a`,
 `functional`, ...) or scenario names; `--target <CONFIG>` picks the build and
 skips scenarios pinned to another target; `--reseed N` caps the seeds per
 scenario. `python3 scripts/check_testlists.py` validates the lists against the

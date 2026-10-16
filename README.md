@@ -105,8 +105,8 @@ make test SIM=verilator  # the same on Verilator
 ```
 
 The GitHub check-in workflow (`.github/workflows/uvm-smoke.yml`) builds the
-testbench on Verilator and runs its smoke group; the full regression runs on
-VCS.
+testbench on Verilator and runs its `ci` group (the smoke gate, the short lists
+and the datapath area's AXI traffic); the full regression runs on VCS.
 
 ## Integration
 

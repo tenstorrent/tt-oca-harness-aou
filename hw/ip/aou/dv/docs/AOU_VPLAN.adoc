@@ -213,7 +213,8 @@ rules is an open item (`OPEN_ITEMS.md`).
 [cols="2,5",options="header"]
 |===
 | Group | Content and use
-| `smoke` | The bring-up gate: `aou_sanity_test` and the G1a slice (`aou_t1_slice_test`, `aou_t1_deact_test`, `aou_fdi_t1_bringup_test`); every pull request (`.github/workflows/uvm-smoke.yml`, Verilator) and `make test`
+| `smoke` | The bring-up gate: `aou_sanity_test` and the G1a slice (`aou_t1_slice_test`, `aou_t1_deact_test`, `aou_fdi_t1_bringup_test`); `make test` and the first thing to run after a change
+| `ci` | The pull-request gate: `smoke`, `g1a`, `g1b`, `t1_api` and the `datapath` area's default-target scenarios (real AXI traffic), on the default target (`.github/workflows/uvm-smoke.yml`, Verilator)
 | `<area>` | One group per testlist (`g1a`, `g1b`, `t1_api`, `fdi`, `datapath`, `features`, `stress`, `link`, `errors`, `err_int`, `lifecycle`, `matrix`, `perf`, `assertions`), the unit `run_list.py --per-list` reports on
 | `functional` | The functional areas (every area but `stress`, `matrix`, `perf` and `assertions`): the nightly on the default target
 | `all` | Every non-blocked scenario of the bench: the full regression, swept over every target (`run_list.py --target <t>`; the `assertions` scenarios on the `<t>-assert` targets)
