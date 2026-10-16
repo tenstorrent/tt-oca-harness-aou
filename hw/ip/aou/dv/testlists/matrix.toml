@@ -1,0 +1,926 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Configuration matrix (stream J).
+#
+# Configuration matrix (stream J): multi-RP (plan 2.12), data width conversion
+# (2.14) and performance data (2.10) on the CONFIGs of docs/ARCHITECTURE.md. TB=t1.
+# The latency and drain performance runs pass when they produced their data;
+# scripts/perf_report.py tabulates perf.txt. The gated bandwidth scenarios
+# (plan 10.1-10.3, 10.8, 10.10-10.13) are in perf.yaml.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-0"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=0"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-1.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-2.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=2"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-3.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=3"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-3.4xmix4211-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=3"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-2.4xmix2144-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=2"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-1.2xmix-tp64_128"
+module = { uvm = "aou_mrp_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.mrp_rps-0_1.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq", "+mrp_rps=0,1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.mrp_rps-0_1.2xmix-tp64_128"
+module = { uvm = "aou_mrp_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq", "+mrp_rps=0,1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.2xmix-tp64_128"
+module = { uvm = "aou_mrp_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.4xmix4211-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.4xmix2144-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.4xmix4211-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.4xmix2144-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=indep"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.4xmix4211-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=indep"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.4xmix2144-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=indep"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.2xmix-tp64_128"
+module = { uvm = "aou_mrp_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=indep"]
+
+[[tests]]
+name = "aou_dest_rp_dup_test"
+module = { uvm = "aou_dest_rp_dup_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+
+# 12.13 is dropped (MAS 3.10.1 forbids an asymmetric DEST_RP); the test still runs
+# as BUGS/031 evidence.
+# Known failures: BUGS/031 (expected_fail.yaml)
+[[tests]]
+name = "aou_dest_rp_asym_test.4x512-sp64"
+module = { uvm = "aou_dest_rp_asym_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+expect_fail = "BUGS/031 (expected_fail.yaml)"
+expect_fail_match = "AXI-R07: B ID|matches no outstanding write"
+
+# Known failures: BUGS/031 (expected_fail.yaml)
+[[tests]]
+name = "aou_dest_rp_asym_test.2xmix-tp64_128"
+module = { uvm = "aou_dest_rp_asym_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+expect_fail = "BUGS/031 (expected_fail.yaml)"
+expect_fail_match = "AXI-R07: B ID|matches no outstanding write"
+
+# The per-RP remote widths put every RP of the 4xmix pair through each of its
+# converters. 1024-bit remote data reaches a 256-bit RP only aligned while
+# BUGS/025 is open, and in aou_dw_down1024_test, which XFAILs on it.
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.4xmix4211-sp128"
+module = { uvm = "aou_dw_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.4xmix4211-sp128"
+module = { uvm = "aou_dw_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128_128_64_64"
+module = { uvm = "aou_dw_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128,128,64,64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32_128_64_32"
+module = { uvm = "aou_dw_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32,128,64,32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128.dp_align-aligned.4xmix4211-sp128"
+module = { uvm = "aou_dw_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128", "+dp_align=aligned"]
+
+# Known failures: BUGS/025 (expected_fail.yaml)
+[[tests]]
+name = "aou_dw_down1024_test.4xmix4211-sp128"
+module = { uvm = "aou_dw_down1024_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+expect_fail = "BUGS/025 (expected_fail.yaml)"
+expect_fail_match = "AXI-S02: remote->local"
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.4xmix2144-sp64"
+module = { uvm = "aou_dw_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.4xmix2144-sp64"
+module = { uvm = "aou_dw_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128_64_128_128"
+module = { uvm = "aou_dw_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128,64,128,128"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128_32_32_64"
+module = { uvm = "aou_dw_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128,32,32,64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128.dp_align-aligned.4xmix2144-sp64"
+module = { uvm = "aou_dw_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128", "+dp_align=aligned"]
+
+# Known failures: BUGS/025 (expected_fail.yaml)
+[[tests]]
+name = "aou_dw_down1024_test.4xmix2144-sp64"
+module = { uvm = "aou_dw_down1024_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+expect_fail = "BUGS/025 (expected_fail.yaml)"
+expect_fail_match = "AXI-S02: remote->local"
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.1x256-sp32"
+module = { uvm = "aou_dw_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.1x256-sp32"
+module = { uvm = "aou_dw_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=64"]
+
+# Known failures: BUGS/025 (expected_fail.yaml)
+[[tests]]
+name = "aou_dw_down1024_test.1x256-sp32"
+module = { uvm = "aou_dw_down1024_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+expect_fail = "BUGS/025 (expected_fail.yaml)"
+expect_fail_match = "AXI-S02: remote->local"
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.2xmix-tp64_128"
+module = { uvm = "aou_dw_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.2xmix-tp64_128"
+module = { uvm = "aou_dw_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128.2xmix-tp64_128"
+module = { uvm = "aou_dw_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.1x512-sp64"
+module = { uvm = "aou_dw_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.1x512-sp64"
+module = { uvm = "aou_dw_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128.1x512-sp64"
+module = { uvm = "aou_dw_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32_64_128_64"
+module = { uvm = "aou_dw_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32,64,128,64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.4x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=4x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.4x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=4x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=4xmix4211-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.4xmix2144-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4xmix2144-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=4xmix2144-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=4xmix4211-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.4xmix2144-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4xmix2144-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=4xmix2144-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.1x256-sp32"
+module = { uvm = "aou_perf_test" }
+target = "1x256-sp32"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=1x256-sp32"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.1x256-sp32"
+module = { uvm = "aou_perf_test" }
+target = "1x256-sp32"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=1x256-sp32"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.2xmix-tp64_128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.2xmix-tp64_128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-2.3x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=2"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.3x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.3x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.3x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=indep"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32_64_128"
+module = { uvm = "aou_dw_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32,64,128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.3x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "3x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=3x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.3x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "3x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=3x512-sp64"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-seq.mrp_rps-0_1.2x512-tp32_64"
+module = { uvm = "aou_mrp_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=seq", "+mrp_rps=0,1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.2x512-tp32_64"
+module = { uvm = "aou_mrp_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.2x512-tp32_64"
+module = { uvm = "aou_mrp_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=indep"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.2x512-tp32_64"
+module = { uvm = "aou_dw_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.2x512-tp32_64"
+module = { uvm = "aou_dw_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=64"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128.2x512-tp32_64"
+module = { uvm = "aou_dw_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.2x512-tp32_64"
+module = { uvm = "aou_perf_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=2x512-tp32_64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.2x512-tp32_64"
+module = { uvm = "aou_perf_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=2x512-tp32_64"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-crd_rr.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=crd_rr"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-crd_rr.4xmix4211-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=crd_rr"]
+
+# AXI_PEER_DIE_MAX_DATA_WD 512 (plan 14.17): a remote die at most 512 bits
+# wide, at and below the RP width. A 256-bit peer does not elaborate, so it
+# has no configuration. Every run is an expected failure on BUGS/053.
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.1x512-sp64-p512"
+module = { uvm = "aou_dp_random_test" }
+target = "1x512-sp64-p512"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both"]
+
+[[tests]]
+name = "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512"
+module = { uvm = "aou_dp_size_test" }
+target = "1x512-sp64-p512"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_size=0,1,2,3,4,5,6"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.1x512-sp64-p512"
+module = { uvm = "aou_dw_test" }
+target = "1x512-sp64-p512"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32"]
+
+# 12.20: local and remote RP_COUNT differ; traffic on the RPs both dies have
+# (T1-M01: the others carry no AXI message; AOU-R14/AOU-R24 on the smaller count).
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.remote_rp_count-2"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1", "+remote_rp_count=2"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1"
+module = { uvm = "aou_mrp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=solo", "+mrp_rps=0", "+remote_rp_count=1"]
+
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-4"
+module = { uvm = "aou_mrp_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=4"]
+
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-3"
+module = { uvm = "aou_mrp_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=3"]
+
+[[groups]]
+name = "matrix"
+expected_count = 82
+tests = [
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-0",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-1.4x512-sp64",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-2.4x512-sp64",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-3.4x512-sp64",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-3.4xmix4211-sp128",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-2.4xmix2144-sp64",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-1.2xmix-tp64_128",
+  "aou_mrp_test.mrp_scn-seq.mrp_rps-0_1.4x512-sp64",
+  "aou_mrp_test.mrp_scn-seq.mrp_rps-0_1.2xmix-tp64_128",
+  "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.4x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.2xmix-tp64_128",
+  "aou_mrp_test.mrp_scn-seq.4x512-sp64",
+  "aou_mrp_test.mrp_scn-seq.4xmix4211-sp128",
+  "aou_mrp_test.mrp_scn-seq.4xmix2144-sp64",
+  "aou_mrp_test.mrp_scn-interleave.4x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.4xmix4211-sp128",
+  "aou_mrp_test.mrp_scn-interleave.4xmix2144-sp64",
+  "aou_mrp_test.mrp_scn-indep.4x512-sp64",
+  "aou_mrp_test.mrp_scn-indep.4xmix4211-sp128",
+  "aou_mrp_test.mrp_scn-indep.4xmix2144-sp64",
+  "aou_mrp_test.mrp_scn-indep.2xmix-tp64_128",
+  "aou_dest_rp_dup_test",
+  "aou_dest_rp_asym_test.4x512-sp64",
+  "aou_dest_rp_asym_test.2xmix-tp64_128",
+  "aou_dw_test.remote_bytes-32.4xmix4211-sp128",
+  "aou_dw_test.remote_bytes-64.4xmix4211-sp128",
+  "aou_dw_test.remote_bytes-128_128_64_64",
+  "aou_dw_test.remote_bytes-32_128_64_32",
+  "aou_dw_test.remote_bytes-128.dp_align-aligned.4xmix4211-sp128",
+  "aou_dw_down1024_test.4xmix4211-sp128",
+  "aou_dw_test.remote_bytes-32.4xmix2144-sp64",
+  "aou_dw_test.remote_bytes-64.4xmix2144-sp64",
+  "aou_dw_test.remote_bytes-128_64_128_128",
+  "aou_dw_test.remote_bytes-128_32_32_64",
+  "aou_dw_test.remote_bytes-128.dp_align-aligned.4xmix2144-sp64",
+  "aou_dw_down1024_test.4xmix2144-sp64",
+  "aou_dw_test.remote_bytes-32.1x256-sp32",
+  "aou_dw_test.remote_bytes-64.1x256-sp32",
+  "aou_dw_down1024_test.1x256-sp32",
+  "aou_dw_test.remote_bytes-32.2xmix-tp64_128",
+  "aou_dw_test.remote_bytes-64.2xmix-tp64_128",
+  "aou_dw_test.remote_bytes-128.2xmix-tp64_128",
+  "aou_dw_test.remote_bytes-32.1x512-sp64",
+  "aou_dw_test.remote_bytes-64.1x512-sp64",
+  "aou_dw_test.remote_bytes-128.1x512-sp64",
+  "aou_dw_test.remote_bytes-32_64_128_64",
+  "aou_perf_test.perf_mode-lat.1x512-sp64",
+  "aou_perf_test.perf_mode-drain.1x512-sp64",
+  "aou_perf_test.perf_mode-lat.4x512-sp64",
+  "aou_perf_test.perf_mode-drain.4x512-sp64",
+  "aou_perf_test.perf_mode-lat.4xmix4211-sp128",
+  "aou_perf_test.perf_mode-lat.4xmix2144-sp64",
+  "aou_perf_test.perf_mode-drain.4xmix4211-sp128",
+  "aou_perf_test.perf_mode-drain.4xmix2144-sp64",
+  "aou_perf_test.perf_mode-lat.1x256-sp32",
+  "aou_perf_test.perf_mode-drain.1x256-sp32",
+  "aou_perf_test.perf_mode-lat.2xmix-tp64_128",
+  "aou_perf_test.perf_mode-drain.2xmix-tp64_128",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-2.3x512-sp64",
+  "aou_mrp_test.mrp_scn-seq.3x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.3x512-sp64",
+  "aou_mrp_test.mrp_scn-indep.3x512-sp64",
+  "aou_dw_test.remote_bytes-32_64_128",
+  "aou_perf_test.perf_mode-lat.3x512-sp64",
+  "aou_perf_test.perf_mode-drain.3x512-sp64",
+  "aou_mrp_test.mrp_scn-seq.mrp_rps-0_1.2x512-tp32_64",
+  "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.2x512-tp32_64",
+  "aou_mrp_test.mrp_scn-indep.2x512-tp32_64",
+  "aou_dw_test.remote_bytes-32.2x512-tp32_64",
+  "aou_dw_test.remote_bytes-64.2x512-tp32_64",
+  "aou_dw_test.remote_bytes-128.2x512-tp32_64",
+  "aou_perf_test.perf_mode-lat.2x512-tp32_64",
+  "aou_perf_test.perf_mode-drain.2x512-tp32_64",
+  "aou_mrp_test.mrp_scn-crd_rr.4x512-sp64",
+  "aou_mrp_test.mrp_scn-crd_rr.4xmix4211-sp128",
+  "aou_dp_random_test.dp_dir-both.1x512-sp64-p512",
+  "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512",
+  "aou_dw_test.remote_bytes-32.1x512-sp64-p512",
+  "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.remote_rp_count-2",
+  "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1",
+  "aou_mrp_test.remote_rp_count-4",
+  "aou_mrp_test.remote_rp_count-3",
+]

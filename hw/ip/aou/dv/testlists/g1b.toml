@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Gate G1b: remote activation, link events, low-power.
+#
+# Gate G1b: the bringup tests with UCIe state encodings (fdi_enc=SPEC). They
+# encode the spec and are expected failures (expected_fail.yaml) until
+# BUGS/001 and BUGS/002 are fixed. Format as in g1a.yaml.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_fdi_t1_bringup_spec_test"
+module = { uvm = "aou_fdi_t1_bringup_spec_test" }
+seed = 1
+tags = ["g1b"]
+run_modes = ["g1b"]
+expect_fail = "BUGS/001 (expected_fail.yaml)"
+expect_fail_match = "FDI-M01: lp_state_req mismatch in BRG_RETRAIN|FDI-M05: O_FDI_FSM_STATE mismatch in BRG_RETRAIN|FDI-M06: O_FDI_LINK_UP mismatch in BRG_RETRAIN|FDI-R48: lp_state_req stayed 0x1"
+
+[[tests]]
+name = "aou_fdi_t1_linkerror_spec_test"
+module = { uvm = "aou_fdi_t1_linkerror_spec_test" }
+seed = 1
+tags = ["g1b"]
+run_modes = ["g1b"]
+expect_fail = "BUGS/001, BUGS/002, BUGS/038 (expected_fail.yaml)"
+expect_fail_match = "FDI-M07: lp_linkerror mismatch in BRG_LINKERROR|FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKERROR|FDI-M01: lp_state_req mismatch in BRG_LINKERROR \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-R51: no NOP->Active on lp_state_req in Reset after"
+
+[[tests]]
+name = "aou_fdi_t1_linkdown_spec_test"
+module = { uvm = "aou_fdi_t1_linkdown_spec_test" }
+seed = 1
+tags = ["g1b"]
+run_modes = ["g1b"]
+expect_fail = "BUGS/001, BUGS/038 (expected_fail.yaml)"
+expect_fail_match = "FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-M06: O_FDI_LINK_UP mismatch in BRG_LINKDOWN \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-M01: lp_state_req mismatch in BRG_LINKERROR \\(fdi_enc=AOU_FDI_ENC_SPEC\\)|FDI-R50: no lp_state_req=Active in|FDI-R51: no NOP->Active on lp_state_req in Reset after"
+
+[[groups]]
+name = "g1b"
+expected_count = 3
+tests = [
+  "aou_fdi_t1_bringup_spec_test",
+  "aou_fdi_t1_linkerror_spec_test",
+  "aou_fdi_t1_linkdown_spec_test",
+]

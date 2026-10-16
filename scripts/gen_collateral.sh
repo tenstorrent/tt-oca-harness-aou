@@ -35,9 +35,8 @@ echo "  [4/5] Interactive HTML docs   -> DOC/csr/html/"
 peakrdl html $RDL -o DOC/csr/html
 
 # UVM RAL package: shipped as integration collateral for downstream
-# verification environments. The in-repo cocotb testbench does not
-# consume this; it parses csr/aou-core.rdl at runtime via
-# systemrdl-compiler instead.
+# verification environments. The in-repo UVM testbench generates its own
+# copy from the same RDL (hw/ip/aou/dv/scripts/regen_ral.sh).
 echo "  [5/5] UVM register model      -> $UVM_DIR/aou_core_csr_uvm_pkg.sv"
 peakrdl uvm $RDL -o $UVM_DIR/aou_core_csr_uvm_pkg.sv
 

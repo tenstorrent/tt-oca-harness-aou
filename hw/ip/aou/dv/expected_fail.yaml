@@ -1,0 +1,2287 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# Known DUT bugs that make tests fail. Each entry names the test, the bug (its
+# GitHub issue, tenstorrent/tt-oca-harness-aou#<n>, or BUGS/NNN while the draft is
+# staged and not yet filed; AGENTS.md "Reporting bugs") and the exact failing
+# check: a substring of the UVM_ERROR message. A run of an affected test passes review only if every
+# UVM_ERROR it reports matches one of its entries. Seeds change which writes hit
+# the bug, not whether. An entry with `requires: <bug>` is a generic follow-on
+# symptom: it counts only when a bug-specific entry (one without `requires:`) for
+# that bug matched in the same run. `check_re:` (a regular expression) replaces
+# `check:` when the signature spans several fields of one message. `when_re:` (a
+# regular expression) limits an entry to runs whose log matches it, such as one
+# CONFIG or active PHY of aou_perf_test (its PERF_GATE lines carry the key).
+# AOU_FDI_CHECKER's AOU-R29/AOU-R30 reports end in the DUT's CREDIT_MANAGE: the
+# BUGS/009 LP(DUT->peer) entries match CREDIT_MANAGE=1 only, since with 0 the MAS
+# forbids credits after DeactivateAck and such a report is BUGS/033 or new.
+
+- test: aou_reg_bit_bash_test
+  bug: BUGS/003
+  check: 'in bit #22 of register "aou_core.axi_slv_id_mismatch_err_rp'
+  note: reserved bit 22 is a read/write checker enable in RTL (all four RPs)
+
+- test: aou_reg_bit_bash_test
+  bug: BUGS/004
+  check: 'Writing a 1 in bit #2 of register "aou_core.aou_con0"'
+  note: AXI_SPLIT_TR_EN has no storage and reads 0
+
+- test: aou_reg_bit_bash_test
+  bug: BUGS/007
+  check: 'Writing a 1 in bit #4 of register "aou_core.aou_con0"'
+  seed_dependent: true
+  note: AOU_SW_RESET resets every SFR including itself, so it reads back 0 (seed-dependent)
+
+- test: aou_reg_access_test
+  bug: BUGS/003
+  check: 'REG-R06: aou_core.axi_slv_id_mismatch_err_rp'
+
+- test: aou_reg_access_test
+  bug: BUGS/004
+  check: 'REG-R02: aou_core.aou_con0.axi_split_tr_en'
+
+- test: aou_reg_access_test
+  bug: BUGS/007
+  check: 'REG-R11: aou_core.aou_con0.aou_sw_reset'
+  note: >-
+    Not yet filed. AOU_SW_RESET is RW in the RDL and MAS, but a write of 1 resets
+    every SFR, the bit included, so it reads 0. The MAS doesn't say whether the
+    software reset clears the configuration registers.
+
+- test: aou_reg_reserved_test
+  bug: BUGS/003
+  check: 'REG-R06: aou_core.axi_slv_id_mismatch_err_rp'
+
+- test: aou_reg_alias_test
+  bug: BUGS/004
+  check: 'REG-R08: aou_core.aou_con0.axi_split_tr_en'
+  seed_dependent: true
+  note: only seeds whose alias walk writes aou_con0 (Verilator seed 2 never touches it)
+
+- test: aou_fdi_t1_bringup_spec_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_RETRAIN'
+
+- test: aou_fdi_t1_bringup_spec_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_RETRAIN'
+
+- test: aou_fdi_t1_bringup_spec_test
+  bug: BUGS/001
+  check: 'FDI-M06: O_FDI_LINK_UP mismatch in BRG_RETRAIN'
+
+- test: aou_fdi_t1_bringup_spec_test
+  bug: BUGS/001
+  check: 'FDI-R48: lp_state_req stayed 0x1'
+
+- test: aou_link_force_deact_test
+  bug: BUGS/010
+  check: 'DeactivateReq: PropertyReq on a non-ActivateReq opcode'
+  note: DEACTIVATE_FORCE sends DeactivateReq with PropertyReq=1 (L3 model, AOU-R11)
+
+- test: aou_link_force_deact_test
+  bug: BUGS/010
+  check: 'AOU-R11: AOU_FDI_CHECKER VIOL_RSVD_NONZERO LP(DUT->peer)'
+  seed_dependent: true
+  note: >-
+    the same DeactivateReq seen by AOU_FDI_CHECKER; two-PHY builds (tp configs) have no
+    AOU_FDI_CHECKER, so only the L3 model's entry above matches there
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/013
+  check: 'T1-L16: LinkReset after a act_ack in ST_DISABLED'
+  seed_dependent: true
+  note: >-
+    A stray ActivateAck in DISABLED is accepted silently (MAS) and makes the next
+    activation fail with LinkReset. Only runs that include +state=disabled.
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/019
+  check: 'T1-L15: 2 answers to an invalid DeactivateReq'
+  seed_dependent: true
+  note: in ACTIVATE the DUT answers DeactivateAck and also re-sends ActivateReq (+state=activate)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/019
+  check: 'T1-L15: 1 answers to an invalid deact_ack'
+  seed_dependent: true
+  note: in ACTIVATE the DUT re-sends ActivateReq after an invalid DeactivateAck (+state=activate)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/020
+  check: 'AOU-R6: DUT->remote'
+  seed_dependent: true
+  note: DeactivateAck and ActivateReq in one flit, one at G12 (L3 model; +state=activate)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/020
+  check: 'AOU-R6: AOU_FDI_CHECKER VIOL_MISC_PLACEMENT'
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/020
+  check: 'G1: undefined encoding, first granule 0000000000'
+  seed_dependent: true
+  note: >-
+    SP_32B (1x256-sp32): the second activation message gets MsgStart at G1 after G1's bytes have
+    left in chunk 0, so G1 is all zero and the ActivateReq is lost (+state=activate)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/020
+  check: 'AOU-R3: AOU_FDI_CHECKER VIOL_MISCOP LP(DUT->peer)'
+  requires: BUGS/020
+  seed_dependent: true
+  note: the same empty G1 seen by AOU_FDI_CHECKER
+
+- test: aou_act_after_deact_test
+  bug: BUGS/020
+  check: 'AOU-R6: DUT->remote'
+  seed_dependent: true
+  note: >-
+    ActivateReq co-packed with the DUT's DeactivateAck (the second trigger path BUGS/020
+    names); not seen on T1 1x512-sp64 (VCS, Verilator), kept so a hit is tied to the bug
+
+- test: aou_act_after_deact_test
+  bug: BUGS/020
+  check: 'AOU-R6: AOU_FDI_CHECKER VIOL_MISC_PLACEMENT'
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/019
+  check: 'AOU-R40: [l3] DUT ActivateReq while AOU_LS_ACTIVATE'
+  seed_dependent: true
+  note: on the ActivateAck time-out the DUT sends a second ActivateReq (+src=act_ack only)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the DUT returns RDATA/WRESP credit after its DeactivateAck as
+    the MAS asks; AOU_FDI_CHECKER follows v0.7 8.4 and reports it.
+
+- test: aou_t1_deact_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1 (reset value): the DUT advertises RDATA/WRESP credits after its
+    DeactivateAck as the MAS documents; AOU_FDI_CHECKER follows AoU v0.7 8.4, which forbids
+    any credit after one's own DeactivateAck. Seen only when the deactivation lands while
+    credits are still owed.
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/023
+  check: 'T1-L25: INT_ACTIVATE_START on an invalid ActivateReq'
+  seed_dependent: true
+  note: a late ActivateReq in ENABLED/DEACTIVATE sends the FSM to DISABLED then ACTIVATE (+state=enabled/deactivate)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/023
+  check: 'AOU-R21: AOU_FDI_CHECKER VIOL_CRD_OVERFLOW LP(DUT->peer)'
+  requires: BUGS/023
+  seed_dependent: true
+  note: >-
+    the restarted activation advertises the whole RX buffer again while the remote die,
+    still ENABLED, holds the first advertisement; with the 4xmix builds' 1024-bit RP buffers the sum
+    passes AOU_FDI_CHECKER's 2048-credit counter
+
+- test: aou_link_act_deact_test
+  bug: BUGS/009
+  check: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: >-
+    the remote model answers a DUT write after its own DeactivateReq (v0.8 8.4, MAS
+    CREDIT_MANAGE=1); AOU_FDI_CHECKER calls it out of order
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1 (RDL reset value) on a software deactivation between cases: the remote model,
+    like the DUT, returns RDATA/WRESP credit after its own DeactivateAck (4x512-sp64 +mask=1 seed 1)
+
+- test: aou_credit_return_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1 (RDL reset value): the remote model, like the DUT, returns
+    RDATA/WRESP credit after its own DeactivateAck; AOU_FDI_CHECKER follows v0.7 8.4
+
+- test: aou_credit_return_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the DUT returns RDATA/WRESP credit after its own DeactivateAck, as the
+    MAS documents (4xmix2144-sp64 +method=grant seeds 3 and 7)
+
+# BUGS/039: a CrdtGrant that starts in the last granule of a 64-byte RX chunk is decoded
+# before its second granule arrives when pl_valid has a bubble there, so the DUT takes
+# garbage for the second-granule credit fields. Too much credit shows as the DUT sending
+# beyond what the remote die granted; lost credit shows as a stall (no bug-specific
+# signature, so such a run stays FAIL).
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'AOU-R16: AOU_FDI_CHECKER VIOL_CRD_UNDERFLOW LP(DUT->peer)'
+  seed_dependent: true
+  note: the DUT sends on credit it decoded from a stale second granule (4xmix2144-sp64 +method=grant seed 1)
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'AOU-R16: [l3] DUT'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the L3 model's view of the same send
+
+- test: aou_link_act_deact_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: the same rule seen on the remote model's credits (CREDIT_MANAGE=1)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/032
+  check_re: 'AOU-R33: \[l3\] DeactivateReq: (\d+) write\(s\), (\d+) read\(s\) on RP\d unanswered \(\1 write\(s\), \2 read\(s\) received after our DeactivateReq\)'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=0, remote DeactivateReq first: a request the DUT accepted before it is
+    still in the DUT's TX backlog, crosses it on the link, and is open when the DUT sends
+    DeactivateReq (MAS 7.3.5/7.3.6 re-activation vs AoU v0.8 8.4). Matches only when every
+    unanswered request on that RP arrived after L3's DeactivateReq; any other AOU-R33 fails.
+    4x512-sp64 VCS +who=both +order=simul +deact_who=both +credit_manage=0 +busy=1 seed 3
+
+- test: aou_link_act_deact_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=0: the DUT puts an RDATA/WRESP MsgCredit in the flit that carries
+    its DeactivateAck (v0.7 8.4, MAS 7.3.1); seeds 6 and 15 (CONFIG=4x512-sp64, Verilator)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: >-
+    the same flit seen by AOU_FDI_CHECKER; the BUGS/009 entry above covers only
+    CREDIT_MANAGE=1 (4x512-sp64 Verilator seed 15, +deact_who=remote +credit_manage=0 +busy=1)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/009
+  check_re: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the DUT answers a remote write with WriteResp in the flit of its own
+    DeactivateReq (v0.8 8.4 and the MAS allow it, v0.7 8.4 and AOU_FDI_CHECKER do not);
+    1x256-sp32 VCS seed 4
+
+# AOU_SW_RESET and link-loss recovery (aou_reset_test, aou_link_event_test). Each
+# bug has bug-specific checks; the generic symptoms it causes (traffic stalls,
+# scoreboard mismatches, failed handshakes) carry `requires:` and only count when
+# a bug-specific check for that bug fired in the same run (scripts/check_run.py).
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R02: WVALID dropped or W payload changed before WREADY'
+  seed_dependent: true
+  note: AOU_SW_RESET mid-traffic cuts a W burst on the DUT M port
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R01: AWVALID dropped or AW payload changed before AWREADY'
+  seed_dependent: true
+  note: the same software reset drops a pending AW on the DUT M port (seen on a 4xmix build's 256-bit m_axi[3])
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-S05: local memory'
+  requires: BUGS/021
+  seed_dependent: true
+  note: >-
+    a remote->local burst the reset cut short on the M port leaves its bytes unwritten
+    (256-bit RPs, as on 1x256-sp32 and the 4xmix builds, take more beats per burst)
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R06: '
+  seed_dependent: true
+  note: truncated or overrun W bursts on the DUT M port after AOU_SW_RESET
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R16: WSTRB'
+  seed_dependent: true
+  note: beats of a cut burst land in the next one (M port)
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R07: B ID'
+  seed_dependent: true
+  note: S port: an AW/W handshaken inside the AOU_SW_RESET pulse shifts the DUT's W-to-AW pairing (waves aou_reset_test.rid.w8.seed.1)
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R09: RLAST'
+  seed_dependent: true
+  note: an S-port read burst cut by AOU_SW_RESET; the next read's beat closes it (waves Verilator aou_link_event_test.rid.w10.seed.1)
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-L26: orphan R beat'
+  seed_dependent: true
+  note: the M-port R beat presented when the link dropped is never accepted after AOU_SW_RESET (waves aou_link_event_test.rid.w7.seed.1)
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'W beats, AWLEN says'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the local subordinate driver's view of the truncated bursts
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'W burst runs past AWLEN'
+  requires: BUGS/021
+  seed_dependent: true
+  note: M-port bursts overrun after AOU_SW_RESET
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'matches no outstanding write'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the local manager driver's view of the shifted B
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'INT_MI0_ID_MISMATCH: interrupt asserted'
+  requires: BUGS/021
+  seed_dependent: true
+  note: responses to the cut bursts no longer match the DUT's pending-ID table
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-S02: local->remote'
+  requires: BUGS/021
+  seed_dependent: true
+  note: writes acknowledged with another burst's data after the shifted pairing, or a write handshaken during AOU_SW_RESET that gets B OKAY but never reaches the remote memory
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-S04: local->remote'
+  requires: BUGS/021
+  seed_dependent: true
+  note: read data of the cut burst's successor checked against the cut burst
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-S05: remote memory'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the remote memory keeps the shifted writes' data at end of test
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/021
+  seed_dependent: true
+  note: traffic stalls after the shifted pairing
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-V06: not drained'
+  requires: BUGS/021
+  seed_dependent: true
+  note: a DUT request L3 never sees completed after the cut bursts
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-T01: not drained'
+  requires: BUGS/021
+  seed_dependent: true
+  note: DUT requests left open by the cut bursts at end of test
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-R17: at end of test'
+  requires: BUGS/021
+  seed_dependent: true
+  note: bursts the DUT stopped accepting after the shifted pairing are still open at end of test
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-V04: remote (L3) not DISABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: deactivation cannot complete while DUT requests from the cut bursts stay open
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-V05: DUT not DISABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: deactivation cannot complete while DUT requests from the cut bursts stay open
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-V02: remote (L3) not ENABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: re-activation after the failed deactivation
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-V03: DUT not ENABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: re-activation after the failed deactivation
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the core stops moving traffic after the orphan R
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-V04: remote (L3) not DISABLED'
+  requires: BUGS/024
+  seed_dependent: true
+  note: deactivation cannot complete with the core deadlocked
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-V05: DUT not DISABLED'
+  requires: BUGS/024
+  seed_dependent: true
+  note: deactivation cannot complete with the core deadlocked
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-V06: not drained'
+  requires: BUGS/024
+  seed_dependent: true
+  note: requests stuck behind the deadlocked core
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'AXI-R17: at end of test'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the orphan R beat is still presented on the M port at end of test
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-T02: scoreboard checked'
+  requires: BUGS/024
+  seed_dependent: true
+  note: no local->remote transaction completes after the deadlock
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'INT_MI0_ID_MISMATCH: interrupt asserted'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the orphan R no longer matches a pending read
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R02: WVALID dropped or W payload changed before WREADY'
+  seed_dependent: true
+  note: AOU_SW_RESET mid-traffic cuts a W burst on the DUT M port
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R01: AWVALID dropped or AW payload changed before AWREADY'
+  seed_dependent: true
+  note: the recovery's AOU_SW_RESET drops a pending AW on the DUT M port (seen on a 4xmix build's 256-bit m_axi[3])
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-S05: local memory'
+  requires: BUGS/021
+  seed_dependent: true
+  note: a remote->local burst the reset cut short on the M port leaves its bytes unwritten
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V02: remote (L3) not ENABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: re-activation after the failed recovery
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V03: DUT not ENABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: re-activation after the failed recovery
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R06: '
+  seed_dependent: true
+  note: truncated or overrun W bursts on the DUT M port after AOU_SW_RESET
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R16: WSTRB'
+  seed_dependent: true
+  note: beats of a cut burst land in the next one (M port)
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R07: B ID'
+  seed_dependent: true
+  note: S port: an AW/W handshaken inside the AOU_SW_RESET pulse shifts the DUT's W-to-AW pairing (waves aou_reset_test.rid.w8.seed.1)
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R09: RLAST'
+  seed_dependent: true
+  note: an S-port read burst cut by AOU_SW_RESET; the next read's beat closes it (waves Verilator aou_link_event_test.rid.w10.seed.1)
+
+# A DUT that BUGS/021 (S-port beats lost in AOU_SW_RESET) or BUGS/024 (an orphan M-port R/B
+# beat never accepted) left stuck still holds credit and queued work, so the work-conservation
+# check (T1-C02, aou_t1_crd_flow_chk) fires with the stall checks T1-V08/T1-V06.
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-C02: '
+  requires: BUGS/021
+  seed_dependent: true
+  note: the DUT stuck after a W beat was lost in AOU_SW_RESET
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-C02: '
+  requires: BUGS/024
+  seed_dependent: true
+  note: an orphan M-port R or B beat the DUT never accepts (RDATA/WRESP work held) and what follows
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-C02: '
+  requires: BUGS/021
+  seed_dependent: true
+  note: the DUT stuck after a W beat was lost in AOU_SW_RESET
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-C02: '
+  requires: BUGS/024
+  seed_dependent: true
+  note: an orphan M-port R or B beat the DUT never accepts (RDATA/WRESP work held) and what follows
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-L26: orphan R beat'
+  seed_dependent: true
+  note: the M-port R beat presented when the link dropped is never accepted after AOU_SW_RESET (waves aou_link_event_test.rid.w7.seed.1)
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V02: remote (L3) not ENABLED'
+  requires: BUGS/024
+  seed_dependent: true
+  note: >-
+    a W beat for RP1 left in the RX path by the recovery's AOU_SW_RESET keeps
+    AOU_RX_FIFO_PENDING high, so the DUT never sends its ActivateReq (021 "stale W beat
+    blocks the next activation"); seen with the 024 orphan R beat, 3x512-sp64 VCS
+    +event=linkerror seed 2 (waves rid.renw.seed.2, WLAST_GEN WVALID[1] stuck from 540.5 ns)
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V03: DUT not ENABLED'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the same blocked re-activation, seen from the DUT's status
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-T01: not drained'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the remote die's queued traffic never leaves after the blocked re-activation
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'W beats, AWLEN says'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the local subordinate driver's view of the truncated bursts
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'W burst runs past AWLEN'
+  requires: BUGS/021
+  seed_dependent: true
+  note: M-port bursts overrun after AOU_SW_RESET
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'matches no outstanding write'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the local manager driver's view of the shifted B
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-S02: local->remote'
+  requires: BUGS/021
+  seed_dependent: true
+  note: writes acknowledged with another burst's data after the shifted pairing, or a write handshaken during AOU_SW_RESET that gets B OKAY but never reaches the remote memory
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-S04: local->remote'
+  requires: BUGS/021
+  seed_dependent: true
+  note: read data of the cut burst's successor checked against the cut burst
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-S05: remote memory'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the remote memory keeps the shifted writes' data at end of test
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/021
+  seed_dependent: true
+  note: traffic stalls after the shifted pairing
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V06: not drained'
+  requires: BUGS/021
+  seed_dependent: true
+  note: a DUT request L3 never sees completed after the cut bursts
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-T01: not drained'
+  requires: BUGS/021
+  seed_dependent: true
+  note: DUT requests left open by the cut bursts at end of test
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-R17: at end of test'
+  requires: BUGS/021
+  seed_dependent: true
+  note: bursts the DUT stopped accepting after the shifted pairing are still open at end of test
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V04: remote (L3) not DISABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: deactivation cannot complete while DUT requests from the cut bursts stay open
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-V05: DUT not DISABLED'
+  requires: BUGS/021
+  seed_dependent: true
+  note: deactivation cannot complete while DUT requests from the cut bursts stay open
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the core stops moving traffic after the orphan R
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-V04: remote (L3) not DISABLED'
+  requires: BUGS/024
+  seed_dependent: true
+  note: deactivation cannot complete with the core deadlocked
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-V05: DUT not DISABLED'
+  requires: BUGS/024
+  seed_dependent: true
+  note: deactivation cannot complete with the core deadlocked
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-V06: not drained'
+  requires: BUGS/024
+  seed_dependent: true
+  note: requests stuck behind the deadlocked core
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'AXI-R17: at end of test'
+  requires: BUGS/024
+  seed_dependent: true
+  note: the orphan R beat is still presented on the M port at end of test
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-T02: scoreboard checked'
+  requires: BUGS/024
+  seed_dependent: true
+  note: no local->remote transaction completes after the deadlock
+
+- test: aou_id_mismatch_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the end-of-test deactivation lands while the DUT still owes RDATA
+    credit and it returns it after its DeactivateAck, as the MAS documents
+    (4xmix2144-sp64 VCS seed 2, +side=mgr +kind=b +mask=1 +detect_only=1)
+
+- test: aou_link_event_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the final deactivation lands while the DUT still owes RDATA/WRESP
+    credit and it returns it after its DeactivateAck, as the MAS documents (Verilator
+    +event=retrain seed 1)
+
+- test: aou_zero_credit_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: DeactivateAck at 2486.5 ns, then credit in LP flit 466 at 2495.5 ns
+    (waves vcs-t1-4x512-sp64 aou_zero_credit_test.rid.allw2.seed.1, +credit=rreq)
+
+# BUGS/045: the TX per-RP arbiters park on an RP that has no credit for its head message, and
+# the shared AW/W path holds a credit-less RP's write, so an RP with credit and queued work is
+# held back (T1-C01) and the DUT stops using the credit it holds (T1-C02). aou_t1_crd_flow_chk
+# checks every test; multi-RP builds reach it wherever one RP runs out of credit while another
+# has work: the zero-credit starve and limit modes and withheld or slow credit returns. Seeds
+# and classes decide which RP runs dry first.
+- test: aou_zero_credit_test
+  bug: BUGS/045
+  check: 'T1-C01: '
+  seed_dependent: true
+  note: one RP starved of a class (or of its credit limit) blocks the others' messages of that class
+
+- test: aou_zero_credit_test
+  bug: BUGS/045
+  check: 'T1-C02: '
+  requires: BUGS/045
+  seed_dependent: true
+  note: the same block outlasts the work-conservation bound
+
+- test: aou_credit_return_test
+  bug: BUGS/045
+  check: 'T1-C01: '
+  seed_dependent: true
+  note: >-
+    withheld or delayed returns leave one RP short of WDATA credit for a full-width WriteData; the
+    AW/W path and the W arbiter stay on it and the other RPs' writes wait
+
+- test: aou_credit_return_test
+  bug: BUGS/045
+  check: 'T1-C02: '
+  requires: BUGS/045
+  seed_dependent: true
+  note: the same block outlasts the work-conservation bound
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check: 'T1-L26: orphan B beat'
+  requires: BUGS/024
+  seed_dependent: true
+  note: a B the local subordinate presents once the core has stopped is caught by the next recovery's AOU_SW_RESET (waves Verilator 1x512-sp64 aou_link_event_test.rid.mw2.seed.1, bvalid from 11320.5 ns)
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check: 'T1-L26: orphan B beat'
+  requires: BUGS/024
+  seed_dependent: true
+  note: a B presented after the deadlock, caught by a later AOU_SW_RESET
+
+- test: aou_reset_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck (deactivation stuck after BUGS/021, +when=queued)
+
+- test: aou_reset_test
+  bug: BUGS/009
+  check: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: the remote model answers DUT writes after its own DeactivateReq (v0.8 8.4, MAS CREDIT_MANAGE=1)
+
+# Entries added on the integration branch by streams I, J, K and L.
+- test: aou_fdi_t1_linkerror_spec_test
+  bug: BUGS/002
+  check: 'FDI-M07: lp_linkerror mismatch in BRG_LINKERROR'
+  note: >-
+    TB=t1, fdi_enc=SPEC. I_SW_LINKERROR_INJECT takes the bringup controller to
+    LINKERROR (lp_state_req NOP); AOU_TOP has no lp_linkerror, so the Adapter is
+    never told and stays Active until it takes the link down itself.
+
+- test: aou_fdi_t1_linkerror_spec_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKERROR'
+  note: O_FDI_FSM_STATE reports LINKERROR as 0x2, not the UCIe 1010b the guide claims
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-L05: no INT_ACTIVATE_START after a remote ActivateReq'
+  seed_dependent: true
+  note: >-
+    the same failed deactivation, met by a remote-only re-activation: the DUT stays in
+    DEACTIVATE (waves aou_reset_test.rid.w1.seed.2, CONFIG=4x512-sp64: r_cur_st 0x8 from
+    400972 ns until the core reset at 441607 ns), so it never raises INT_ACTIVATE_START
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'not accepted in 500 cycles (BUGS/029)'
+  seed_dependent: true
+  note: >-
+    +side=mgr. The M port never raises BREADY/RREADY for a response with an
+    unknown ID; it flags the mismatch but holds the channel.
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'T1-RM01: WriteResp with no write outstanding'
+  seed_dependent: true
+  note: +side=mgr +kind=b. Clearing SPLIT_BID_MISMATCH_ERR sends WriteResps with the previous B's ID to the remote die
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'T1-RM02: ReadData with no read outstanding'
+  seed_dependent: true
+  note: +side=mgr +kind=r. Clearing SPLIT_RID_MISMATCH_ERR sends the never-accepted R beat to the remote die
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'split_bid_mismatch_err read 0x1, expected 0x0'
+  seed_dependent: true
+  note: +side=mgr. The error sets again while the unaccepted response is still presented
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'split_rid_mismatch_err read 0x1, expected 0x0'
+  seed_dependent: true
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'split_bid_mismatch_info read 0x'
+  seed_dependent: true
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'split_rid_mismatch_info read 0x'
+  seed_dependent: true
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'T1-E06: INT_MI0_ID_MISMATCH is 1, expected 0'
+  seed_dependent: true
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'T1-E15: SLV_TR_COMPLETE is 0 with nothing outstanding'
+  seed_dependent: true
+  note: >-
+    +side=sub (+kind=r, or +slv_en=0). An unrequested ReadData, or a WriteResp
+    with the subordinate checker off, leaves SLV_TR_COMPLETE low for good, so
+    deactivation never completes.
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'AXI-R07: B ID'
+  seed_dependent: true
+  note: +side=sub +slv_en=0. The unrequested WriteResp reaches the S port as a B nobody asked for
+
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check: 'matches no outstanding write'
+  seed_dependent: true
+  note: +side=sub +slv_en=0. The local manager's view of the same B
+
+- test: aou_credit_violation_test
+  bug: BUGS/030
+  check: 'T1-E13: '
+  note: ReadReqs beyond the advertised credit overwrite the DUT's RX buffer; the rest are never answered
+
+- test: aou_credit_violation_test
+  bug: BUGS/030
+  check: 'AXI-S04: remote->local beat 0 lane 0 (addr 50000'
+  note: reads within the credit come back with the data of the overflowing reads' addresses
+
+# BUGS/025: the 1024-to-256-bit downsizer misplaces AWSIZE=6 writes that start
+# unaligned in the upper half of their 64-byte container. aou_dw_down1024_test
+# sends 1024-bit remote traffic only to the 256-bit RPs, so these checks can
+# only come from that path; reads of the corrupted bytes and the final memory
+# compare follow from the bad writes.
+- test: aou_dw_down1024_test
+  bug: BUGS/025
+  check: 'AXI-S02: remote->local'
+  note: remote AWSIZE=6 write, unaligned in the upper 32 bytes, lands one 32-byte beat late
+
+- test: aou_dw_down1024_test
+  bug: BUGS/025
+  check: 'AXI-S04: remote->local'
+  seed_dependent: true
+  note: a read-back of bytes a BUGS/025 write corrupted
+
+- test: aou_dw_down1024_test
+  bug: BUGS/025
+  check: 'AXI-S05: local memory'
+  seed_dependent: true
+  note: end-of-test memory compare of the same bytes
+
+- test: aou_dw_down1024_test
+  bug: BUGS/025
+  check: 'AXI-R10: AW INCR burst crosses 4KB: WR rp'
+  seed_dependent: true
+  note: the extra 32-byte beat crosses 4KB when the remote write ends at a 4KB boundary
+
+# The same BUGS/025 conversion in aou_pack_test +pk=crossflit +remote_bytes=128, on
+# builds with a 256-bit RP (4xmix4211-sp128 RP2/RP3, 4xmix2144-sp64 RP1, 1x256-sp32).
+# Other RPs and remote widths share the test, so the bug-specific check is the
+# corrupted write itself: a remote AWSIZE=6 write starting in the upper half of its
+# 64-byte container.
+- test: aou_pack_test
+  bug: BUGS/025
+  check_re: 'AXI-S02: remote->local .* WR rp\d remote id=\w+ addr=[0-9a-f]*[2367abef][0-9a-f] len=\d+ size=6 '
+  seed_dependent: true
+  note: remote AWSIZE=6 write, unaligned in the upper 32 bytes, lands one 32-byte beat late
+
+- test: aou_pack_test
+  bug: BUGS/025
+  check: 'AXI-S04: remote->local'
+  requires: BUGS/025
+  seed_dependent: true
+  note: a read-back of bytes a BUGS/025 write corrupted
+
+- test: aou_pack_test
+  bug: BUGS/025
+  check: 'AXI-S05: local memory'
+  requires: BUGS/025
+  seed_dependent: true
+  note: end-of-test memory compare of the same bytes
+
+- test: aou_pack_test
+  bug: BUGS/025
+  check: 'AXI-R10: AW INCR burst crosses 4KB: WR rp'
+  requires: BUGS/025
+  seed_dependent: true
+  note: the extra 32-byte beat crosses 4KB when the remote write ends at a 4KB boundary
+
+# BUGS/033 in aou_pack_test +pk=act (CREDIT_MANAGE=0): a MsgCredit in the flit of the
+# DUT's DeactivateAck.
+- test: aou_pack_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: CREDIT_MANAGE=0, the protocol-header MsgCredit shares the flit of the DUT's DeactivateAck
+
+- test: aou_pack_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+# aou_act_after_deact_test on multi-RP and narrow-FDI builds: the deactivation lands
+# while credits and responses are still moving.
+- test: aou_act_after_deact_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: >-
+    +credit_manage=1: the remote model returns RDATA/WRESP credit after its own
+    DeactivateAck as the MAS documents for CREDIT_MANAGE=1; AOU_FDI_CHECKER follows v0.7 8.4
+    (3x512-sp64 VCS/Verilator, 4x512-sp64 and 1x256-sp32 Verilator)
+
+- test: aou_act_after_deact_test
+  bug: BUGS/009
+  check_re: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    +credit_manage=1: the DUT answers a remote request after its own DeactivateReq (v0.8 8.4
+    and the MAS allow it, v0.7 8.4 and AOU_FDI_CHECKER do not); 3x512-sp64 seed 2
+
+- test: aou_act_after_deact_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: >-
+    a WDATA (request) MsgCredit committed two cycles before the remote DeactivateReq
+    waits in the register slice and goes out in the header of the DeactivateAck's flit
+    (2x512-tp32_64, 32-byte PHY0, VCS seed 1 with and without +credit_manage=1; waves
+    rid.renw.seed.1, CREDIT_MANAGE=0, slice loaded 440.5 ns, Ack queued 443.5 ns, credit sent
+    451.5 ns)
+
+- test: aou_act_after_deact_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: >-
+    AOU_FDI_CHECKER's view of the same flit: an RDATA MsgCredit accepted in the cycle the
+    remote DeactivateReq arrives shares the flit of the DUT's DeactivateAck, which completes
+    the deactivation, so the L3 model reports it "in DISABLED" (4x512-sp64 VCS seed 1, waves
+    rid.wp12tri, CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
+
+# BUGS/031: asymmetric DEST_RP (illegal per MAS 3.10.1). The remote die answers
+# RP0's requests on plane 1 and the DUT presents those B/R on RP1's S port,
+# where nothing is outstanding.
+- test: aou_dest_rp_asym_test
+  bug: BUGS/031
+  check: 'AXI-R07: B ID'
+  note: RP1's S-port monitor sees a B for an RP0 write
+
+- test: aou_dest_rp_asym_test
+  bug: BUGS/031
+  check: 'matches no outstanding write'
+  note: RP1's manager driver, same B
+
+- test: aou_dest_rp_asym_test
+  bug: BUGS/031
+  check: 'AXI-R08: R ID'
+  seed_dependent: true
+  note: RP1's S-port monitor sees an R for an RP0 read
+
+- test: aou_dest_rp_asym_test
+  bug: BUGS/031
+  check: 'matches no outstanding read'
+  seed_dependent: true
+  note: RP1's manager driver, same R
+
+# BUGS/034: enabling TX_LP_MODE while a TX flit is in progress abandons the flit
+# after its first beat (FDI-R02); seen in 2xmix-tp64_128 and 1x256-sp32.
+- test: aou_lp_mode_traffic_test
+  bug: BUGS/034
+  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
+  seed_dependent: true
+  note: the AOU_CON0.TX_LP_MODE write lands on beat 0 of an idle flit
+
+- test: aou_t1_lp_mode_test
+  bug: BUGS/034
+  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
+  seed_dependent: true
+  note: the AOU_CON0.TX_LP_MODE write lands on beat 0 of an idle flit
+
+# After the truncated flit AOU_FDI_CHECKER (single-PHY builds) counts beats from
+# the wrong flit start and decodes every later DUT flit as garbage.
+- test: aou_lp_mode_traffic_test
+  bug: BUGS/034
+  check: 'AOU_FDI_CHECKER'
+  requires: BUGS/034
+  seed_dependent: true
+  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
+
+- test: aou_t1_lp_mode_test
+  bug: BUGS/034
+  check: 'AOU_FDI_CHECKER'
+  requires: BUGS/034
+  seed_dependent: true
+  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
+
+# aou_lp_mode_align_test aims the TX_LP_MODE write at chunk 0's lower half on a
+# half-width path, so every such build hits BUGS/034 at one sweep offset.
+- test: aou_lp_mode_align_test
+  bug: BUGS/034
+  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
+  seed_dependent: true
+  note: LP mode engages on the edge chunk 0's lower half goes out; only half-width builds (SP_32B, PHY0 of two-PHY)
+
+- test: aou_lp_mode_align_test
+  bug: BUGS/034
+  check: 'AOU_FDI_CHECKER'
+  requires: BUGS/034
+  seed_dependent: true
+  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
+
+# BUGS/035: the debug-window read of an RP narrower than the remote die is split
+# into a burst that AOU_ERROR_INFO answers with one beat, so it never completes.
+# Only builds with a 256-bit RP (4xmix4211-sp128, 4xmix2144-sp64, 1x256-sp32) reach it.
+- test: aou_axi_err_resp_test
+  bug: BUGS/035
+  check: 'T1-E14: '
+  seed_dependent: true
+  note: the 64-byte remote read becomes ARLEN=1 ARSIZE=5; AOU_ERROR_INFO returns one beat with RLAST
+
+# Debug-window bursts (+dbg_len, +max_awburstlen/+max_arburstlen with +part=fifo; BUGS/035,
+# BUGS/041, BUGS/043). Only the err_int entries with those knobs reach them.
+- test: aou_axi_err_resp_test
+  bug: BUGS/035
+  check_re: 'T1-RM04: RLAST=1 on beat \d+ of \d+: RD rp\d remote id=3f[0-3] '
+  seed_dependent: true
+  note: a debug read the splitter cuts into sub-bursts; AOU_ERROR_INFO answers its sub-burst with one beat and RLAST
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/043
+  check: 'T1-E19: '
+  seed_dependent: true
+  note: a debug read longer than MAX_ARBURSTLEN+1 RP beats is split and the sub-bursts after the first read memory
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/043
+  check: 'AXI-S05: local memory'
+  requires: BUGS/043
+  seed_dependent: true
+  note: the split debug pop's sub-bursts after the first write local memory
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/041
+  check: 'T1-E02: RP'
+  requires: BUGS/043
+  seed_dependent: true
+  note: >-
+    with +max_arburstlen=0 on a 256-bit RP the error read is split into narrow beats, each pushing its
+    own FIFO entry (BUGS/041); reached only with the BUGS/043 split knobs on unpatched RTL
+
+# BUGS/001 item 4 (link-down exits, fdi_enc=SPEC).
+# They fire on the unpatched RTL and on the first candidate fix (Retrain, lp_linkerror);
+# list tests reach these states depending on seed and plusargs.
+- test: aou_axi_err_resp_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_credit_return_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_credit_return_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_credit_return_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_credit_violation_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
+
+- test: aou_credit_violation_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_credit_violation_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_credit_violation_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M06: O_FDI_LINK_UP mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: LinkReset/Disabled not decoded; O_FDI_LINK_UP stays 1 while the Link Status is Down (Table 8-2)
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
+  seed_dependent: true
+  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
+
+- test: aou_fdi_t1_linkerror_spec_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_fdi_t1_linkerror_spec_test
+  bug: BUGS/001
+  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
+  seed_dependent: true
+  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
+
+- test: aou_id_mismatch_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_id_mismatch_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
+  seed_dependent: true
+  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/001
+  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
+  seed_dependent: true
+  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_link_act_deact_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_link_act_deact_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M06: O_FDI_LINK_UP mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled not decoded; O_FDI_LINK_UP stays 1 while the Link Status is Down (Table 8-2)
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
+  seed_dependent: true
+  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
+
+- test: aou_lp_mode_traffic_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_lp_mode_traffic_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
+
+- test: aou_rx_msg_error_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_rx_msg_error_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_t1_deact_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_t1_deact_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_t1_deact_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_t1_remote_act_test
+  bug: BUGS/001
+  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
+
+- test: aou_t1_remote_act_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
+
+- test: aou_t1_remote_act_test
+  bug: BUGS/001
+  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: unpatched RTL only, LinkError reported as 0x2
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/002
+  check: 'FDI-M07: lp_linkerror mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
+  seed_dependent: true
+  note: unpatched RTL only, AOU_TOP has no lp_linkerror
+
+# BUGS/001 item 4: the Adapter's own LinkReset/Disabled ends on the DUT's Active request
+# (fdi_enc=SPEC, FDI-R50). Same tests as the BRG_LINKDOWN entries above.
+- test: aou_credit_return_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_credit_violation_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_int_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_link_event_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_reset_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_t1_deact_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_t1_remote_act_test
+  bug: BUGS/001
+  check: 'FDI-R50: no lp_state_req=Active in'
+  seed_dependent: true
+  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/037
+  check: 'T1-L15: 0 answers to an invalid ActivateReq, expected 1 (the Adapter entered LinkError on lp_linkerror first)'
+  seed_dependent: true
+  note: >-
+    lp_linkerror rises about 8 cycles before the MAS-required ActivateAck reaches FDI, and an
+    Adapter that enters LinkError at once may drop it (UCIe r1.1 8.3.3.7). Only with
+    +react_linkerror=1, fdi_enc=SPEC and a DUT with lp_linkerror.
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/037
+  check: 'T1-L30: lp_linkerror rose at '
+  seed_dependent: true
+  note: >-
+    the same ordering seen on FDI, whatever the Adapter model does: lp_linkerror rises before the
+    Ack's last beat. Only a DUT with lp_linkerror (BUGS/002 fix) and without the BUGS/037 fix;
+    retire with the BUGS/037 entry above once the fix lands.
+
+# BUGS/038: after LinkError/LinkReset/Disabled -> Reset the DUT gives no NOP->Active, so a
+# compliant Adapter doesn't train again (fdi_enc=SPEC, FDI-R51). Every test that takes the link
+# down; list tests do so depending on seed and plusargs.
+- test: aou_fdi_t1_linkdown_spec_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_fdi_t1_linkerror_spec_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_credit_return_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_credit_violation_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_id_mismatch_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_int_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_link_act_deact_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_link_event_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_linkreset_timeout_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_lp_mode_traffic_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_pack_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_reset_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_rx_msg_error_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_t1_deact_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_t1_remote_act_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+- test: aou_t1_sw_reset_test
+  bug: BUGS/038
+  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
+  seed_dependent: true
+  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
+
+# BUGS/021 and BUGS/007 mechanisms that the BUGS/024/029 deadlock hid: with the 029 fix
+# the traffic after AOU_SW_RESET runs on, and these follow. T1-L28 is the bug-specific
+# check for the S-port case wherever a beat is accepted inside the reset; with the 021
+# fix's guard it follows the guard's isolation and stays silent.
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-L28: s_axi'
+  seed_dependent: true
+  note: >-
+    an S-port AW/W/AR handshaken while the core is in AOU_SW_RESET is lost (VCS 1x512-sp64
+    +event=inband_drop seed 1: s_axi0 W at 820.5 ns, AW/W/AR at 1310.5 ns with the core
+    reset low); later Bs and W-to-AW pairing shift
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'T1-L28: s_axi'
+  seed_dependent: true
+  note: >-
+    an S-port AW and W beat accepted inside the AOU_SW_RESET pulse (VCS 1x512-sp64
+    +reset=sw seed 1, at 1550.5 ns with the core reset low)
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-S02: remote->local'
+  requires: BUGS/021
+  seed_dependent: true
+  note: >-
+    an M-port W burst cut by the recovery's AOU_SW_RESET (WVALID drops with WLAST=0); the
+    local subordinate pairs later beats with it, so remote->local writes land wrong
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-S02: remote->local'
+  requires: BUGS/021
+  seed_dependent: true
+  note: the same cut M-port burst after +reset=sw
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'AXI-S04: remote->local'
+  requires: BUGS/021
+  seed_dependent: true
+  note: a remote read of bytes a cut M-port burst left wrong (inside a burst AXI-S02 flagged)
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check: 'AXI-S04: remote->local'
+  requires: BUGS/021
+  seed_dependent: true
+  note: a remote read of bytes a cut M-port burst left wrong (inside a burst AXI-S02 flagged)
+
+- test: aou_link_event_test
+  bug: BUGS/007
+  check: 'T1-L29: RX W beat pending'
+  seed_dependent: true
+  note: >-
+    a stale remote W beat left in the RX FIFO (on I_RESETN, not the software reset) is still
+    pending after AOU_SW_RESET and holds AOU_RX_FIFO_PENDING high (VCS 1x512-sp64
+    +event=linkerror seed 2 with the BUGS/029 fix: WLAST_GEN WVALID[0] stuck from 411576.5 ns,
+    software reset released at 411641.5 ns)
+
+- test: aou_link_event_test
+  bug: BUGS/007
+  check: 'T1-V02: remote (L3) not ENABLED'
+  requires: BUGS/007
+  seed_dependent: true
+  note: >-
+    the stale beat T1-L29 reports blocks the DUT's ActivateReq, so it stays in ACTIVATE
+    (same run: T1-V02/V03 at 431904.5 ns)
+
+- test: aou_link_event_test
+  bug: BUGS/007
+  check: 'T1-V03: DUT not ENABLED'
+  requires: BUGS/007
+  seed_dependent: true
+  note: the same blocked re-activation, seen from the DUT's status
+
+- test: aou_link_event_test
+  bug: BUGS/007
+  check: 'T1-V06: not drained'
+  requires: BUGS/007
+  seed_dependent: true
+  note: traffic queued for the link never leaves after the blocked re-activation
+
+- test: aou_link_event_test
+  bug: BUGS/007
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/007
+  seed_dependent: true
+  note: traffic queued for the link never leaves after the blocked re-activation
+
+# Performance gate (aou_perf_chk). Keys are <CONFIG>|<PHY>|<scenario>|<window>|<link>;
+# each entry is limited (when_re) to the CONFIG and scenarios where the bug shows.
+- test: aou_perf_test
+  bug: BUGS/046
+  check_re: 'T1-P02: 1x256-sp32\|0\|S[12]\|\w+\|l2r below target'
+  when_re: 'PERF_GATE 1x256-sp32\|0\|S[12]\|'
+  note: >-
+    256-bit data messages at a 32 B FDI: the DUT TX link caps at 16.00 B/cycle (one data
+    message per 12-granule pack step), 60-83% of the model
+- test: aou_perf_test
+  bug: BUGS/046
+  check_re: 'T1-P02: 1x256-sp32\|0\|S[12]\|\w+\|r2l below target'
+  when_re: 'PERF_GATE 1x256-sp32\|0\|S[12]\|'
+  requires: BUGS/046
+  note: >-
+    the DUT RX link in the same window, held to the capped TX link's transaction rate
+    (bw_mix_l2r 16.00) or, for 1-beat local reads (sm_rd_l2r 16.00), to the DUT's ReadReq
+    rate; the latter is in the triage queue to confirm it is the same pack-step limit
+- test: aou_perf_test
+  bug: BUGS/046
+  check_re: 'T1-P02: 2xmix-tp64_128\|[01]\|S1\|\w+\|l2r below target'
+  when_re: 'PERF_GATE 2xmix-tp64_128\|[01]\|S1\|'
+  note: >-
+    FDI_PACK_WD 1024 (widest FDI 128 B): the DUT TX link caps at 32/48 B/cycle on PHY0 and
+    64/96 on PHY1 (58-87% of the model), on either PHY
+- test: aou_perf_test
+  bug: BUGS/046
+  check_re: 'T1-P02: 2xmix-tp64_128\|[01]\|S1\|bw_mix_r2l\|r2l below target'
+  when_re: 'PERF_GATE 2xmix-tp64_128\|[01]\|S1\|'
+  requires: BUGS/046
+  note: remote-issued mix, the remote's writes held to the rate of its reads served by the capped TX link
+- test: aou_perf_test
+  bug: BUGS/046
+  check_re: 'T1-P02: 4xmix4211-sp128\|0\|S[123]\|\w+\|l2r below target'
+  when_re: 'PERF_GATE 4xmix4211-sp128\|0\|S[123]\|'
+  note: FDI_PACK_WD 1024 at a 128 B FDI: the DUT TX link caps at 64 B/cycle (58-75% of the model)
+- test: aou_perf_test
+  bug: BUGS/046
+  check_re: 'T1-P02: 4xmix4211-sp128\|0\|S[12]\|\w+\|r2l below target'
+  when_re: 'PERF_GATE 4xmix4211-sp128\|0\|S[12]\|'
+  requires: BUGS/046
+  note: the DUT RX link in mixed and both-sides windows, held to the capped TX link's rate
+- test: aou_perf_test
+  bug: BUGS/047
+  check_re: 'T1-P02: (1x512-sp64|4x512-sp64|3x512-sp64|2x512-tp32_64)\|\d\|S1\|bw_(rd|mix)\|l2r below target'
+  when_re: 'PERF_GATE (1x512-sp64|4x512-sp64|3x512-sp64|2x512-tp32_64)\|\d\|S1\|'
+  seed_dependent: true
+  note: >-
+    reads both ways: the DUT TX link carries remote read data at ~97.0-97.8% of the model,
+    right on the gate (1x512 bw_rd l2r 0.9704 in the first gated run, passing); not
+    seed-dependent on this deterministic bench, but borderline, so it may or may not fire
+
+# BUGS/005: AOU_CORE_RP leaves the early-response O_PENDING_CNT_OVER unconnected, and
+# AOU_EARLY_BRESP_CTRL_AWCACHE raises it only on an AW handshake at the limit, which
+# its own AWREADY gating forbids, so an AW waiting at the limit never raises it.
+# Only +early_over=1 runs check it (plan 16.17); it fires on every such run. The other
+# aou_early_bresp_test runs never reach the check, hence seed_dependent.
+- test: aou_early_bresp_test
+  bug: BUGS/005
+  check_re: 'FEAT-R21: RP\d+: an AW waited \d+ cycles at the early-response limit .* O_PENDING_CNT_OVER never rose'
+  seed_dependent: true
+  note: MAS 3.7.5 says the signal fires on a write attempted at the limit and reaches the interrupt controller
+
+# BUGS/048: with bursts the RP splits, the M port carries more than
+# M_RD_MO_CNT (32) reads outstanding (aou_t1_mo_chk counts M-port bursts). Unsplit traffic stops
+# at 32, so aou_dp_outstanding_test (plan 9.20) has no entry.
+- test: aou_split_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
+
+- test: aou_dp_burst_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
+
+- test: aou_perf_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: perf bw windows on the mixed-width configs split long bursts and go one read past M_RD_MO_CNT
+
+- test: aou_dp_random_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
+
+- test: aou_stress_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
+
+# Exclusive writes with early responses (aou_attr_test +attr_early=1 only).
+- test: aou_attr_test
+  bug: BUGS/055
+  check: 'DP-R07: local->remote: exclusive BRESP 0 at the requester, the subordinate answered BRESP 1'
+  seed_dependent: true
+  note: a bufferable exclusive write gets the early OKAY instead of the subordinate's EXOKAY
+
+- test: aou_attr_test
+  bug: BUGS/055
+  check: 'AXI-S05: remote memory'
+  requires: BUGS/055
+  seed_dependent: true
+  note: the exclusive data the manager was told failed is in the remote memory
+
+# BUGS/053: with AXI_PEER_DIE_MAX_DATA_WD 512 (config 1x512-sp64-p512 only) the RX
+# FIFOs put data bits in place of {RID, RRESP, RLAST} and shift back-pressured
+# WriteData. The entries cannot be scoped to a config, so they name only the
+# matrix tests run on 1x512-sp64-p512, and everything except the wrong RID is a
+# follow-on. They are seed_dependent because the other configs never hit them.
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check_re: 'AXI-R08: R ID [0-9a-f]+ matches no outstanding read'
+  seed_dependent: true
+  note: every remote ReadData reaches the S port with data bits as RID
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check_re: '\[aou_axi_mgr_driver\] R ID [0-9a-f]+ matches no outstanding read'
+  requires: BUGS/053
+  seed_dependent: true
+  note: the S-port manager driver, same R
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/053
+  seed_dependent: true
+  note: reads with a corrupted RID never complete
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'AXI-R09: RLAST'
+  requires: BUGS/053
+  seed_dependent: true
+  note: RLAST is a data bit too
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'AXI-S04: local->remote'
+  requires: BUGS/053
+  seed_dependent: true
+  note: ReadData that does reach the requester carries shifted fields
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'AXI-S02: remote->local'
+  requires: BUGS/053
+  seed_dependent: true
+  note: back-pressured remote WriteData lands shifted by 8 bytes
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'AXI-S04: remote->local'
+  requires: BUGS/053
+  seed_dependent: true
+  note: remote reads of local memory the corrupted writes changed
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'AXI-S05: local memory'
+  requires: BUGS/053
+  seed_dependent: true
+  note: end-of-test compare of the same local memory
+
+- test: aou_dp_size_test
+  bug: BUGS/053
+  check_re: 'AXI-R08: R ID [0-9a-f]+ matches no outstanding read'
+  seed_dependent: true
+  note: every remote ReadData reaches the S port with data bits as RID
+
+- test: aou_dp_size_test
+  bug: BUGS/053
+  check_re: '\[aou_axi_mgr_driver\] R ID [0-9a-f]+ matches no outstanding read'
+  requires: BUGS/053
+  seed_dependent: true
+  note: the S-port manager driver, same R
+
+- test: aou_dp_size_test
+  bug: BUGS/053
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/053
+  seed_dependent: true
+  note: reads with a corrupted RID never complete
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check_re: 'AXI-R08: R ID [0-9a-f]+ matches no outstanding read'
+  seed_dependent: true
+  note: every remote ReadData reaches the S port with data bits as RID
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check_re: '\[aou_axi_mgr_driver\] R ID [0-9a-f]+ matches no outstanding read'
+  requires: BUGS/053
+  seed_dependent: true
+  note: the S-port manager driver, same R
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/053
+  seed_dependent: true
+  note: reads with a corrupted RID never complete
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'DP-R04: RP0 (512-bit, remote 256-bit): no narrow S-port read'
+  requires: BUGS/053
+  seed_dependent: true
+  note: no local read completes
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'AXI-S02: remote->local'
+  requires: BUGS/053
+  seed_dependent: true
+  note: back-pressured remote WriteData lands shifted by 8 bytes
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'AXI-S04: remote->local'
+  requires: BUGS/053
+  seed_dependent: true
+  note: remote reads of local memory the corrupted writes changed
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'AXI-S05: local memory'
+  requires: BUGS/053
+  seed_dependent: true
+  note: end-of-test compare of the same local memory
+
+- test: aou_dp_random_test
+  bug: BUGS/053
+  check: 'AXI-S03: local->remote'
+  requires: BUGS/053
+  seed_dependent: true
+  note: RRESP sits in the same corrupted field as RID
+
+- test: aou_dp_size_test
+  bug: BUGS/053
+  check: 'AXI-R09: RLAST'
+  requires: BUGS/053
+  seed_dependent: true
+  note: RLAST is a data bit too
+
+- test: aou_dp_size_test
+  bug: BUGS/053
+  check: 'AXI-S03: local->remote'
+  requires: BUGS/053
+  seed_dependent: true
+  note: RRESP sits in the same corrupted field as RID
+
+- test: aou_dp_size_test
+  bug: BUGS/053
+  check: 'AXI-S04: local->remote'
+  requires: BUGS/053
+  seed_dependent: true
+  note: ReadData that does reach the requester carries shifted fields
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'AXI-R09: RLAST'
+  requires: BUGS/053
+  seed_dependent: true
+  note: RLAST is a data bit too
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'AXI-S03: local->remote'
+  requires: BUGS/053
+  seed_dependent: true
+  note: RRESP sits in the same corrupted field as RID
+
+- test: aou_dw_test
+  bug: BUGS/053
+  check: 'AXI-S04: local->remote'
+  requires: BUGS/053
+  seed_dependent: true
+  note: ReadData that does reach the requester carries shifted fields
+
+# DFT scan mode (aou_dft_scan_test, plan 11.19). The integration guide (3.13.1) says
+# TIEL_DFT_MODESCAN=1 de-asserts the software reset; the RTL's scan input is a buffered
+# constant 0, which holds AOU_CORE in reset for as long as scan mode lasts.
+- test: aou_dft_scan_test
+  bug: BUGS/052
+  check: 'T1-DFT01: the core reset was asserted for'
+  note: w_DFTED_sw_resetn is 0 for the whole scan window (every seed)
+
+- test: aou_dft_scan_test
+  bug: BUGS/052
+  check: 'T1-DFT02: aou_core.lp_linkreset.msgcredit_time_out_value read 0x0, expected 0x6'
+  note: the SFRs are held in reset in scan mode, so the marker reads 0 (before and after the AOU_SW_RESET write)
+
+# BUGS/056: after a LinkError entered mid-DUT-TX-flit (+le_mid_flit_pct, plan 18.23) the
+# DUT's TX beat counter keeps the abandoned flit's position, so every later flit reaches
+# the Adapter shifted (FDI-R45 on the Flit Header and CRC bytes). When the Adapter then
+# leaves Active at what it counts as a boundary, the DUT is mid-flit (FDI-R43, FDI-R02).
+# The plain link-stress runs never leave Active mid-flit, hence seed_dependent.
+- test: aou_fdi_t1_link_stress_test
+  bug: BUGS/056
+  check_re: 'FDI-R45: phy\d+ Adapter-owned bytes: FH='
+  seed_dependent: true
+  note: UCIe r1.1 8.3.3.7 requires the upper layer to clean up its data path in LinkError
+
+- test: aou_fdi_t1_link_stress_test
+  bug: BUGS/056
+  requires: BUGS/056
+  check_re: 'FDI-R43: phy\d+ TX flit starts while pl_state_sts='
+  seed_dependent: true
+  note: follow-on of the shifted TX flits; the DUT is mid-flit when the Adapter leaves Active
+
+- test: aou_fdi_t1_link_stress_test
+  bug: BUGS/056
+  requires: BUGS/056
+  check_re: 'FDI-R02: phy\d+ bubble inside a TX flit at beat'
+  seed_dependent: true
+  note: follow-on of the shifted TX flits; the Adapter's flit boundary falls inside a DUT flit
+
+# Plan 1.10, 2.5, 2.10, 2.12, 3.20/3.23/3.25: deactivations in these tests meet the same
+# credit-after-DeactivateAck findings as the activation tests.
+
+- test: aou_rx_credit_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
+
+- test: aou_rx_credit_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+
+- test: aou_rx_credit_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: >-
+    a MsgCredit in the flit of the DUT's DeactivateAck, reported "after its DeactivateAck" or,
+    when that Ack completes the deactivation, "in DISABLED" (WDATA on 2x512-tp32_64)
+
+- test: aou_rx_credit_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+- test: aou_act_rx_drain_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
+
+- test: aou_act_rx_drain_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+
+- test: aou_act_rx_drain_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: >-
+    a MsgCredit in the flit of the DUT's DeactivateAck, reported "after its DeactivateAck" or,
+    when that Ack completes the deactivation, "in DISABLED" (WDATA on 2x512-tp32_64)
+
+- test: aou_act_rx_drain_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+- test: aou_deact_ctrl_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
+
+- test: aou_deact_ctrl_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+
+- test: aou_deact_ctrl_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: >-
+    a MsgCredit in the flit of the DUT's DeactivateAck, reported "after its DeactivateAck" or,
+    when that Ack completes the deactivation, "in DISABLED" (WDATA on 2x512-tp32_64)
+
+- test: aou_deact_ctrl_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+- test: aou_zero_credit_test
+  bug: BUGS/009
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  seed_dependent: true
+  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+
+- test: aou_zero_credit_test
+  bug: BUGS/033
+  check: 'AOU-R26: [l3] DUT MsgCredit'
+  seed_dependent: true
+  note: >-
+    a MsgCredit in the flit of the DUT's DeactivateAck, reported "after its DeactivateAck" or,
+    when that Ack completes the deactivation, "in DISABLED" (WDATA on 2x512-tp32_64)
+
+- test: aou_zero_credit_test
+  bug: BUGS/033
+  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP(DUT->peer)'
+  requires: BUGS/033
+  seed_dependent: true
+  note: the same flit seen by AOU_FDI_CHECKER
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/019
+  check: 'T1-C40: [l3] DUT advertised'
+  seed_dependent: true
+  note: >-
+    an ActivateReq in ENABLED restarts the DUT's activation, which advertises the whole RX FIFO
+    again on top of the credit the remote die holds (019 B and its addendum); +state=enabled cases
+
+# p2a landing (2026-10-14): after a LinkError/LinkReset re-activation on 4xmix4211-sp128 the remote
+# model sees the DUT advertise more RDATA credit than MAS 3.9 allows (T1-C40). It only appears in
+# runs already corrupted by the known post-link-event bugs; root cause not yet triaged (queue item
+# 20261014-p2a-02: DUT follow-on vs the L3 credit ledger not resetting on link reset).
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-C40: [l3] DUT advertised'
+  requires: BUGS/021
+  seed_dependent: true
+  note: provisional; follow-on of the post-link-event corruption until 20261014-p2a-02 is triaged

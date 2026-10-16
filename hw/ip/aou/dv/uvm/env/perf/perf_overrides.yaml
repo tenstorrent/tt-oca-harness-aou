@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# Per-target tolerance overrides for uvm/env/perf/aou_perf_targets.svh (make
+# perf_targets applies them). The default tolerance is 0.03: a link passes at
+# >= 97 % of the d2d_model value. An override needs a structural reason that
+# was measured (a granule breakdown showing the gap is not idle flits, or a
+# bug ID); a threshold is never lowered to make a run pass. Above-model
+# results are never overridden: they mean the model or the measurement is
+# wrong.
+#
+# Format (one entry per target key; all fields required, bug optional):
+#
+# - config: 4xmix4211-sp128
+#   active_phy: 0
+#   scenario: S2
+#   window: sm_wr_l2r
+#   dir: r2l
+#   tol: 0.05
+#   reason: one WriteResp per 1-beat write pads the end of every flit on r2l
+#   bug: BUGS/NNN

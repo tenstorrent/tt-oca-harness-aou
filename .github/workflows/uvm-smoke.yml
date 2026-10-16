@@ -1,0 +1,118 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright (c) 2026 Tenstorrent USA Inc
+#
+# Builds the UVM testbench in hw/ip/aou/dv/ on Verilator (the pin in
+# .github/tool-versions.env) and runs its smoke group: the sanity test of
+# each bench and a register readback. This is the check-in qualification;
+# the full regression (every CONFIG, every testlist) runs on VCS through
+# the Makefile and scripts/run_list.py, see hw/ip/aou/dv/README.md.
+#
+# The heavy steps are gated by a `detect` job (dorny/paths-filter): when no
+# simulation-relevant path changed, the job still reports success so a
+# required-status-check on `main` is satisfied for doc-only PRs.
+
+name: UVM Smoke
+
+on:
+  pull_request:
+  push:
+    branches: [main, design]
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  detect:
+    name: Detect simulation-relevant changes
+    runs-on: ubuntu-latest
+    outputs:
+      sim: ${{ steps.filter.outputs.sim }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Run paths filter
+        uses: dorny/paths-filter@v4
+        id: filter
+        with:
+          filters: |
+            sim:
+              - 'RTL/**'
+              - 'hw/ip/aou/dv/**'
+              - 'csr/**'
+              - '.github/workflows/uvm-smoke.yml'
+              - '.github/tool-versions.env'
+
+  smoke:
+    needs: detect
+    name: "Verilator + UVM smoke"
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - name: Skip notice
+        if: needs.detect.outputs.sim != 'true'
+        run: echo "No simulation-relevant paths changed; skipping the UVM smoke run."
+
+      - uses: actions/checkout@v7
+        if: needs.detect.outputs.sim == 'true'
+
+      - name: Load tool versions
+        if: needs.detect.outputs.sim == 'true'
+        id: tools
+        run: |
+          set -a
+          # shellcheck disable=SC1091
+          source .github/tool-versions.env
+          set +a
+          echo "verilator=${VERILATOR_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Verilator
+        if: needs.detect.outputs.sim == 'true'
+        uses: veryl-lang/setup-verilator@v2
+        with:
+          version: ${{ steps.tools.outputs.verilator }}
+
+      - name: Set up Python
+        if: needs.detect.outputs.sim == 'true'
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Fetch the bench dependencies (uvm-core, ocah_lib, z3, PeakRDL)
+        if: needs.detect.outputs.sim == 'true'
+        working-directory: hw/ip/aou/dv
+        run: make setup
+
+      - name: Lint the testbench configuration (testlists, RAL freshness)
+        if: needs.detect.outputs.sim == 'true'
+        working-directory: hw/ip/aou/dv
+        run: make check-config
+
+      - name: Build the T1 and register benches
+        if: needs.detect.outputs.sim == 'true'
+        working-directory: hw/ip/aou/dv
+        run: |
+          make build SIM=verilator TB=t1 JOBS=$(nproc) LSF=0
+          make build SIM=verilator TB=reg JOBS=$(nproc) LSF=0
+
+      - name: Run the smoke group
+        if: needs.detect.outputs.sim == 'true'
+        working-directory: hw/ip/aou/dv
+        run: |
+          set -o pipefail
+          python3 scripts/run_list.py --sim verilator --tb t1 --items smoke --reseed 1 -j 2 --rid ci 2>&1 | tee "$GITHUB_WORKSPACE/smoke_t1.log"
+          python3 scripts/run_list.py --sim verilator --tb reg --items smoke --reseed 1 -j 2 --rid ci 2>&1 | tee "$GITHUB_WORKSPACE/smoke_reg.log"
+
+      - name: Upload run logs
+        if: always() && needs.detect.outputs.sim == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: uvm-smoke-logs
+          path: |
+            smoke_t1.log
+            smoke_reg.log
+            hw/ip/aou/dv/out/**/sim.log
+            hw/ip/aou/dv/out/**/verdict.txt
+            hw/ip/aou/dv/out/**/results*.csv

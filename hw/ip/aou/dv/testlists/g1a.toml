@@ -1,0 +1,54 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Gate G1a: the thin end-to-end slice on T1.
+#
+# Gate G1a: the thin end-to-end slice on T1 (CONFIG=1x512-sp64). One entry per test;
+# seeds: N means seeds 1..N, or an explicit list (1,4,7) or range (3-6); plan_ids are dv/doc/AOU_RTL_TEST_PLAN.md IDs.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_t1_slice_test"
+module = { uvm = "aou_t1_slice_test" }
+seed = 1
+reseed = 6
+tags = ["g1a"]
+run_modes = ["g1a"]
+
+[[tests]]
+name = "aou_t1_deact_test"
+module = { uvm = "aou_t1_deact_test" }
+seed = 1
+reseed = 4
+tags = ["g1a"]
+run_modes = ["g1a"]
+
+[[tests]]
+name = "aou_t1_remote_act_test"
+module = { uvm = "aou_t1_remote_act_test" }
+seed = 1
+reseed = 2
+tags = ["g1a"]
+run_modes = ["g1a"]
+
+[[tests]]
+name = "aou_fdi_t1_bringup_test"
+module = { uvm = "aou_fdi_t1_bringup_test" }
+seed = 1
+tags = ["g1a"]
+run_modes = ["g1a"]
+
+[[groups]]
+name = "g1a"
+expected_count = 4
+tests = [
+  "aou_t1_slice_test",
+  "aou_t1_deact_test",
+  "aou_t1_remote_act_test",
+  "aou_fdi_t1_bringup_test",
+]

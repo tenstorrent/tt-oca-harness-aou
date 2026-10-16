@@ -1,0 +1,456 @@
+SPDX-License-Identifier: Apache-2.0
+Escape pr46: reverse of main #46, 24c0364: best_index_* written from two always_comb processes (GEN_BEST_SEL_DEFAULT); a multi-driver build error on Questa, functionally identical.
+Applied to a build-time copy of RTL/ by make build ESCAPE=pr46.
+
+diff --git a/RTL/AOU_RX_CRD_CTRL.sv b/RTL/AOU_RX_CRD_CTRL.sv
+index e0c96c5..48e9570 100644
+--- a/RTL/AOU_RX_CRD_CTRL.sv
++++ b/RTL/AOU_RX_CRD_CTRL.sv
+@@ -2,7 +2,6 @@
+ // SPDX-License-Identifier: Apache-2.0
+ // *****************************************************************************
+ //  Copyright (c) 2026 BOS Semiconductors
+-//  Copyright (c) 2026 Tenstorrent USA Inc
+ //
+ //  Licensed under the Apache License, Version 2.0 (the "License");
+ //  you may not use this file except in compliance with the License.
+@@ -27,50 +26,50 @@
+ `timescale 1ns/1ps
+ 
+ module AOU_RX_CRD_CTRL
+-import packet_def_pkg::*;
++import packet_def_pkg::*; 
+ #(
+-    parameter RP_COUNT              = 4,
+-
+-    parameter RP0_AW_MAX_CREDIT     = 256,
+-    parameter RP0_AR_MAX_CREDIT     = 256,
+-    parameter RP0_W_MAX_CREDIT      = 256,
+-    parameter RP0_R_MAX_CREDIT      = 256,
+-    parameter RP0_B_MAX_CREDIT      = 256,
+-    parameter RP1_AW_MAX_CREDIT     = 256,
+-    parameter RP1_AR_MAX_CREDIT     = 256,
+-    parameter RP1_W_MAX_CREDIT      = 256,
+-    parameter RP1_R_MAX_CREDIT      = 256,
+-    parameter RP1_B_MAX_CREDIT      = 256,
+-    parameter RP2_AW_MAX_CREDIT     = 256,
+-    parameter RP2_AR_MAX_CREDIT     = 256,
+-    parameter RP2_W_MAX_CREDIT      = 256,
+-    parameter RP2_R_MAX_CREDIT      = 256,
+-    parameter RP2_B_MAX_CREDIT      = 256,
+-    parameter RP3_AW_MAX_CREDIT     = 256,
+-    parameter RP3_AR_MAX_CREDIT     = 256,
+-    parameter RP3_W_MAX_CREDIT      = 256,
+-    parameter RP3_R_MAX_CREDIT      = 256,
+-    parameter RP3_B_MAX_CREDIT      = 256,
+-
+-    localparam CNT_RP0_AW_MAX_CREDIT = $clog2(RP0_AW_MAX_CREDIT+1),
+-    localparam CNT_RP0_AR_MAX_CREDIT = $clog2(RP0_AR_MAX_CREDIT+1),
+-    localparam CNT_RP0_W_MAX_CREDIT  = $clog2(RP0_W_MAX_CREDIT +1),
+-    localparam CNT_RP0_R_MAX_CREDIT  = $clog2(RP0_R_MAX_CREDIT +1),
+-    localparam CNT_RP0_B_MAX_CREDIT  = $clog2(RP0_B_MAX_CREDIT +1),
+-    localparam CNT_RP1_AW_MAX_CREDIT = $clog2(RP1_AW_MAX_CREDIT+1),
+-    localparam CNT_RP1_AR_MAX_CREDIT = $clog2(RP1_AR_MAX_CREDIT+1),
+-    localparam CNT_RP1_W_MAX_CREDIT  = $clog2(RP1_W_MAX_CREDIT +1),
+-    localparam CNT_RP1_R_MAX_CREDIT  = $clog2(RP1_R_MAX_CREDIT +1),
+-    localparam CNT_RP1_B_MAX_CREDIT  = $clog2(RP1_B_MAX_CREDIT +1),
+-    localparam CNT_RP2_AW_MAX_CREDIT = $clog2(RP2_AW_MAX_CREDIT+1),
+-    localparam CNT_RP2_AR_MAX_CREDIT = $clog2(RP2_AR_MAX_CREDIT+1),
+-    localparam CNT_RP2_W_MAX_CREDIT  = $clog2(RP2_W_MAX_CREDIT +1),
+-    localparam CNT_RP2_R_MAX_CREDIT  = $clog2(RP2_R_MAX_CREDIT +1),
+-    localparam CNT_RP2_B_MAX_CREDIT  = $clog2(RP2_B_MAX_CREDIT +1),
+-    localparam CNT_RP3_AW_MAX_CREDIT = $clog2(RP3_AW_MAX_CREDIT+1),
+-    localparam CNT_RP3_AR_MAX_CREDIT = $clog2(RP3_AR_MAX_CREDIT+1),
+-    localparam CNT_RP3_W_MAX_CREDIT  = $clog2(RP3_W_MAX_CREDIT +1),
+-    localparam CNT_RP3_R_MAX_CREDIT  = $clog2(RP3_R_MAX_CREDIT +1),
++    parameter RP_COUNT              = 4,    
++
++    parameter RP0_AW_MAX_CREDIT     = 256, 
++    parameter RP0_AR_MAX_CREDIT     = 256, 
++    parameter RP0_W_MAX_CREDIT      = 256, 
++    parameter RP0_R_MAX_CREDIT      = 256, 
++    parameter RP0_B_MAX_CREDIT      = 256, 
++    parameter RP1_AW_MAX_CREDIT     = 256, 
++    parameter RP1_AR_MAX_CREDIT     = 256, 
++    parameter RP1_W_MAX_CREDIT      = 256, 
++    parameter RP1_R_MAX_CREDIT      = 256, 
++    parameter RP1_B_MAX_CREDIT      = 256, 
++    parameter RP2_AW_MAX_CREDIT     = 256, 
++    parameter RP2_AR_MAX_CREDIT     = 256, 
++    parameter RP2_W_MAX_CREDIT      = 256, 
++    parameter RP2_R_MAX_CREDIT      = 256, 
++    parameter RP2_B_MAX_CREDIT      = 256, 
++    parameter RP3_AW_MAX_CREDIT     = 256, 
++    parameter RP3_AR_MAX_CREDIT     = 256, 
++    parameter RP3_W_MAX_CREDIT      = 256, 
++    parameter RP3_R_MAX_CREDIT      = 256, 
++    parameter RP3_B_MAX_CREDIT      = 256, 
++
++    localparam CNT_RP0_AW_MAX_CREDIT = $clog2(RP0_AW_MAX_CREDIT+1), 
++    localparam CNT_RP0_AR_MAX_CREDIT = $clog2(RP0_AR_MAX_CREDIT+1), 
++    localparam CNT_RP0_W_MAX_CREDIT  = $clog2(RP0_W_MAX_CREDIT +1), 
++    localparam CNT_RP0_R_MAX_CREDIT  = $clog2(RP0_R_MAX_CREDIT +1), 
++    localparam CNT_RP0_B_MAX_CREDIT  = $clog2(RP0_B_MAX_CREDIT +1), 
++    localparam CNT_RP1_AW_MAX_CREDIT = $clog2(RP1_AW_MAX_CREDIT+1), 
++    localparam CNT_RP1_AR_MAX_CREDIT = $clog2(RP1_AR_MAX_CREDIT+1), 
++    localparam CNT_RP1_W_MAX_CREDIT  = $clog2(RP1_W_MAX_CREDIT +1), 
++    localparam CNT_RP1_R_MAX_CREDIT  = $clog2(RP1_R_MAX_CREDIT +1), 
++    localparam CNT_RP1_B_MAX_CREDIT  = $clog2(RP1_B_MAX_CREDIT +1), 
++    localparam CNT_RP2_AW_MAX_CREDIT = $clog2(RP2_AW_MAX_CREDIT+1), 
++    localparam CNT_RP2_AR_MAX_CREDIT = $clog2(RP2_AR_MAX_CREDIT+1), 
++    localparam CNT_RP2_W_MAX_CREDIT  = $clog2(RP2_W_MAX_CREDIT +1), 
++    localparam CNT_RP2_R_MAX_CREDIT  = $clog2(RP2_R_MAX_CREDIT +1), 
++    localparam CNT_RP2_B_MAX_CREDIT  = $clog2(RP2_B_MAX_CREDIT +1), 
++    localparam CNT_RP3_AW_MAX_CREDIT = $clog2(RP3_AW_MAX_CREDIT+1), 
++    localparam CNT_RP3_AR_MAX_CREDIT = $clog2(RP3_AR_MAX_CREDIT+1), 
++    localparam CNT_RP3_W_MAX_CREDIT  = $clog2(RP3_W_MAX_CREDIT +1), 
++    localparam CNT_RP3_R_MAX_CREDIT  = $clog2(RP3_R_MAX_CREDIT +1), 
+     localparam CNT_RP3_B_MAX_CREDIT  = $clog2(RP3_B_MAX_CREDIT +1),
+ 
+ 
+@@ -108,7 +107,7 @@ import packet_def_pkg::*;
+         RP2_B_MAX_CREDIT,
+         RP3_B_MAX_CREDIT
+     },
+-
++ 
+     localparam int unsigned CNT_RP_AW_MAX_CREDIT[4] = '{
+         CNT_RP0_AW_MAX_CREDIT,
+         CNT_RP1_AW_MAX_CREDIT,
+@@ -180,14 +179,14 @@ import packet_def_pkg::*;
+     output                      O_AOU_CRDTGRANT_VALID,
+     input                       I_AOU_CRDTGRANT_READY,
+ 
+-    input  [RP_COUNT-1:0]       I_AOU_RX_WREQVALID    ,
+-    input  [RP_COUNT-1:0]       I_AOU_RX_RREQVALID    ,
+-    input  [RP_COUNT-1:0]       I_AOU_RX_WDATAVALID   ,
++    input  [RP_COUNT-1:0]       I_AOU_RX_WREQVALID    , 
++    input  [RP_COUNT-1:0]       I_AOU_RX_RREQVALID    , 
++    input  [RP_COUNT-1:0]       I_AOU_RX_WDATAVALID   , 
+     input  [RP_COUNT-1:0][1:0]  I_AOU_RX_WDATA_DLENGTH,
+-    input  [RP_COUNT-1:0]       I_AOU_RX_WDATAF       ,
+-    input  [RP_COUNT-1:0]       I_AOU_RX_RDATAVALID   ,
++    input  [RP_COUNT-1:0]       I_AOU_RX_WDATAF       , 
++    input  [RP_COUNT-1:0]       I_AOU_RX_RDATAVALID   , 
+     input  [RP_COUNT-1:0][1:0]  I_AOU_RX_RDATA_DLENGTH,
+-    input  [RP_COUNT-1:0]       I_AOU_RX_WRESPVALID   ,
++    input  [RP_COUNT-1:0]       I_AOU_RX_WRESPVALID   , 
+ 
+     input                       I_REQ_CRD_ADVERTISE_EN,
+     input                       I_RSP_CRD_ADVERTISE_EN,
+@@ -284,8 +283,8 @@ end
+ 
+ logic   [RP_COUNT-1:0] [8:0]          w_cnt_rp_aw_credit_return_rx;
+ logic   [RP_COUNT-1:0] [8:0]          w_cnt_rp_ar_credit_return_rx;
+-logic   [RP_COUNT-1:0] [8:0]          w_cnt_rp_w_credit_return_rx;
+-logic   [RP_COUNT-1:0] [8:0]          w_cnt_rp_r_credit_return_rx;
++logic   [RP_COUNT-1:0] [8:0]          w_cnt_rp_w_credit_return_rx; 
++logic   [RP_COUNT-1:0] [8:0]          w_cnt_rp_r_credit_return_rx; 
+ logic   [RP_COUNT-1:0] [4:0]          w_cnt_rp_b_credit_return_rx;
+ 
+ logic   [RP_COUNT-1:0] [3:0]          o_aou_crdtgrant_wrespcred;
+@@ -294,7 +293,7 @@ logic   [RP_COUNT-1:0] [7:0]          o_aou_crdtgrant_wdatacred;
+ logic   [RP_COUNT-1:0] [7:0]          o_aou_crdtgrant_rreqcred;
+ logic   [RP_COUNT-1:0] [7:0]          o_aou_crdtgrant_wreqcred;
+ 
+-logic   [RP_COUNT-1:0] [3:0]          o_aou_msgcrdt_wrespcred;
++logic   [RP_COUNT-1:0] [3:0]          o_aou_msgcrdt_wrespcred; 
+ logic   [RP_COUNT-1:0] [7:0]          o_aou_msgcrdt_rdatacred;
+ logic   [RP_COUNT-1:0] [7:0]          o_aou_msgcrdt_wdatacred;
+ logic   [RP_COUNT-1:0] [7:0]          o_aou_msgcrdt_rreqcred;
+@@ -423,14 +422,16 @@ generate
+         end
+     end
+ 
+-   if (RP_COUNT < 4) begin : GEN_UNUSED_ZERO
+-        for (genvar k = RP_COUNT; k < 4; k++) begin
+-            assign best_index_aw[k] = '0;
+-            assign best_index_ar[k] = '0;
+-            assign best_index_w[k]  = '0;
+-            assign best_index_r[k]  = '0;
+-            assign best_index_b[k]  = '0;
+-        end
++    if(RP_COUNT <4) begin: GEN_BEST_SEL_DEFAULT
++        always_comb begin
++            for(int unsigned k = RP_COUNT; k < 4 ; k=k+1) begin
++                best_index_aw[k] ='d0;
++                best_index_ar[k] ='d0;
++                best_index_w[k] ='d0;
++                best_index_r[k] = 'd0;
++                best_index_b[k] ='d0;
++            end
++    end
+     end
+ 
+ endgenerate
+@@ -446,7 +447,7 @@ always_comb begin
+             if(I_AOU_RX_WDATA_DLENGTH[i]==2'b10) begin
+                 w_cnt_rp_w_credit_return_rx[i] = I_AOU_RX_WDATAF[i] ? WF1024b_G : W1024b_G;
+             end else if (I_AOU_RX_WDATA_DLENGTH[i]==2'b01) begin
+-                w_cnt_rp_w_credit_return_rx[i] = I_AOU_RX_WDATAF[i] ? WF512b_G  : W512b_G;
++                w_cnt_rp_w_credit_return_rx[i] = I_AOU_RX_WDATAF[i] ? WF512b_G  : W512b_G;        
+             end else if (I_AOU_RX_WDATA_DLENGTH[i]==2'b00) begin
+                 w_cnt_rp_w_credit_return_rx[i] = I_AOU_RX_WDATAF[i] ? WF256b_G  : W256b_G;
+             end
+@@ -457,7 +458,7 @@ always_comb begin
+             if(I_AOU_RX_RDATA_DLENGTH[i]==2'b10) begin
+                 w_cnt_rp_r_credit_return_rx[i] = R1024b_G;
+             end else if (I_AOU_RX_RDATA_DLENGTH[i]==2'b01) begin
+-                w_cnt_rp_r_credit_return_rx[i] = R512b_G;
++                w_cnt_rp_r_credit_return_rx[i] = R512b_G;    
+             end else if (I_AOU_RX_RDATA_DLENGTH[i]==2'b00) begin
+                 w_cnt_rp_r_credit_return_rx[i] = R256b_G;
+             end
+@@ -479,8 +480,8 @@ generate
+                     generate_rp_aw_credit[b].r_cnt_aw_credit_rx <= 'd0;
+                 end else if (~I_STATUS_DISABLE)begin
+                     if( (w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==b[1:0])) | w_crdtgrant_hs | I_AOU_RX_WREQVALID[b]) begin
+-                        generate_rp_aw_credit[b].r_cnt_aw_credit_rx <= generate_rp_aw_credit_next[b].w_cnt_aw_credit_rx_next;
+-                    end
++                        generate_rp_aw_credit[b].r_cnt_aw_credit_rx <= generate_rp_aw_credit_next[b].w_cnt_aw_credit_rx_next; 
++                    end 
+                 end
+             end
+         end
+@@ -493,8 +494,8 @@ generate
+                     generate_rp_ar_credit[b].r_cnt_ar_credit_rx <= 'd0;
+                 end else if (~I_STATUS_DISABLE)begin
+                     if( (w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==b[1:0])) | w_crdtgrant_hs | I_AOU_RX_RREQVALID[b]) begin
+-                        generate_rp_ar_credit[b].r_cnt_ar_credit_rx <= generate_rp_ar_credit_next[b].w_cnt_ar_credit_rx_next;
+-                    end
++                        generate_rp_ar_credit[b].r_cnt_ar_credit_rx <= generate_rp_ar_credit_next[b].w_cnt_ar_credit_rx_next; 
++                    end 
+                 end
+             end
+         end
+@@ -507,8 +508,8 @@ generate
+                     generate_rp_w_credit[b].r_cnt_w_credit_rx <= 'd0;
+                 end else if (~I_STATUS_DISABLE)begin
+                     if( (w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==b[1:0])) | w_crdtgrant_hs | I_AOU_RX_WDATAVALID[b]) begin
+-                        generate_rp_w_credit[b].r_cnt_w_credit_rx <= generate_rp_w_credit_next[b].w_cnt_w_credit_rx_next;
+-                    end
++                        generate_rp_w_credit[b].r_cnt_w_credit_rx <= generate_rp_w_credit_next[b].w_cnt_w_credit_rx_next; 
++                    end 
+                 end
+             end
+         end
+@@ -521,8 +522,8 @@ generate
+                     generate_rp_r_credit[b].r_cnt_r_credit_rx <= 'd0;
+                 end else if (~I_STATUS_DISABLE)begin
+                     if( (w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==b[1:0])) | w_crdtgrant_hs | I_AOU_RX_RDATAVALID[b]) begin
+-                        generate_rp_r_credit[b].r_cnt_r_credit_rx <= generate_rp_r_credit_next[b].w_cnt_r_credit_rx_next;
+-                    end
++                        generate_rp_r_credit[b].r_cnt_r_credit_rx <= generate_rp_r_credit_next[b].w_cnt_r_credit_rx_next; 
++                    end 
+                 end
+             end
+         end
+@@ -536,8 +537,8 @@ generate
+                     generate_rp_b_credit[b].r_cnt_b_credit_rx <= 'd0;
+                 end else if (~I_STATUS_DISABLE)begin
+                     if( (w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==b[1:0])) | w_crdtgrant_hs | I_AOU_RX_WRESPVALID[b]) begin
+-                        generate_rp_b_credit[b].r_cnt_b_credit_rx <= generate_rp_b_credit_next[b].w_cnt_b_credit_rx_next;
+-                    end
++                        generate_rp_b_credit[b].r_cnt_b_credit_rx <= generate_rp_b_credit_next[b].w_cnt_b_credit_rx_next; 
++                    end 
+                 end
+             end
+         end
+@@ -555,25 +556,25 @@ generate
+             if(w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==i[1:0]) & r_aou_misc_crdgrant_done) generate_rp_aw_credit_next[i].w_cnt_aw_credit_rx_next = CNT_RP_AW_MAX_CREDIT[i]'(generate_rp_aw_credit_next[i].w_cnt_aw_credit_rx_next + o_aou_msgcrdt_wreqcred[i]);
+             if(w_crdtgrant_hs)     generate_rp_aw_credit_next[i].w_cnt_aw_credit_rx_next  = CNT_RP_AW_MAX_CREDIT[i]'(generate_rp_aw_credit_next[i].w_cnt_aw_credit_rx_next + o_aou_crdtgrant_wreqcred[i]);
+         end
+-
++        
+         always_comb begin
+             generate_rp_ar_credit_next[i].w_cnt_ar_credit_rx_next =  generate_rp_ar_credit[i].r_cnt_ar_credit_rx - w_cnt_rp_ar_credit_return_rx[i];
+             if(w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==i[1:0]) & r_aou_misc_crdgrant_done) generate_rp_ar_credit_next[i].w_cnt_ar_credit_rx_next = CNT_RP_AR_MAX_CREDIT[i]'(generate_rp_ar_credit_next[i].w_cnt_ar_credit_rx_next + o_aou_msgcrdt_rreqcred[i]);
+             if(w_crdtgrant_hs)     generate_rp_ar_credit_next[i].w_cnt_ar_credit_rx_next  = CNT_RP_AR_MAX_CREDIT[i]'(generate_rp_ar_credit_next[i].w_cnt_ar_credit_rx_next + o_aou_crdtgrant_rreqcred[i]);
+         end
+-
++        
+         always_comb begin
+             generate_rp_w_credit_next[i].w_cnt_w_credit_rx_next =  generate_rp_w_credit[i].r_cnt_w_credit_rx - w_cnt_rp_w_credit_return_rx[i];
+             if(w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==i[1:0]) & r_aou_misc_crdgrant_done) generate_rp_w_credit_next[i].w_cnt_w_credit_rx_next = CNT_RP_W_MAX_CREDIT[i]'(generate_rp_w_credit_next[i].w_cnt_w_credit_rx_next + o_aou_msgcrdt_wdatacred[i]);
+             if(w_crdtgrant_hs)     generate_rp_w_credit_next[i].w_cnt_w_credit_rx_next  = CNT_RP_W_MAX_CREDIT[i]'(generate_rp_w_credit_next[i].w_cnt_w_credit_rx_next + o_aou_crdtgrant_wdatacred[i]);
+         end
+-
++        
+         always_comb begin
+             generate_rp_r_credit_next[i].w_cnt_r_credit_rx_next =  generate_rp_r_credit[i].r_cnt_r_credit_rx - w_cnt_rp_r_credit_return_rx[i];
+             if(w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==i[1:0]) & r_aou_misc_crdgrant_done) generate_rp_r_credit_next[i].w_cnt_r_credit_rx_next = CNT_RP_R_MAX_CREDIT[i]'(generate_rp_r_credit_next[i].w_cnt_r_credit_rx_next + o_aou_msgcrdt_rdatacred[i]);
+             if(w_crdtgrant_hs)     generate_rp_r_credit_next[i].w_cnt_r_credit_rx_next  = CNT_RP_R_MAX_CREDIT[i]'(generate_rp_r_credit_next[i].w_cnt_r_credit_rx_next + o_aou_crdtgrant_rdatacred[i]);
+         end
+-
++        
+         always_comb begin
+             generate_rp_b_credit_next[i].w_cnt_b_credit_rx_next =  generate_rp_b_credit[i].r_cnt_b_credit_rx - w_cnt_rp_b_credit_return_rx[i];
+             if(w_msgcredit_cred_hs & (O_AOU_MSGCREDIT_RP==i[1:0]) & r_aou_misc_crdgrant_done) generate_rp_b_credit_next[i].w_cnt_b_credit_rx_next = CNT_RP_B_MAX_CREDIT[i]'(generate_rp_b_credit_next[i].w_cnt_b_credit_rx_next + o_aou_msgcrdt_wrespcred[i][3:0]);
+@@ -594,7 +595,7 @@ generate
+         end
+     end
+ endgenerate
+-
++ 
+ //-------------------------------------------------------------
+ always_comb begin
+     for(int unsigned i = 0; i < RP_COUNT ; i=i+1) begin
+@@ -602,7 +603,7 @@ always_comb begin
+     end
+     for(int unsigned i = RP_COUNT; i < 4 ; i=i+1) begin
+         w_credit_en[i] = 'd0;
+-    end
++    end 
+ end
+ 
+ AOU_4X1_ARBITER u_aou_msgcredit_rp_4x1_arbiter (
+@@ -611,88 +612,88 @@ AOU_4X1_ARBITER u_aou_msgcredit_rp_4x1_arbiter (
+ 
+     .I_REQ                              ( {w_credit_en[3], w_credit_en[2], w_credit_en[1], w_credit_en[0]} ),
+     .I_ARB_EN                           ( r_aou_misc_crdgrant_done & O_AOU_MSGCREDIT_CRED_VALID & I_AOU_MSGCREDIT_CRED_READY),
+-
++    
+     .O_GRANTED_AGENT                    ( {w_rp_credit_grant[3], w_rp_credit_grant[2], w_rp_credit_grant[1], w_rp_credit_grant[0]} )
+ );
+ 
+ always_comb begin
+     case(w_rp_credit_grant)
+         4'b0001:begin
+-            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[0]  : 3'b000;
+-            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[0]  : 3'b000;
+-            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[0]   : 3'b000;
+-            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[0]   : 3'b000;
+-            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[0]   : 2'b00;
+-            w_aou_msgcredit_rp          =  2'b00;
++            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[0]  : 3'b000; 
++            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[0]  : 3'b000; 
++            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[0]   : 3'b000; 
++            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[0]   : 3'b000; 
++            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[0]   : 2'b00; 
++            w_aou_msgcredit_rp          =  2'b00;    
+         end
+         4'b0010:begin
+-            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[1]  : 3'b000;
+-            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[1]  : 3'b000;
+-            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[1]   : 3'b000;
+-            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[1]   : 3'b000;
+-            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[1]   : 2'b00;
+-            w_aou_msgcredit_rp          =  2'b01;
++            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[1]  : 3'b000; 
++            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[1]  : 3'b000; 
++            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[1]   : 3'b000; 
++            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[1]   : 3'b000;          
++            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[1]   : 2'b00; 
++            w_aou_msgcredit_rp          =  2'b01; 
+         end
+         4'b0100:begin
+-            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[2]  : 3'b000;
+-            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[2]  : 3'b000;
+-            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[2]   : 3'b000;
+-            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[2]   : 3'b000;
+-            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[2]   : 2'b00;
+-            w_aou_msgcredit_rp          =  2'b10;
++            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[2]  : 3'b000; 
++            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[2]  : 3'b000; 
++            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[2]   : 3'b000; 
++            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[2]   : 3'b000;          
++            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[2]   : 2'b00; 
++            w_aou_msgcredit_rp          =  2'b10;                                                     
+         end
+         4'b1000:begin
+-            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[3]  : 3'b000;
+-            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[3]  : 3'b000;
+-            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[3]   : 3'b000;
+-            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[3]   : 3'b000;
+-            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[3]   : 2'b00;
+-            w_aou_msgcredit_rp          =  2'b11;
++            w_aou_msgcredit_wreqcred    =  r_aou_misc_crdgrant_done ? best_index_aw[3]  : 3'b000;  
++            w_aou_msgcredit_rreqcred    =  r_aou_misc_crdgrant_done ? best_index_ar[3]  : 3'b000; 
++            w_aou_msgcredit_wdatacred   =  r_aou_misc_crdgrant_done ? best_index_w[3]   : 3'b000; 
++            w_aou_msgcredit_rdatacred   =  r_aou_misc_crdgrant_done ? best_index_r[3]   : 3'b000; 
++            w_aou_msgcredit_wrespcred   =  r_aou_misc_crdgrant_done ? best_index_b[3]   : 2'b00; 
++            w_aou_msgcredit_rp          =  2'b11;                                                
+         end
+         default: begin
+-            w_aou_msgcredit_wreqcred    =  3'b000;
+-            w_aou_msgcredit_rreqcred    =  3'b000;
+-            w_aou_msgcredit_wdatacred   =  3'b000;
+-            w_aou_msgcredit_rdatacred   =  3'b000;
+-            w_aou_msgcredit_wrespcred   =  2'b00;
+-            w_aou_msgcredit_rp          =  2'b00;
++            w_aou_msgcredit_wreqcred    =  3'b000; 
++            w_aou_msgcredit_rreqcred    =  3'b000; 
++            w_aou_msgcredit_wdatacred   =  3'b000; 
++            w_aou_msgcredit_rdatacred   =  3'b000; 
++            w_aou_msgcredit_wrespcred   =  2'b00; 
++            w_aou_msgcredit_rp          =  2'b00;    
+         end
+     endcase
+ end
+ 
+-assign  O_AOU_MSGCREDIT_WREQCRED    = w_aou_msgcredit_wreqcred   ;
+-assign  O_AOU_MSGCREDIT_RREQCRED    = w_aou_msgcredit_rreqcred   ;
+-assign  O_AOU_MSGCREDIT_WDATACRED   = w_aou_msgcredit_wdatacred  ;
+-assign  O_AOU_MSGCREDIT_RDATACRED   = w_aou_msgcredit_rdatacred  ;
+-assign  O_AOU_MSGCREDIT_WRESPCRED   = w_aou_msgcredit_wrespcred  ;
+-assign  O_AOU_MSGCREDIT_RP          = w_aou_msgcredit_rp         ;
++assign  O_AOU_MSGCREDIT_WREQCRED    = w_aou_msgcredit_wreqcred   ; 
++assign  O_AOU_MSGCREDIT_RREQCRED    = w_aou_msgcredit_rreqcred   ; 
++assign  O_AOU_MSGCREDIT_WDATACRED   = w_aou_msgcredit_wdatacred  ; 
++assign  O_AOU_MSGCREDIT_RDATACRED   = w_aou_msgcredit_rdatacred  ; 
++assign  O_AOU_MSGCREDIT_WRESPCRED   = w_aou_msgcredit_wrespcred  ; 
++assign  O_AOU_MSGCREDIT_RP          = w_aou_msgcredit_rp         ; 
+ assign  O_AOU_MSGCREDIT_CRED_VALID  = ~I_STATUS_DISABLE;
+ //-------------------------------------------------------------
+ 
+-assign  O_AOU_CRDTGRANT_WRESPCRED3  = w_crd_advertise_rising_edge_detect ? best_index_b[3]  : 2'b00;
+-assign  O_AOU_CRDTGRANT_RDATACRED3  = w_crd_advertise_rising_edge_detect ? best_index_r[3]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_WDATACRED3  = w_crd_advertise_rising_edge_detect ? best_index_w[3]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_RREQCRED3   = w_crd_advertise_rising_edge_detect ? best_index_ar[3] : 3'b000;
+-assign  O_AOU_CRDTGRANT_WREQCRED3   = w_crd_advertise_rising_edge_detect ? best_index_aw[3] : 3'b000;
+-
+-assign  O_AOU_CRDTGRANT_WRESPCRED2  = w_crd_advertise_rising_edge_detect ? best_index_b[2]  : 2'b00;
+-assign  O_AOU_CRDTGRANT_RDATACRED2  = w_crd_advertise_rising_edge_detect ? best_index_r[2]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_WDATACRED2  = w_crd_advertise_rising_edge_detect ? best_index_w[2]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_RREQCRED2   = w_crd_advertise_rising_edge_detect ? best_index_ar[2] : 3'b000;
+-assign  O_AOU_CRDTGRANT_WREQCRED2   = w_crd_advertise_rising_edge_detect ? best_index_aw[2] : 3'b000;
+-
+-assign  O_AOU_CRDTGRANT_WRESPCRED1  = w_crd_advertise_rising_edge_detect ? best_index_b[1]  : 2'b00;
+-assign  O_AOU_CRDTGRANT_RDATACRED1  = w_crd_advertise_rising_edge_detect ? best_index_r[1]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_WDATACRED1  = w_crd_advertise_rising_edge_detect ? best_index_w[1]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_RREQCRED1   = w_crd_advertise_rising_edge_detect ? best_index_ar[1] : 3'b000;
+-assign  O_AOU_CRDTGRANT_WREQCRED1   = w_crd_advertise_rising_edge_detect ? best_index_aw[1] : 3'b000;
+-
+-assign  O_AOU_CRDTGRANT_WRESPCRED0  = w_crd_advertise_rising_edge_detect ? best_index_b[0]  : 2'b00;
+-assign  O_AOU_CRDTGRANT_RDATACRED0  = w_crd_advertise_rising_edge_detect ? best_index_r[0]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_WDATACRED0  = w_crd_advertise_rising_edge_detect ? best_index_w[0]  : 3'b000;
+-assign  O_AOU_CRDTGRANT_RREQCRED0   = w_crd_advertise_rising_edge_detect ? best_index_ar[0] : 3'b000;
+-assign  O_AOU_CRDTGRANT_WREQCRED0   = w_crd_advertise_rising_edge_detect ? best_index_aw[0] : 3'b000;
++assign  O_AOU_CRDTGRANT_WRESPCRED3  = w_crd_advertise_rising_edge_detect ? best_index_b[3]  : 2'b00;  
++assign  O_AOU_CRDTGRANT_RDATACRED3  = w_crd_advertise_rising_edge_detect ? best_index_r[3]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_WDATACRED3  = w_crd_advertise_rising_edge_detect ? best_index_w[3]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_RREQCRED3   = w_crd_advertise_rising_edge_detect ? best_index_ar[3] : 3'b000; 
++assign  O_AOU_CRDTGRANT_WREQCRED3   = w_crd_advertise_rising_edge_detect ? best_index_aw[3] : 3'b000; 
++                                                                                                    
++assign  O_AOU_CRDTGRANT_WRESPCRED2  = w_crd_advertise_rising_edge_detect ? best_index_b[2]  : 2'b00; 
++assign  O_AOU_CRDTGRANT_RDATACRED2  = w_crd_advertise_rising_edge_detect ? best_index_r[2]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_WDATACRED2  = w_crd_advertise_rising_edge_detect ? best_index_w[2]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_RREQCRED2   = w_crd_advertise_rising_edge_detect ? best_index_ar[2] : 3'b000; 
++assign  O_AOU_CRDTGRANT_WREQCRED2   = w_crd_advertise_rising_edge_detect ? best_index_aw[2] : 3'b000; 
++
++assign  O_AOU_CRDTGRANT_WRESPCRED1  = w_crd_advertise_rising_edge_detect ? best_index_b[1]  : 2'b00;  
++assign  O_AOU_CRDTGRANT_RDATACRED1  = w_crd_advertise_rising_edge_detect ? best_index_r[1]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_WDATACRED1  = w_crd_advertise_rising_edge_detect ? best_index_w[1]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_RREQCRED1   = w_crd_advertise_rising_edge_detect ? best_index_ar[1] : 3'b000; 
++assign  O_AOU_CRDTGRANT_WREQCRED1   = w_crd_advertise_rising_edge_detect ? best_index_aw[1] : 3'b000; 
++
++assign  O_AOU_CRDTGRANT_WRESPCRED0  = w_crd_advertise_rising_edge_detect ? best_index_b[0]  : 2'b00; 
++assign  O_AOU_CRDTGRANT_RDATACRED0  = w_crd_advertise_rising_edge_detect ? best_index_r[0]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_WDATACRED0  = w_crd_advertise_rising_edge_detect ? best_index_w[0]  : 3'b000; 
++assign  O_AOU_CRDTGRANT_RREQCRED0   = w_crd_advertise_rising_edge_detect ? best_index_ar[0] : 3'b000; 
++assign  O_AOU_CRDTGRANT_WREQCRED0   = w_crd_advertise_rising_edge_detect ? best_index_aw[0] : 3'b000; 
+ 
+ assign  O_AOU_CRDTGRANT_VALID       = w_crd_advertise_rising_edge_detect;
+ 
+-endmodule
++endmodule 

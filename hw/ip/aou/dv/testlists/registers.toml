@@ -1,0 +1,177 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Register tests on the APB-only register bench (TB=reg).
+# The register bench's aggregate (aou_reg_sim_cfg.toml [testlist]).
+#
+# Register tests on the APB-only bench. tb: reg; no config.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_reg_hw_reset_test"
+module = { uvm = "aou_reg_hw_reset_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+
+[[tests]]
+name = "aou_reg_bit_bash_test"
+module = { uvm = "aou_reg_bit_bash_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "in bit #22 of register \"aou_core\\.axi_slv_id_mismatch_err_rp|Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
+
+[[tests]]
+name = "aou_reg_access_test"
+module = { uvm = "aou_reg_access_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+
+[[tests]]
+name = "aou_reg_reserved_test"
+module = { uvm = "aou_reg_reserved_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+expect_fail = "BUGS/003 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp"
+
+[[tests]]
+name = "aou_reg_alias_test"
+module = { uvm = "aou_reg_alias_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+
+[[tests]]
+name = "aou_reg_feature_seq_test"
+module = { uvm = "aou_reg_feature_seq_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+
+# PCLK:CLK ratios through the asynchronous APB bridge (plan 11.17): slow
+# (25 MHz), fast (1.67 GHz, PCLK faster than CLK) and near-equal (987 MHz, so
+# the phase drifts through every alignment). CLK stays 1 GHz.
+[[tests]]
+name = "aou_reg_bit_bash_test.pclk_ps-40000"
+module = { uvm = "aou_reg_bit_bash_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+args = ["+pclk_ps=40000"]
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "in bit #22 of register \"aou_core\\.axi_slv_id_mismatch_err_rp|Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
+
+[[tests]]
+name = "aou_reg_bit_bash_test.pclk_ps-600"
+module = { uvm = "aou_reg_bit_bash_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+args = ["+pclk_ps=600"]
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "in bit #22 of register \"aou_core\\.axi_slv_id_mismatch_err_rp|Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
+
+[[tests]]
+name = "aou_reg_bit_bash_test.pclk_ps-1013"
+module = { uvm = "aou_reg_bit_bash_test" }
+seed = 1
+reseed = 2
+tags = ["registers"]
+run_modes = ["registers"]
+args = ["+pclk_ps=1013"]
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "in bit #22 of register \"aou_core\\.axi_slv_id_mismatch_err_rp|Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
+
+[[tests]]
+name = "aou_reg_access_test.pclk_ps-40000"
+module = { uvm = "aou_reg_access_test" }
+seed = 1
+tags = ["registers"]
+run_modes = ["registers"]
+args = ["+pclk_ps=40000"]
+expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+
+[[tests]]
+name = "aou_reg_access_test.pclk_ps-600"
+module = { uvm = "aou_reg_access_test" }
+seed = 1
+tags = ["registers"]
+run_modes = ["registers"]
+args = ["+pclk_ps=600"]
+expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+
+[[tests]]
+name = "aou_reg_access_test.pclk_ps-1013"
+module = { uvm = "aou_reg_access_test" }
+seed = 1
+tags = ["registers"]
+run_modes = ["registers"]
+args = ["+pclk_ps=1013"]
+expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+
+[[groups]]
+name = "registers"
+expected_count = 12
+tests = [
+  "aou_reg_hw_reset_test",
+  "aou_reg_bit_bash_test",
+  "aou_reg_access_test",
+  "aou_reg_reserved_test",
+  "aou_reg_alias_test",
+  "aou_reg_feature_seq_test",
+  "aou_reg_bit_bash_test.pclk_ps-40000",
+  "aou_reg_bit_bash_test.pclk_ps-600",
+  "aou_reg_bit_bash_test.pclk_ps-1013",
+  "aou_reg_access_test.pclk_ps-40000",
+  "aou_reg_access_test.pclk_ps-600",
+  "aou_reg_access_test.pclk_ps-1013",
+]
+
+# Bring-up gate of the register bench
+[[groups]]
+name = "smoke"
+expected_count = 1
+tests = [
+  "aou_reg_hw_reset_test",
+]
+
+[[groups]]
+name = "all"
+expected_count = 12
+tests = [
+  "aou_reg_hw_reset_test",
+  "aou_reg_bit_bash_test",
+  "aou_reg_access_test",
+  "aou_reg_reserved_test",
+  "aou_reg_alias_test",
+  "aou_reg_feature_seq_test",
+  "aou_reg_bit_bash_test.pclk_ps-40000",
+  "aou_reg_bit_bash_test.pclk_ps-600",
+  "aou_reg_bit_bash_test.pclk_ps-1013",
+  "aou_reg_access_test.pclk_ps-40000",
+  "aou_reg_access_test.pclk_ps-600",
+  "aou_reg_access_test.pclk_ps-1013",
+]

@@ -1,0 +1,328 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The RTL's ASSERTION_ON checks (plan 11.18) on the <CONFIG>-assert targets.
+#
+# Regression on a build with the RTL's own ASSERTION_ON checks (plan 11.18): FIFO
+# ready/valid, M-port AW/AR stability in the 1xN switch, table ID errors in the
+# early-response, aggregator, splitter and downsizer tables. The WLAST generator's
+# AWREADY-within-500-cycles check is off (BUGS/054, tb/tb_top.sv). A firing
+# assertion calls $finish before the UVM report, so check_run.py judges the run FAIL.
+# +rtl_asserts=1 makes a run on a build without the assertions fatal, so these
+# entries pass only on an assertion build:
+#   make build RTL_ASSERT=1 CONFIG=<c>
+#   python3 scripts/run_list.py --target <c>-assert --items assertions
+# A representative set per configuration: data path, every table the assertions
+# watch, AXI back-pressure, multi-RP switching and width conversion.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_t1_slice_test.rtl_asserts-1.1x512-sp64-assert"
+module = { uvm = "aou_t1_slice_test" }
+target = "1x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.dp_profile-stall.rtl_asserts-1"
+module = { uvm = "aou_dp_random_test" }
+target = "1x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+dp_dir=both", "+dp_profile=stall", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dp_burst_test.dp_len-31_63_255.rtl_asserts-1"
+module = { uvm = "aou_dp_burst_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+dp_len=31,63,255", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dp_outstanding_test.dp_batch-16.dp_ids-same.rtl_asserts-1"
+module = { uvm = "aou_dp_outstanding_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+dp_batch=16", "+dp_ids=same", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-0_15_63_255.rtl_asserts-1"
+module = { uvm = "aou_split_test" }
+target = "1x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+split_aw=sweep", "+split_ar=sweep", "+dp_len=0,15,63,255", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_aggregator_test.agg_en-1.rtl_asserts-1"
+module = { uvm = "aou_aggregator_test" }
+target = "1x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+agg_en=1", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.early_full-1.rtl_asserts-1"
+module = { uvm = "aou_early_bresp_test" }
+target = "1x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+early_en=1", "+early_full=1", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-all.rtl_asserts-1"
+module = { uvm = "aou_stress_test" }
+target = "1x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+st_bp=all", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-w.rtl_asserts-1"
+module = { uvm = "aou_stress_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+st_bp=w", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-aw.rtl_asserts-1"
+module = { uvm = "aou_stress_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+st_bp=aw", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.rtl_asserts-1.1x512-sp64-assert"
+module = { uvm = "aou_dw_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+remote_bytes=32", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-1.rtl_asserts-1"
+module = { uvm = "aou_lp_mode_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+lp_mode=1", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_link_event_test.event-retrain.rtl_asserts-1"
+module = { uvm = "aou_link_event_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+event=retrain", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_credit_return_test.method-grant.rtl_asserts-1"
+module = { uvm = "aou_credit_return_test" }
+target = "1x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+method=grant", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_t1_slice_test.rtl_asserts-1.4x512-sp64-assert"
+module = { uvm = "aou_t1_slice_test" }
+target = "4x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.rtl_asserts-1"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+mrp_scn=interleave", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-3.rtl_asserts-1"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+arb_mode=1", "+qos_tiers=3", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dest_rp_test.rtl_asserts-1"
+module = { uvm = "aou_dest_rp_test" }
+target = "4x512-sp64-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_t1_slice_test.rtl_asserts-1.4xmix4211-sp128-assert"
+module = { uvm = "aou_t1_slice_test" }
+target = "4xmix4211-sp128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128_128_64_64.rtl_asserts-1"
+module = { uvm = "aou_dw_test" }
+target = "4xmix4211-sp128-assert"
+seed = 1
+reseed = 2
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+remote_bytes=128,128,64,64", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dw_down1024_test.rtl_asserts-1"
+module = { uvm = "aou_dw_down1024_test" }
+target = "4xmix4211-sp128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+expect_fail = "BUGS/025 (expected_fail.yaml)"
+expect_fail_match = "AXI-S02: remote->local"
+
+[[tests]]
+name = "aou_aggregator_test.agg_en-1.dp_size-5.agg_need-32_128.rtl_asserts-1"
+module = { uvm = "aou_aggregator_test" }
+target = "4xmix4211-sp128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+agg_en=1", "+dp_size=5", "+agg_need=32:128", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-indep.rtl_asserts-1"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+mrp_scn=indep", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_t1_slice_test.rtl_asserts-1.2xmix-tp64_128-assert"
+module = { uvm = "aou_t1_slice_test" }
+target = "2xmix-tp64_128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.rtl_asserts-1"
+module = { uvm = "aou_mrp_test" }
+target = "2xmix-tp64_128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.rtl_asserts-1.2xmix-tp64_128-assert"
+module = { uvm = "aou_dw_test" }
+target = "2xmix-tp64_128-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+remote_bytes=32", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_t1_slice_test.rtl_asserts-1.1x256-sp32-assert"
+module = { uvm = "aou_t1_slice_test" }
+target = "1x256-sp32-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.rtl_asserts-1"
+module = { uvm = "aou_dp_random_test" }
+target = "1x256-sp32-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+dp_dir=both", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-64.rtl_asserts-1"
+module = { uvm = "aou_dw_test" }
+target = "1x256-sp32-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+remote_bytes=64", "+rtl_asserts=1"]
+
+[[groups]]
+name = "assertions"
+expected_count = 29
+tests = [
+  "aou_t1_slice_test.rtl_asserts-1.1x512-sp64-assert",
+  "aou_dp_random_test.dp_dir-both.dp_profile-stall.rtl_asserts-1",
+  "aou_dp_burst_test.dp_len-31_63_255.rtl_asserts-1",
+  "aou_dp_outstanding_test.dp_batch-16.dp_ids-same.rtl_asserts-1",
+  "aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-0_15_63_255.rtl_asserts-1",
+  "aou_aggregator_test.agg_en-1.rtl_asserts-1",
+  "aou_early_bresp_test.early_en-1.early_full-1.rtl_asserts-1",
+  "aou_stress_test.st_bp-all.rtl_asserts-1",
+  "aou_stress_test.st_bp-w.rtl_asserts-1",
+  "aou_stress_test.st_bp-aw.rtl_asserts-1",
+  "aou_dw_test.remote_bytes-32.rtl_asserts-1.1x512-sp64-assert",
+  "aou_lp_mode_test.lp_mode-1.rtl_asserts-1",
+  "aou_link_event_test.event-retrain.rtl_asserts-1",
+  "aou_credit_return_test.method-grant.rtl_asserts-1",
+  "aou_t1_slice_test.rtl_asserts-1.4x512-sp64-assert",
+  "aou_mrp_test.mrp_scn-interleave.rtl_asserts-1",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-3.rtl_asserts-1",
+  "aou_dest_rp_test.rtl_asserts-1",
+  "aou_t1_slice_test.rtl_asserts-1.4xmix4211-sp128-assert",
+  "aou_dw_test.remote_bytes-128_128_64_64.rtl_asserts-1",
+  "aou_dw_down1024_test.rtl_asserts-1",
+  "aou_aggregator_test.agg_en-1.dp_size-5.agg_need-32_128.rtl_asserts-1",
+  "aou_mrp_test.mrp_scn-indep.rtl_asserts-1",
+  "aou_t1_slice_test.rtl_asserts-1.2xmix-tp64_128-assert",
+  "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.rtl_asserts-1",
+  "aou_dw_test.remote_bytes-32.rtl_asserts-1.2xmix-tp64_128-assert",
+  "aou_t1_slice_test.rtl_asserts-1.1x256-sp32-assert",
+  "aou_dp_random_test.dp_dir-both.rtl_asserts-1",
+  "aou_dw_test.remote_bytes-64.rtl_asserts-1",
+]

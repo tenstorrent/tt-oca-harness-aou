@@ -1,0 +1,23 @@
+`verilator_config
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: (c) 2026 Tenstorrent USA Inc
+// Lint configuration for the testbench; see the coding guidelines.
+// RTL, uvm-core and the OCAH shared library (tt-oca-harness
+// hw/common/dv/vip, fetched by scripts/get_ocah_lib.sh or supplied by the
+// harness tree) are excluded: they have their own owners.
+lint_off -file "*/RTL/*"
+lint_off -rule WIDTHCONCAT -file "*/RTL/*"
+lint_off -file "*/uvm-core/*"
+lint_off -file "*/hw/common/dv/vip/*"
+lint_off -rule TIMESCALEMOD
+
+// Testbench interfaces carry whole buses; each component uses part of them.
+lint_off -rule UNUSEDSIGNAL -file "*/hw/ip/aou/dv/*"
+lint_off -rule UNUSEDPARAM -file "*/hw/ip/aou/dv/*"
+// Packages include many class files, so declarations never match file names.
+lint_off -rule DECLFILENAME -file "*/hw/ip/aou/dv/*"
+
+// One aou_axi_bus_if type serves both ends of a port (ARCHITECTURE.md): on
+// the T1 top the DUT side of each instance is wired with assigns, while the
+// clocking block of the other end exists but is never used there.
+lint_off -rule MULTIDRIVENPROC -file "*/hw/ip/aou/dv/uvm/env/axi/aou_axi_bus_if.sv"

@@ -1,0 +1,101 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The L3 protocol model and AOU_FDI_CHECKER unit bench (TB=l3_unit, no DUT).
+# The bench's aggregate (aou_l3_unit_sim_cfg.toml [testlist]).
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_l3_codec_test"
+module = { uvm = "aou_l3_codec_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_credit_test"
+module = { uvm = "aou_l3_credit_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_crossflit_test"
+module = { uvm = "aou_l3_crossflit_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_dest_rp_test"
+module = { uvm = "aou_l3_dest_rp_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_inject_test"
+module = { uvm = "aou_l3_inject_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_link_test"
+module = { uvm = "aou_l3_link_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_loopback_test"
+module = { uvm = "aou_l3_loopback_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[tests]]
+name = "aou_l3_unit_env_test"
+module = { uvm = "aou_l3_unit_env_test" }
+seed = 1
+tags = ["l3_unit"]
+run_modes = ["l3_unit"]
+
+[[groups]]
+name = "l3_unit"
+expected_count = 8
+tests = [
+  "aou_l3_codec_test",
+  "aou_l3_credit_test",
+  "aou_l3_crossflit_test",
+  "aou_l3_dest_rp_test",
+  "aou_l3_inject_test",
+  "aou_l3_link_test",
+  "aou_l3_loopback_test",
+  "aou_l3_unit_env_test",
+]
+
+[[groups]]
+name = "smoke"
+expected_count = 1
+tests = [
+  "aou_l3_codec_test",
+]
+
+[[groups]]
+name = "all"
+expected_count = 8
+tests = [
+  "aou_l3_codec_test",
+  "aou_l3_credit_test",
+  "aou_l3_crossflit_test",
+  "aou_l3_dest_rp_test",
+  "aou_l3_inject_test",
+  "aou_l3_link_test",
+  "aou_l3_loopback_test",
+  "aou_l3_unit_env_test",
+]

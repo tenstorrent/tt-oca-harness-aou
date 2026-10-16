@@ -33,16 +33,3 @@ updates:
     open-pull-requests-limit: 3
     commit-message:
       prefix: "deps"
-
-  # Cocotb testbench Python deps.
-  - package-ecosystem: "pip"
-    directory: "/VERIF"
-    schedule:
-      interval: "weekly"
-      day: "monday"
-    groups:
-      cocotb:
-        patterns: ["*"]
-    open-pull-requests-limit: 3
-    commit-message:
-      prefix: "verif"

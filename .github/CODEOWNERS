@@ -5,5 +5,5 @@
 # Protected design + verification + register source: require review from the
 # maintainers team before merge into main.
 /RTL/   @tenstorrent/aou-rtl-maintainers
-/VERIF/ @tenstorrent/aou-rtl-maintainers
+/hw/ip/aou/dv/ @tenstorrent/aou-rtl-maintainers
 /csr/   @tenstorrent/aou-rtl-maintainers

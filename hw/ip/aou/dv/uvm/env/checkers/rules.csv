@@ -1,0 +1,271 @@
+rule,checker,secondary,scope,description,reference
+APB-R01,aou_apb_if,,MODEL,PSEL and PENABLE are low while PRESETN is low,AMBA APB (IHI 0024) reset; amiq_apb sel/enable post-reset
+APB-R02,aou_apb_if,,MODEL,PSEL and PENABLE are never X/Z out of reset,amiq_apb X/Z checks
+APB-R03,aou_apb_if,,MODEL,PADDR and PWRITE are known while PSEL is high,amiq_apb X/Z checks
+APB-R04,aou_apb_if,,MODEL,PWDATA is known while a write is selected,amiq_apb X/Z checks
+APB-R05,aou_apb_if,,MODEL,PENABLE is only high together with PSEL,APB operating states; amiq_apb enable between transfers
+APB-R06,aou_apb_if,,MODEL,a SETUP cycle is followed by an ACCESS cycle,APB operating states
+APB-R07,aou_apb_if,,MODEL,an ACCESS cycle with PREADY low is extended,APB wait states
+APB-R08,aou_apb_if,,MODEL,PENABLE goes low after the completing ACCESS cycle,APB operating states
+APB-R09,aou_apb_if,,MODEL,PADDR is stable from SETUP to completion,APB transfers; amiq_apb addr stability
+APB-R10,aou_apb_if,,MODEL,PWRITE is stable from SETUP to completion,APB transfers; amiq_apb write stability
+APB-R11,aou_apb_if,,MODEL,PWDATA is stable from SETUP until a write completes,APB write transfers; amiq_apb wdata stability
+APB-R12,aou_apb_if,,DUT,PREADY and PSLVERR are known in every ACCESS cycle,amiq_apb X/Z checks
+APB-R13,aou_apb_if,,DUT,PRDATA is known when a read completes without error,amiq_apb rdata checks
+APB-R14,aou_apb_monitor,,DUT,PREADY is low for at most max_wait_cycles ACCESS cycles,amiq_apb ready low maximum time
+REG-R01,uvm_reg_hw_reset_seq,,DUT,every compared field reads its RDL reset value after reset,csr/aou-core.rdl
+REG-R02,aou_reg_base_seq,,DUT,an RW field reads back what was written (MAX_AxBURSTLEN: 2^n-1 or 0xF),csr/aou-core.rdl; MAS architecture.adoc splitter
+REG-R03,aou_reg_base_seq,,DUT,an RO field is not changed by writes,csr/aou-core.rdl
+REG-R04,aou_reg_base_seq,,DUT,a W1C field clears on 1 and ignores 0,csr/aou-core.rdl
+REG-R05,aou_reg_access_seq,,DUT,the write-only DEACTIVATE_FORCE reads 0,csr/aou-core.rdl
+REG-R06,aou_reg_base_seq,,DUT,reserved bits read 0 after writes of 1,csr/aou-core.rdl
+REG-R07,aou_reg_reserved_seq,,DUT,writes to unmapped offsets change no register,csr/aou-core.rdl address map
+REG-R08,aou_reg_alias_seq,,DUT,a write at offset + k*64KiB updates the register at offset,assumed 16-bit decode (not documented)
+REG-R09,aou_reg_alias_seq,,DUT,a read at offset + k*64KiB returns the register at offset,assumed 16-bit decode (not documented)
+REG-R10,aou_reg_base_seq,,DUT,accesses to mapped registers complete without PSLVERR,AMBA APB; csr/aou-core.rdl
+REG-R11,aou_reg_access_seq,,DUT,AOU_SW_RESET reads back as written (RW),csr/aou-core.rdl; MAS software-operation.adoc
+AXI-R01,aou_axi_monitor,,DUT,AWVALID stays high and the AW payload stays stable until AWREADY,AXI4 A3.2.1
+AXI-R02,aou_axi_monitor,,DUT,WVALID stays high and the W payload stays stable until WREADY,AXI4 A3.2.1
+AXI-R03,aou_axi_monitor,,DUT,BVALID stays high and the B payload stays stable until BREADY,AXI4 A3.2.1
+AXI-R04,aou_axi_monitor,,DUT,ARVALID stays high and the AR payload stays stable until ARREADY,AXI4 A3.2.1
+AXI-R05,aou_axi_monitor,,DUT,RVALID stays high and the R payload stays stable until RREADY,AXI4 A3.2.1
+AXI-R06,aou_axi_monitor,,DUT,A W burst has AWLEN+1 beats with WLAST on the last one only,AXI4 A3.4.1
+AXI-R07,aou_axi_monitor,,DUT,A B response matches an outstanding write ID whose AW and last W handshakes are done,AXI4 A3.3.1/A5.2
+AXI-R08,aou_axi_monitor,,DUT,An R beat matches an outstanding read ID,AXI4 A5.2
+AXI-R09,aou_axi_monitor,,DUT,RLAST is on the last beat of the read and no other,AXI4 A3.4.1
+AXI-R10,aou_axi_monitor,,DUT,An INCR burst does not cross a 4KB boundary,AXI4 A3.4.1
+AXI-R11,aou_axi_monitor,,DUT,A WRAP burst has 2/4/8/16 beats and a size-aligned start address,AXI4 A3.4.1
+AXI-R12,aou_axi_monitor,,DUT,AxBURST is not the reserved value 2'b11,AXI4 A3.4.1
+AXI-R13,aou_axi_monitor,,DUT,AxSIZE does not exceed the data bus width,AXI4 A3.4.1
+AXI-R14,aou_axi_monitor,,DUT,A FIXED burst has at most 16 beats,AXI4 A3.4.1
+AXI-R15,aou_axi_monitor,,DUT,An exclusive access is 2^n bytes up to 128; aligned to its size; at most 16 beats,AXI4 A7.2.4
+AXI-R16,aou_axi_monitor,,DUT,WSTRB is set only on the active byte lanes of each beat,AXI4 A3.4.3
+AXI-R17,aou_axi_monitor,,DUT,Every request has completed by the end of the test,AXI4 A3.3
+AXI-R18,aou_axi_monitor,,DUT,No VALID signal is X or Z out of reset,AXI4 A3.1.2
+AXI-R19,aou_axi_monitor,,MODEL,"On an INCR-only port (the DUT's S ports) every AW/AR burst is INCR; anything else is a test-stimulus error (AoU carries no AxBURST, the DUT supports INCR only)",AoU 2.5 / Basic Profile BURST=INCR; DECISIONS D5
+AXI-S01,aou_scoreboard,,DUT,BRESP equals the target memory's response (error region; exclusive OKAY/EXOKAY); SLVERR allowed if outstanding at AOU_SW_RESET,ARCHITECTURE.md scoreboard rule
+AXI-S02,aou_scoreboard,,DUT,After B the target memory holds the written bytes,ARCHITECTURE.md scoreboard rule
+AXI-S03,aou_scoreboard,,DUT,Each RRESP equals the target memory's response for that beat; SLVERR allowed if outstanding at AOU_SW_RESET,ARCHITECTURE.md scoreboard rule
+AXI-S04,aou_scoreboard,,DUT,Read data equals golden memory on every active lane of OKAY/EXOKAY beats (a byte an aborted write strobed: old or written value),ARCHITECTURE.md scoreboard rule
+AXI-S05,aou_scoreboard,,DUT,At end of test the real memories equal golden on every written byte (a byte an aborted write strobed: old or written value),ARCHITECTURE.md scoreboard rule
+FDI-R01,aou_fdi_monitor,,DUT,A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both),UCIe r1.1 8.2.4
+FDI-R02,aou_fdi_monitor,,DUT,No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes (L1; checks the DUT),UCIe r1.1 8.2.4
+FDI-R03,by construction (aou_fdi_pl_driver),,MODEL,RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes),UCIe r1.1 8.2.4
+FDI-R04,via AOU-R3,,DUT,Flit byte k is FDI byte k mod N of transfer floor(k/N) both ways (a mis-mapped DUT flit decodes to undefined granules),UCIe r1.1 8.3.1
+FDI-R05,aou_fdi_monitor,,MODEL,pl_flit_cancel only in the cycle after the last beat of a 128B half (L1; checks the Adapter),UCIe r1.1 Table 8-2 pl_flit_cancel
+FDI-R06,n/a,,N/A,On pl_error the Adapter completes and cancels the partial flit (the DUT has no pl_error input),UCIe r1.1 Table 8-2 pl_error
+FDI-R07,aou_fdi_monitor,,DUT,pl_stallreq and lp_stallack both low at reset exit (L1; checks the both),UCIe r1.1 8.3.2
+FDI-R08,aou_fdi_monitor,by construction (aou_fdi_tx_responder),MODEL,pl_stallreq rises only with lp_stallack low and falls only with lp_stallack high (L1; checks the Adapter),UCIe r1.1 8.3.2
+FDI-R09,aou_fdi_monitor,,DUT,lp_stallack rises only with pl_stallreq high and falls only with pl_stallreq low (L1; checks the DUT),UCIe r1.1 8.3.2
+FDI-R10,aou_fdi_monitor,,DUT,lp_valid and lp_irdy low while lp_stallack is high (L1; checks the DUT),UCIe r1.1 8.3.2
+FDI-R11,by construction (aou_fdi_tx_responder),,MODEL,While pl_stallreq is high the Adapter accepts presented data until lp_stallack (TX responder holds pl_trdy) (L1; checks the Adapter),UCIe r1.1 8.3.2
+FDI-R12,aou_fdi_monitor,,DUT,At least one flop between pl_stallreq and lp_stallack (L1; checks the DUT),UCIe r1.1 8.3.2
+FDI-R13,aou_fdi_monitor,,DUT,lp_stallack rises only at a flit boundary (L1; checks the DUT),UCIe r1.1 8.3.2
+FDI-R14,aou_lsm_monitor,,MODEL,pl_wake_ack rises at least one clock after lp_wake_req (L2; checks the Adapter),UCIe r1.1 8.2.3.1
+FDI-R15,aou_lsm_monitor,,MODEL,pl_wake_ack falls only after lp_wake_req fell (L2; checks the Adapter),UCIe r1.1 8.2.3.1
+FDI-R16,aou_lsm_monitor,aou_bringup_model (FDI-M02),DUT,lp_wake_req is high when lp_state_req changes leaving Reset/PM/LinkReset/Disabled (L2; checks the DUT),UCIe r1.1 8.2.3 / 8.2.3.1; UCIe r3.0 wake handshake rules
+FDI-R17,n/a,,N/A,The PL waits for pl_wake_ack before driving lp_cfg (the DUT has no sideband config interface),UCIe r1.1 8.2.3.1
+FDI-R18,aou_lsm_monitor,aou_lsm_driver,DUT,lp_clk_ack rises at least one clock after pl_clk_req and answers it (L2; checks the DUT),UCIe r1.1 8.2.3.2
+FDI-R19,aou_lsm_monitor,aou_lsm_driver,DUT,lp_clk_ack falls after pl_clk_req falls (L2; checks the DUT),UCIe r1.1 8.2.3.2
+FDI-R20,by construction (aou_lsm_driver),,MODEL,"The Adapter may change level signals (inband_pres, rx_active_req, ...) without waiting for lp_clk_ack (a permission)",UCIe r1.1 8.2.3.2
+FDI-R21,by construction (aou_lsm_driver),,MODEL,pl_clk_req handshake before a LinkError transition from Reset/LinkReset/Disabled/PM (L2 enters LinkError only from Active),UCIe r1.1 8.2.3.2
+FDI-R22,not checked,,MODEL,"pl_clk_req asserted before leaving Reset/PM and held until the status leaves (L2 releases it before Active unless clk_req_hold_bringup, a deliberate variation)",UCIe r1.1 8.2.3.2
+FDI-R23,n/a,,N/A,The Adapter waits for lp_clk_ack before driving pl_cfg (no sideband config interface),UCIe r1.1 8.2.3.2
+FDI-R24,via FDI-M01,,DUT,No clock gating in LinkError; a gated PL in Reset requests Active only after pl_inband_pres (the bringup model predicts lp_state_req from inband_pres),UCIe r1.1 8.2.3 / 8.2.3.2
+FDI-R25,aou_lsm_monitor,,MODEL,pl_rx_active_req rises only with lp_rx_active_sts low in Reset/Retrain/Active (L2; checks the Adapter),UCIe r1.1 8.2.7
+FDI-R26,aou_lsm_monitor,aou_lsm_driver,DUT,lp_rx_active_sts rises at least one clock after pl_rx_active_req (L2; checks the DUT),UCIe r1.1 8.2.7
+FDI-R27,n/a,,N/A,pl_rx_active_req=1 and lp_rx_active_sts=1 means RX is Active (a definition),UCIe r1.1 8.2.7
+FDI-R28,aou_lsm_monitor,aou_lsm_driver,DUT,lp_rx_active_sts falls after pl_rx_active_req falls (L2; checks the DUT),UCIe r1.1 8.2.7
+FDI-R29,aou_lsm_monitor,,MODEL,rx_active req and sts both low before pl_state_sts leaves Active (except to LinkError) (L2; checks the Adapter),UCIe r1.1 8.2.7
+FDI-R30,by construction (aou_fdi_pl_driver),,MODEL,With pl_rx_active_req low in Active the Adapter sends no flits (the PL driver runs only while L2 has the gate open),UCIe r1.1 8.2.7
+FDI-R31,by construction (aou_lsm_driver),,MODEL,Active to LinkError: rx_active req and sts both low before leaving LinkError,UCIe r1.1 8.2.7
+FDI-R32,by construction (aou_lsm_driver),,MODEL,"Bring-up order: clk_req handshake, then pl_inband_pres=1",UCIe r1.1 8.2.8
+FDI-R33,aou_lsm_monitor,aou_lsm_driver,DUT,From Reset lp_state_req is NOP for at least one clock before Active (L2; checks the DUT),UCIe r1.1 8.2.8 / 8.3.3.1
+FDI-R34,by construction (aou_lsm_driver),,MODEL,"Active only after rx_active req and sts are both 1, on every entry to Active (Rsp.Active itself is sideband)",UCIe r1.1 8.2.8
+FDI-R35,aou_fdi_monitor,,MODEL,Flits go to the Protocol Layer only in Active (L1; checks the Adapter),UCIe r1.1 8.2.8
+FDI-R36,n/a,,N/A,Streaming PM is requested symmetrically over sideband,UCIe r1.1 8.2.9
+FDI-R37,via FDI-M01,,DUT,The PL requests L1/L2 only after blocking new flits and holds the request (the DUT never requests PM; any L1/L2 request diverges from the bringup model),UCIe r1.1 8.2.9
+FDI-R38,by construction (aou_lsm_driver),,MODEL,The Adapter enters PM only after the stallreq/ack handshake (L2 stalls the DUT TX first),UCIe r1.1 8.2.9 / 8.3.2
+FDI-R39,n/a,,N/A,"PM response timing and PMNAK (sideband, Adapter-internal)",UCIe r1.1 8.2.9
+FDI-R40,n/a,,N/A,From Active.PMNAK the PL requests Active (unreachable: the DUT never requests PM),UCIe r1.1 8.2.9
+FDI-R41,aou_lsm_driver,,DUT,After a remote-initiated PM exit the Protocol Layer requests Active (L2; checks the DUT),UCIe r1.1 8.2.9
+FDI-R42,aou_fdi_monitor,,DUT,lp_valid only with lp_irdy (L1; checks the DUT),UCIe r1.1 Table 8-2 lp_irdy
+FDI-R43,aou_fdi_monitor,,DUT,A TX flit starts only while pl_state_sts is Active (L1; checks the DUT),UCIe r1.1 8.2.4 / 8.3.3
+FDI-R44,aou_fdi_monitor,,DUT,lp_irdy low while pl_state_sts is Reset (after irdy_reset_grace cycles) (L1; checks the DUT),UCIe r1.1 Table 8-2 lp_irdy
+FDI-R45,aou_fdi_monitor,,DUT,TX flit: Byte0[7:6] (Protocol ID) non-zero; other Flit Header bits and CRC bytes zero (L1; checks the DUT),UCIe r1.1 2.4.4 / 3.3.4
+FDI-R46,aou_lsm_monitor,,DUT,lp_state_req never takes a reserved value (per fdi_enc) (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_state_req
+FDI-R47,aou_lsm_monitor,,DUT,No Retrain request outside Raw Format (fdi_enc=SPEC) (L2; checks the DUT),UCIe r1.1 8.3.3.4
+FDI-R48,aou_lsm_driver,,DUT,Retrain entered from Active ends with a NOP->Active request at any time in Retrain (fdi_enc=SPEC) (L2; checks the DUT),UCIe r1.1 8.3.3.4
+FDI-R49,aou_lsm_driver,,DUT,A LinkError the Protocol Layer requested on lp_linkerror ends with lp_state_req=Active and lp_linkerror=0 within req_timeout (fdi_enc=SPEC; L2; checks the DUT),UCIe r1.1 8.3.3.7 / Table 8-3; BUGS/001
+FDI-R50,aou_lsm_driver,,DUT,"In a LinkReset or Disabled the Adapter entered on its own, the Protocol Layer requests Active within req_timeout (fdi_enc=SPEC; interim expectation: the spec lets the Protocol Layer hold the link down, BUGS/001 owner decision; L2; checks the DUT)",UCIe r1.1 8.3.3.5 / 8.3.3.6; BUGS/001
+FDI-R51,aou_lsm_driver,,DUT,"After LinkError/LinkReset/Disabled -> Reset the Protocol Layer gives a NOP->Active transition on lp_state_req within train_timeout, or the link does not train again (fdi_enc=SPEC; L2; checks the DUT)",UCIe r1.1 8.3.3.8 (same rule in r3.0); BUGS/038
+FDI-R56,aou_lsm_monitor,aou_bringup_model (FDI-M01),DUT,"The DUT never requests L2 on lp_state_req (L2 is not implemented, integration guide 6.6.6 GAP-3; without that request the Adapter cannot enter L2, UCIe r1.1 8.2.9) (L2; checks the DUT)",integration guide 6.6.6 GAP-3; UCIe r1.1 8.2.9
+FDI-R57,aou_fdi_monitor,,DUT,lp_stallack answers pl_stallreq within stall_timeout cycles (the Protocol Layer stalls at the next flit boundary; liveness bound of the testbench) (L1; checks the DUT),UCIe r1.1 8.3.2
+FDI-M01,aou_bringup_model,,DUT,lp_state_req matches the bringup model; in Retrain (fdi_enc=SPEC) NOP or Active after NOP; with fdi_enc=SPEC Active in LinkError once the Adapter reported it and in LinkReset/Disabled; LinkReset or Disabled for teardown; in Reset after LinkError/LinkReset/Disabled (fdi_enc=SPEC) NOP or the training trigger's Active after NOP (L2; checks the DUT),integrator guide 3.14 / 6.6 / UCIe r1.1 8.3.3.1 / 8.3.3.4-8.3.3.8 / Table 8-3
+FDI-M02,aou_bringup_model,,DUT,"lp_wake_req matches the bringup model; in Reset after LinkError/LinkReset/Disabled (fdi_enc=SPEC) either value until the training trigger's Active (or pl_inband_pres with pl_wake_ack), then 0 (L2; checks the DUT)",integrator guide 6.6.2 / UCIe r1.1 8.2.3.1 / 8.3.3.8
+FDI-M03,aou_bringup_model,,DUT,lp_clk_ack follows pl_clk_req (L2; checks the DUT),UCIe r1.1 8.2.3.2
+FDI-M04,aou_bringup_model,,DUT,lp_rx_active_sts follows pl_rx_active_req outside Reset/LinkError (L2; checks the DUT),integrator guide 6.6.2 / UCIe r1.1 8.2.7
+FDI-M05,aou_bringup_model,,DUT,O_FDI_FSM_STATE matches the bringup model (L2; checks the DUT),integrator guide 3.16
+FDI-M06,aou_bringup_model,,DUT,O_FDI_LINK_UP matches the bringup model; low in LinkReset/Disabled (L2; checks the DUT),integrator guide 3.16 / 6.6 / UCIe r1.1 Table 8-2 pl_state_sts
+AOU-R1,aou_unpacker,,DUT,Every flit carries the 10-byte protocol header; its RsvdZero bits are 0,AoU 7.2; 4.3 Fig 5
+AOU-R2,via AOU-R11,by construction (L3 packer),DUT,Every message is a whole number of 5-byte granules with RsvdZero padding (lengths come from MSGTYPE/DLENGTH; the padding is checked as RsvdZero),AoU 4.2/4.4
+AOU-R3,aou_unpacker,aou_fdi_chk_adapter,DUT,A MsgStart granule decodes to a defined MSGTYPE/MISCOP/ACTIVATIONOP/DLENGTH,AoU 4.3.2 Table 1/15/27 5.4
+AOU-R4,aou_unpacker,aou_fdi_chk_adapter,DUT,No MsgStart inside the body of a message in the same flit,AoU 4.4
+AOU-R5,aou_unpacker,,DUT,A message spanning flits continues at G0 of the next flit with no MsgStart in the continuation,AoU 4.4
+AOU-R6,aou_unpacker,aou_fdi_chk_adapter,DUT,At most one Activation message per flit and only at G0 (v0.8: alone in its flit),AoU 4.4
+AOU-R7,aou_unpacker,,N/A,v0.8 only: at most 2 non-Activation Misc messages per half-flit (checked with spec_rev=v0.8; the DUT is v0.7),AoU v0.8 4.4
+AOU-R8,aou_unpacker,,DUT,ActivateReq and ActivateAck from one side are in different flits,AoU 9.2
+AOU-R9,aou_unpacker,aou_fdi_chk_adapter,DUT,Flit FDId names the bridge pair under test,AoU 4.3.1
+AOU-R10,via AOU-R3,by construction (L3 packer),DUT,AXI traffic travels only as defined AoU messages (a DUT message must decode to a defined type),AoU 4.4
+AOU-R11,aou_unpacker,aou_fdi_chk_adapter,DUT,RsvdZero fields are zero; CrdtGrant fields of an unimplemented RP are zero,AoU 5.x 6.4.2 Table 26
+AOU-R12,aou_unpacker,,N/A,v0.8 only: Basic Profile ActivateReq ProfileID/Rev/Opt are zero (the v0.7 ActivateReq has no profile fields),AoU v0.8 11.1
+AOU-R13,aou_l3_model,,DUT,ReadData DLENGTH matches the ARSIZE of its ReadReq (256 below 256 bits),AoU 5.7
+AOU-R14,aou_unpacker,aou_fdi_chk_adapter,DUT,RP fields (messages and MsgCredit) stay below the implemented RP count,AoU 6.4.1
+AOU-R15,via AOU-R24,,DUT,The receiver advertises all five credit classes for every RP (the DUT's initial CrdtGrant must cover each),AoU 6.1
+AOU-R16,aou_l3_model,aou_fdi_chk_adapter,DUT,No credited message starts without credit for all its granules (consumed at start),AoU 6.1
+AOU-R17,via AOU-R16,by construction (L3 packer),DUT,"WriteData and WriteDataFull draw on WDATACRED (the model charges both to WDATA, so misuse overruns it)",AoU 6.1
+AOU-R18,via AOU-R31,by construction (aou_credit_mgr hdr_decode),DUT,Header MsgCredit applies to RP MsgCredit[15:14] (credit returned on the wrong RP leaves the right one short at quiescence),AoU 6.2 Table 16
+AOU-R19,via AOU-R9,,DUT,Credits in a flit belong to the FDId initiator (single bridge pair: the flit FDId is checked),AoU 6.4
+AOU-R20,via AOU-R16,by construction (aou_l3_model adds both),DUT,Header and CrdtGrant credits in one flit add up (a DUT that double-counts ours overruns AOU-R16; unit test aou_l3_credit_test),AoU 6.4
+AOU-R21,aou_fdi_chk_adapter,by construction (aou_credit_mgr saturates),DUT,Credit counters saturate on over-grant; checker reports advertisement beyond its capacity,AoU 6.4 (v0.7.1)
+AOU-R22,by construction (aou_credit_mgr decode),,MODEL,"*CRED decode per Table 17; WRESPCRED is 2 bits (every code is defined, so nothing on the wire can violate it)",AoU 6.4.1
+AOU-R23,n/a,,N/A,Unimplemented channels start with zero credit (the DUT has no asymmetric channel configuration),AoU 6.3
+AOU-R24,aou_l3_model,,DUT,After activation the DUT sends a CrdtGrant covering every class of every RP,AoU 6.4.3; MAS 3.9
+AOU-R25,by construction (aou_l3_model),,MODEL,Misc messages are never credit-checked (the model charges no credit for Misc; a DUT that did could not be told apart),AoU 6.4.1
+AOU-R26,aou_l3_model,,DUT,No credits or credited messages in DISABLED; no credits after one's DeactivateAck (see BUGS/009),AoU 8.2/8.4
+AOU-R27,via AOU-R40,by construction (aou_link_ctrl),DUT,ActivateReq sent or received moves DISABLED to ACTIVATE (a DUT that did not move answers out of sequence),AoU 8.4
+AOU-R28,aou_l3_model,,DUT,A received ActivateReq is answered with ActivateAck (end-of-test check),AoU 8.4
+AOU-R29,aou_l3_model,aou_fdi_chk_adapter,DUT,Credits are sent only after one's own ActivateAck,AoU 8.4
+AOU-R30,aou_l3_model,aou_fdi_chk_adapter,DUT,Credited messages only once ActivateReq sent and ActivateAck received,AoU 8.4/9.2
+AOU-R31,aou_l3_model,,DUT,In ENABLED credits are sent: quiescent at end of test every advertised credit is back within cred_return_cycles,AoU 8.4; MAS software-operation 7.1 (LP threshold 0)
+AOU-R32,via AOU-R40,by construction (aou_link_ctrl),DUT,DeactivateReq sent or received moves ENABLED to DEACTIVATE (a DUT that did not move answers out of sequence),AoU 8.4
+AOU-R33,aou_l3_model,,DUT,DeactivateReq only after the sender's requests are complete,AoU 8.3.2/8.4
+AOU-R34,aou_l3_model,,DUT,No request messages after one's DeactivateReq,AoU 8.4
+AOU-R35,via T1-T01,by construction (L3 packer),DUT,Pending data and WriteResp are still sent in DEACTIVATE (a DUT that stops leaves remote requests undrained),AoU 8.4
+AOU-R36,aou_l3_model,,DUT,A DeactivateReq is answered with DeactivateAck (end-of-test check),AoU 8.4
+AOU-R37,via AOU-R40,by construction (aou_link_ctrl),DUT,DISABLED needs both DeactivateAcks sent and received (a DUT disabled early answers out of sequence),AoU 8.4
+AOU-R38,n/a,,N/A,"v0.8 clarification: request credits are sent after DeactivateReq; v0.7, v0.8 and the MAS disagree (BUGS/009)",AoU v0.8 8.4
+AOU-R39,n/a,,N/A,"Quiesce option 1 supported and both ends use the same mode (configuration, not visible on the wire)",AoU 8.3.2
+AOU-R40,aou_l3_model,aou_fdi_chk_adapter,DUT,An out-of-sequence Req/Ack is a violation; v0.8 moves to ERROR,AoU 8.3.3
+AOU-R41,aou_link_ctrl,,N/A,v0.8 only: ERROR transmits nothing and ignores what it receives (the v0.7 DUT has no ERROR state),AoU v0.8 8.3.3
+AOU-R42,aou_link_ctrl,,N/A,v0.8 only: ERROR returns to DISABLED (recover()),AoU v0.8 8.3.3
+AOU-R43,n/a,,N/A,Profile configuration completes before leaving DISABLED (Basic Profile only; nothing to configure),AoU 11.2.2
+AOU-R44,by construction (aou_lsm_driver),,MODEL,Streaming + Format 6 negotiated before AoU starts (the Adapter's job; L2 only presents a Streaming Format 6 link),AoU 9.1
+AOU-R45,aou_fdi_chk_adapter,,DUT,RP counts/DEST_RP maps agree on both ends (checker VIOL_RP_MAP),AoU 6.2; MAS 3.10
+FEAT-R01,aou_split_chk,,DUT,No M-port burst is longer than MAX_AxBURSTLEN+1 beats (illegal values stored as 0xF),MAS 3.6.2/3.6.4
+FEAT-R02,aou_split_chk,,DUT,Each inbound burst becomes ceil(beats/(MAX_AxBURSTLEN+1)) M-port bursts; within the limit it passes unsplit,MAS 3.6.2
+FEAT-R03,aou_agg_chk,,DUT,Aggregator enabled: no narrow multi-beat burst reaches the M port (size promoted to the bus width),MAS 3.8.2/3.8.3
+FEAT-R04,aou_agg_chk,,DUT,Aggregator disabled: every inbound burst reaches the M port with its own address/size/length,MAS 3.8.1
+FEAT-R05,aou_early_bresp_chk,,DUT,EARLY_BRESP_EN=1 and AWCACHE[0]=1: OKAY B at the S port before the remote die completes the write,MAS 3.7.1
+FEAT-R06,aou_early_bresp_chk,,DUT,Early response off or non-bufferable: B at the S port only after the remote die completed the write,MAS 3.7.1
+FEAT-R07,aou_early_bresp_vseq,,DUT,Remote error after an early B: INT_EARLY_RESP_ERR plus WRITE_RESP_ERR_ID_INFO/TYPE_INFO capture; W1C clears all three,MAS 3.7.3; SW op WRITE_EARLY_RESPONSE
+FEAT-R08,aou_lp_mode_vseq,,DUT,Idle FDI flits: continuous with TX_LP_MODE=0; none with TX_LP_MODE=1/threshold 0; periodic heartbeat otherwise,SW op Low Power mode; RDL AOU_CON0
+FEAT-R09,aou_dest_rp_chk,,DUT,AXI messages the DUT sends carry DEST_RP of the local RP,MAS 3.10.2
+FEAT-R10,aou_dest_rp_chk,,DUT,CrdtGrant credits use the source (local) RP slot not DEST_RP,MAS 3.10.2
+FEAT-R11,not checked,,DUT,Port/AXI QoS: with requests of two tiers queued the higher tier is sent first (until the starvation timer promotes),MAS 3.2.1
+DP-R01,aou_msg_stats,,DUT,A packing scenario produced the layout it targets (WriteResp sharing a flit; flit-spanning messages; given message sizes),AoU v0.7 4.x; test plan 6.2/6.9/11.6/11.7
+T1-T01,aou_base_test,,DUT,Nothing is outstanding at the end of the test (scoreboard drained),ARCHITECTURE.md scoreboard rule
+T1-T02,aou_base_test,,DUT,The scoreboard checked at least min_l2r local->remote transactions (a test whose traffic never reached it fails),test self-check; ARCHITECTURE.md scoreboard rule
+T1-T03,aou_base_test,,DUT,The scoreboard checked at least min_r2l remote->local transactions,test self-check; ARCHITECTURE.md scoreboard rule
+T1-V01,aou_base_test_seq,,DUT,The FDI link reaches Active after bringup (pulsing I_SW_ACTIVATE_START once if it waits for software),UCIe r1.1 8.2.8; integrator guide 6.6
+T1-V02,aou_base_test_seq,,DUT,The remote side (L3) reaches ENABLED within act_timeout of an activation,AoU 8.4; MAS software-operation 7.3.2
+T1-V03,aou_base_test_seq,aou_int_vseq,DUT,ACTIVATE_STATE_ENABLED is set within act_timeout of an activation,MAS software-operation 7.1/7.3.2
+T1-V04,aou_base_test_seq,,DUT,The remote side (L3) reaches DISABLED within act_timeout of a deactivation,AoU 8.4; MAS software-operation 7.3.3
+T1-V05,aou_base_test_seq,aou_int_vseq,DUT,ACTIVATE_STATE_DISABLED is set within act_timeout of a deactivation,MAS software-operation 7.1/7.3.3
+T1-V06,aou_base_test_seq,,DUT,Nothing stays outstanding for drain_timeout cycles once traffic stops (drain()),test self-check
+T1-V07,aou_base_test_seq,,DUT,The FDI link is Active again after a Retrain/L1 exit/bringup event (or a LinkError/LinkReset with re-bringup),UCIe r1.1 8.3.3.4; integrator guide 6.6
+T1-V08,aou_base_test_seq,,DUT,Traffic completes within drain_timeout cycles (a DUT that stops responding ends the test with errors instead of a hang),test self-check
+T1-L01,aou_link_base_vseq,,DUT,The provoked LP_LINKRESET sticky error bit is set,MAS software-operation 7.2.3
+T1-L02,aou_link_base_vseq,,DUT,No other LP_LINKRESET error bit is set by the provoked source,MAS software-operation 7.2.3
+T1-L03,aou_link_base_vseq,,DUT,INVALID_ACTMSG_INFO holds the offending ACTIVATIONOP,MAS software-operation 7.2.3
+T1-L04,aou_link_base_vseq,,DUT,The FDI link is Active again after LinkReset recovery,MAS software-operation 7.3.6
+T1-L05,aou_link_base_vseq,,DUT,A remote ActivateReq raises INT_ACTIVATE_START,MAS software-operation 7.3.5
+T1-L06,aou_link_base_vseq,,DUT,A remote DeactivateReq raises INT_DEACTIVATE_START,MAS software-operation 7.3.5
+T1-L07,aou_link_act_deact_vseq,,DUT,Transactions caught by a deactivation complete after re-activation,MAS software-operation 7.3.6
+T1-L08,aou_link_act_deact_vseq,,DUT,ACTIVATE_STATE_ENABLED/DISABLED report the activation state,MAS software-operation 7.1; plan 1.7
+T1-L09,aou_link_act_deact_vseq,,DUT,ACTIVATE_START/DEACTIVATE_START self-clear once the state is reached,csr/aou-core.rdl AOU_INIT; MAS 7.3.2
+T1-L10,aou_link_act_deact_vseq,,DUT,MST_TR_COMPLETE and SLV_TR_COMPLETE are 1 once DISABLED with nothing pending,MAS software-operation 7.1
+T1-L11,aou_zero_credit_vseq,,DUT,Traffic needing a class with no credit does not complete before the grant,AoU 6.1; plan 3.8-3.12
+T1-L12,aou_zero_credit_vseq,,DUT,The remote die advertised no credit of the starved class,test self-check
+T1-L13,aou_invalid_actmsg_vseq,aou_linkreset_timeout_vseq,DUT,The DUT sends ActivateReq/DeactivateReq when software starts the handshake,MAS software-operation 7.3.2/7.3.3
+T1-L14,aou_invalid_actmsg_vseq,,DUT,An invalid activation message raises INT_REQ_LINKRESET unless masked,MAS software-operation 7.2.3
+T1-L15,aou_invalid_actmsg_vseq,,DUT,An invalid ActivateReq is acknowledged; an invalid ActivateAck is not (BUGS/013),MAS software-operation 7.2.3
+T1-L16,aou_invalid_actmsg_vseq,,DUT,An opcode the MAS permits raises no LinkReset and no answer (BUGS/013 interim),MAS software-operation 7.2.3
+T1-L17,aou_linkreset_timeout_vseq,,DUT,A time-out does not fire before 2^(value+18) cycles,MAS software-operation 7.1/7.2.3
+T1-L18,aou_rx_msg_error_vseq,,DUT,A malformed received message raises no LinkReset and leaves AoU ENABLED (BUGS/012 interim),AoU 4.4/5.x; BUGS/012
+T1-L19,aou_link_event_vseq,,DUT,Retrain and clk_req wake leave AoU ENABLED (BUGS/015 interim),UCIe r1.1 8.3.3.4; BUGS/015
+T1-L20,aou_lp_mode_traffic_vseq,,DUT,With TX_LP_MODE=0 the DUT keeps sending flits while idle,MAS software-operation 7.1 Low Power mode
+T1-L21,aou_lp_mode_traffic_vseq,,DUT,TX_LP_MODE=1 with threshold 0 sends no flit while idle,MAS software-operation 7.1 Low Power mode
+T1-L22,aou_lp_mode_traffic_vseq,,DUT,TX_LP_MODE=1 with threshold T sends a bounded heartbeat (BUGS/017 interim),MAS software-operation 7.1; BUGS/017
+T1-L23,aou_reset_vseq,,DUT,"Registers are in the core reset domain (I_RESETN, the SFRs' reset behind the APB bridge): AOU_SW_RESET or I_RESETN (alone or with I_PRESETN) returns every programmed register to its reset value; I_PRESETN alone leaves them programmed (BUGS/007 and BUGS/016 interim)",BUGS/007; BUGS/016
+T1-L24,aou_reset_vseq,,DUT,I_PRESETN alone leaves AoU ENABLED (BUGS/016 interim),BUGS/016
+T1-L25,aou_invalid_actmsg_vseq,,DUT,An invalid ActivateReq raises no INT_ACTIVATE_START (BUGS/023),MAS software-operation 7.2.3/7.3.5
+T1-E16,aou_slv_id_mismatch_vseq,,DUT,An unsolicited B/R sets AXI_SLV_ID_MISMATCH_ERR_RPn of that kind with the ID in INFO; W1C clears it,MAS software-operation 7.2.2; BUGS/003
+T1-E17,aou_slv_id_mismatch_vseq,,DUT,INT_SI0_ID_MISMATCH rises on a subordinate ID mismatch and falls after the W1C,MAS software-operation 7.2.2
+T1-E18,aou_slv_id_mismatch_vseq,,DUT,White-box: AOU_CORE's RID/BID subordinate mismatch aggregate of that kind only (main #76),main b8b9060 commit message
+FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (any fdi_enc when the DUT has lp_linkerror; else fdi_enc=SPEC; L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7; BUGS/002
+FEAT-R12,aou_qos_order_chk,,DUT,Port/AXI QoS: a lower-tier request waiting longer than TIMER_THRESHOLD x TIMER_RESOLUTION is promoted to high,MAS 3.2.1; RDL PRIOR_TIMER
+FEAT-R13,aou_qos_order_chk,,DUT,QoS scenario: both tiers were waiting at the arbiter after release (else the order check proves nothing),MAS 3.2.1
+FEAT-R14,aou_qos_order_chk,,DUT,Round-robin (ARB_MODE 0 or equal priority): no RP granted twice in a row while another has a request waiting,MAS 3.2.1 Figure 5
+FEAT-R15,aou_t1_early_tbl_chk,,DUT,"EARLY_BRESP_EN=1: no S-port AW is accepted while WR_MO_CNT (32) writes hold early-table entries (WLAST accepted, remote WriteResp not yet sent)",MAS 3.7.5; plan 16.11
+FEAT-R16,aou_t1_early_tbl_chk,aou_early_bresp_vseq,DUT,An AW held by the full early table is accepted within 1000 cycles (+early_free_bound) of the remote WriteResp that frees an entry; WRITE_RESP_DONE reads 1 once every write completed,MAS 3.7.5/3.7.6; plan 16.12
+FEAT-R21,aou_t1_early_tbl_chk,,DUT,An AW presented while the early table is full raises O_PENDING_CNT_OVER (white-box; no interrupt carries it) and it never rises below the limit,MAS 3.7.5; BUGS/005; plan 16.17
+FEAT-R22,aou_t1_mo_chk,,DUT,At most M_RD_MO_CNT reads and M_WR_MO_CNT writes (32) outstanding per RP on the M port: the pending-ID tables back-pressure when full,MAS software-operation 7.2.2; integration guide M_*_MO_CNT; plan 9.20
+T1-E02,aou_t1_dbg_fifo_chk,,DUT,"The response error debug FIFO returns, in push order, one {ID; ADDR aligned to the request size; RESP} entry per remote request answered with an M-port B/R error (either order for errors pushed together); holds four and drops later errors (BUGS/028 interim layout, BUGS/041)",MAS software-operation 7.2.4
+T1-E03,aou_t1_dbg_fifo_chk,,DUT,A debug FIFO read and pop at the configured address complete with OKAY,MAS software-operation 7.2.4
+T1-E19,aou_t1_dbg_fifo_chk,,DUT,"Every RP-wide lane of every beat of a debug FIFO read equals the head entry, for reads and pops of any length within 4 KB: the window answers each beat and the RP sends no part of the access to memory or splits it by MAX_AxBURSTLEN (BUGS/035, BUGS/043 interim)",MAS software-operation 7.2.4; AXI4 A3.4.1; BUGS/035; BUGS/043
+T1-E04,aou_id_mismatch_vseq,,DUT,An ID mismatch sets its per-RP error bit and captures the ID; INFO clears with the error,MAS software-operation 7.2.2; interrupts-errors 4
+T1-E05,aou_id_mismatch_vseq,,DUT,The DUT takes an M-port response with an unknown ID (BUGS/029 interim),AXI4 A3.2.1; BUGS/029
+T1-E06,aou_id_mismatch_vseq / aou_int_vseq,,DUT,An interrupt is high exactly while its status bit is set and unmasked,MAS software-operation 7.2.1
+T1-E07,aou_id_mismatch_vseq / aou_int_vseq,,DUT,Clearing a mask with the status pending raises the interrupt (BUGS/029 interim),MAS software-operation 7.2.1; BUGS/029
+T1-E08,aou_int_vseq,,DUT,A write-1-to-clear in the cycle a new error sets the bit never loses the error (BUGS/029 interim),BUGS/029
+T1-E09,aou_int_vseq,,DUT,Every provoked early-response error got an early OKAY,MAS architecture 3.7.3
+T1-E10,aou_int_vseq,,DUT,Reading or writing 0 leaves a W1C status bit and its interrupt set; writing 1 clears both,MAS interrupts-errors 4; csr/aou-core.rdl
+T1-E11,aou_int_vseq,,DUT,WRITE_EARLY_RESPONSE_RPn captures the failing ID and type and clears them with WRITE_RESP_ERR,MAS architecture 3.7.3/3.7.9
+T1-E12,aou_int_vseq,,DUT,Simultaneous interrupt sources are all captured and clear independently,MAS interrupts-errors 4
+T1-E13,aou_credit_violation_vseq,,DUT,Reads beyond the advertised RREQ credit leave reads within it answered and raise no LinkReset (BUGS/030 interim),AoU 6.1; BUGS/030
+T1-E14,aou_before_enable_vseq,,DUT,A request before activation waits and raises INT_ACTIVATE_START,AoU 8.4; MAS software-operation 7.3.5
+T1-E15,aou_id_mismatch_vseq,,DUT,SLV_TR_COMPLETE is 1 with nothing outstanding after an unrequested response (BUGS/029),MAS software-operation 7.1; BUGS/029
+DP-R02,aou_dw_chk,,DUT,An S-port read beat whose ReadData is narrower than the RP carries that ReadData replicated across the bus,MAS 3.3 (R 4M1S FIFO); plan 14.16
+DP-R03,aou_dw_chk,,DUT,WriteData the DUT sends carries the DLENGTH of its RP's AXI data width,MAS 3.5.2
+DP-R04,aou_dw_chk,,DUT,A width-conversion run produced every conversion it targets (remote width writes and reads; single- and multi-beat M-port writes; narrow S-port reads),test self-check; plan 14.x
+DP-R05,aou_t1_attr_chk,,DUT,"Each WriteReq/ReadReq the DUT sends carries the AxLOCK, AxCACHE, AxPROT and AxQOS of the S-port AW/AR it came from",AoU 5.3; Basic Profile Table 31; plan 4.25-4.28/5.23-5.26
+DP-R06,aou_t1_attr_chk,,DUT,"Each M-port AW/AR carries the AxLOCK, AxCACHE, AxPROT and AxQOS of the WriteReq/ReadReq it came from",AoU 5.3; Basic Profile Table 31; plan 4.25-4.28/5.23-5.26
+DP-R07,aou_t1_attr_chk,,DUT,"An exclusive transaction's BRESP/RRESP at the requester is the far subordinate's (EXOKAY or OKAY), when the DUT neither split nor merged it",AXI4 A7.2; AoU 5.5/5.6; plan 4.25/5.23
+DP-R08,aou_t1_attr_chk,,DUT,FLEX is 0 in every AXI message the DUT sends (it has no AXI USER ports),AoU 5.2 (FLEX = USER[15:0] in the Basic Profile); plan 4.30
+T1-M01,aou_mrp_chk,,DUT,Per RP the DUT sends one request per S-port transaction and one WriteResp/last ReadData per remote transaction; idle RPs carry no AXI message,MAS 3.10; AoU RP field; plan 12.1-12.8/12.19
+T1-M02,aou_mrp_chk,,DUT,With every RP backlogged no RP starves: when the first RP has sent all its requests the others have sent at least 25% of theirs,MAS 3.2.1 (round-robin arbitration); plan 12.6/12.8
+T1-M03,aou_mrp_chk,,DUT,A slowed RP does not hold back the others: they complete while it still has transactions outstanding,MAS 3.4 (per-RP FIFOs and credits); plan 12.x
+T1-M04,aou_dest_rp_asym_vseq,,DUT,With asymmetric DEST_RP no transaction of the remapped RP completes (its responses come back on the other plane),MAS 3.10.1; BUGS/031 interim; plan 12.13
+T1-C01,aou_t1_crd_flow_chk,,DUT,"Independent per-RP progress: while another RP has work queued without credit, a credit class does not stall for block_cycles (env cfg crd_block_cycles or +crd_block_cycles, default 256 cycles the Adapter takes a beat) with an RP holding credit and work of that class at its AXI input (BUGS/045)",AoU 6.1 (credits per RP and class); MAS 3.9; plan 3.15/12.14
+T1-C02,aou_t1_crd_flow_chk,,DUT,"Work conservation: a credit class does not stall for idle_cycles (crd_idle_cycles, default 4096) while an RP holds credit and work of that class at its AXI input; the DUT uses the credit it holds",AoU 6.1; plan 8.3/8.6
+T1-C03,aou_t1_crd_rr_chk,aou_mrp_vseq,DUT,With several RPs owed credit the DUT advertises them in header MsgCredit round robin: the first N grants name each of the N owed RPs once,MAS 3.9 (credit advertisement); plan 3.19
+T1-C40,aou_l3_model,,DUT,"The DUT never advertises more credit per RP and class than the MAS 3.9 maximum for that RP's RX FIFO depth and AXI data width, and once quiescent in ENABLED it has advertised exactly that",MAS 3.4/3.9; integration guide 2 (FIFO depth parameters); plan 3.20/3.25
+T1-C41,aou_t1_rx_fifo_chk,,DUT,"The credit the DUT holds for an RP covers every remote WriteReq/ReadReq whose AW/AR the M port has not taken, beyond a slack of messages past the RX FIFO (credit returns at RX FIFO dequeue)",MAS 3.9; plan 3.23
+T1-P01,aou_perf_mon,aou_perf_chk,DUT,"A performance run measured every window it ran, and each gated link's steady state reached min_ss_flits",plan 10.x; docs/PERF_JSON.md
+T1-P02,aou_perf_chk,,DUT,"Each bandwidth window's link (l2r DUT TX, r2l DUT RX) delivers at least (1 - tol) x the d2d_model saturated bytes/cycle for the exact CONFIG, active PHY and traffic (tol 3% unless perf_overrides.yaml); a window link with no target or a target with no data is NO_TARGET",plan 10.1-10.3 10.8 10.10-10.13; uvm/env/perf/aou_perf_targets.svh
+T1-P03,aou_perf_chk,,DUT,"ABOVE_MAX: no link exceeds max(d2d_model value, the model's saturated packing of the messages the link carried in its steady state) by more than one flit of bytes over the steady state; above means fix the model once the measurement is confirmed",plan 10.x; d2d_model.py
+T1-P04,aou_perf_chk,,DUT,"Over the whole window each data-path message type crosses each link in the share the d2d_model generator predicts (within max(1, 0.2%) messages)",AoU spec message rules; d2d_model.py
+T1-L26,aou_t1_orphan_chk,,DUT,An R or B beat presented on an M port before AOU_SW_RESET is accepted within a bound after it (BUGS/024 interim),MAS software-operation 7.3.6; AXI4 A3.2.1; BUGS/024
+T1-L27,aou_act_after_deact_vseq,,DUT,ACTIVATE_START written while a deactivation completes leads to ENABLED again,MAS software-operation 7.3.2/7.3.6; BUGS/020
+T1-L28,aou_t1_sw_reset_chk,,DUT,No S-port AW/W/AR handshake while the DUT core is held in AOU_SW_RESET (the beat is lost; BUGS/021 interim); with the BUGS/021 guard only an AR or an unowed AW/W while the guard isolates the port,MAS software-operation 7.3.6; AXI4 A3.2.1; BUGS/021
+T1-L29,aou_t1_sw_reset_chk,,DUT,An RX W beat pending at the release of AOU_SW_RESET is drained within 1000 cycles (a stale beat holds AOU_RX_FIFO_PENDING and blocks re-activation; BUGS/007 interim),MAS software-operation 7.3.6; BUGS/007
+T1-DFT01,aou_t1_sw_reset_chk,,DUT,"With TIEL_DFT_MODESCAN=1 the core reset (w_DFTED_sw_resetn) stays de-asserted, AOU_SW_RESET written or not (BUGS/052 interim: the guide text; the RTL disagrees)",integration guide 3.13.1; BUGS/052
+T1-DFT02,aou_dft_scan_vseq,,DUT,"With TIEL_DFT_MODESCAN=1 the SFRs keep their values and an AOU_SW_RESET write resets nothing (the software reset path is neutralised)",integration guide 3.13.1
+T1-L30,aou_t1_act_chk,,DUT,"The ActivateAck answering any ActivateReq the DUT received (valid or not) has its last FDI beat transferred before lp_linkerror rises: an Adapter may drop anything not yet on FDI once it sees lp_linkerror (BUGS/037 interim)",MAS software-operation 7.2.3/7.3; UCIe r1.1 Table 8-2 and 8.3.3.7; BUGS/037
+T1-L40,aou_t1_rx_fifo_chk,,DUT,"The DUT sends no ActivateReq while more than a slack of remote WriteReq/ReadReq per RP still wait for its M port (the RX FIFO is emptied before activation)",MAS software-operation 7.3.2/7.3.4; plan 1.10
+T1-L43,aou_link_act_deact_vseq,,DUT,"ACTIVATE_START written while the FDI link is down reads back 1 with the DUT still DISABLED (read-back in the test; activation after link-up is T1-V02/T1-V03)",MAS software-operation 7.1/7.3.2; plan 1.11
+T1-L45,aou_deact_ctrl_vseq,,DUT,"INT_DEACTIVATE_PROPERTY reads 0 in ENABLED and the received PropertyReq while in DEACTIVATE after a remote DeactivateReq (interim expectation; the bit is undocumented)",csr/aou-core.rdl AOU_INIT; BUGS/010; plan 2.10
+T1-L46,aou_t1_rx_fifo_chk,,DUT,"A DeactivateReq (PropertyReq 0) comes at least 2^(DEACTIVATE_TIME_OUT_VALUE+3) cycles (less a TX pipeline slack) after the DUT's last credited message",MAS software-operation 7.1 AOU_INIT.DEACTIVATE_TIME_OUT_VALUE; BUGS/057 interim; plan 2.12
+T1-L47,aou_t1_rx_fifo_chk,,DUT,"With CREDIT_MANAGE=0 the DUT sends DeactivateReq only once it has answered every remote request older than the link crossing time",MAS software-operation 7.1 (DEACTIVATE_START condition 1)/7.3.1; plan 2.5
+T1-LP01,aou_t1_lp_mode_vseq,,DUT,With TX_LP_MODE=0 the DUT keeps sending flits in an idle window (at least window/16),MAS software-operation 7.1 Low Power mode
+T1-LP02,aou_t1_lp_mode_vseq,,DUT,With TX_LP_MODE=1 and threshold 0 the DUT sends at most 4 flits in an idle window,MAS software-operation 7.1 Low Power mode
+T1-RA01,aou_t1_remote_act_vseq,,DUT,Each remote-initiated activation is serviced once as INT_ACTIVATE_START,MAS software-operation 7.3.5
+T1-RA02,aou_t1_remote_act_vseq,,DUT,A remote-initiated deactivation is serviced once as INT_DEACTIVATE_START,MAS software-operation 7.3.5
+T1-RM01,aou_t1_remote_mgr_driver,,DUT,A WriteResp the DUT sends matches a remote write outstanding on its RP and ID (late answers to aborted writes excepted),AXI4 A5.2
+T1-RM02,aou_t1_remote_mgr_driver,,DUT,ReadData the DUT sends matches a remote read outstanding on its RP and ID (late answers to aborted reads excepted),AXI4 A5.2
+T1-RM03,aou_t1_remote_mgr_driver,,DUT,A remote read gets no more ReadData beats than ARLEN+1,AXI4 A3.4.1
+T1-RM04,aou_t1_remote_mgr_driver,,DUT,ReadData LAST is set on the last beat of a remote read and no other,AXI4 A3.4.1
+T1-RM05,aou_t1_remote_mgr_driver,,DUT,No remote write or read is outstanding at the end of the test,ARCHITECTURE.md scoreboard rule
+T1-RM06,aou_t1_remote_mgr,,DUT,A WriteResp/ReadData the DUT sends carries an RP below the remote managers' plane count,AoU 6.4.1; MAS 3.10
+T1-L4A01,aou_t1_l4a_adapter,,DUT,Every WriteData beat of one write burst carries the same DLENGTH,MAS 3.5.2

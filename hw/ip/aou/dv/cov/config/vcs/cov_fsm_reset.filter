@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+// VCS -cm_fsmresetfilter: FSM transitions made only in the asynchronous-reset branch
+// (every DUT reset is active low) are left out of FSM coverage (DECISIONS.md D10).
+signal=I_RESETN case=FALSE
+signal=I_PRESETN case=FALSE
+signal=I_S_PRESETN case=FALSE
+signal=I_M_PRESETN case=FALSE

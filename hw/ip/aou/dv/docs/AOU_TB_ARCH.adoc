@@ -1,0 +1,330 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+[[aou-dv-testbench-architecture]]
+== AoU Testbench Architecture
+
+=== Overview
+
+The AoU bench verifies `AOU_TOP`, the AXI-over-UCIe adapter (`RTL/`), as one
+die of a two-die link. The local side drives the DUT's AXI subordinate (S) ports,
+answers at its AXI manager (M) ports and programs it over APB; the remote die is
+entirely models layered the way the protocol is: L1 presents a UCIe adapter at
+the Flit-Die Interface, L2 plays the PL link-state machine, L3 is the remote AoU
+protocol layer (packing, credits, activation) and L4a its AXI side. A byte-level
+scoreboard checks every transaction end to end against golden memories, so it is
+unaffected by splitting, aggregation and width conversion inside the DUT.
+
+The bench is SystemVerilog UVM only. It runs standalone from this repository's
+`hw/ip/aou/dv/Makefile` (VCS, Verilator; Xcelium and Questa paths exist and are
+untested), and, in a tt-oca-harness checkout that places this directory at the
+same `hw/ip/aou/dv` path (the RTL vendored under
+`vendor/tenstorrent/aou/upstream/`), through the harness runner `run_dv.py` from
+the same `aou_sim_cfg.toml`, testlists and sources. This document describes the
+bench that exists; `docs/ARCHITECTURE.md` carries the stream contracts and API
+names the layers were built against, and `docs/DECISIONS.md` the decisions.
+
+Four tops share the environment packages:
+
+[cols="1,2,3",options="header"]
+|===
+| Bench (`TB=`) | Top | What it verifies
+| `t1` | `tb/tb_top.sv` | `AOU_TOP` against the layered models: the whole plan but the register-only items
+| `reg` | `tb/aou_reg_top.sv` | `AOU_TOP`'s APB register file alone (reset values, access policy, aliasing, bit bash, feature sequences)
+| `l3_unit` | `tb/aou_l3_unit_top.sv` | The L3 protocol model and `AOU_FDI_CHECKER` against each other, no DUT
+| `axi_selftest` | `tb/aou_axi_selftest_top.sv` | The AXI agents and the scoreboard in loopback, no DUT
+|===
+
+Each has a sim config (`aou_sim_cfg.toml`, `aou_reg_sim_cfg.toml`,
+`aou_l3_unit_sim_cfg.toml`, `aou_axi_selftest_sim_cfg.toml`) and a testlist
+(`testlists/all.toml` with the per-area lists it includes, `registers.toml`,
+`l3_unit.toml`, `axi_selftest.toml`).
+
+=== VIP Selection Policy
+
+No commercial VIP and no vendored third-party VIP is used; `DECISIONS.md` D2
+and `docs/VIP_EVALUATION.md` record why. Every bus model is the bench's own,
+written against the public specifications (AMBA AXI4 and APB, UCIe FDI, the
+AoU specification) and against the rules in `uvm/env/checkers/rules.csv`.
+
+The base classes come from the OCAH library (`ocah_lib`, fetched by `make setup`
+into `.deps/ocah_lib/` from the public tt-oca-harness repository at the pin in
+`scripts/get_ocah_lib.sh`, and supplied by the harness itself through
+`source_lists` when the bench runs there): `aou_base_test` extends `ocah_test`
+and `aou_base_test_seq` extends `ocah_sequence`. Nothing else of the library's
+VIP set (`ocah_env`, `ocah_scoreboard`, `ocah_checker`, `ocah_axi_vip`) is
+adopted; `OPEN_ITEMS.md` lists that migration.
+
+Arm's AXI4 protocol checker (BP063) can be bound to the DUT's AXI ports when
+the user supplies it (`AXI4PC_DIR`); nothing requires it. README "Optional:
+Arm AXI4 protocol assertions".
+
+=== DUT-Local Model Ownership
+
+Every model is DUT-local to this bench and lives under `uvm/env/`:
+
+[cols="2,1,4",options="header"]
+|===
+| Package | Layer | Contents
+| `aou_axi_pkg` (`uvm/env/axi/`) | L4b, L4a | `aou_axi_txn`, `aou_axi_cfg`, manager and subordinate agents, monitor, sparse memory `aou_mem`, timing policies (`aou_axi_delay`), the remote die's AXI model `aou_remote_axi_model`, AXI sequences
+| `aou_fdi_pkg` (`uvm/env/fdi/l1/`) | L1 | Flit item, Format 6 codec, PL driver and TX responder, monitor, L1 coverage
+| `aou_lsm_pkg` (`uvm/env/fdi/l2/`) | L2 | PL link-state agent, bring-up reference model, L2 coverage
+| `aou_l3_pkg` (`uvm/env/l3/`) | L3 | Message classes, flit objects, packer with policies, unpacker, credit manager, link controller, rule checker, injection sequences, L3 coverage, the `AOU_FDI_CHECKER` adapter
+| `aou_fdi_checker_pkg`, `AOU_FDI_CHECKER` (`uvm/env/checker/`) | FDI | Passive FDI protocol checker bound to the DUT's FDI (`DESIGN.md` beside it)
+| `aou_apb_pkg`, `aou_reg_pkg` (`uvm/env/apb/`) | APB | APB agent, register adapter and predictor, register sequences on the generated RAL (`uvm/env/gen/aou_core_csr_uvm_pkg.sv`, from `csr/aou-core.rdl` by `scripts/regen_ral.sh`)
+| `aou_env_pkg` (`uvm/env/`) | scoreboard | `aou_scoreboard`, `aou_env_cfg`, `aou_env`
+| `aou_t1_env_pkg` (`uvm/env/`) | T1 | `aou_t1_env`, its configs, the T1 checkers (`aou_t1_*_chk`, `chk/`), the performance monitor (`perf/`), `aou_base_test_seq`
+| `aou_rule_pkg` (`uvm/env/checkers/`) | all | Rule IDs, the per-run rule ledger (`rules.csv` is the inventory)
+| `aou_fc_pkg`, `aou_axi4_fc_pkg` (`cov/sv/`) | all | The functional-coverage service and the bound AXI4 coverage monitors
+|===
+
+Layers depend only downward: L4a uses L3's message API, L3 uses L1's flit API,
+L1 and L2 know nothing above them. `docs/ARCHITECTURE.md` "Inter-layer APIs"
+gives the contracts.
+
+=== Testbench Hierarchy
+
+----
+tb_top                                  tb/tb_top.sv (no ports)
+  u_dut : AOU_TOP                       RTL/AOU_TOP.sv, parameters from the target's defines
+  s_axi[r], m_axi[r] : aou_axi_bus_if   DUT S and M ports, one pair per RP
+  fdi_mb[p] : aou_fdi_mb_if             FDI mainband, one per PHY
+  fdi_lsm : aou_fdi_lsm_if              FDI link-state sideband
+  apb : aou_apb_if
+  status, irq, rst : aou_status_if, aou_irq_if, aou_rst_if
+  u_chk : AOU_FDI_CHECKER               single-PHY targets only; ports on aou_fdi_checker_if "fdi_chk"
+  (COV=1) axi_tx_rp<n>, axi_rx_rp<n>    bound AXI4 coverage monitors (cov/sv/aou_axi4_cov_bind.sv)
+  `ifdef UVM                            uvm_config_db registration of every interface, run_test()
+    uvm_test_top : <test>               uvm/tests/aou_tests.sv, chosen by +UVM_TESTNAME
+      env : aou_t1_env
+        s_mgr[r] : aou_axi_mgr_agent    L4b managers at the S ports
+        m_sub[r] : aou_axi_sub_agent    L4b subordinates at the M ports (aou_mem)
+        fdi[p] : L1 agent               driver, TX responder, monitor
+        lsm : L2 agent                  PL link-state machine
+        l3 : aou_l3_agent               remote AoU protocol layer
+        remote : aou_remote_axi_model   remote AXI side, behind l4a (aou_t1_l4a_adapter)
+        rmgr[r] : aou_t1_remote_mgr     remote managers whose transactions go out through L3
+        apb : APB agent; regs : aou_t1_reg_env (RAL)
+        rst : aou_t1_reset_agent        mid-test I_RESETN / I_PRESETN
+        sb : aou_scoreboard             byte-level, golden local and remote memories
+        status, fdi_chk, expects, sw_isr, the T1 checkers, xfer_cov
+        vseqr : aou_t1_vseqr            handles to all of the above
+----
+
+=== HDL Top
+
+`tb_top` has no ports. It generates the core and APB clocks, holds both resets
+at power-on while the clocks run, instantiates `AOU_TOP` as `u_dut` with the
+parameters the target's defines select (`AOU_RP_COUNT`, `AOU_RP<n>_DATA_W`,
+`AOU_FDI_CONFIG`, `AOU_PEER_MAX_W`, `TWO_PHY`, `AOU_RX_FIFO_ALT`; `[targets.<name>]`
+in `aou_sim_cfg.toml`), ties off the DUT's bring-up pins, and binds the
+interfaces. One parameterisation per interface type (the widest width, the
+real width in the agent's config) gives one virtual-interface type per bus on
+every simulator. `aou_rst_if.apb_quiet` is read from the asynchronous APB
+bridge's state so the reset agent can honour the integration guide's reset rule.
+With `ASSERTION_ON` (the `<target>-assert` targets) the RTL's own assertions are
+compiled, all but the WLAST generator's unbounded-AWREADY check, which the top
+turns off (BUGS/054).
+
+Under `ifdef UVM` (always defined by the Makefile and by the harness) the top
+registers every interface in `uvm_config_db` under scope `"*"` (`s_axi<r>`,
+`m_axi<r>`, `fdi_mb<p>`, `fdi_lsm`, `apb`, `status`, `irq`, `rst`, `fdi_chk`),
+includes `uvm/tests/aou_tests.sv` so the test classes compile after the
+packages, and calls `run_test()`. `tb/aou_waves.sv` is bound for `WAVES=1`.
+
+=== Environment Components
+
+[cols="2,4",options="header"]
+|===
+| Component | Role
+| `aou_t1_env_cfg` | RP count and per-RP data bytes, remote widths (`+remote_bytes`), `spec_rev`, `fdi_enc` (RTL or SPEC state encoding), the L1/L2/L3/AXI agent configs, timing profiles, checker enables, drain and stale windows
+| `aou_t1_feature_cfg` | What `program_cfg()` writes to the DUT: split, aggregator, early response, QoS, DEST_RP, LP mode, interrupt masks, error info, time-outs, credit management
+| `aou_t1_traffic_cfg` | A traffic profile: AXI sequence knobs, timing policies, RP mask (`named("rand"\|"unaligned"\|"b_zero"\|"long"\|"short"\|"narrow"\|"stall")`)
+| `aou_t1_vseqr` | The virtual sequencer: every agent's sequencer, the env, the model handles
+| `aou_scoreboard` | Golden local and remote `aou_mem` copies; checks bytes, responses, order within an ID, attributes; counts aborted transactions across resets; drain at end of test
+| `aou_t1_expect` / `aou_t1_expect_catcher` | The expectation registry: `expect_event(id, min, max)` declares a rule, interrupt or check a scenario is meant to cause; the catcher demotes and counts matching errors; the base test checks every count at end of test
+| `aou_t1_status` | Interrupt and status watcher on `aou_status_if` / `aou_irq_if`
+| `aou_t1_sw_isr` | The local software of the activation protocol: answers `INT_ACTIVATE_START` / `INT_DEACTIVATE_START` through the registers
+| `aou_t1_reset_agent` | Drives `I_RESETN` / `I_PRESETN` mid-test on `aou_rst_if`, quiesces APB first, flushes every component (`reset_flush()`)
+| `aou_t1_l4a_adapter` | Implements L3's `aou_l4a_if_c` responder over `aou_remote_axi_model.execute()`
+| `aou_t1_remote_mgr` | Remote managers: AXI transactions that originate on the remote die and travel through L3 to the DUT's M ports
+| `aou_fdi_chk_adapter` | Turns `AOU_FDI_CHECKER`'s status ports into `AOU-R*` rule reports
+| T1 checkers | `aou_t1_act_chk` (T1-L30), `aou_t1_attr_chk` (attributes, exclusives, FLEX across the link), `aou_t1_crd_flow_chk` (T1-C01/C02), `aou_t1_crd_rr_chk` (T1-C03), `aou_t1_dbg_fifo_chk` (debug FIFO prediction), `aou_t1_early_tbl_chk` (FEAT-R15/R16), `aou_t1_mo_chk`, `aou_t1_orphan_chk`, `aou_t1_rx_fifo_chk`, `aou_t1_sw_reset_chk`; test-owned checkers in `uvm/env/chk/` (`aou_split_chk`, `aou_early_bresp_chk`, `aou_qos_order_chk`, `aou_mrp_chk`, `aou_flit_counter`)
+| `perf/` | `aou_perf_mon`, `aou_perf_chk`, `aou_perf_targets.svh`: throughput and latency windows for `aou_perf_test`, judged against targets from the d2d model (`scripts/perf_model.py`)
+| `aou_t1_xfer_cov` and the layer coverage classes | The covergroups and their copies in the coverage service (`AOU_FCOV.adoc`)
+|===
+
+The sequence library (`uvm/seq_lib/aou_seq_lib_pkg.sv`) holds every virtual
+sequence, one file per family and area subdirectories (`errors/`, `lifecycle/`,
+`link/`, `matrix/`, `perf/`, `stress/`). `aou_base_test_seq` composes the
+scenario primitives: `link_up()`, `activate(who, order)`,
+`deactivate(who, forced, credit_manage)`, `program_cfg(feature_cfg)`,
+`traffic(dir, n, profile)` / `traffic_nb()` / `wait_traffic()`,
+`pause_traffic()` / `resume_traffic()`, `drain(timeout)`, `link_event(kind)`,
+`lp_mode(en, threshold)`, `hold_tx()` / `release_tx()`,
+`hold_remote_tx()` / `release_remote_tx()`, `inject(kind, args)`, `sw_reset()`,
+`hard_reset(which)`, `expect_event(id, min, max)`, `inject_mem_error()`,
+`wait_link()`, `wait_l3()`, `write_field()`. `aou_sanity_test_seq` is the
+bring-up scenario: link up, activate, traffic both ways, drain.
+
+=== Clock and Reset Strategy
+
+The top drives the core clock (`I_CLK`, 1 GHz nominal) and the APB clock
+(`I_PCLK`, 100 MHz nominal) and releases `I_RESETN` and `I_PRESETN` after a
+power-on interval with both clocks running. Drivers wait for their reset to
+release; drivers use only their own clocking block and monitors only `mon_cb`.
+
+Mid-test resets follow the integration guide's rule (3.1.1): a reset is asserted
+only with the APB master idle and the asynchronous APB bridge's handshake
+drained in both clock domains (`aou_rst_if.apb_quiet`), both clocks running.
+The reset agent's `do_reset()` holds the APB driver, waits for `PSEL` low and
+the bridge idle for four `PCLK` cycles, then asserts; a checker in the agent
+reports any reset asserted otherwise. A test that resets mid-access on purpose
+passes `quiesce = 0` and says so in its header.
+
+Every agent, model, monitor and checker implements `reset_flush()`.
+`I_RESETN` drops queued and in-flight AXI items, requests at the subordinates
+and the monitors' in-flight transactions; `I_PRESETN` alone cancels only the
+software ISR; `AOU_SW_RESET` (`sw_reset()`) leaves the AXI ports alive, so a
+burst already on the bus completes. Outstanding transactions end
+`aborted`, the scoreboard counts them and marks the bytes an aborted write
+strobed unknown until a checked write defines them again; within the
+`stale_window` a response on an ID with an aborted request is taken as the
+stale one. The remote die always drops everything.
+
+=== Stimulus Strategy
+
+A scenario is a test class plus plusargs plus a seed, named in a testlist. The
+test class sets `aou_t1_env_cfg` and names its virtual sequence (`vseq_type`);
+the virtual sequence composes the base sequence's primitives; plusargs select
+variants (`+dp_dir`, `+dp_profile`, `+who`, `+order`, `+arb_mode`, ...; each
+class header lists its own). Randomisation is per seed: activation initiator
+and order, AXI addresses, lengths, sizes, strobes, attributes and timing within
+the profile, the active PHY on two-PHY targets, the packer layout policy of the
+remote die (`aou_packer_policy`: DUT-like, sparse, minimum and maximum density,
+random), credit return policy and delays.
+
+Stimulus keeps in-flight transactions to disjoint addresses unless a test asks
+otherwise, so the golden model is unambiguous. Negative scenarios inject through
+L3 (`aou_msg.ignore_credits / ignore_state / flip_mask / len_adj / raw_g` and
+the `l3/seq/` sequences: bad type, reserved bits, no credit, out-of-state
+activation messages, flit placement, over-grant) and through the memories (AXI
+error regions, exclusive failures), and declare what they cause with
+`expect_event()`. Back-pressure comes from `hold_tx()` (L1 holds `pl_trdy`)
+and `hold_remote_tx()` (L3 withholds credited messages, then packs the
+backlog densely). The remote die's width is a run-time choice
+(`+remote_bytes=N` or per RP), so one build covers every upsize, downsize and
+bypass pairing.
+
+Build-time variation is the target: ten `[targets.<name>]` in
+`aou_sim_cfg.toml` form a pairwise set over RP count (1 to 4), local width
+(256, 512, 1024, mixed), FDI width (256, 512, 1024, both two-PHY pairs), the
+peer width limit and the RX FIFO depths (README "Build configurations",
+`make configs`). A scenario without `target` runs on every target
+(`run_list.py --target`); one pinned by `target` runs there only.
+
+=== Checking Strategy
+
+Checks are layered and every finding carries a rule ID from
+`uvm/env/checkers/rules.csv` (`AOU-R*` protocol, `FDI-R*`/`FDI-M*` interface,
+`AXI-R*`/`AXI-S*` AXI, `APB-R*`, `REG-R*`, `FEAT-R*` features, `DP-R*` data
+path, `T1-*` bench-level) so a failure names the requirement it violates.
+`scripts/check_rules.py` keeps the inventory and the emitters in step;
+`scripts/rule_inventory.py` reports, from the runs' rule ledgers, which rules
+were hit in passing runs and which fired in negative runs
+(`docs/checker_inventory.md`).
+
+* *Scoreboard.* Bytes as AXI4 defines them: a write entering an S port changes
+  the remote golden memory at exactly the bytes addressing and `WSTRB` select,
+  and matches golden when its `B` returns `OKAY`; read data equals golden beat by
+  beat and lane by lane; the same for remote-originated traffic towards local
+  memory. Exactly one response per request with its own ID, in order within an
+  ID; injected error responses propagate unchanged; attributes checked end to
+  end where no feature splits or merges the transaction; nothing outstanding at
+  end of test.
+* *Protocol checkers.* `AOU_FDI_CHECKER` (passive, on the DUT's FDI) and L3's
+  `aou_l3_rule_chk` check flit and message rules from both directions; the L1
+  monitor checks FDI handshake and cancel/stall rules; the AXI and APB
+  interfaces carry their own assertions (`AXI-R*`, `APB-R*`).
+* *T1 checkers.* Activation and credit behaviour that spans layers (listed
+  above), the register predictions of the debug FIFOs and the error-info
+  registers, early-table back-pressure, software reset.
+* *Expectations.* Negative scenarios stay strict: `expect_event(id, min, max)`
+  demotes and counts the errors a scenario is meant to cause, every count is
+  checked against `[min, max]` at end of test, and an unexpected error fails
+  the test.
+* *Verdict.* `scripts/check_run.py` judges each log: `PASS` with no
+  `UVM_ERROR`/`UVM_FATAL` and a UVM report summary, `XFAIL` when every error
+  matches an entry of `expected_fail.yaml` tied to a bug's GitHub issue, `FAIL`
+  otherwise; an entry that matched nothing is reported `XPASS` for review.
+  `scripts/judge_run.py` applies the same grader to harness runs. The
+  testlists carry `expect_fail` / `expect_fail_match` for the entries whose
+  failure is deterministic, so the harness runner grades them the same way.
+* *RTL assertions.* The `<target>-assert` targets compile the RTL's
+  `ASSERTION_ON` checks; `testlists/assertions.toml` runs a representative set
+  with `+rtl_asserts=1`.
+* *Bug-escape suite.* `make escape` re-introduces every fixed bug from
+  `escape/<id>.patch` on a build-time copy of `RTL/` and requires the named test
+  to fail with its signature (`testlists/escape.toml`).
+
+=== Coverage Strategy
+
+Functional coverage is counted by the bench's own coverage service
+(`cov/sv/aou_fc_pkg.sv`) from the same bin tables the covergroups use, because
+Verilator scores covergroups as zero and the commercial tools weight them
+differently; each `COV=1` run writes `fc.json` and `scripts/fc_report.py`
+union-merges the passing runs. Code coverage of `RTL/` comes from the
+simulator (`COV=1`, `make cov_report`), with the integrator-replaced cells
+excluded by `cov/config/vcs/cov_exclude.hier`. Bound AXI4 coverage monitors
+(`cov/sv/aou_axi4_coverage_mod.sv`) cover every S and M port. Closure is
+measured on the union of every target, with no waivers; `AOU_FCOV.adoc` has
+the goals, the definitions and the closure policy, `docs/COVERAGE_CLOSURE.md`
+the closure plan and its decisions.
+
+=== SystemVerilog UVM Realization
+
+This bench has one realization, SV-UVM. Where the tt-oca-harness DV pattern
+defines the DUT-neutral contract with a PyUVM/cocotb twin, this bench states
+the contract in `docs/ARCHITECTURE.md` and keeps the cocotb twin as an open
+item (`OPEN_ITEMS.md`). The realization follows the harness compile-order
+contract: packages in dependency order from the sim config's `sources`, the
+tests included from `tb_top.sv` under `ifdef UVM`, `aou_base_test` on
+`ocah_test` (so the `UVM TEST PASSED`/`FAILED` banner the runner's `uvm-log`
+parser needs is emitted), `aou_sanity_test` the bring-up gate's required pair.
+
+Differences from the pattern, and why:
+
+[cols="2,4",options="header"]
+|===
+| Difference | Reason
+| UVM library | Standalone compiles the pinned uvm-core (`.deps/uvm-core`, `scripts/get_uvm_core.sh`) on every simulator so VCS and Verilator run one library (D2); under the harness runner VCS's shipped `uvm-ieee-2020-2.0` is used (`[build.vcs].uvm_lib` in the sim configs), the shipped library nearest the pinned source; the harness leg is a deferred follow-up (OPEN_ITEMS.md). Constructs only one library accepts are replaced in the bench or selected by the library's version macro.
+| Scenario naming | A scenario is a class plus plusargs, named `<class>[.<plusarg slug>][.<target>]` in the testlist, instead of one class per scenario; the plusarg variants predate the pattern (`OPEN_ITEMS.md`).
+| Expected failures | `expected_fail.yaml` plus `check_run.py` is the grader of record; the testlists carry `expect_fail` for the deterministic entries only, because the harness schema has no equivalent of `requires:`, `seed_dependent` or `when_re`.
+| Plan traceability | `testlists/plan_ids.yaml` maps scenario to plan items (the harness testlist schema has no key for it); `scripts/plan_status.py` joins the two.
+| Vendored root | Paths in the sim config are harness-relative (`vendor/tenstorrent/aou/upstream/...`, `hw/common/dv/vip/...`); `scripts/sim_cfg.py` maps them to this repository and `.deps/ocah_lib/` for the standalone Makefile.
+| Executors | Standalone `run_list.py` keeps an LSF pool with live steering and per-job metrics; the harness runner's regression mode draws random seeds, so a seed-exact sweep goes through `scripts/sweep.py` one leaf at a time.
+|===
+
+=== Adding a Scenario
+
+. Write the virtual sequence in `uvm/seq_lib/<area>/` on `aou_base_test_seq`
+  (or a family base such as `aou_dp_vseq`), composing the primitives; give it a
+  header that says what it does and which rules it exercises.
+. Write the test class in `uvm/tests/<area>/`, thin: `aou_t1_env_cfg` settings,
+  `vseq_type`, plusargs in the header; include it from the area's
+  `<area>_tests.svh`. Checkers a scenario needs go in `uvm/env/` (or
+  `uvm/env/chk/`), never in the test.
+. Add a `[[tests]]` entry to `testlists/<area>.toml` (`name`,
+  `module = { uvm = "<class>" }`, `args`, `seed`/`reseed`, `target` when
+  pinned, `tags`, `run_modes = ["<area>"]`), list the name in every group it
+  joins in `all.toml` and raise each group's `expected_count`, and add its plan
+  items under its name in `testlists/plan_ids.yaml`.
+  `python3 scripts/check_testlists.py` (in `make lint`) validates all of it.
+. A scenario that must fail on a known DUT bug gets an `expected_fail.yaml`
+  entry tied to the bug's GitHub issue (or its staged draft, AGENTS.md
+  "Reporting bugs"); if the failure is deterministic, also
+  `expect_fail` / `expect_fail_match` in the testlist entry.
+. Run it (`make build`, `make run TEST=<class> PLUSARGS="..."` or
+  `scripts/run_list.py --items <name>`), then `make docs` so
+  `AOU_VPLAN.adoc`'s generated summary, procedure and matrix pick it up, and
+  check the FCOV traceability table names the covergroups it drives.

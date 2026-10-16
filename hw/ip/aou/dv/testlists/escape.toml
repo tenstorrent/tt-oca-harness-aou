@@ -1,0 +1,106 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Bug-escape suite (acceptance A3), read by scripts/escape.py (make escape) only: every
+# real bug fixed on main, re-introduced by escape/<escape>.patch on a build-time copy
+# of RTL/, must make the test fail with `signature` (a regex matched against the
+# UVM_ERROR/UVM_FATAL lines) while the same run passes on the clean build. Keys: test
+# (UVM class, or "none" for a compile-time catch), escape, signature, tb (t1 or reg;
+# default t1), target, args, seed, reseed, build (the simulator whose compile catches
+# it), note. [[escapes]] is this bench's own schema, not the harness's [[tests]].
+# GitHub #14, #15, #16, #35 are open; #27 (FDI_IF_WD*) went away with the
+# FDI_CONFIG refactor, #30 (scoped imports, #31) and #56 (testbench stimulus)
+# changed no behaviour: none of them has a fix to re-introduce.
+
+[[escapes]]
+test = "aou_link_act_deact_test"
+escape = "pr28"
+target = "1x512-sp64"
+args = ["+who=both", "+order=simul", "+deact_who=both", "+busy=0"]
+seed = 1
+signature = "T1-V05: DUT not DISABLED"
+
+[[escapes]]
+test = "aou_lp_mode_traffic_test"
+escape = "pr28"
+target = "1x512-sp64"
+args = ["+threshold=0"]
+seed = 1
+signature = "T1-V05: DUT not DISABLED"
+
+[[escapes]]
+test = "none"
+escape = "pr46"
+build = "questa"
+signature = "vopt-7033"
+note = "best_index_* written by two always_comb processes; VCS, Xcelium and Verilator accept it and simulate it identically"
+
+[[escapes]]
+test = "aou_lp_mode_test"
+escape = "pr49"
+target = "1x512-sp64"
+args = ["+lp_mode=1", "+lp_thr=0", "+dp_dir=l2r", "+dp_wr_pct=0", "+dp_n=64"]
+seed = 1
+signature = "AOU-R31: .*credits not returned"
+
+[[escapes]]
+test = "aou_reg_access_test"
+escape = "pr75"
+tb = "reg"
+seed = 1
+signature = "REG-R02: aou_core\\.axi_split_tr_rp[0-3]\\.max_a[rw]burstlen"
+
+[[escapes]]
+test = "aou_split_test"
+escape = "pr75"
+target = "1x512-sp64"
+args = ["+split_aw=illegal", "+split_ar=illegal", "+dp_len=15,31"]
+seed = 1
+signature = "FEAT-R01: "
+
+[[escapes]]
+test = "aou_slv_id_mismatch_test"
+escape = "pr76"
+target = "4x512-sp64"
+seed = 1
+signature = "T1-E18: RP[1-3] "
+
+[[escapes]]
+test = "aou_reg_hw_reset_test"
+escape = "pr77"
+tb = "reg"
+seed = 1
+signature = "aou_core\\.prior_rp_axi.*does not match mirrored"
+
+# A pre-release bug (fixed in the RTL drop the initial commit came from):
+# the splitter's M-port AWVALID falls before AWREADY and the write is lost.
+# The pins never show the drop: the 1xN switch masks the splitter's AWVALID
+# while its previous W burst is in flight, and that is when the next sub-burst's
+# AW is dropped. The lost AW leaves its W stuck in the switch, so the catch is
+# the traffic hang. Any split write triggers it; +st_bp=aw adds pin back-pressure.
+[[escapes]]
+test = "aou_split_test"
+escape = "split_awvalid_drop"
+target = "1x512-sp64"
+args = ["+split_aw=7", "+split_ar=7", "+dp_len=15,31"]
+seed = 1
+signature = "T1-V08: traffic did not complete"
+
+[[escapes]]
+test = "aou_stress_test"
+escape = "split_awvalid_drop"
+target = "1x512-sp64"
+args = ["+st_bp=aw"]
+seed = 1
+signature = "T1-V08: traffic did not complete"
+
+# Checker mutations: not main fixes, but RTL mutations that break one rule a
+# new checker enforces, so that checker is shown to fire (checker inventory).
+[[escapes]]
+test = "aou_fdi_t1_bringup_test"
+escape = "mut_fdi_r16"
+target = "1x512-sp64"
+seed = 1
+signature = "FDI-R16: "

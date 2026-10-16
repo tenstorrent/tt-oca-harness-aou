@@ -1,0 +1,254 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Performance data (stream J).
+#
+# Performance gate (plan 2.10): every scenario of docs/perf_scenarios.yaml on
+# the CONFIGs it names, TB=t1. aou_perf_chk judges each window's links against
+# uvm/env/perf/aou_perf_targets.svh (T1-P02 at least 97% of the d2d_model value,
+# T1-P03 not above it, T1-P04 the model's message mix). The windows are
+# deterministic (aou_perf_seq), so one seed is enough. Two-PHY builds run once
+# per active PHY, since the target depends on it.
+# The latency and drain windows (10.4-10.7, 10.9) stay in matrix.yaml.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.4x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=4x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.3x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "3x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=3x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=4xmix4211-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.4xmix2144-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4xmix2144-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=4xmix2144-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.1x256-sp32"
+module = { uvm = "aou_perf_test" }
+target = "1x256-sp32"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=1x256-sp32"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+active_phy=0", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+active_phy=1", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64"
+module = { uvm = "aou_perf_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+active_phy=0", "+aou_config=2x512-tp32_64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64"
+module = { uvm = "aou_perf_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+active_phy=1", "+aou_config=2x512-tp32_64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S2.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S2", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S2.1x256-sp32"
+module = { uvm = "aou_perf_test" }
+target = "1x256-sp32"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S2", "+aou_config=1x256-sp32"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S2.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S2", "+aou_config=4xmix4211-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S3.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S3", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S3.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S3", "+aou_config=4xmix4211-sp128"]
+
+# blocked: narrow-AxSIZE bursts (128/256 beats): WriteData size vs DLENGTH (spec reading or DUT/bench deviation) and a ReadData256 pack-rate cap are under triage
+[[tests]]
+name = "aou_perf_test.perf_scn-S4"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf", "blocked"]
+run_modes = ["perf"]
+args = ["+perf_scn=S4", "+aou_config=1x512-sp64"]
+
+# blocked: narrow-AxSIZE bursts (128/256 beats): WriteData size vs DLENGTH (spec reading or DUT/bench deviation) and a ReadData256 pack-rate cap are under triage
+[[tests]]
+name = "aou_perf_test.perf_scn-S4.active_phy-0"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["perf", "blocked"]
+run_modes = ["perf"]
+args = ["+perf_scn=S4", "+active_phy=0", "+aou_config=2xmix-tp64_128"]
+
+# blocked: narrow-AxSIZE bursts (128/256 beats): WriteData size vs DLENGTH (spec reading or DUT/bench deviation) and a ReadData256 pack-rate cap are under triage
+[[tests]]
+name = "aou_perf_test.perf_scn-S4.active_phy-1"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["perf", "blocked"]
+run_modes = ["perf"]
+args = ["+perf_scn=S4", "+active_phy=1", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S5.4x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S5", "+aou_config=4x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S5.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S5", "+aou_config=4xmix4211-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S5.active_phy-0"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S5", "+active_phy=0", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S5.active_phy-1"
+module = { uvm = "aou_perf_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S5", "+active_phy=1", "+aou_config=2xmix-tp64_128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S5.3x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "3x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S5", "+aou_config=3x512-sp64"]
+
+[[groups]]
+name = "perf"
+expected_count = 20
+tests = [
+  "aou_perf_test.perf_scn-S1.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.4x512-sp64",
+  "aou_perf_test.perf_scn-S1.3x512-sp64",
+  "aou_perf_test.perf_scn-S1.4xmix4211-sp128",
+  "aou_perf_test.perf_scn-S1.4xmix2144-sp64",
+  "aou_perf_test.perf_scn-S1.1x256-sp32",
+  "aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128",
+  "aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128",
+  "aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64",
+  "aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64",
+  "aou_perf_test.perf_scn-S2.1x512-sp64",
+  "aou_perf_test.perf_scn-S2.1x256-sp32",
+  "aou_perf_test.perf_scn-S2.4xmix4211-sp128",
+  "aou_perf_test.perf_scn-S3.1x512-sp64",
+  "aou_perf_test.perf_scn-S3.4xmix4211-sp128",
+  "aou_perf_test.perf_scn-S5.4x512-sp64",
+  "aou_perf_test.perf_scn-S5.4xmix4211-sp128",
+  "aou_perf_test.perf_scn-S5.active_phy-0",
+  "aou_perf_test.perf_scn-S5.active_phy-1",
+  "aou_perf_test.perf_scn-S5.3x512-sp64",
+]

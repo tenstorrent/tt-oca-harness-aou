@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# Pre-existing findings in files inherited from PR 80 and dv/cov. New files get no
+# waivers; an entry goes away when its file is rewritten or fixed.
+waive --rule=always-ff-non-blocking --location="cov/sv/aou_axi4_fc_bins.svh"
+waive --rule=line-length --location="cov/sv/aou_axi4_coverage_mod.sv"
+waive --rule=line-length --location="cov/sv/aou_axi4_fc_bins.svh"
+waive --rule=line-length --location="cov/sv/aou_axi4_fc_pkg.sv"
+waive --rule=line-length --location="uvm/env/pkg/core/aou_pkg.sv"

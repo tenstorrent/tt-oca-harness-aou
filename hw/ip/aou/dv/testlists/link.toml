@@ -1,0 +1,424 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Credits and link (stream G).
+#
+# Credits/link tests (TB=t1). One entry per run-list line: the test, its
+# plusargs, how many seeds and the test-plan IDs it covers
+# (docs/test_plan_items.yaml).
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_link_act_deact_test"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+reseed = 4
+tags = ["link"]
+run_modes = ["link"]
+
+[[tests]]
+name = "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+who=both", "+order=simul", "+deact_who=both", "+busy=0"]
+
+[[tests]]
+name = "aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+who=remote", "+deact_who=remote", "+credit_manage=1", "+busy=1"]
+
+[[tests]]
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1"]
+
+[[tests]]
+name = "aou_link_force_deact_test"
+module = { uvm = "aou_link_force_deact_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+expect_fail = "BUGS/010 (expected_fail.yaml)"
+expect_fail_match = "DeactivateReq: PropertyReq on a non-ActivateReq opcode"
+
+[[tests]]
+name = "aou_act_after_deact_test"
+module = { uvm = "aou_act_after_deact_test" }
+seed = 1
+reseed = 4
+tags = ["link"]
+run_modes = ["link"]
+
+[[tests]]
+name = "aou_act_after_deact_test.credit_manage-1.busy-1"
+module = { uvm = "aou_act_after_deact_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit_manage=1", "+busy=1"]
+
+[[tests]]
+name = "aou_credit_return_test.method-grant"
+module = { uvm = "aou_credit_return_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+method=grant"]
+
+[[tests]]
+name = "aou_credit_return_test.method-hdr"
+module = { uvm = "aou_credit_return_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+method=hdr"]
+
+[[tests]]
+name = "aou_credit_return_test.method-mixed.ret-withheld"
+module = { uvm = "aou_credit_return_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+method=mixed", "+ret=withheld"]
+
+[[tests]]
+name = "aou_credit_return_test.ret-delayed.overgrant-1"
+module = { uvm = "aou_credit_return_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+ret=delayed", "+overgrant=1"]
+
+[[tests]]
+name = "aou_credit_return_test"
+module = { uvm = "aou_credit_return_test" }
+seed = 1
+reseed = 4
+tags = ["link"]
+run_modes = ["link"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wreq"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wreq"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rreq"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rreq"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wdata"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wdata"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rdata"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rdata"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wresp"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wresp"]
+
+# 3.15 (12.14 merged): one RP starved of one credit class; the others complete.
+[[tests]]
+name = "aou_zero_credit_test.credit-wreq.starve_rp-0"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wreq", "+starve_rp=0"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rreq.starve_rp-1"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rreq", "+starve_rp=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wdata.starve_rp-2"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wdata", "+starve_rp=2"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rdata.starve_rp-3"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rdata", "+starve_rp=3"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wresp.starve_rp-0"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wresp", "+starve_rp=0"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wdata.starve_rp-0"
+module = { uvm = "aou_zero_credit_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wdata", "+starve_rp=0"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rdata.starve_rp-1"
+module = { uvm = "aou_zero_credit_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rdata", "+starve_rp=1"]
+
+# 8.3/8.6: credit for k requests per RP and none returned; the DUT sends exactly k.
+[[tests]]
+name = "aou_zero_credit_test.credit-wreq.limit-4"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wreq", "+limit=4"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wreq.limit-12"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wreq", "+limit=12"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rreq.limit-4"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rreq", "+limit=4"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rreq.limit-12"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rreq", "+limit=12"]
+
+# 1.11: ACTIVATE_START written while the FDI link is down; activation starts on link-up.
+[[tests]]
+name = "aou_link_act_deact_test.early_act-1"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+early_act=1"]
+
+# 1.10: re-activation with remote requests still in the RX FIFO behind held M ports
+# (aou_t1_rx_fifo_chk T1-L40/T1-C41).
+[[tests]]
+name = "aou_act_rx_drain_test"
+module = { uvm = "aou_act_rx_drain_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+
+# 3.20/3.23: advertised credit against the RX FIFO depths (T1-C40) and credit held
+# behind held M ports (T1-C41); 3.25 on the non-default-depth, RS_EN=0 build.
+[[tests]]
+name = "aou_rx_credit_test"
+module = { uvm = "aou_rx_credit_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+
+[[tests]]
+name = "aou_rx_credit_test.loops-3"
+module = { uvm = "aou_rx_credit_test" }
+target = "2xmix-sp64-rxf"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+loops=3"]
+
+# 2.5: DEACTIVATE_START while traffic waits for credit (AOU-R33/AOU-R34, T1-L47, scoreboard).
+[[tests]]
+name = "aou_zero_credit_test.credit-wreq.deact-1"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wreq", "+deact=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rreq.deact-1"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rreq", "+deact=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wdata.deact-1"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wdata", "+deact=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-rdata.deact-1"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=rdata", "+deact=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wresp.deact-1"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wresp", "+deact=1"]
+
+# 2.12: DEACTIVATE_TIME_OUT_VALUE sweep (aou_t1_rx_fifo_chk T1-L46).
+[[tests]]
+name = "aou_deact_ctrl_test.mode-tov"
+module = { uvm = "aou_deact_ctrl_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+mode=tov"]
+
+# 2.10: INT_DEACTIVATE_PROPERTY during a remote deactivation (T1-L45, interim).
+[[tests]]
+name = "aou_deact_ctrl_test.mode-property"
+module = { uvm = "aou_deact_ctrl_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+mode=property"]
+
+[[groups]]
+name = "link"
+expected_count = 39
+tests = [
+  "aou_link_act_deact_test",
+  "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0",
+  "aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1",
+  "aou_link_force_deact_test",
+  "aou_act_after_deact_test",
+  "aou_act_after_deact_test.credit_manage-1.busy-1",
+  "aou_credit_return_test.method-grant",
+  "aou_credit_return_test.method-hdr",
+  "aou_credit_return_test.method-mixed.ret-withheld",
+  "aou_credit_return_test.ret-delayed.overgrant-1",
+  "aou_credit_return_test",
+  "aou_zero_credit_test.credit-wreq",
+  "aou_zero_credit_test.credit-rreq",
+  "aou_zero_credit_test.credit-wdata",
+  "aou_zero_credit_test.credit-rdata",
+  "aou_zero_credit_test.credit-wresp",
+  "aou_zero_credit_test.credit-wreq.starve_rp-0",
+  "aou_zero_credit_test.credit-rreq.starve_rp-1",
+  "aou_zero_credit_test.credit-wdata.starve_rp-2",
+  "aou_zero_credit_test.credit-rdata.starve_rp-3",
+  "aou_zero_credit_test.credit-wresp.starve_rp-0",
+  "aou_zero_credit_test.credit-wdata.starve_rp-0",
+  "aou_zero_credit_test.credit-rdata.starve_rp-1",
+  "aou_zero_credit_test.credit-wreq.limit-4",
+  "aou_zero_credit_test.credit-wreq.limit-12",
+  "aou_zero_credit_test.credit-rreq.limit-4",
+  "aou_zero_credit_test.credit-rreq.limit-12",
+  "aou_link_act_deact_test.early_act-1",
+  "aou_act_rx_drain_test",
+  "aou_rx_credit_test",
+  "aou_rx_credit_test.loops-3",
+  "aou_zero_credit_test.credit-wreq.deact-1",
+  "aou_zero_credit_test.credit-rreq.deact-1",
+  "aou_zero_credit_test.credit-wdata.deact-1",
+  "aou_zero_credit_test.credit-rdata.deact-1",
+  "aou_zero_credit_test.credit-wresp.deact-1",
+  "aou_deact_ctrl_test.mode-tov",
+  "aou_deact_ctrl_test.mode-property",
+]

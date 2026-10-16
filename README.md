@@ -22,7 +22,7 @@ DOC/                    Documentation
 INTEG/                  Integration collateral
   constraints/          SDC timing constraints and UPF power intent
   ipxact/               IP-XACT register map
-VERIF/                  Verification testbench and infrastructure
+hw/ip/aou/dv/           Verification: the SystemVerilog UVM testbench (tt-oca-dv layout)
 scripts/                Collateral generation and validation scripts
 ```
 
@@ -32,8 +32,8 @@ The fastest way to explore this IP:
 
 1. **Clone and setup environment:**
    ```bash
-   git clone https://github.com/tenstorrent/aou-rtl.git
-   cd aou-rtl
+   git clone https://github.com/tenstorrent/tt-oca-harness-aou.git
+   cd tt-oca-harness-aou
    python3 -m venv venv
    source venv/bin/activate
    pip install -r requirements.txt
@@ -47,11 +47,10 @@ The fastest way to explore this IP:
 3. **Review the interactive register browser:**
    Open `DOC/csr/html/index.html` in your browser to explore the register map.
 
-4. **Run verification (open-source, Verilator-based by default):**
+4. **Run verification** (the UVM testbench; see [Running Verification](#running-verification)):
    ```bash
-   cd VERIF
-   bash setup_cocotb_env.sh && source venv/bin/activate
-   make                     # Verilator
+   cd hw/ip/aou/dv
+   make setup && make test
    ```
 
 See sections below for detailed documentation, integration guidance, and tool requirements.
@@ -81,33 +80,33 @@ bash scripts/gen_collateral.sh
 
 ## Running Verification
 
-The repository ships a single open-source verification flow built on
-[cocotb](https://www.cocotb.org/) +
-[`cocotbext-axi`](https://github.com/alexforencich/cocotbext-axi). All
-verification IP is fetched from PyPI at install time -- no commercial
-VIP and no vendored AXI VIP source. The default simulator is Verilator
-(open source); Synopsys VCS is supported transparently for users with
-a commercial license.
+The verification environment for this IP is the VIP-free SystemVerilog/UVM
+testbench in [`hw/ip/aou/dv/`](hw/ip/aou/dv/README.md). It drives `AOU_TOP` from
+layered models of the remote die and the UCIe adapter, with spec-traced checkers,
+a test plan, code and functional coverage, and an expected-failure list that ties
+known DUT issues to their GitHub issues. It runs on
+Synopsys VCS (the development simulator) and on Verilator, and needs no
+commercial verification IP. Start with [`hw/ip/aou/dv/README.md`](hw/ip/aou/dv/README.md);
+the testbench architecture, the verification plan and the functional coverage
+plan are [`hw/ip/aou/dv/docs/AOU_TB_ARCH.adoc`](hw/ip/aou/dv/docs/AOU_TB_ARCH.adoc),
+[`hw/ip/aou/dv/docs/AOU_VPLAN.adoc`](hw/ip/aou/dv/docs/AOU_VPLAN.adoc) and
+[`hw/ip/aou/dv/docs/AOU_FCOV.adoc`](hw/ip/aou/dv/docs/AOU_FCOV.adoc), and
+[`hw/ip/aou/dv/docs/DECISIONS.md`](hw/ip/aou/dv/docs/DECISIONS.md) explains why it is
+built the way it is. The bench follows the
+[tt-oca-harness](https://github.com/tenstorrent/tt-oca-harness) DV layout and
+conventions; it is complete and self-sufficient here, and running it through
+that harness's runner is a separate, later step.
 
 ```bash
-cd VERIF
-bash setup_cocotb_env.sh && source venv/bin/activate
-make                     # Verilator (default)
-make SIM=vcs             # Synopsys VCS
-make WAVES=1             # enable waveform dump
+cd hw/ip/aou/dv
+make setup               # once: fetch uvm-core and the Python tools
+make test                # build and run the default T1 test (VCS when available)
+make test SIM=verilator  # the same on Verilator
 ```
 
-The testbench instantiates two `AOU_CORE_TOP` DUTs in single-PHY 32B
-FDI loopback and exercises:
-
-- AXI write/read round-trips through the FDI loopback in both
-  directions (forward, reverse, and concurrent).
-- A CSR reset-value readback driven from
-  [`csr/aou-core.rdl`](csr/aou-core.rdl) over APB on both DUTs --
-  catches RDL ↔ RTL drift on every run.
-
-See [`VERIF/README.md`](VERIF/README.md) for setup details, available
-tests, watchdog tuning, and the harness layout.
+The GitHub check-in workflow (`.github/workflows/uvm-smoke.yml`) builds the
+testbench on Verilator and runs its smoke group; the full regression runs on
+VCS.
 
 ## Integration
 
@@ -131,7 +130,7 @@ This project originated from a collaboration between BOS Semiconductors and Tens
 
 We welcome contributions from the community! Here's how you can help:
 
-- **Report bugs**: Submit issues via [GitHub Issues](https://github.com/tenstorrent/aou-rtl/issues)
+- **Report bugs**: Submit issues via [GitHub Issues](https://github.com/tenstorrent/tt-oca-harness-aou/issues)
 - **Submit changes**: Create pull requests for bug fixes and new features
 - **Review process**: Pull requests are reviewed on a weekly basis
 

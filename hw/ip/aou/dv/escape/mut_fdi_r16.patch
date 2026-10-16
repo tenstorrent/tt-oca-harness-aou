@@ -1,0 +1,15 @@
+SPDX-License-Identifier: Apache-2.0
+Mutation mut_fdi_r16 (not a main fix): lp_wake_req drops when lp_state_req goes
+to Active in Reset, so the new FDI-R16 checker must fire.
+Applied to a build-time copy of RTL/ by make build ESCAPE=mut_fdi_r16.
+
+--- a/RTL/AOU_FDI_BRINGUP_CTRL.sv
++++ b/RTL/AOU_FDI_BRINGUP_CTRL.sv
+@@ -371,7 +371,6 @@
+             case (w_nxt_st)
+                 ST_WAKE_ASSERT,
+                 ST_WAKE_WAIT_ACK,
+-                ST_REQ_ACTIVE,
+                 ST_ACTIVE,
+                 ST_RETRAIN:      r_wake_req <= 1'b1;
+                 default:         r_wake_req <= 1'b0;

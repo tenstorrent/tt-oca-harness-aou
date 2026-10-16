@@ -1,0 +1,381 @@
+SPDX-License-Identifier: Apache-2.0
+Escape pr49: reverse of main #49, 37b480f: TX core pops AXI FIFOs without the credited-message enables; LP threshold-0 flit launch from the live MsgCredit payload only.
+Applied to a build-time copy of RTL/ by make build ESCAPE=pr49.
+
+diff --git a/RTL/AOU_CORE.sv b/RTL/AOU_CORE.sv
+index bd72807..4b7621b 100644
+--- a/RTL/AOU_CORE.sv
++++ b/RTL/AOU_CORE.sv
+@@ -547,9 +547,6 @@ import packet_def_pkg::*;
+     logic                                   w_txcore_crdtgrant_valid        ;
+     logic                                   w_txcore_crdtgrant_ready        ;
+ 
+-    logic                                   w_tx_req_credit_blockn          ;
+-    logic                                   w_tx_rsp_credit_blockn          ;
+-
+     //interface
+     logic [RP_COUNT-1:0][CNT_RP_TX_AW_MAX_CREDIT_MAX-1:0] w_aou_tx_wreqcred ;
+     logic [RP_COUNT-1:0][CNT_RP_TX_AR_MAX_CREDIT_MAX-1:0] w_aou_tx_rreqcred ;
+@@ -1043,10 +1040,7 @@ import packet_def_pkg::*;
+ 
+         .I_RP_DEST_RP                   ( w_rp_dest_rp                  ),
+ 
+-        .I_CREDIT_BLOCK                 ( w_err_info_rid_mismatch_err | w_err_info_split_bid_mismatch_err | (|w_err_split_bid_mismatch_set) | (|w_err_rid_mismatch_set)),
+-        .O_TX_REQ_CREDIT_BLOCKn         ( w_tx_req_credit_blockn        ),
+-        .O_TX_RSP_CREDIT_BLOCKn         ( w_tx_rsp_credit_blockn        )
+-
++        .I_CREDIT_BLOCK                 ( w_err_info_rid_mismatch_err | w_err_info_split_bid_mismatch_err | (|w_err_split_bid_mismatch_set) | (|w_err_rid_mismatch_set))
+     );
+ 
+ //----------------------------------------------------------------------------
+@@ -1302,10 +1296,7 @@ import packet_def_pkg::*;
+         .I_PRIOR_RP_AXI_RP0_PRIOR       ( w_prior_rp_axi_rp0_prior      ),
+         .I_PRIOR_RP_AXI_ARB_MODE        ( w_prior_rp_axi_arb_mode       ),
+         .I_PRIOR_TIMER_TIMER_RESOLUTION ( w_prior_timer_timer_resolution),
+-        .I_PRIOR_TIMER_TIMER_THRESHOLD  ( w_prior_timer_timer_threshold ),
+-        .I_TX_REQ_CREDIT_BLOCKn         ( w_tx_req_credit_blockn        ),
+-        .I_TX_RSP_CREDIT_BLOCKn         ( w_tx_rsp_credit_blockn        )
+-
++        .I_PRIOR_TIMER_TIMER_THRESHOLD  ( w_prior_timer_timer_threshold )
+ 
+     );
+ 
+diff --git a/RTL/AOU_CRD_CTRL.sv b/RTL/AOU_CRD_CTRL.sv
+index c061ede..f1831b1 100644
+--- a/RTL/AOU_CRD_CTRL.sv
++++ b/RTL/AOU_CRD_CTRL.sv
+@@ -218,10 +218,7 @@ import packet_def_pkg::*;
+     
+     input       [3:0][1:0]                      I_RP_DEST_RP,
+     
+-    input                                       I_CREDIT_BLOCK,
+-    output                                      O_TX_REQ_CREDIT_BLOCKn,
+-    output                                      O_TX_RSP_CREDIT_BLOCKn
+-    
++    input                                       I_CREDIT_BLOCK
+ 
+ );
+ 
+@@ -302,96 +299,93 @@ AOU_RX_CRD_CTRL
+ );
+                                               
+ AOU_TX_CRD_CTRL #(                                                            
+-    .RP_COUNT                       (RP_COUNT                       ),
+-
+-    .RP0_AW_MAX_CREDIT              (RP0_TX_AW_MAX_CREDIT           ), 
+-    .RP0_AR_MAX_CREDIT              (RP0_TX_AR_MAX_CREDIT           ), 
+-    .RP0_W_MAX_CREDIT               (RP0_TX_W_MAX_CREDIT            ), 
+-    .RP0_R_MAX_CREDIT               (RP0_TX_R_MAX_CREDIT            ), 
+-    .RP0_B_MAX_CREDIT               (RP0_TX_B_MAX_CREDIT            ), 
+-    .RP1_AW_MAX_CREDIT              (RP1_TX_AW_MAX_CREDIT           ), 
+-    .RP1_AR_MAX_CREDIT              (RP1_TX_AR_MAX_CREDIT           ), 
+-    .RP1_W_MAX_CREDIT               (RP1_TX_W_MAX_CREDIT            ), 
+-    .RP1_R_MAX_CREDIT               (RP1_TX_R_MAX_CREDIT            ), 
+-    .RP1_B_MAX_CREDIT               (RP1_TX_B_MAX_CREDIT            ), 
+-    .RP2_AW_MAX_CREDIT              (RP2_TX_AW_MAX_CREDIT           ), 
+-    .RP2_AR_MAX_CREDIT              (RP2_TX_AR_MAX_CREDIT           ), 
+-    .RP2_W_MAX_CREDIT               (RP2_TX_W_MAX_CREDIT            ), 
+-    .RP2_R_MAX_CREDIT               (RP2_TX_R_MAX_CREDIT            ), 
+-    .RP2_B_MAX_CREDIT               (RP2_TX_B_MAX_CREDIT            ), 
+-    .RP3_AW_MAX_CREDIT              (RP3_TX_AW_MAX_CREDIT           ), 
+-    .RP3_AR_MAX_CREDIT              (RP3_TX_AR_MAX_CREDIT           ), 
+-    .RP3_W_MAX_CREDIT               (RP3_TX_W_MAX_CREDIT            ), 
+-    .RP3_R_MAX_CREDIT               (RP3_TX_R_MAX_CREDIT            ), 
+-    .RP3_B_MAX_CREDIT               (RP3_TX_B_MAX_CREDIT            ),
+-
+-    .AXI_DATA_WD_RP0                (RP0_AXI_DATA_WD                ),
+-    .AXI_DATA_WD_RP1                (RP1_AXI_DATA_WD                ),
+-    .AXI_DATA_WD_RP2                (RP2_AXI_DATA_WD                ),
+-    .AXI_DATA_WD_RP3                (RP3_AXI_DATA_WD                ),
++    .RP_COUNT                   (RP_COUNT                   ),
++
++    .RP0_AW_MAX_CREDIT          (RP0_TX_AW_MAX_CREDIT       ), 
++    .RP0_AR_MAX_CREDIT          (RP0_TX_AR_MAX_CREDIT       ), 
++    .RP0_W_MAX_CREDIT           (RP0_TX_W_MAX_CREDIT        ), 
++    .RP0_R_MAX_CREDIT           (RP0_TX_R_MAX_CREDIT        ), 
++    .RP0_B_MAX_CREDIT           (RP0_TX_B_MAX_CREDIT        ), 
++    .RP1_AW_MAX_CREDIT          (RP1_TX_AW_MAX_CREDIT       ), 
++    .RP1_AR_MAX_CREDIT          (RP1_TX_AR_MAX_CREDIT       ), 
++    .RP1_W_MAX_CREDIT           (RP1_TX_W_MAX_CREDIT        ), 
++    .RP1_R_MAX_CREDIT           (RP1_TX_R_MAX_CREDIT        ), 
++    .RP1_B_MAX_CREDIT           (RP1_TX_B_MAX_CREDIT        ), 
++    .RP2_AW_MAX_CREDIT          (RP2_TX_AW_MAX_CREDIT       ), 
++    .RP2_AR_MAX_CREDIT          (RP2_TX_AR_MAX_CREDIT       ), 
++    .RP2_W_MAX_CREDIT           (RP2_TX_W_MAX_CREDIT        ), 
++    .RP2_R_MAX_CREDIT           (RP2_TX_R_MAX_CREDIT        ), 
++    .RP2_B_MAX_CREDIT           (RP2_TX_B_MAX_CREDIT        ), 
++    .RP3_AW_MAX_CREDIT          (RP3_TX_AW_MAX_CREDIT       ), 
++    .RP3_AR_MAX_CREDIT          (RP3_TX_AR_MAX_CREDIT       ), 
++    .RP3_W_MAX_CREDIT           (RP3_TX_W_MAX_CREDIT        ), 
++    .RP3_R_MAX_CREDIT           (RP3_TX_R_MAX_CREDIT        ), 
++    .RP3_B_MAX_CREDIT           (RP3_TX_B_MAX_CREDIT        ),
++
++    .AXI_DATA_WD_RP0            (RP0_AXI_DATA_WD            ),
++    .AXI_DATA_WD_RP1            (RP1_AXI_DATA_WD            ),
++    .AXI_DATA_WD_RP2            (RP2_AXI_DATA_WD            ),
++    .AXI_DATA_WD_RP3            (RP3_AXI_DATA_WD            ),
+     
+-    .DEC_MULTI                      (DEC_MULTI                      )
++    .DEC_MULTI                  (DEC_MULTI                  )
+ 
+ ) u_aou_tx_crd_ctrl(
+-    .I_CLK                          (I_CLK                          ),
+-    .I_RESETN                       (I_RESETN                       ),
+-                                                                    
+-    .O_AOU_TX_WREQCRED              (O_AOU_TX_WREQCRED              ),
+-    .O_AOU_TX_RREQCRED              (O_AOU_TX_RREQCRED              ),
+-    .O_AOU_TX_WDATACRED             (O_AOU_TX_WDATACRED             ),
+-    .O_AOU_TX_RDATACRED             (O_AOU_TX_RDATACRED             ),
+-    .O_AOU_TX_WRESPCRED             (O_AOU_TX_WRESPCRED             ),
+-                                                               
+-    .I_AOU_TX_WREQVALID             (I_AOU_TX_WREQVALID             ),
+-    .I_AOU_TX_RREQVALID             (I_AOU_TX_RREQVALID             ),
+-    .I_AOU_TX_WDATAVALID            (I_AOU_TX_WDATAVALID            ),
+-    .I_AOU_TX_WFDATA                (I_AOU_TX_WFDATA                ),
+-    .I_AOU_TX_RDATAVALID            (I_AOU_TX_RDATAVALID            ),
+-    .I_AOU_TX_RDATA_DLENGTH         (I_AOU_TX_RDATA_DLENGTH         ),
+-    .I_AOU_TX_WRESPVALID            (I_AOU_TX_WRESPVALID            ),
+-                                                                    
+-    .I_AOU_CRDTGRANT_WRESPCRED3     (I_AOU_CRDTGRANT_WRESPCRED3     ),
+-    .I_AOU_CRDTGRANT_WRESPCRED2     (I_AOU_CRDTGRANT_WRESPCRED2     ),
+-    .I_AOU_CRDTGRANT_WRESPCRED1     (I_AOU_CRDTGRANT_WRESPCRED1     ),
+-    .I_AOU_CRDTGRANT_WRESPCRED0     (I_AOU_CRDTGRANT_WRESPCRED0     ),
+-    .I_AOU_CRDTGRANT_RDATACRED3     (I_AOU_CRDTGRANT_RDATACRED3     ),
+-    .I_AOU_CRDTGRANT_RDATACRED2     (I_AOU_CRDTGRANT_RDATACRED2     ),
+-    .I_AOU_CRDTGRANT_RDATACRED1     (I_AOU_CRDTGRANT_RDATACRED1     ),
+-    .I_AOU_CRDTGRANT_RDATACRED0     (I_AOU_CRDTGRANT_RDATACRED0     ),
+-    .I_AOU_CRDTGRANT_WDATACRED3     (I_AOU_CRDTGRANT_WDATACRED3     ),
+-    .I_AOU_CRDTGRANT_WDATACRED2     (I_AOU_CRDTGRANT_WDATACRED2     ),
+-    .I_AOU_CRDTGRANT_WDATACRED1     (I_AOU_CRDTGRANT_WDATACRED1     ),
+-    .I_AOU_CRDTGRANT_WDATACRED0     (I_AOU_CRDTGRANT_WDATACRED0     ),
+-    .I_AOU_CRDTGRANT_RREQCRED3      (I_AOU_CRDTGRANT_RREQCRED3      ),
+-    .I_AOU_CRDTGRANT_RREQCRED2      (I_AOU_CRDTGRANT_RREQCRED2      ),
+-    .I_AOU_CRDTGRANT_RREQCRED1      (I_AOU_CRDTGRANT_RREQCRED1      ),
+-    .I_AOU_CRDTGRANT_RREQCRED0      (I_AOU_CRDTGRANT_RREQCRED0      ),
+-    .I_AOU_CRDTGRANT_WREQCRED3      (I_AOU_CRDTGRANT_WREQCRED3      ),
+-    .I_AOU_CRDTGRANT_WREQCRED2      (I_AOU_CRDTGRANT_WREQCRED2      ),
+-    .I_AOU_CRDTGRANT_WREQCRED1      (I_AOU_CRDTGRANT_WREQCRED1      ),
+-    .I_AOU_CRDTGRANT_WREQCRED0      (I_AOU_CRDTGRANT_WREQCRED0      ),
+-    .I_AOU_CRDTGRANT_VALID          (I_AOU_CRDTGRANT_VALID          ),
+-                                                                    
+-    .I_AOU_MSGCRDT_WRESPCRED        (I_AOU_MSGCRDT_WRESPCRED        ),
+-    .I_AOU_MSGCRDT_RDATACRED        (I_AOU_MSGCRDT_RDATACRED        ),
+-    .I_AOU_MSGCRDT_WDATACRED        (I_AOU_MSGCRDT_WDATACRED        ),
+-    .I_AOU_MSGCRDT_RREQCRED         (I_AOU_MSGCRDT_RREQCRED         ),
+-    .I_AOU_MSGCRDT_WREQCRED         (I_AOU_MSGCRDT_WREQCRED         ),
+-    .I_AOU_MSGCRDT_RP               (I_AOU_MSGCRDT_RP               ),//destination
+-    .I_AOU_MSGCRDT_VALID            (I_AOU_MSGCRDT_VALID            ),
+-
+-    .I_CRD_COUNT_EN                 (I_CRD_COUNT_EN                 ), 
++    .I_CLK                      (I_CLK                      ),
++    .I_RESETN                   (I_RESETN                   ),
++                                                            
++    .O_AOU_TX_WREQCRED          (O_AOU_TX_WREQCRED          ),
++    .O_AOU_TX_RREQCRED          (O_AOU_TX_RREQCRED          ),
++    .O_AOU_TX_WDATACRED         (O_AOU_TX_WDATACRED         ),
++    .O_AOU_TX_RDATACRED         (O_AOU_TX_RDATACRED         ),
++    .O_AOU_TX_WRESPCRED         (O_AOU_TX_WRESPCRED         ),
++                                                           
++    .I_AOU_TX_WREQVALID         (I_AOU_TX_WREQVALID         ),
++    .I_AOU_TX_RREQVALID         (I_AOU_TX_RREQVALID         ),
++    .I_AOU_TX_WDATAVALID        (I_AOU_TX_WDATAVALID        ),
++    .I_AOU_TX_WFDATA            (I_AOU_TX_WFDATA            ),
++    .I_AOU_TX_RDATAVALID        (I_AOU_TX_RDATAVALID        ),
++    .I_AOU_TX_RDATA_DLENGTH     (I_AOU_TX_RDATA_DLENGTH     ),
++    .I_AOU_TX_WRESPVALID        (I_AOU_TX_WRESPVALID        ),
++                                                            
++    .I_AOU_CRDTGRANT_WRESPCRED3 (I_AOU_CRDTGRANT_WRESPCRED3 ),
++    .I_AOU_CRDTGRANT_WRESPCRED2 (I_AOU_CRDTGRANT_WRESPCRED2 ),
++    .I_AOU_CRDTGRANT_WRESPCRED1 (I_AOU_CRDTGRANT_WRESPCRED1 ),
++    .I_AOU_CRDTGRANT_WRESPCRED0 (I_AOU_CRDTGRANT_WRESPCRED0 ),
++    .I_AOU_CRDTGRANT_RDATACRED3 (I_AOU_CRDTGRANT_RDATACRED3 ),
++    .I_AOU_CRDTGRANT_RDATACRED2 (I_AOU_CRDTGRANT_RDATACRED2 ),
++    .I_AOU_CRDTGRANT_RDATACRED1 (I_AOU_CRDTGRANT_RDATACRED1 ),
++    .I_AOU_CRDTGRANT_RDATACRED0 (I_AOU_CRDTGRANT_RDATACRED0 ),
++    .I_AOU_CRDTGRANT_WDATACRED3 (I_AOU_CRDTGRANT_WDATACRED3 ),
++    .I_AOU_CRDTGRANT_WDATACRED2 (I_AOU_CRDTGRANT_WDATACRED2 ),
++    .I_AOU_CRDTGRANT_WDATACRED1 (I_AOU_CRDTGRANT_WDATACRED1 ),
++    .I_AOU_CRDTGRANT_WDATACRED0 (I_AOU_CRDTGRANT_WDATACRED0 ),
++    .I_AOU_CRDTGRANT_RREQCRED3  (I_AOU_CRDTGRANT_RREQCRED3  ),
++    .I_AOU_CRDTGRANT_RREQCRED2  (I_AOU_CRDTGRANT_RREQCRED2  ),
++    .I_AOU_CRDTGRANT_RREQCRED1  (I_AOU_CRDTGRANT_RREQCRED1  ),
++    .I_AOU_CRDTGRANT_RREQCRED0  (I_AOU_CRDTGRANT_RREQCRED0  ),
++    .I_AOU_CRDTGRANT_WREQCRED3  (I_AOU_CRDTGRANT_WREQCRED3  ),
++    .I_AOU_CRDTGRANT_WREQCRED2  (I_AOU_CRDTGRANT_WREQCRED2  ),
++    .I_AOU_CRDTGRANT_WREQCRED1  (I_AOU_CRDTGRANT_WREQCRED1  ),
++    .I_AOU_CRDTGRANT_WREQCRED0  (I_AOU_CRDTGRANT_WREQCRED0  ),
++    .I_AOU_CRDTGRANT_VALID      (I_AOU_CRDTGRANT_VALID      ),
++                                                            
++    .I_AOU_MSGCRDT_WRESPCRED    (I_AOU_MSGCRDT_WRESPCRED    ),
++    .I_AOU_MSGCRDT_RDATACRED    (I_AOU_MSGCRDT_RDATACRED    ),
++    .I_AOU_MSGCRDT_WDATACRED    (I_AOU_MSGCRDT_WDATACRED    ),
++    .I_AOU_MSGCRDT_RREQCRED     (I_AOU_MSGCRDT_RREQCRED     ),
++    .I_AOU_MSGCRDT_WREQCRED     (I_AOU_MSGCRDT_WREQCRED     ),
++    .I_AOU_MSGCRDT_RP           (I_AOU_MSGCRDT_RP           ),//destination
++    .I_AOU_MSGCRDT_VALID        (I_AOU_MSGCRDT_VALID        ),
++
++    .I_CRD_COUNT_EN             (I_CRD_COUNT_EN             ), 
+ 
+     .I_TX_REQ_CREDITED_MESSAGE_EN   (I_TX_REQ_CREDITED_MESSAGE_EN   ),
+     .I_TX_RSP_CREDITED_MESSAGE_EN   (I_TX_RSP_CREDITED_MESSAGE_EN   ),
+-    .I_STATUS_DISABLE               (I_STATUS_DISABLE               ),
++    .I_STATUS_DISABLE           (I_STATUS_DISABLE           ),
+ 
+-    .I_RP_DEST_RP                   (I_RP_DEST_RP                   ),
++    .I_RP_DEST_RP               (I_RP_DEST_RP               ),
+ 
+-    .I_CREDIT_BLOCK                 (I_CREDIT_BLOCK                 ),
+-    .O_TX_REQ_CREDIT_BLOCKn         (O_TX_REQ_CREDIT_BLOCKn         ),
+-    .O_TX_RSP_CREDIT_BLOCKn         (O_TX_RSP_CREDIT_BLOCKn         )
+-    
++    .I_CREDIT_BLOCK             (I_CREDIT_BLOCK             )
+ );
+ endmodule                                     
+                                               
+diff --git a/RTL/AOU_TX_CORE.sv b/RTL/AOU_TX_CORE.sv
+index 09f3a4a..99e92fd 100644
+--- a/RTL/AOU_TX_CORE.sv
++++ b/RTL/AOU_TX_CORE.sv
+@@ -235,9 +235,7 @@ import packet_def_pkg::*;
+     input  logic [1:0]                                          I_PRIOR_RP_AXI_RP0_PRIOR,
+     input  logic [1:0]                                          I_PRIOR_RP_AXI_ARB_MODE,
+     input  logic [15:0]                                         I_PRIOR_TIMER_TIMER_RESOLUTION,
+-    input  logic [15:0]                                         I_PRIOR_TIMER_TIMER_THRESHOLD,
+-    input  logic                                                I_TX_REQ_CREDIT_BLOCKn,
+-    input  logic                                                I_TX_RSP_CREDIT_BLOCKn        
++    input  logic [15:0]                                         I_PRIOR_TIMER_TIMER_THRESHOLD
+ 
+ );
+ // Flit-packing parameters derived from FDI data width.
+@@ -368,7 +366,7 @@ logic  [RP_CNT-1:0] w_aou_tx_r_hs      ;
+ 
+ logic   w_rdata_256b;
+ logic   w_rdata_512b;
+-
++logic   w_rdata_1024b;
+ 
+ 
+ assign  w_aou_fifo_aw_hs        = w_aou_fifo_awvalid && w_aou_fifo_awready;
+@@ -456,7 +454,7 @@ logic                       r_ring_buffer_ready;
+ 
+ assign  w_rdata_256b    = (w_aou_fifo_rdlen == 2'b00);
+ assign  w_rdata_512b    = (w_aou_fifo_rdlen == 2'b01);
+-
++assign  w_rdata_1024b   = (w_aou_fifo_rdlen == 2'b10);
+ 
+ //assume maximum granule is not larger than 64
+ logic [5:0]  w_rdata_granule_size;
+@@ -508,11 +506,11 @@ logic w_lp_engaged;
+ // engaged mode).
+ wire w_pop_ok = w_flit_fifo_ready || (w_lp_engaged && !w_flit_fifo_valid);
+ 
+-assign w_aou_fifo_awready           = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok && I_TX_REQ_CREDIT_BLOCKn;
+-assign w_aou_fifo_wready            = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok && I_TX_REQ_CREDIT_BLOCKn;
+-assign w_aou_fifo_bready            = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok && I_TX_RSP_CREDIT_BLOCKn;
+-assign w_aou_fifo_arready           = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok && I_TX_REQ_CREDIT_BLOCKn;
+-assign w_aou_fifo_rready            = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok && I_TX_RSP_CREDIT_BLOCKn;
++assign w_aou_fifo_awready           = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok;
++assign w_aou_fifo_wready            = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok;
++assign w_aou_fifo_bready            = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok;
++assign w_aou_fifo_arready           = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok;
++assign w_aou_fifo_rready            = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok;
+ 
+ assign w_misc_crdtgrant_fifo_ready  = w_ring_buffer_ready && (!w_misc_activation_valid) && w_pop_ok;
+ 
+@@ -1006,17 +1004,6 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+     end
+ end
+ 
+-logic r_msgcredit_port_valid;
+-
+-always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+-    if (!I_RESETN) begin
+-        r_msgcredit_port_valid <= 1'b0;
+-    end else if (I_AOU_MSGCREDIT_CRED_VALID) begin
+-        r_msgcredit_port_valid <= |{I_AOU_MSGCREDIT_WREQCRED, I_AOU_MSGCREDIT_RREQCRED, I_AOU_MSGCREDIT_WDATACRED
+-                                    , I_AOU_MSGCREDIT_RDATACRED, I_AOU_MSGCREDIT_WRESPCRED};
+-    end
+-end
+-
+ assign w_lp_engaged = I_AOU_TX_LP_MODE && I_STATUS_ENABLED
+                     && (!w_misc_activation_valid) && (!r_act_in_flight);
+ 
+@@ -1027,9 +1014,9 @@ assign w_lp_engaged = I_AOU_TX_LP_MODE && I_STATUS_ENABLED
+ //   - threshold != 0: existing periodic heartbeat preserved (every threshold+1
+ //                     cycles while activation is valid) so legacy CSR semantics
+ //                     are unchanged for non-zero thresholds.
+-//   - threshold == 0: heartbeat is inert; flits may launch on the current MsgCredit payload or
+-//                     a previously latched MsgCredit presence via r_msgcredit_port_valid.
+-//                     This preserves the legacy latched-credit behavior while LP engagement/pop gating is fixed.
++//   - threshold == 0: heartbeat is inert; flits launch only on real work
++//                     (ring buffer non-empty, mid-flit, or a MsgCredit header
++//                      with at least one non-zero credit field to return).
+ // LP not engaged (handshake in progress / non-LP):
+ //   Legacy behavior: fire whenever ring is non-empty, mid-flit, or activation
+ //   has started (r_tx_activation_valid). This guarantees the activation FIFO
+@@ -1043,27 +1030,20 @@ assign w_lp_engaged = I_AOU_TX_LP_MODE && I_STATUS_ENABLED
+ //   the live credit payload directly so flits only launch when there is at
+ //   least one real credit to return. (FWD_RS r_mdata still carries the actual
+ //   chunk-2 payload at handshake time, so credit accounting is unchanged.)
+-
+-logic w_flit_header_credit_valid;
+-
+-assign w_flit_header_credit_valid = w_aou_msgcredit_valid && |{
+-        w_aou_rs_msgcredit_wrespcred, w_aou_rs_msgcredit_rdatacred,
+-        w_aou_rs_msgcredit_wdatacred, w_aou_rs_msgcredit_rreqcred,
+-        w_aou_rs_msgcredit_wreqcred
++wire w_msgcredit_payload_pending =
++    I_AOU_MSGCREDIT_CRED_VALID && |{
++        I_AOU_MSGCREDIT_WREQCRED, I_AOU_MSGCREDIT_RREQCRED,
++        I_AOU_MSGCREDIT_WDATACRED, I_AOU_MSGCREDIT_RDATACRED,
++        I_AOU_MSGCREDIT_WRESPCRED
+     };
+ 
+-logic w_lp_mode_thres_val;
+-
+-assign w_lp_mode_thres_val = (I_AOU_TX_LP_MODE_THRESHOLD == 'b0) ?  {w_flit_header_credit_valid || r_msgcredit_port_valid} : w_flit_fifo_valid_out_valid;
+-
+-
+ assign w_flit_fifo_valid = w_lp_engaged
+-    ? ((r_cur_granule_start != r_cur_flit_for_fifo_start) ||
+-         (r_flit_packing_state != '0) ||
+-         (r_tx_activation_valid && w_lp_mode_thres_val))
+-      : ((r_cur_granule_start != r_cur_flit_for_fifo_start) ||
+-         (r_flit_packing_state != '0) ||
+-         r_tx_activation_valid);
++    ? ( (r_cur_granule_start != r_cur_flit_for_fifo_start)
++        || (r_flit_packing_state != '0)
++        || ( (I_AOU_TX_LP_MODE_THRESHOLD == 8'd0)
++             ? w_msgcredit_payload_pending
++             : (r_tx_activation_valid && w_flit_fifo_valid_out_valid) ) )
++    : ( (r_cur_granule_start != r_cur_flit_for_fifo_start) || (r_flit_packing_state != '0) || (r_tx_activation_valid) );
+ 
+ 
+ assign O_AOU_TX_PENDING = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_aou_fifo_bvalid
+diff --git a/RTL/AOU_TX_CRD_CTRL.sv b/RTL/AOU_TX_CRD_CTRL.sv
+index e3bac38..3145416 100644
+--- a/RTL/AOU_TX_CRD_CTRL.sv
++++ b/RTL/AOU_TX_CRD_CTRL.sv
+@@ -225,10 +225,7 @@ import packet_def_pkg::*;
+     //RP Mapping
+     input       [3:0][1:0]                      I_RP_DEST_RP,
+ 
+-    input                                       I_CREDIT_BLOCK,
+-    output                                      O_TX_REQ_CREDIT_BLOCKn,
+-    output                                      O_TX_RSP_CREDIT_BLOCKn
+-    
++    input                                       I_CREDIT_BLOCK
+ 
+ );
+ 
+@@ -321,10 +318,6 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+         r_tx_rsp_credited_message_en <= I_TX_RSP_CREDITED_MESSAGE_EN && ~I_CREDIT_BLOCK;
+     end
+ end
+-
+-assign O_TX_REQ_CREDIT_BLOCKn  = r_tx_req_credited_message_en;
+-assign O_TX_RSP_CREDIT_BLOCKn  = r_tx_rsp_credited_message_en;
+-
+ //For TX_CORE Credit count
+ assign  w_rp0_credit_match        = (I_AOU_MSGCRDT_RP == 2'b00);
+ assign  w_rp1_credit_match        = (I_AOU_MSGCRDT_RP == 2'b01);

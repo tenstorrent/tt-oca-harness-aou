@@ -1,0 +1,341 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Reset, low-power and link events (stream G).
+#
+# Reset, low-power and link-event tests (TB=t1); format as in link.yaml.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_link_event_test.event-retrain"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=retrain"]
+
+[[tests]]
+name = "aou_link_event_test.event-clk_wake"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=clk_wake"]
+
+[[tests]]
+name = "aou_link_event_test.event-l1"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=l1"]
+
+[[tests]]
+name = "aou_link_event_test.event-linkerror"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=linkerror"]
+
+[[tests]]
+name = "aou_link_event_test.event-link_reset"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=link_reset"]
+
+[[tests]]
+name = "aou_link_event_test.event-inband_drop"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=inband_drop"]
+
+[[tests]]
+name = "aou_link_event_test"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+
+[[tests]]
+name = "aou_lp_mode_traffic_test.threshold-0"
+module = { uvm = "aou_lp_mode_traffic_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+threshold=0"]
+
+[[tests]]
+name = "aou_lp_mode_traffic_test"
+module = { uvm = "aou_lp_mode_traffic_test" }
+seed = 1
+reseed = 3
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+
+# TX_LP_MODE written on the edge the lower half of a flit's first chunk goes
+# out on a half-width FDI path, with a message waiting for the next cycle
+# (BUGS/034). Only builds with a half-width path: SP_32B and PHY0 of the
+# two-PHY builds.
+[[tests]]
+name = "aou_lp_mode_align_test.1x256-sp32"
+module = { uvm = "aou_lp_mode_align_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+
+[[tests]]
+name = "aou_lp_mode_align_test.2x512-tp32_64"
+module = { uvm = "aou_lp_mode_align_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+
+[[tests]]
+name = "aou_lp_mode_align_test.2xmix-tp64_128"
+module = { uvm = "aou_lp_mode_align_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+
+[[tests]]
+name = "aou_reset_test.reset-sw"
+module = { uvm = "aou_reset_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=sw"]
+
+[[tests]]
+name = "aou_reset_test.reset-core.when-traffic"
+module = { uvm = "aou_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=core", "+when=traffic"]
+
+[[tests]]
+name = "aou_reset_test.reset-apb.when-traffic"
+module = { uvm = "aou_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=apb", "+when=traffic"]
+
+[[tests]]
+name = "aou_reset_test.reset-both.when-activating"
+module = { uvm = "aou_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=both", "+when=activating"]
+
+[[tests]]
+name = "aou_reset_test.when-queued"
+module = { uvm = "aou_reset_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+when=queued"]
+
+[[tests]]
+name = "aou_reset_test"
+module = { uvm = "aou_reset_test" }
+seed = 1
+reseed = 3
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+
+# PCLK:CLK ratios through the asynchronous APB bridge (plan 11.17), as in
+# registers.yaml: +pclk_ps=40000 (slow), 600 (fast) and 1013 (near-equal); the
+# software paths that use APB most (interrupt W1C, activation by APB, AOU_SW_RESET,
+# the debug FIFO, I_PRESETN alone during traffic).
+[[tests]]
+name = "aou_int_test.mode-w1c.pclk_ps-40000"
+module = { uvm = "aou_int_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+mode=w1c", "+pclk_ps=40000"]
+
+[[tests]]
+name = "aou_int_test.mode-w1c.pclk_ps-600"
+module = { uvm = "aou_int_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+mode=w1c", "+pclk_ps=600"]
+
+[[tests]]
+name = "aou_int_test.mode-w1c.pclk_ps-1013"
+module = { uvm = "aou_int_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+mode=w1c", "+pclk_ps=1013"]
+
+[[tests]]
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-40000"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1", "+pclk_ps=40000"]
+
+[[tests]]
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-600"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1", "+pclk_ps=600"]
+
+[[tests]]
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-1013"
+module = { uvm = "aou_link_act_deact_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1", "+pclk_ps=1013"]
+
+[[tests]]
+name = "aou_t1_sw_reset_test.pclk_ps-40000"
+module = { uvm = "aou_t1_sw_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+pclk_ps=40000"]
+
+[[tests]]
+name = "aou_t1_sw_reset_test.pclk_ps-600"
+module = { uvm = "aou_t1_sw_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+pclk_ps=600"]
+
+[[tests]]
+name = "aou_t1_sw_reset_test.pclk_ps-1013"
+module = { uvm = "aou_t1_sw_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+pclk_ps=1013"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.pclk_ps-40000"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+pclk_ps=40000"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.pclk_ps-600"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+pclk_ps=600"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.pclk_ps-1013"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+pclk_ps=1013"]
+
+[[tests]]
+name = "aou_reset_test.reset-apb.when-traffic.pclk_ps-40000"
+module = { uvm = "aou_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=apb", "+when=traffic", "+pclk_ps=40000"]
+
+[[tests]]
+name = "aou_reset_test.reset-apb.when-traffic.pclk_ps-600"
+module = { uvm = "aou_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=apb", "+when=traffic", "+pclk_ps=600"]
+
+[[tests]]
+name = "aou_reset_test.reset-apb.when-traffic.pclk_ps-1013"
+module = { uvm = "aou_reset_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+reset=apb", "+when=traffic", "+pclk_ps=1013"]
+
+# DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path (plan 11.19).
+[[tests]]
+name = "aou_dft_scan_test"
+module = { uvm = "aou_dft_scan_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+expect_fail = "BUGS/052 (expected_fail.yaml)"
+expect_fail_match = "T1-DFT01: the core reset was asserted for|T1-DFT02: aou_core\\.lp_linkreset\\.msgcredit_time_out_value read 0x0, expected 0x6"
+
+[[groups]]
+name = "lifecycle"
+expected_count = 34
+tests = [
+  "aou_link_event_test.event-retrain",
+  "aou_link_event_test.event-clk_wake",
+  "aou_link_event_test.event-l1",
+  "aou_link_event_test.event-linkerror",
+  "aou_link_event_test.event-link_reset",
+  "aou_link_event_test.event-inband_drop",
+  "aou_link_event_test",
+  "aou_lp_mode_traffic_test.threshold-0",
+  "aou_lp_mode_traffic_test",
+  "aou_lp_mode_align_test.1x256-sp32",
+  "aou_lp_mode_align_test.2x512-tp32_64",
+  "aou_lp_mode_align_test.2xmix-tp64_128",
+  "aou_reset_test.reset-sw",
+  "aou_reset_test.reset-core.when-traffic",
+  "aou_reset_test.reset-apb.when-traffic",
+  "aou_reset_test.reset-both.when-activating",
+  "aou_reset_test.when-queued",
+  "aou_reset_test",
+  "aou_int_test.mode-w1c.pclk_ps-40000",
+  "aou_int_test.mode-w1c.pclk_ps-600",
+  "aou_int_test.mode-w1c.pclk_ps-1013",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-40000",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-600",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-1013",
+  "aou_t1_sw_reset_test.pclk_ps-40000",
+  "aou_t1_sw_reset_test.pclk_ps-600",
+  "aou_t1_sw_reset_test.pclk_ps-1013",
+  "aou_axi_err_resp_test.pclk_ps-40000",
+  "aou_axi_err_resp_test.pclk_ps-600",
+  "aou_axi_err_resp_test.pclk_ps-1013",
+  "aou_reset_test.reset-apb.when-traffic.pclk_ps-40000",
+  "aou_reset_test.reset-apb.when-traffic.pclk_ps-600",
+  "aou_reset_test.reset-apb.when-traffic.pclk_ps-1013",
+  "aou_dft_scan_test",
+]

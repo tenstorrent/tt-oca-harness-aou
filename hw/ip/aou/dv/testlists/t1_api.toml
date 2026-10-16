@@ -1,0 +1,63 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The T1 test-layer API: injection, SW and hard reset, slices.
+#
+# One test per base-vseq helper beyond the G1a slice (T1, CONFIG=1x512-sp64).
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_t1_link_event_test"
+module = { uvm = "aou_t1_link_event_test" }
+seed = 1
+reseed = 3
+tags = ["t1_api"]
+run_modes = ["t1_api"]
+
+[[tests]]
+name = "aou_t1_lp_mode_test"
+module = { uvm = "aou_t1_lp_mode_test" }
+seed = 1
+reseed = 3
+tags = ["t1_api"]
+run_modes = ["t1_api"]
+
+[[tests]]
+name = "aou_t1_inject_test"
+module = { uvm = "aou_t1_inject_test" }
+seed = 1
+reseed = 3
+tags = ["t1_api"]
+run_modes = ["t1_api"]
+
+[[tests]]
+name = "aou_t1_sw_reset_test"
+module = { uvm = "aou_t1_sw_reset_test" }
+seed = 1
+reseed = 3
+tags = ["t1_api"]
+run_modes = ["t1_api"]
+
+[[tests]]
+name = "aou_t1_hard_reset_test"
+module = { uvm = "aou_t1_hard_reset_test" }
+seed = 1
+reseed = 3
+tags = ["t1_api"]
+run_modes = ["t1_api"]
+
+[[groups]]
+name = "t1_api"
+expected_count = 5
+tests = [
+  "aou_t1_link_event_test",
+  "aou_t1_lp_mode_test",
+  "aou_t1_inject_test",
+  "aou_t1_sw_reset_test",
+  "aou_t1_hard_reset_test",
+]

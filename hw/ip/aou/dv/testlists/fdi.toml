@@ -1,0 +1,241 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# FDI L1/L2 against the DUT: bring-up, link error, link down, link stress.
+#
+# FDI corners under AoU traffic (plan 2.18; TB=t1). The L1 knobs
+# (aou_t1_env_cfg::l1_plusargs) put stalls and flit cancels where the default
+# stimulus does not (the l1.cg_fdi_stall/cancel/abandon bins show they did); the
+# scoreboard, AOU_FDI_CHECKER and the FDI-R rules judge the DUT. Format as in
+# link.yaml.
+# Stall corners (18.22): pl_stallreq mid-flit (lp_stallack only at the flit boundary,
+# FDI-R13), with pl_trdy low before the ack (UCIe r1.1 8.3.2 rule 7), and with TX
+# low-power mode; FDI-R57 bounds the ack.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-60.fdi_stall_trdy_free-1"
+module = { uvm = "aou_dp_random_test" }
+seed = 1
+reseed = 3
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+dp_dir=both", "+fdi_trdy=holes", "+fdi_stall_pct=5", "+fdi_stall_mid_pct=60", "+fdi_stall_trdy_free=1"]
+
+[[tests]]
+name = "aou_stress_test.st_pol-random.st_crd-slow.fdi_trdy-random.fdi_stall_pct-8.fdi_stall_mid_pct-50"
+module = { uvm = "aou_stress_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+st_pol=random", "+st_crd=slow", "+fdi_trdy=random", "+fdi_stall_pct=8", "+fdi_stall_mid_pct=50"]
+
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-90.fdi_stall_trdy_free-1"
+module = { uvm = "aou_lp_mode_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+lp_mode=1", "+fdi_trdy=holes", "+fdi_stall_pct=5", "+fdi_stall_mid_pct=90", "+fdi_stall_trdy_free=1"]
+
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-1.lp_thr-0.fdi_trdy-random.fdi_stall_pct-5.fdi_stall_mid_pct-90.fdi_stall_trdy_free-1"
+module = { uvm = "aou_lp_mode_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+lp_mode=1", "+lp_thr=0", "+fdi_trdy=random", "+fdi_stall_pct=5", "+fdi_stall_mid_pct=90", "+fdi_stall_trdy_free=1"]
+
+# Flit-cancel corners (18.24): every cancel shape (second half, both halves, second
+# half with the first resent), the same half cancelled up to three times, cancels of
+# flits that continue a message from the flit before, and cancels during a TX stall.
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1"
+module = { uvm = "aou_dp_random_test" }
+seed = 1
+reseed = 3
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+dp_dir=both", "+l1_cancel_pct=40", "+l1_cancel_mix=1"]
+
+[[tests]]
+name = "aou_dp_packing_test.dp_pack-crossflit.l1_cancel_pct-50.l1_cancel_mix-1"
+module = { uvm = "aou_dp_packing_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+dp_pack=crossflit", "+l1_cancel_pct=50", "+l1_cancel_mix=1"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.fdi_trdy-holes.fdi_stall_pct-8.fdi_stall_mid_pct-50.fdi_stall_trdy_free-1"
+module = { uvm = "aou_dp_random_test" }
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+dp_dir=both", "+l1_cancel_pct=40", "+l1_cancel_mix=1", "+fdi_trdy=holes", "+fdi_stall_pct=8", "+fdi_stall_mid_pct=50", "+fdi_stall_trdy_free=1"]
+
+# L2 (18.16): not implemented (integration guide 6.6.6 GAP-3), and the Adapter cannot
+# enter L2 without the Protocol Layer's request (UCIe r1.1 8.2.9), so the check is that
+# the DUT never requests it (FDI-R56) through every link event and PM flow.
+[[tests]]
+name = "aou_fdi_t1_link_stress_test"
+module = { uvm = "aou_fdi_t1_link_stress_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+
+# pl_state_sts leaves Active mid-flit (18.23): only LinkError may (UCIe r1.1 8.3.3.7;
+# other exits stop at a flit boundary, 8.3.2). L1 abandons the partial flits both ways;
+# the DUT must drop its own (FDI-R02/R43/R44/R45 after recovery, AOU_FDI_CHECKER, and
+# with traffic the scoreboard).
+[[tests]]
+name = "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100"
+module = { uvm = "aou_fdi_t1_link_stress_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 3
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+le_mid_flit_pct=100"]
+
+[[tests]]
+name = "aou_link_event_test.event-linkerror.le_mid_flit_pct-100"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=linkerror", "+le_mid_flit_pct=100"]
+
+# Disabled (18.18): Adapter-initiated entry and exit with AoU traffic (fdi_enc=SPEC; the
+# test selects it). The DUT requests Active to leave (FDI-R50), O_FDI_LINK_UP drops
+# (FDI-M06), and traffic resumes after recovery.
+[[tests]]
+name = "aou_link_event_test.event-disabled"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=disabled"]
+
+# Two-PHY with PHY1 active (18.25): +park_idle_phy keeps PHY0 in Reset with its
+# mainband closed, so the DUT must follow PHY1's pl_state_sts (the bringup model,
+# FDI-M01/M05/M06, follows I_PHY_TYPE) and PHY1's stalls (L1 entry, random stalls);
+# PHY0 must stay quiet (FDI-R43/R44 on its monitor).
+[[tests]]
+name = "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128"
+module = { uvm = "aou_t1_slice_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+active_phy=1", "+park_idle_phy=1"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128"
+module = { uvm = "aou_dp_random_test" }
+target = "2xmix-tp64_128"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+dp_dir=both", "+active_phy=1", "+park_idle_phy=1", "+fdi_trdy=holes", "+fdi_stall_pct=5", "+fdi_stall_mid_pct=50"]
+
+[[tests]]
+name = "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128"
+module = { uvm = "aou_link_event_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=l1", "+active_phy=1", "+park_idle_phy=1"]
+
+[[tests]]
+name = "aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2xmix-tp64_128"
+module = { uvm = "aou_link_event_test" }
+target = "2xmix-tp64_128"
+seed = 1
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=retrain", "+active_phy=1", "+park_idle_phy=1"]
+
+[[tests]]
+name = "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2x512-tp32_64"
+module = { uvm = "aou_t1_slice_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+active_phy=1", "+park_idle_phy=1"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2x512-tp32_64"
+module = { uvm = "aou_dp_random_test" }
+target = "2x512-tp32_64"
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+dp_dir=both", "+active_phy=1", "+park_idle_phy=1", "+fdi_trdy=holes", "+fdi_stall_pct=5", "+fdi_stall_mid_pct=50"]
+
+[[tests]]
+name = "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2x512-tp32_64"
+module = { uvm = "aou_link_event_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=l1", "+active_phy=1", "+park_idle_phy=1"]
+
+[[tests]]
+name = "aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2x512-tp32_64"
+module = { uvm = "aou_link_event_test" }
+target = "2x512-tp32_64"
+seed = 1
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=retrain", "+active_phy=1", "+park_idle_phy=1"]
+
+[[groups]]
+name = "fdi"
+expected_count = 19
+tests = [
+  "aou_dp_random_test.dp_dir-both.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-60.fdi_stall_trdy_free-1",
+  "aou_stress_test.st_pol-random.st_crd-slow.fdi_trdy-random.fdi_stall_pct-8.fdi_stall_mid_pct-50",
+  "aou_lp_mode_test.lp_mode-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-90.fdi_stall_trdy_free-1",
+  "aou_lp_mode_test.lp_mode-1.lp_thr-0.fdi_trdy-random.fdi_stall_pct-5.fdi_stall_mid_pct-90.fdi_stall_trdy_free-1",
+  "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1",
+  "aou_dp_packing_test.dp_pack-crossflit.l1_cancel_pct-50.l1_cancel_mix-1",
+  "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.fdi_trdy-holes.fdi_stall_pct-8.fdi_stall_mid_pct-50.fdi_stall_trdy_free-1",
+  "aou_fdi_t1_link_stress_test",
+  "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100",
+  "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
+  "aou_link_event_test.event-disabled",
+  "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
+  "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
+  "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
+  "aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
+  "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2x512-tp32_64",
+  "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2x512-tp32_64",
+  "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2x512-tp32_64",
+  "aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2x512-tp32_64",
+]

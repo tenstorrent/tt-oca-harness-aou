@@ -1,0 +1,369 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Error and interrupt registers (stream G).
+#
+# AXI error responses, the response error debug FIFO, ID mismatch, credit
+# violations and interrupts (plan 2.9, 2.19; TB=t1). Format as in link.yaml.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_axi_err_resp_test"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+reseed = 3
+tags = ["err_int"]
+run_modes = ["err_int"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.4x512-sp64"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+
+# Splitter error merge: 16-beat remote bursts split into sub-bursts, one (or
+# two) of which hit a 32-byte error region; merged BRESP and per-beat RRESP.
+[[tests]]
+name = "aou_axi_err_resp_test.part-split.max_awburstlen-3.max_arburstlen-3"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+reseed = 3
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=split", "+max_awburstlen=3", "+max_arburstlen=3"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.part-split.max_awburstlen-0.max_arburstlen-1"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=split", "+max_awburstlen=0", "+max_arburstlen=1"]
+
+# Debug-window bursts (BUGS/035, BUGS/043): reads and pops longer than one beat
+# and longer than the splitter's MAX_AxBURSTLEN (default 15, or 0 below), every
+# read beat checked lane by lane against the FIFO head (T1-E19).
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.dbg_len-31"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo", "+dbg_len=31"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.dbg_len-max"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo", "+dbg_len=max"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo", "+dbg_len=3", "+max_awburstlen=0", "+max_arburstlen=0"]
+
+[[tests]]
+name = "aou_before_enable_test"
+module = { uvm = "aou_before_enable_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+
+[[tests]]
+name = "aou_credit_violation_test"
+module = { uvm = "aou_credit_violation_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+expect_fail = "BUGS/030 (expected_fail.yaml)"
+expect_fail_match = "T1-E13: |AXI-S04: remote->local beat 0 lane 0 \\(addr 50000"
+
+[[tests]]
+name = "aou_id_mismatch_test.side-mgr.kind-b"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=mgr", "+kind=b"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-mgr.kind-r"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=mgr", "+kind=r"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-mgr.kind-b.mask-1"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=mgr", "+kind=b", "+mask=1"]
+
+# BUGS/029 bug-avoiding variant (decision D8): status, INFO, interrupt and mask
+# are checked, then a hard reset ends the scenario. It drops the 500-cycle
+# acceptance check, so it is weaker than the entries above, which stay.
+[[tests]]
+name = "aou_id_mismatch_test.side-mgr.kind-b.detect_only-1"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=mgr", "+kind=b", "+detect_only=1"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-mgr.kind-r.detect_only-1"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=mgr", "+kind=r", "+detect_only=1"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=mgr", "+kind=b", "+mask=1", "+detect_only=1"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-sub.kind-b"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=sub", "+kind=b"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-sub.kind-b.4x512-sp64"
+module = { uvm = "aou_id_mismatch_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=sub", "+kind=b"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-sub.kind-b.slv_en-0"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=sub", "+kind=b", "+slv_en=0"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-sub.kind-r"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=sub", "+kind=r"]
+
+[[tests]]
+name = "aou_id_mismatch_test.side-sub.kind-b.mask-1"
+module = { uvm = "aou_id_mismatch_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+side=sub", "+kind=b", "+mask=1"]
+
+[[tests]]
+name = "aou_int_test.mode-w1c"
+module = { uvm = "aou_int_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=w1c"]
+
+[[tests]]
+name = "aou_int_test.mode-early"
+module = { uvm = "aou_int_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=early"]
+
+[[tests]]
+name = "aou_int_test.mode-early.4x512-sp64"
+module = { uvm = "aou_int_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=early"]
+
+[[tests]]
+name = "aou_int_test.mode-early.mask-1"
+module = { uvm = "aou_int_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=early", "+mask=1"]
+
+[[tests]]
+name = "aou_int_test.mode-multi"
+module = { uvm = "aou_int_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=multi"]
+
+[[tests]]
+name = "aou_int_test.mode-multi.4x512-sp64"
+module = { uvm = "aou_int_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=multi"]
+
+[[tests]]
+name = "aou_int_test.mode-race"
+module = { uvm = "aou_int_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+mode=race"]
+
+# 9.18: debug address programmed with RPn_ERROR_INFO_ACCESS_EN=0 is ordinary memory
+# (scoreboard); on 4x512-sp64 RPs 0 and 2 keep the window and run the FIFO checks.
+[[tests]]
+name = "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+T1_VSEQ=aou_dbg_off_vseq"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+T1_VSEQ=aou_dbg_off_vseq", "+dbg_on=5"]
+
+# 9.19: debug FIFO reads through an RP narrower than the remote die: the 64-byte
+# remote read becomes a two-beat 32-byte burst (BUGS/035; BUGS/041 behind it).
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.1x256-sp32"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 3
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.4xmix4211-sp128"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo"]
+
+# 9.21: the remote die answers reads with ReadData1024 on RPs narrower than 1024 bits
+# (BUGS/051 interim: completes, DUT keeps working).
+[[tests]]
+name = "aou_rdata_wide_test.1x512-sp64"
+module = { uvm = "aou_rdata_wide_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+
+[[tests]]
+name = "aou_rdata_wide_test.1x256-sp32"
+module = { uvm = "aou_rdata_wide_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+
+[[tests]]
+name = "aou_rdata_wide_test.4xmix4211-sp128"
+module = { uvm = "aou_rdata_wide_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+
+[[groups]]
+name = "err_int"
+expected_count = 34
+tests = [
+  "aou_axi_err_resp_test",
+  "aou_axi_err_resp_test.4x512-sp64",
+  "aou_axi_err_resp_test.part-split.max_awburstlen-3.max_arburstlen-3",
+  "aou_axi_err_resp_test.part-split.max_awburstlen-0.max_arburstlen-1",
+  "aou_axi_err_resp_test.part-fifo.dbg_len-31",
+  "aou_axi_err_resp_test.part-fifo.dbg_len-max",
+  "aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0",
+  "aou_before_enable_test",
+  "aou_credit_violation_test",
+  "aou_id_mismatch_test.side-mgr.kind-b",
+  "aou_id_mismatch_test.side-mgr.kind-r",
+  "aou_id_mismatch_test.side-mgr.kind-b.mask-1",
+  "aou_id_mismatch_test.side-mgr.kind-b.detect_only-1",
+  "aou_id_mismatch_test.side-mgr.kind-r.detect_only-1",
+  "aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1",
+  "aou_id_mismatch_test.side-sub.kind-b",
+  "aou_id_mismatch_test.side-sub.kind-b.4x512-sp64",
+  "aou_id_mismatch_test.side-sub.kind-b.slv_en-0",
+  "aou_id_mismatch_test.side-sub.kind-r",
+  "aou_id_mismatch_test.side-sub.kind-b.mask-1",
+  "aou_int_test.mode-w1c",
+  "aou_int_test.mode-early",
+  "aou_int_test.mode-early.4x512-sp64",
+  "aou_int_test.mode-early.mask-1",
+  "aou_int_test.mode-multi",
+  "aou_int_test.mode-multi.4x512-sp64",
+  "aou_int_test.mode-race",
+  "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq",
+  "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5",
+  "aou_axi_err_resp_test.part-fifo.1x256-sp32",
+  "aou_axi_err_resp_test.part-fifo.4xmix4211-sp128",
+  "aou_rdata_wide_test.1x512-sp64",
+  "aou_rdata_wide_test.1x256-sp32",
+  "aou_rdata_wide_test.4xmix4211-sp128",
+]

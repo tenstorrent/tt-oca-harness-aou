@@ -1,0 +1,111 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# Settings for gh_import.py (GitHub issues from the drafts) and the area vocabulary that
+# gen_readme.py checks the drafts' `area` against.
+
+# OWNER/NAME of the target repository (the public GitHub repository); gh_import.py
+# --repo overrides it, and --apply requires it to be given explicitly.
+repo: tenstorrent/tt-oca-harness-aou
+
+# Issue type per draft kind (organisation issue types).
+issue_types:
+  dut-bug: Bug
+  rtl-doc-mismatch: Task
+  spec-doc-conflict: Task
+  documentation: Task
+  testbench: Task
+
+# Severity as labels (severity:high, ...) or as an organisation single-select issue field.
+severity:
+  mode: labels            # labels | field
+  field: Severity         # field name when mode is field; options High, Medium, Low
+
+# Label colours per prefix; descriptions come from the lists below.
+label_colors:
+  kind: "d73a4a"
+  severity: "fbca04"
+  area: "0e8a16"
+  needs: "5319e7"
+
+kinds:
+  dut-bug: The RTL is wrong against the spec or its own documentation
+  rtl-doc-mismatch: RTL and RDL/MAS disagree
+  spec-doc-conflict: The AoU spec and the MAS disagree
+  documentation: Behaviour unspecified, or a question
+  testbench: Not a DUT finding; a testbench fault
+
+severities:
+  high: Data corruption, deadlock or interoperability failure
+  medium: Wrong behaviour with a workaround, or limited reach
+  low: Diagnostic, misconfiguration-only or documentation
+
+needs:
+  owner-decision: Open questions for the RTL owners
+  spec-clarification: The AoU or UCIe spec is ambiguous or conflicts with the MAS
+  docs: A change to the MAS, RDL or integration guide is requested
+
+# Area vocabulary: 1-3 per draft. files lists the RTL (and doc) files each area covers.
+areas:
+  fdi-bringup:
+    description: FDI bringup controller (pl/lp state, LinkError, link-down and restart)
+    files: [RTL/AOU_FDI_BRINGUP_CTRL.sv, RTL/AOU_TOP.sv]
+  fdi-datapath:
+    description: FDI TX/RX data interfaces and their beat/chunk phase
+    files: [RTL/AOU_TX_FDI_IF.sv, RTL/AOU_RX_FDI_IF.sv, RTL/AOU_TX_CORE_OUT_MUX.sv,
+            RTL/AOU_RX_CORE_IN_MUX.sv]
+  activation:
+    description: Activation/deactivation FSM, activation messages, LinkReset requests
+    files: [RTL/AOU_ACTIVATION_CTRL.sv]
+  tx-core:
+    description: TX message packing into flits, MsgCredit headers
+    files: [RTL/AOU_TX_CORE.sv]
+  rx-core:
+    description: RX flit and message decode, routing of received messages
+    files: [RTL/AOU_RX_CORE.sv]
+  credit:
+    description: Credit advertisement, CrdtGrant/MsgCredit accounting, credit violations
+    files: [RTL/AOU_CRD_CTRL.sv, RTL/AOU_RX_CRD_CTRL.sv, RTL/AOU_TX_CRD_CTRL.sv]
+  tx-arbiter:
+    description: TX per-RP buffering and arbitration, AW/W alignment
+    files: [RTL/AOU_TX_AXI_BUFFER.sv, RTL/AOU_TX_QOS_ARBITER.sv, RTL/AOU_TX_ARBITER.sv,
+            RTL/AOU_AW_W_ALIGNER.sv, RTL/AOU_2X1_ARBITER.v, RTL/AOU_3X1_ARBITER.v,
+            RTL/AOU_4X1_ARBITER.v]
+  qos:
+    description: AXI QoS tiers and priority timers
+    files: [RTL/AOU_TX_QOS_BUFFER.sv, RTL/AOU_TX_QOS_ARBITER.sv]
+  axi-port:
+    description: Per-RP AXI S/M ports, ID checks, WLAST generation, RX FIFOs and RAMs
+    files: [RTL/AOU_CORE_RP.sv, RTL/AOU_AXIMUX_1XN_SS.v, RTL/AOU_SLV_AXI_INFO.sv,
+            RTL/AOU_AXI_WLAST_GEN.v, RTL/AOU_FIFO_RP.sv, RTL/AOU_DATA_R_FIFO_NS1M_TPSRAM.sv,
+            RTL/AOU_DATA_W_FIFO_NS1M_TPSRAM.sv, RTL/AOU_TPSRAM.sv, RTL/AOU_SYNC_FIFO_NS1M.sv,
+            RTL/AOU_SYNC_FIFO_NS1M_SREADY.sv, RTL/AOU_SYNC_FIFO_REG.v, RTL/AOU_FWD_RS.sv,
+            RTL/AOU_REV_RS.sv, RTL/AOU_ISO_RS.sv]
+  axi-convert:
+    description: AXI data-width conversion (up/downsizers) between the remote die and the RP
+    files: [RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_TOP.v, RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_256.v,
+            RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_512.v, RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_1024.v,
+            RTL/AXI4MUX_3X1/AOU_AXI_DOWN.v, RTL/AXI4MUX_3X1/AOU_AXI_DOWN_RDATA_ORDER.sv,
+            RTL/AXI4MUX_3X1/AOU_AXI_UP.v, RTL/AXI4MUX_3X1/AOU_UP_FIFO.v,
+            RTL/AXI4MUX_3X1/AOU_AXI_INST_SPLITTER.v]
+  split:
+    description: Burst split and aggregation, pending-ID tables, M-port outstanding limits
+    files: [RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v, RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_ADDRGEN.v,
+            RTL/AXI4MUX_3X1/AOU_SPLIT_RD_PENDING_INFO.sv,
+            RTL/AXI4MUX_3X1/AOU_SPLIT_WR_PENDING_INFO.sv, RTL/AXI4MUX_3X1/AOU_AGGREGATOR.v,
+            RTL/AXI4MUX_3X1/AOU_AGGREGATOR_INFO.sv]
+  early-resp:
+    description: Early write response
+    files: [RTL/AOU_EARLY_BRESP_CTRL_AWCACHE.sv, RTL/AOU_EARLY_TABLE.sv]
+  debug-fifo:
+    description: R/B response error debug FIFO and its debug window
+    files: [RTL/AOU_ERROR_INFO.sv]
+  registers:
+    description: APB register block and register descriptions
+    files: [RTL/AOU_CORE_SFR.v, csr/aou-core.rdl]
+  reset:
+    description: Hardware, software (AOU_SW_RESET) and DFT reset behaviour
+    files: [RTL/AOU_CORE_TOP.sv, RTL/AOU_CORE.sv]
+  low-power:
+    description: TX low-power mode and its heartbeat
+    files: [RTL/AOU_TX_CORE.sv]

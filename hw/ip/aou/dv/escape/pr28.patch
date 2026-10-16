@@ -1,0 +1,16 @@
+SPDX-License-Identifier: Apache-2.0
+Escape pr28: reverse of main #28, 951d93f: O_SLV/MST_TR_COMPLETE OR the per-RP flags instead of AND (AOU_INIT.*_TR_COMPLETE, deactivation bus-clean).
+Applied to a build-time copy of RTL/ by make build ESCAPE=pr28.
+
+--- a/RTL/AOU_CORE.sv
++++ b/RTL/AOU_CORE.sv
+@@ -1724,7 +1724,7 @@
+         end
+     endgenerate
+ 
+-    assign O_SLV_TR_COMPLETE = &w_slv_tr_complete;
+-    assign O_MST_TR_COMPLETE = &w_mst_tr_complete;
++    assign O_SLV_TR_COMPLETE = |w_slv_tr_complete;
++    assign O_MST_TR_COMPLETE = |w_mst_tr_complete;
+ 
+ endmodule

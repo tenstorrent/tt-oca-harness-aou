@@ -1,0 +1,53 @@
+SPDX-License-Identifier: Apache-2.0
+Escape pr77: reverse of main #77, 800f5e1: AXI_QOS_TO_NP/HP reset 0xA/0x5 and the classifier compares with > instead of >=.
+Applied to a build-time copy of RTL/ by make build ESCAPE=pr77.
+
+diff --git a/RTL/AOU_CORE_SFR.v b/RTL/AOU_CORE_SFR.v
+index b3e460e..26f7958 100644
+--- a/RTL/AOU_CORE_SFR.v
++++ b/RTL/AOU_CORE_SFR.v
+@@ -661,7 +661,7 @@ end
+ 
+ always @(posedge I_PCLK or negedge I_PRESETN) begin
+     if (!I_PRESETN) begin
+-        r_prior_rp_axi_axi_qos_to_np <= 4'h5;
++        r_prior_rp_axi_axi_qos_to_np <= 4'hA;
+     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_PRIOR_RP_AXI_ADDR)) begin
+         r_prior_rp_axi_axi_qos_to_np <= I_PWDATA[27:24];
+     end
+@@ -669,7 +669,7 @@ end
+ 
+ always @(posedge I_PCLK or negedge I_PRESETN) begin
+     if (!I_PRESETN) begin
+-        r_prior_rp_axi_axi_qos_to_hp <= 4'hA;
++        r_prior_rp_axi_axi_qos_to_hp <= 4'h5;
+     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_PRIOR_RP_AXI_ADDR)) begin
+         r_prior_rp_axi_axi_qos_to_hp <= I_PWDATA[23:20];
+     end
+diff --git a/RTL/AOU_TX_AXI_BUFFER.sv b/RTL/AOU_TX_AXI_BUFFER.sv
+index 5a1b681..3296feb 100644
+--- a/RTL/AOU_TX_AXI_BUFFER.sv
++++ b/RTL/AOU_TX_AXI_BUFFER.sv
+@@ -2,7 +2,6 @@
+ // SPDX-License-Identifier: Apache-2.0
+ // *****************************************************************************
+ //  Copyright (c) 2026 BOS Semiconductors
+-//  Copyright (c) 2026 Tenstorrent USA Inc
+ //
+ //  Licensed under the Apache License, Version 2.0 (the "License");
+ //  you may not use this file except in compliance with the License.
+@@ -419,10 +418,10 @@ assign w_aou_ar_port_qos = {w_aou_rp_port_qos[3], w_aou_rp_port_qos[2], w_aou_rp
+ 
+ always_comb begin
+     for (int unsigned i = 0; i < RP_CNT ; i++) begin
+-        w_aou_aw_axi_qos[i] = (I_AOU_TX_S_AXI_AWQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
+-                              (I_AOU_TX_S_AXI_AWQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
+-        w_aou_ar_axi_qos[i] = (I_AOU_TX_S_AXI_ARQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
+-                              (I_AOU_TX_S_AXI_ARQOS[i] >= I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
++        w_aou_aw_axi_qos[i] = (I_AOU_TX_S_AXI_AWQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
++                              (I_AOU_TX_S_AXI_AWQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
++        w_aou_ar_axi_qos[i] = (I_AOU_TX_S_AXI_ARQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_HP) ? 2'b11 :
++                              (I_AOU_TX_S_AXI_ARQOS[i] > I_PRIOR_RP_AXI_AXI_QOS_TO_NP) ? 2'b10 : 2'b01;
+     end
+ end
+ 

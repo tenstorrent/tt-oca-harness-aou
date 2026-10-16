@@ -6,7 +6,7 @@ Thank you for your interest in contributing to the AXI-over-UCIe Bridge RTL proj
 
 ### Reporting Bugs
 
-If you find a bug, please report it via [GitHub Issues](https://github.com/tenstorrent/aou-rtl/issues):
+If you find a bug, please report it via [GitHub Issues](https://github.com/tenstorrent/tt-oca-harness-aou/issues):
 
 1. Search existing issues to avoid duplicates
 2. Provide a clear title and description
@@ -80,7 +80,7 @@ Please note that this project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md)
 ## Questions?
 
 If you have questions about contributing, please:
-- Open a [GitHub Issue](https://github.com/tenstorrent/aou-rtl/issues) for general questions
+- Open a [GitHub Issue](https://github.com/tenstorrent/tt-oca-harness-aou/issues) for general questions
 - Contact the maintainers via the repository
 
 ## License

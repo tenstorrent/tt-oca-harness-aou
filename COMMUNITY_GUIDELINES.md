@@ -91,7 +91,7 @@ All contributors must follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ### For Bug Reports or Feature Requests
 
-Open a [GitHub Issue](https://github.com/tenstorrent/aou-rtl/issues) and choose an appropriate label:
+Open a [GitHub Issue](https://github.com/tenstorrent/tt-oca-harness-aou/issues) and choose an appropriate label:
 - **Bug** - For RTL, testbench, or script issues
 - **Feature Request** - For new functionality or enhancements
 - **Question** - For general questions

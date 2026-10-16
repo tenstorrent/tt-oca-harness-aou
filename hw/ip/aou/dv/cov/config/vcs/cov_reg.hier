@@ -1,0 +1,4 @@
+// VCS code-coverage scope for TB=reg: the DUT (AOU_CORE_TOP) and everything below it,
+// never the testbench. The AXI4 functional-coverage binds are reported separately.
++tree aou_reg_top.u_dut
+-moduletree aou_axi4_cov_bind

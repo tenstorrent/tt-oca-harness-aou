@@ -1,0 +1,50 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# Verible lint rules for the hw/ip/aou/dv testbench (see CODING_GUIDELINES.md).
+# RTL uses scripts/.rules.verible_lint; this file only applies under hw/ip/aou/dv.
+
+# Formatting
+line-length=length:100
+no-tabs
+no-trailing-spaces
+posix-eof
+
+# Structure and best practice
+always-comb
+case-missing-default
+generate-label
+forbid-defparam
+typedef-enums
+typedef-structs-unions
+mismatched-labels
+suspicious-semicolon
+truncated-numeric-literal
+undersized-binary-literal
+legacy-generate-region
+forbid-line-continuations
+
+# Naming
+macro-name-style=style_regex:[A-Z_0-9]+
+parameter-name-style=parameter_style:ALL_CAPS;localparam_style:ALL_CAPS
+interface-name-style=style_regex:[a-z_0-9]+_if
+enum-name-style=style_regex:[a-z_0-9]+_e
+struct-union-name-style
+
+# UVM
+create-object-name-match
+uvm-macro-semicolon
+plusarg-assignment
+
+# Not applied to testbench code
+-explicit-function-lifetime
+-explicit-task-lifetime
+-signal-name-style
+-module-filename
+-package-filename
+-one-module-per-file
+-port-name-suffix
+-explicit-begin
+-banned-declared-name-patterns
+-dff-name-style
+-constraint-name-style

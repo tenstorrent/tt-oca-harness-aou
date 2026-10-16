@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The AXI L4 agent and scoreboard self-test bench (TB=axi_selftest, no DUT).
+# The bench's aggregate (aou_axi_selftest_sim_cfg.toml [testlist]).
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_axi_selftest_test"
+module = { uvm = "aou_axi_selftest_test" }
+seed = 1
+tags = ["axi_selftest"]
+run_modes = ["axi_selftest"]
+
+[[tests]]
+name = "aou_axi_selftest_neg_test"
+module = { uvm = "aou_axi_selftest_neg_test" }
+seed = 1
+tags = ["axi_selftest"]
+run_modes = ["axi_selftest"]
+
+[[tests]]
+name = "aou_axi_sb_reset_test"
+module = { uvm = "aou_axi_sb_reset_test" }
+seed = 1
+tags = ["axi_selftest"]
+run_modes = ["axi_selftest"]
+
+[[groups]]
+name = "axi_selftest"
+expected_count = 3
+tests = [
+  "aou_axi_selftest_test",
+  "aou_axi_selftest_neg_test",
+  "aou_axi_sb_reset_test",
+]
+
+[[groups]]
+name = "smoke"
+expected_count = 1
+tests = [
+  "aou_axi_selftest_test",
+]
+
+[[groups]]
+name = "all"
+expected_count = 3
+tests = [
+  "aou_axi_selftest_test",
+  "aou_axi_selftest_neg_test",
+  "aou_axi_sb_reset_test",
+]

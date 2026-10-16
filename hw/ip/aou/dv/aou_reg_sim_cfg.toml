@@ -1,0 +1,189 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The register bench: AOU_TOP as u_dut in tb/aou_reg_top.sv with only its APB
+# port driven, for the register tests (uvm/tests/reg) against the RAL model
+# generated from csr/aou-core.rdl. It carries the T1 bench's targets so its DUT
+# coverage merges into T1's (cov/config/vcs/cov_reg.hier). Standalone:
+# make build TB=reg. See aou_sim_cfg.toml for how the paths are read.
+name = "aou_reg"
+profile = "native"
+default_framework = "uvm"
+description = "AXI-over-UCIe bridge register bench (APB + RAL, SV-UVM)"
+
+# The runner requires every implemented framework declared as a [frameworks.<name>]
+# table; the build, sim and targets of this one-framework bench stay in the shared
+# tables above and below, which the runner merges under it.
+[frameworks.uvm]
+description = "AoU register bench, SV-UVM (the only framework)"
+
+[testlist]
+path = "testlists/registers.toml"
+format = "toml_list"
+
+[defaults]
+# The native profile defaults run_mode to smoke; this bench has one run mode.
+run_mode = "registers"
+target = "1x512-sp64"
+timeout_sec = 1800
+
+[native.stages.clean]
+kind = "clean"
+paths = ["{run_dir}", "hw/ip/aou/dv/build/uvm_reg"]
+
+[build]
+top_module = "aou_reg_top"
+top_file = "hw/ip/aou/dv/tb/aou_reg_top.sv"
+filelist = "hw/ip/aou/dv/build/uvm_reg/aou_reg_uvm_compile.f"
+bender_filelist = "hw/ip/aou/dv/build/uvm_reg/aou_reg_uvm_bender.f"
+work_dir = "hw/ip/aou/dv/build/uvm_reg"
+bender_targets = ["aou", "simulation"]
+# The register tests extend uvm_test directly; the OCAH library is the T1 bench's.
+incdirs = [
+  "hw/ip/aou/dv/uvm/env/pkg",
+  "hw/ip/aou/dv/uvm/env/apb",
+  "hw/ip/aou/dv/uvm/tests/reg",
+]
+sources = [
+  "hw/ip/aou/dv/uvm/env/gen/aou_core_csr_uvm_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/apb/aou_apb_if.sv",
+  "hw/ip/aou/dv/uvm/env/apb/aou_apb_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/apb/aou_reg_pkg.sv",
+  "hw/ip/aou/dv/uvm/tests/reg/aou_reg_test_pkg.sv",
+]
+
+
+[build.vcs]
+# The simulator-shipped UVM closest to the pinned uvm-core 2020.3.1 the standalone
+# flow compiles (docs/DECISIONS.md D2). It reproduces the standalone runs seed for
+# seed, so a harness regression compares with a standalone one; the default
+# uvm-1.2 draws a different random stream from the same seed and does not.
+uvm_lib = "uvm-ieee-2020-2.0"
+
+[build.options]
+# Partition the build directory by input fingerprint (as the SEP bench does):
+# the targets share one work_dir and differ in defines, so without it a target
+# switch would overwrite the other target's simv and a multi-target regression
+# could run one target's model for another. Each unchanged target reuses its
+# build; a source or define change rebuilds only that fingerprint.
+cache_enabled = true
+
+[run_modes.registers]
+description = "Register tests: reset values, access policies, field behaviour over APB"
+timeout_sec = 1800
+args = []
+
+[target_defaults.default]
+defines = ["AOU_AXI_DATA_BYTES=64", "AOU_FDI_DATA_W=512"]
+
+# The T1 targets (aou_sim_cfg.toml documents the names); scripts/sim_cfg.py check
+# keeps the two tables in step.
+# Each target builds in its own directory (build_dir/work_dir): the targets differ
+# only in defines, so a shared work directory would hold one target's simv at a
+# time. Standalone builds use the Makefile's build/<sim>-<tb>-<target> instead.
+[targets.1x512-sp64]
+description = "Default: one RP, the usual data path"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
+
+[targets.4x512-sp64]
+description = "Multi-RP behaviour (2.12) at one width"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4x512-sp64"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4x512-sp64"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
+
+[targets.3x512-sp64]
+description = "RP count that is not a power of two"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/3x512-sp64"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/3x512-sp64"
+defines = ["AOU_RP_COUNT=3", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
+
+[targets.4xmix4211-sp128]
+description = "Mixed widths, every local width (2.14), 128-byte FDI"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=2"]
+
+[targets.4xmix2144-sp64]
+description = "Mixed widths, every local width, RP2/RP3 at 1024 bits, 64-byte FDI"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix2144-sp64"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix2144-sp64"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1"]
+
+[targets.1x256-sp32]
+description = "Narrowest RP and FDI (the RTL default FDI_CONFIG)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x256-sp32"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x256-sp32"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=256", "AOU_RP0_DATA_W=256", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=0"]
+
+[targets.2xmix-tp64_128]
+description = "Two-PHY FDI (64/128 bytes), two RPs, mixed widths"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-tp64_128"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-tp64_128"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=4", "TWO_PHY"]
+
+[targets.2x512-tp32_64]
+description = "Two-PHY FDI (32/64 bytes), two RPs at one width"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/2x512-tp32_64"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/2x512-tp32_64"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=3", "TWO_PHY"]
+
+[targets.1x512-sp64-p512]
+description = "AXI_PEER_DIE_MAX_DATA_WD 512 (plan 14.17)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-p512"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-p512"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "AOU_PEER_MAX_W=512"]
+
+[targets.2xmix-sp64-rxf]
+description = "Non-default RX FIFO depths, RX_*_FIFO_RS_EN=0 (3.25)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-sp64-rxf"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-sp64-rxf"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1", "AOU_RX_FIFO_ALT"]
+
+[targets.1x256-sp32-assert]
+description = "1x256-sp32 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x256-sp32-assert"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x256-sp32-assert"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=256", "AOU_RP0_DATA_W=256", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=0", "ASSERTION_ON"]
+
+[targets.1x512-sp64-assert]
+description = "1x512-sp64 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-assert"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-assert"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "ASSERTION_ON"]
+
+[targets.2xmix-tp64_128-assert]
+description = "2xmix-tp64_128 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-tp64_128-assert"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-tp64_128-assert"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=4", "TWO_PHY", "ASSERTION_ON"]
+
+[targets.4x512-sp64-assert]
+description = "4x512-sp64 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4x512-sp64-assert"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4x512-sp64-assert"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "ASSERTION_ON"]
+
+[targets.4xmix4211-sp128-assert]
+description = "4xmix4211-sp128 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128-assert"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128-assert"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=2", "ASSERTION_ON"]

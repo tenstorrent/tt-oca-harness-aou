@@ -1,0 +1,36 @@
+SPDX-License-Identifier: Apache-2.0
+Escape split_awvalid_drop: pre-release bug, M-port AWVALID drops before AWREADY
+and the write is lost. In the drop that had the bug, the splitter drove
+O_M_AWVALID straight to the pins as w_m_awch_en & I_M_WREADY with no AWREADY
+hold term. The fix added register slices on the splitter's M-port AW and W,
+and the later 1xN switch adds a skid buffer on the pin AW. This takes out both
+AW slices, so the pin AWVALID is the splitter's again: on a split burst the
+next sub-burst's W beats enter the W slice ahead of its AW, the beat counter
+moves, and AWVALID falls without AWREADY, dropping that sub-burst's AW. The
+splitter W slice stays: without it the switch's WREADY (which waits for
+AWVALID) and the splitter's AWVALID (which waits for WREADY) form a loop that
+never raises either.
+Applied to a build-time copy of RTL/ by make build ESCAPE=split_awvalid_drop.
+
+--- a/RTL/AOU_AXIMUX_1XN_SS.v
++++ b/RTL/AOU_AXIMUX_1XN_SS.v
+@@ -30,7 +30,7 @@
+     parameter   AOU_AXIMUX_1XN_RCH_RS_EN  = 1,
+     parameter   AOU_AXIMUX_1XN_AWCH_RS_EN = 1,
+     parameter   AOU_AXIMUX_1XN_WCH_RS_EN  = 1,
+-    parameter   AOU_AXIMUX_1XN_M_AWCH_RS_EN = 1,
++    parameter   AOU_AXIMUX_1XN_M_AWCH_RS_EN = 0,
+     parameter   AOU_AXIMUX_1XN_M_WCH_RS_EN = 1,
+ 
+     parameter   SN            = 4,
+--- a/RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v
++++ b/RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v
+@@ -37,7 +37,7 @@
+     parameter   WR_MO_CNT = 64,
+     parameter   AOU_AXI_SPLIT_TR_SLV_ARCH_RS_EN = 1,
+     parameter   AOU_AXI_SPLIT_TR_SLV_RCH_RS_EN = 1,
+-    parameter   AOU_AXI_SPLIT_TR_MST_AWCH_RS_EN = 1,
++    parameter   AOU_AXI_SPLIT_TR_MST_AWCH_RS_EN = 0,
+     parameter   AOU_AXI_SPLIT_TR_MST_WCH_RS_EN = 1,
+     parameter   AOU_AXI_SPLIT_TR_MST_BCH_RS_EN = 0,
+     parameter   AOU_AXI_SPLIT_TR_MST_ARCH_RS_EN = 0,

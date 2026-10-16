@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+// VCS code-coverage exclusions shared by every bench: module definitions (and anything
+// below them) that an integrator replaces with process cells or that are signed off
+// formally, so DUT coverage measures only the logic the IP delivers. The Makefile passes
+// this file after cov_<TB>.hier (-cm_hier a+b), so the list lives here only.
+
+// Integration guide 8.7 "Library Cell Replacement": behavioural model of a multi-flop
+// CDC synchroniser that must be replaced with a foundry-qualified synchroniser cell.
+// Instances: ASYNC_APB_BRIDGE_SI/MI u_bos_soc_synchsr.
+-moduletree AOU_SOC_SYNCHSR
+// Integration guide 8.7 and 3.13.1: glitch-free reset mux on the DFT scan-reset path
+// (u_sw_reset_mux), replaced by a library clock/reset mux cell; TIEL_DFT_MODESCAN is
+// held low in functional mode (aou_top.sdc set_case_analysis), so I_SEL=1 is scan-only.
+-moduletree AOU_SOC_GFMUX_LVT
+// Integration guide 8.7 and 3.13.1: dont_touch buffer driving the tied-off scan-reset
+// bypass value (dft_persistent_buf_scan_resetn_sw); a constant, so it has nothing to toggle.
+-moduletree AOU_SOC_BUF
+
+// Behavioural two-port SRAM (CLKA/CENA/AA/QA, CLKB/CENB/AB/DB, active-low enables): a
+// generic memory-macro stand-in, not logic specific to this IP. AOU_FIFO_RP instantiates it
+// as gen_[RW]FIFO_FAKE_SRAM, where an integrator places a compiled SRAM; the macro is
+// signed off by its vendor model and memory BIST. The integration guide does not list it in
+// 8.7; that documentation gap is reported separately. The FIFO controllers around it
+// (AOU_DATA_[RW]_FIFO_NS1M_TPSRAM) stay in coverage.
+-moduletree AOU_TPSRAM

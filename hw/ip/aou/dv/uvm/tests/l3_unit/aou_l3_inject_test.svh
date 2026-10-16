@@ -1,0 +1,142 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+// One error injected by model B (the remote die) after legal traffic, chosen
+// by +L3_INJECT. Each must be caught under the expected rule by the
+// receiving model A and by AOU_FDI_CHECKER, and, where the error is
+// structural, by B's own stimulus self-check:
+//   bad_type   reserved MSGTYPE           AOU-R3  (A, B self-check, checker)
+//   rsvd       WriteResp RsvdZero set     AOU-R11 (A, B self-check, checker)
+//   no_credit  WriteResps beyond credit   AOU-R16 (A, checker)
+//   act_seq    ActivateAck in ENABLED     AOU-R40 (A, checker)
+//   msgstart   MsgStart inside a message  AOU-R4  (A, B self-check, checker)
+//   fdid       wrong FDId                 AOU-R9  (A, B self-check, checker)
+//   act_place  Activation not at G0       AOU-R6  (A, B self-check, checker)
+//   overgrant  credit beyond any buffer   saturation in A, AOU-R21 (checker)
+class aou_l3_inject_test extends aou_l3_unit_env_test;
+  `uvm_component_utils(aou_l3_inject_test)
+
+  string       inject = "bad_type";
+  string       rule;
+  bit          self_check;
+  bit          rx_check;
+  string       also[$];
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    void'($value$plusargs("L3_INJECT=%s", inject));
+    rx_check = 1'b1;
+    case (inject)
+      "bad_type":  begin rule = "AOU-R3";  self_check = 1'b1; end
+      "rsvd":      begin rule = "AOU-R11"; self_check = 1'b1; end
+      "no_credit": begin rule = "AOU-R16"; end
+      "act_seq":   begin rule = "AOU-R40"; end
+      "msgstart":  begin rule = "AOU-R4";  self_check = 1'b1; end
+      "fdid":      begin rule = "AOU-R9";  self_check = 1'b1; end
+      "act_place": begin
+        rule = "AOU-R6";
+        self_check = 1'b1;
+        also.push_back("AOU-R40");
+      end
+      "overgrant": begin
+        rule = "AOU-R21";
+        rx_check = 1'b0;
+      end
+      default: `uvm_fatal(get_type_name(), {"unknown +L3_INJECT=", inject})
+    endcase
+    chk.expect_rule(rule);
+    foreach (also[i]) chk.expect_rule(also[i]);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    phase.raise_objection(this);
+    bring_up();
+    traffic();
+    idle(100);
+    do_inject();
+    idle(400);
+    phase.drop_objection(this);
+  endtask
+
+  task do_inject();
+    case (inject)
+      "bad_type": begin
+        aou_l3_bad_type_seq s = aou_l3_bad_type_seq::type_id::create("s");
+        s.start(b.sqr);
+      end
+      "rsvd": begin
+        aou_l3_rsvd_seq s = aou_l3_rsvd_seq::type_id::create("s");
+        s.start(b.sqr);
+      end
+      "no_credit": begin
+        aou_l3_no_credit_seq s = aou_l3_no_credit_seq::type_id::create("s");
+        s.n = 40;
+        s.start(b.sqr);
+      end
+      "act_seq": begin
+        aou_l3_act_inject_seq s = aou_l3_act_inject_seq::type_id::create("s");
+        s.op = AOU_ACT_ACK;
+        s.start(b.sqr);
+      end
+      "msgstart": begin
+        aou_msg_wreq w = aou_msg_wreq::type_id::create("w");
+        // G1 of this WriteReq decodes as a legal WriteResp once MsgStart[11]
+        // is forced, so only the framing rule fires.
+        w.len = 8'h50;
+        w.addr = 64'h0000_0000_0000_1000;
+        b.cfg.pol.start_granule = 10;
+        b.model.pk.inj_flip_start = 11;
+        b.send(w);
+        idle(40);
+        b.cfg.pol.start_granule = -1;
+      end
+      "fdid": begin
+        b.model.pk.inj_fdid = 1;
+        b.model.pk.inj_empty = 1'b1;
+        b.model.kick();
+      end
+      "act_place": begin
+        aou_msg_raw r = aou_msg_raw::type_id::create("r");
+        aou_granule_t g[$];
+        g.push_back({4'h0, 3'b010, 4'(AOU_ACT_REQ), 29'h0});
+        r.set_granules(g);
+        b.cfg.pol.start_granule = 5;
+        b.send(r);
+        idle(40);
+        b.cfg.pol.start_granule = -1;
+      end
+      default: begin
+        aou_l3_overgrant_seq s = aou_l3_overgrant_seq::type_id::create("s");
+        s.cls = AOU_CC_RDATA;
+        s.n = 3000;
+        s.start(b.sqr);
+      end
+    endcase
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    expect_true(chk.count(rule, "aou_fdi_chk_adapter") > 0,
+                $sformatf("AOU_FDI_CHECKER reports %s for %s", rule, inject));
+    if (rx_check)
+      expect_true(chk.count(rule, "aou_unpacker") + chk.count(rule, "aou_l3_model") > 0,
+                  $sformatf("receiving model reports %s for %s", rule, inject));
+    if (self_check)
+      expect_true(chk.count(rule, "aou_unpacker") >= 2,
+                  $sformatf("B's self-check and A both report %s", rule));
+    if (inject == "overgrant")
+      expect_true(a.model.crd.tx_saturations > 0, "A's credit counter saturates");
+    expect_true(chk.total() == chk.count(rule) + also_count(),
+                $sformatf("only the injected rule fires (%s)", chk.summary()));
+  endfunction
+
+  function int unsigned also_count();
+    int unsigned n = 0;
+    foreach (also[i]) n += chk.count(also[i]);
+    return n;
+  endfunction
+endclass

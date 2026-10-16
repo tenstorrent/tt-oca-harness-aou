@@ -1,0 +1,259 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+[[aou-dv-verification-plan]]
+== AoU Verification Plan
+
+=== Overview
+
+This plan covers `AOU_TOP`, the AXI-over-UCIe adapter in `RTL/`: AXI4 traffic
+from up to four resource planes (RPs) packed into 256-byte Format 6 flits on the
+UCIe Flit-Die Interface and unpacked on the far side, with activation and
+deactivation, credit management, transaction splitting, aggregation, early
+write response, QoS arbitration, width conversion between the local and the
+remote die, low-power mode, error reporting and interrupts, and the APB register
+file that configures all of it. The bench and its layers are described in
+`AOU_TB_ARCH.adoc`; the functional coverage model in `AOU_FCOV.adoc`.
+
+The specification this plan traces to is the AoU specification (MAS, revisions
+v0.7 and v0.8, cited by section), UCIe r1.1 chapter 8 for the FDI, AMBA AXI4
+and APB for the buses, and this repository's `DOC/integration_guide/` and
+`csr/aou-core.rdl` for the integration rules and the register map. Licensed
+standards are cited by document and section, never quoted.
+
+=== Verification Strategy
+
+The AoU environment is one SV-UVM environment with four tops (`AOU_TB_ARCH.adoc`,
+Overview). A T1 test builds `tb_top`, releases the resets with both clocks
+running, brings the FDI link up through the L2 model, activates the AoU link
+from the side and in the order the scenario chooses, programs the DUT over APB,
+and drives traffic from the local AXI managers and from the remote die's models:
+
+. *Stimulus.* The local side uses the bench's AXI manager and subordinate
+  agents and the APB agent; the remote die is the L1/L2/L3/L4a model stack.
+  Scenarios compose the base sequence's primitives (link up, activate,
+  program, traffic, hold, inject, reset, deactivate) and select variants with
+  plusargs; seeds randomise initiator, order, addresses, sizes, strobes,
+  attributes, timing, packer layout and credit return policy. Build-time
+  variation is the target (ten configurations; `aou_sim_cfg.toml`).
+. *Checking.* The always-on byte-level scoreboard compares every transaction
+  against golden memories, requires exactly one response per request in order
+  within an ID and nothing outstanding at the end; the protocol checkers
+  (`AOU_FDI_CHECKER`, the L3 rule checker, the L1 monitor, the AXI and APB
+  interface assertions) report every violation under a rule ID from
+  `uvm/env/checkers/rules.csv`; the T1 checkers judge behaviour that spans
+  layers (activation, credits, debug FIFOs, early-table back-pressure,
+  software reset). Every expected value has a source other than the RTL: the
+  message layouts from the AoU specification's tables, the register map from
+  `csr/aou-core.rdl` through the generated register model, the memories'
+  contents from the bench's own sparse memory models. Unless its procedure
+  says otherwise a test ends with zero unexpected errors; negative scenarios
+  declare what they cause with `expect_event()` and are judged just as
+  strictly.
+. *Known DUT bugs.* A failure caused by a reported DUT bug (its GitHub issue,
+  or its staged draft `BUGS/<NNN>` until filed) is
+  tied to it in `expected_fail.yaml`, and `scripts/check_run.py` judges the run
+  `XFAIL` instead of `FAIL`; an entry that stops matching is reported `XPASS`
+  so it is reviewed, never silently kept. The testlists carry `expect_fail` for
+  the deterministic entries so the tt-oca-harness runner grades them alike.
+. *Coverage.* The covergroups of the layer models, the T1 env and the bound
+  AXI4 monitors are the functional coverage model, counted by the bench's
+  coverage service and merged over passing runs of every configuration
+  (`AOU_FCOV.adoc`); code coverage of `RTL/` from the simulator closes the
+  structural view.
+. *Scenario expansion.* A test class with several plusarg variants is expanded
+  into separately named scenarios in the testlists (Naming Rules), each with
+  its own seeds, target pin and plan items, so each is independently
+  selectable and traceable.
+. *Four benches.* The register-only items run on the APB-only register bench
+  (`aou_reg_top`), which builds the same DUT parameters as T1 for each
+  configuration; the L3 model and the FDI checker, and the AXI agents with the
+  scoreboard, each have a unit bench with no DUT that proves the models before
+  they judge the DUT.
+
+=== Naming Rules
+
+* A test class is `aou_<subject>_test` and lives in `uvm/tests/<area>/`; its
+  virtual sequence is `aou_<subject>_vseq` (or `_seq`) in `uvm/seq_lib/`.
+  `aou_sanity_test` / `aou_sanity_test_seq` is the bring-up gate's pair.
+* A scenario is a `[[tests]]` entry of `testlists/<area>.toml`. Its name is
+  the class name when the class has one entry; otherwise the class name
+  followed by a slug of the plusargs that distinguish it
+  (`aou_dp_random_test.dp_dir-both.dp_profile-stall`), then the target when
+  the same arguments run pinned to several targets
+  (`aou_t1_slice_test.rtl_asserts-1.4x512-sp64-assert`), then the area when a
+  name would still repeat. Names are unique across every list `all.toml`
+  includes (`scripts/check_testlists.py`).
+* `module = { uvm = "<class>" }` binds the scenario to its class; `args` are
+  its plusargs; `seed` and `reseed` give seeds `seed`..`seed+reseed-1`;
+  `target` pins it to one `[targets.<name>]`; `run_modes = ["<area>"]` names
+  its timeout class; a scenario that cannot run yet carries the `blocked` tag,
+  joins no group and has its reason under `blocked:` in
+  `testlists/plan_ids.yaml`.
+* A negative scenario's class header names the rules it expects to fire, and
+  the sequence declares them with `expect_event()`.
+* Rule IDs: `AOU-R<n>` AoU protocol, `FDI-R<n>`/`FDI-M<n>` FDI, `AXI-R<n>`/
+  `AXI-S<n>` AXI, `APB-R<n>`, `REG-R<n>` registers, `FEAT-R<n>` features,
+  `DP-R<n>` data path, `T1-<class><n>` bench-level checks (`T1-L` link,
+  `T1-C` credits, `T1-E` errors, `T1-M` matrix, `T1-P` performance, `T1-V`
+  verdict, ...). The inventory is `uvm/env/checkers/rules.csv`.
+* Plan item IDs are `<section>.<item>` from `docs/test_plan_items.yaml`,
+  written as text (`4.10` is not `4.1`).
+
+=== BFM Policy
+
+All bus-functional models are the bench's own, DUT-local and VIP-free
+(`AOU_TB_ARCH.adoc`, VIP Selection Policy and DUT-Local Model Ownership):
+
+[cols="2,2,4",options="header"]
+|===
+| Interface | Model | Ownership and evidence
+| AXI4 S ports (DUT subordinate) | `aou_axi_mgr_agent` | Bench AXI package; proven in loopback by the `axi_selftest` bench against the scoreboard
+| AXI4 M ports (DUT manager) | `aou_axi_sub_agent` on `aou_mem` | The same package; error regions and exclusive rules in the memory model
+| FDI mainband and sideband | L1 agent (`aou_fdi_pkg`), L2 agent (`aou_lsm_pkg`) | Format 6 codec, PL driver, TX responder, monitor; bring-up reference model; checked by `AOU_FDI_CHECKER` and the L3 unit bench
+| AoU protocol (remote die) | `aou_l3_agent` and `aou_remote_axi_model` | Packer, unpacker, credits, activation, injection; proven against `AOU_FDI_CHECKER` by the `l3_unit` bench
+| APB | `aou_apb_pkg` with the generated register model | Register adapter and predictor; the register bench exercises the whole map
+|===
+
+Where the OCAH library offers a shared VIP (`ocah_axi_vip`), its adoption is an
+open item (`OPEN_ITEMS.md`): the bench's own models stay until a shared model
+proves equal on the rule inventory.
+
+[[aou-vplan-scope]]
+=== Verification Scope
+
+In scope, by plan section (`docs/test_plan_items.yaml`, sections 2.1 to 2.22):
+
+[cols="1,3,3",options="header"]
+|===
+| Section | Area | Where it is exercised
+| 2.1, 2.2 | Link activation and deactivation | `g1a`, `g1b`, `link`, `t1_api`, `lifecycle`
+| 2.3 | UCIe FDI interface | `fdi`, `g1b`, `lifecycle`
+| 2.4, 2.5 | Write and read transactions | `g1a`, `datapath`, `stress`
+| 2.6 | Flit packing | `datapath`, `stress`, `l3_unit`
+| 2.7 | Credit management | `link`
+| 2.8 | Outstanding transactions | `datapath`, `stress`
+| 2.9 | Error handling | `errors`, `err_int`
+| 2.10 | Performance | `perf` (`aou_perf_test`, targets from `scripts/perf_model.py`)
+| 2.11 | Register access | `registers` (register bench), `err_int`
+| 2.12 | Multi-resource plane | `matrix`, `features`
+| 2.13 | QoS arbitration | `stress` (`aou_qos_order_test`), `features`
+| 2.14 | Data width converter | `matrix` (`aou_dw_test`), every mixed-width target
+| 2.15 | AXI transaction splitter | `features` (`aou_split_test`)
+| 2.16 | AXI aggregator | `features` (`aou_aggregator_test`)
+| 2.17 | Write early response | `features` (`aou_early_bresp_test`)
+| 2.18 | Data integrity | every traffic scenario (the scoreboard), `datapath`
+| 2.19 | Interrupts | `err_int`, `errors`
+| 2.20 | Low power mode | `features`, `lifecycle`, `g1b`
+| 2.21 | Corner cases | `stress`, `lifecycle`, `t1_api`
+| 2.22 | FDI bring-up controller | `fdi` (`AOU_TOP`'s bring-up controller through L2)
+|===
+
+Out of scope: the UCIe D2D adapter and PHY below the FDI (modelled by L1/L2,
+not verified), the SoC fabric behind the AXI ports, and `AOU_CORE_TOP`
+integrated without the bring-up controller (plan item 22.5). The RTL's own
+assertions are compiled on the `<target>-assert` targets only.
+
+[[aou-scope-traceability]]
+=== Scope and Traceability
+
+==== Source of truth
+
+* `docs/test_plan_items.yaml` is the requirement list: one item per
+  specification sentence or integration rule, with its section, title and
+  priority, generated by `scripts/gen_plan_items.py` from the original test
+  plan and `docs/test_plan_corrections.yaml` (an item that duplicates another
+  is `merged_into` it; one that cannot be tested on this RTL is `dropped`
+  with its reason and listed under Known Limitations).
+* `testlists/*.toml` are the scenario list; `testlists/plan_ids.yaml` maps
+  every scenario to the items it covers. `scripts/check_testlists.py` requires
+  every T1 and register scenario to have an entry (empty when a scenario
+  covers no item on purpose, with the reason in its header).
+* `uvm/env/checkers/rules.csv` is the rule inventory; `scripts/check_rules.py`
+  requires every rule a checker emits to be listed and every listed rule to
+  be referenced.
+* `scripts/plan_status.py` (`make plan_status`) joins the three with the
+  verdicts of the runs under `out/` and reports, per item, covered,
+  xfail-only, failing, blocked or not covered; the documents describe the
+  verification, that report describes its progress.
+
+==== Matrix
+
+The requirement-to-test matrix, every plan item with the scenarios that cite
+it, is generated from the sources above:
+
+include::gen/vplan_matrix.adoc[]
+
+=== Scenario-Expanded Test Summary
+
+One table per testlist, generated from `testlists/`:
+
+include::gen/vplan_summary.adoc[]
+
+=== Test Procedures
+
+One procedure per test class, generated from the class and virtual-sequence
+headers and the testlists. The pass criteria common to every procedure are the
+base test's end-of-test checks (`AOU_TB_ARCH.adoc`, Checking Strategy); a
+procedure's expected failures are the `expected_fail.yaml` entries its
+scenarios cite (summary tables, "Expected failure" column).
+
+include::gen/vplan_procedures.adoc[]
+
+=== Formal Verification Plan
+
+None. The bench has no formal properties and no formal flow; the RTL's own
+`ASSERTION_ON` checks are simulated on the `<target>-assert` targets
+(`testlists/assertions.toml`), and an Arm AXI4 protocol-assertion overlay can
+be bound when the user supplies it. A formal plan for the FDI and credit
+rules is an open item (`OPEN_ITEMS.md`).
+
+=== Regression Groups
+
+[cols="2,5",options="header"]
+|===
+| Group | Content and use
+| `smoke` | The bring-up gate: `aou_sanity_test` and the G1a slice (`aou_t1_slice_test`, `aou_t1_deact_test`, `aou_fdi_t1_bringup_test`); every pull request (`.github/workflows/uvm-smoke.yml`, Verilator) and `make test`
+| `<area>` | One group per testlist (`g1a`, `g1b`, `t1_api`, `fdi`, `datapath`, `features`, `stress`, `link`, `errors`, `err_int`, `lifecycle`, `matrix`, `perf`, `assertions`), the unit `run_list.py --per-list` reports on
+| `functional` | The functional areas (every area but `stress`, `matrix`, `perf` and `assertions`): the nightly on the default target
+| `all` | Every non-blocked scenario of the bench: the full regression, swept over every target (`run_list.py --target <t>`; the `assertions` scenarios on the `<t>-assert` targets)
+| register bench `smoke` / `all` | `aou_reg_hw_reset_test`, then every register test, on every target
+| `l3_unit`, `axi_selftest` `all` | The model unit benches, run on any bench change
+|===
+
+The groups of every testlist, with their members, as generated:
+
+include::gen/vplan_groups.adoc[]
+
+=== Known Limitations
+
+Plan items that cannot be verified on this RTL, with the reason, are marked
+`dropped` in the matrix above: 1.4 (PropertyReq has no defined effect in
+v0.7), 4.16, 4.17, 5.16, 5.17 (WRAP bursts: the DUT supports INCR only and AoU
+carries no `AxBURST`; `AXI-R19` flags any other burst as a stimulus error),
+6.16 and 9.7 (no FDID field exists in this RTL), 9.8 (no RX incomplete-flit
+time-out; the adapter completes or cancels every flit), 12.13 (an asymmetric
+DEST_RP is a misconfiguration the specification forbids; `aou_dest_rp_asym_test`
+records the interim expectation, BUGS/031), 22.5 (`AOU_CORE_TOP` without the
+bring-up controller is not integrated by this bench).
+
+* *Blocked scenarios.* `aou_perf_test` S4 (narrow-`AxSIZE` long bursts) is
+  blocked while the WriteData size versus DLENGTH reading and a ReadData
+  pack-rate cap are under triage (`testlists/plan_ids.yaml`, `blocked:`).
+* *Expected failures.* Items whose only evidence is an `XFAIL` run depend on
+  the reported DUT bugs; `make plan_status` lists them as xfail-only.
+* *FDI state encoding.* The L2 model drives the DUT's private state codes
+  (`fdi_enc = RTL`) by default until BUGS/001 is fixed; the SPEC encoding runs
+  on request (`FDI_ENC=SPEC`) and its coverage bin stays a hole until then.
+* *Two-PHY targets.* `AOU_FDI_CHECKER` is not instantiated on the two-PHY
+  configurations; the L3 rule checker and the L1 monitor are the protocol
+  checks there, and the remote die uses one PHY per run (`+active_phy`).
+* *Performance.* Targets come from the d2d model (`scripts/perf_model.py`,
+  `D2D_COMPARE`); numeric latency and efficiency bounds per FDI width (10.14)
+  have no scenario.
+* *Simulators.* Verilator runs the bench with uvm-core and `--timing`;
+  covergroups are counted by the coverage service, not by Verilator. Xcelium
+  and Questa paths exist in the Makefile and are untested.
+* *Formal.* None (Formal Verification Plan).
+* *Specification revisions.* Bins and rules tagged `v0.8` describe behaviour
+  of AoU v0.8 the RTL does not implement; they stay in the counts as holes.

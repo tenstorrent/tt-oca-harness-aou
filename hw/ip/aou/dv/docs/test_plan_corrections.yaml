@@ -1,0 +1,474 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# Corrections to the old test plan, applied by scripts/gen_plan_items.py when it
+# writes docs/test_plan_items.yaml. One entry per item: `title` rewords it,
+# `merged_into` makes it a duplicate that reports through the surviving ID,
+# `dropped` removes it (not testable on this RTL). Every entry has a `note`.
+
+# Granule counts: AoU v0.8 Table 6 gives WriteData1024 30 granules.
+- id: '4.8'
+  title: Single 128-byte write with DLENGTH_1024 (WriteData1024, 30 granules)
+  note: The old plan said 28 granules; AoU v0.8 Table 6 says 30. 11.8 merged here.
+- id: '6.6'
+  title: WriteData1024 (30 granules) spanning flit boundary
+  note: The old plan said 28 granules; AoU v0.8 Table 6 says 30.
+- id: '11.8'
+  merged_into: '4.8'
+  note: Same message as 4.8 (WriteData1024, the largest message), which is 30 granules, not 28.
+
+# WRAP/FIXED: AoU request messages have no burst field, and the DUT supports
+# INCR bursts only (coverage-closure decision D1, DECISIONS D5).
+- id: '4.16'
+  dropped: The DUT supports INCR bursts only; AoU carries no AxBURST, so WRAP is out of scope (AXI-R19 flags it as a stimulus error).
+  note: Owner decision D1 of the coverage-closure plan. Was "WRAP carried as INCR"; 5.16 goes with it.
+- id: '4.17'
+  dropped: The DUT supports INCR bursts only; AoU carries no AxBURST, so FIXED is out of scope (AXI-R19 flags it as a stimulus error).
+  note: Owner decision D1 of the coverage-closure plan. Was "FIXED carried as INCR"; 5.17 goes with it.
+- id: '5.16'
+  dropped: Read side of 4.16; the DUT supports INCR bursts only.
+  note: Was merged into 4.16, which is dropped (decision D1).
+- id: '5.17'
+  dropped: Read side of 4.17; the DUT supports INCR bursts only.
+  note: Was merged into 4.17, which is dropped (decision D1).
+
+# No FDID in this RTL.
+- id: '6.16'
+  dropped: No FDID field exists in this RTL; the UCIe D2D adapter owns it.
+  note: Obsolete for this design.
+- id: '9.7'
+  dropped: No FDID field exists in this RTL, so there is no FDID check to trigger.
+  note: Obsolete for this design.
+
+# Register corrections.
+- id: '20.16'
+  title: Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers
+  note: PSLVERR is tied 0, so the old PSLVERR expectation was wrong; aliasing and read-0 are tested instead.
+- id: '20.2'
+  title: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, BUGS/004)
+  note: AXI_SPLIT_TR_EN cannot be written; register tests that hit it are XFAIL against BUGS/004.
+
+# Items changed by fixes merged on main.
+- id: '13.12'
+  title: axi_qos_to_hp boundary; a QoS value equal to the threshold is high priority (>=, reset 0xA)
+  note: >-
+    Main #77: the classifier compares with >= and the reset thresholds were
+    swapped (HP 0xA, NP 0x5), so at reset 10-15 is high, 5-9 normal, 0-4 low.
+- id: '13.13'
+  title: axi_qos_to_np boundary; a QoS value equal to the threshold is normal priority (>=, reset 0x5)
+  note: 'Main #77, as for 13.12.'
+- id: '15.6'
+  title: Configure 16-beat max write (MAX_AWBURSTLEN=15); split 32-beat burst
+  note: 'Main #75 - only 2^n-1 MAX_AxBURSTLEN values are legal; any other write stores 0xF.'
+- id: '15.7'
+  title: Configure 16-beat max read (MAX_ARBURSTLEN=15); split 32-beat burst
+  note: 'Main #75, as for 15.6.'
+- id: '15.8'
+  title: Configure 8-beat max write (MAX_AWBURSTLEN=7); split 16-beat burst
+  note: 'Main #75, as for 15.6.'
+- id: '15.9'
+  title: Configure 8-beat max read (MAX_ARBURSTLEN=7); split 16-beat burst
+  note: 'Main #75, as for 15.6.'
+- id: '20.9'
+  title: Read/write per-RP split config; legal 2^n-1 MAX_AxBURSTLEN values read back as written, any other value as 0xF
+  note: 'Main #75 - the SFR stores an illegal MAX_AxBURSTLEN as 0xF (16 beats, the reset value).'
+- id: '9.11'
+  title: BRESP with BID not matching pending (subordinate side), on every RP; per-RP status and the BID mismatch interrupt
+  note: >-
+    Main #76: RP1-RP3 BID/RID mismatch interrupts were crossed; each aggregate
+    now ORs the per-RP bits of its own type, so check every RP. 19.3 merged here.
+- id: '9.12'
+  title: RRESP with RID not matching pending (subordinate side), on every RP; per-RP status and the RID mismatch interrupt
+  note: 'Main #76, as for 9.11.'
+- id: '19.3'
+  merged_into: '9.11'
+  note: 'The SI0 ID-mismatch interrupt is checked by 9.11/9.12 (main #76 changed which pin each RP drives).'
+- id: '1.9'
+  title: Send ActivateReq while ENABLED; INVALID_ACTMSG and INT_REQ_LINKRESET, the ActivateAck is still sent
+  note: 'Main #79 (MAS) - ActivateReq after the handshake has completed is a link error; the ack is still sent.'
+
+# Duplicates: the second ID reports through the first.
+- id: '2.4'
+  merged_into: '1.6'
+  note: Deactivate then re-activate is the activate/deactivate/activate cycle of 1.6.
+- id: '3.13'
+  title: A message is packed only when credit for the whole message is available (never on partial credit), and queued messages drain when credits return
+  note: The old 3.13 said partial packing is not allowed and 3.14 was skipped for the same reason; 3.14 merged here.
+- id: '3.14'
+  merged_into: '3.13'
+  note: Queue drain after credit replenish is part of 3.13.
+- id: '6.17'
+  merged_into: '3.2'
+  note: msg_credit in the flit header (bytes 128-129) is the credit return of 3.2.
+- id: '12.14'
+  merged_into: '3.15'
+  note: RP0 credit starvation not affecting RP1 is independent per-RP credit tracking (3.15).
+- id: '12.9'
+  merged_into: '6.19'
+  note: Same scenario (messages from several RPs in one flit).
+- id: '11.4'
+  merged_into: '6.2'
+  note: The 1-granule WriteResp is the message 6.2 packs.
+- id: '11.3'
+  merged_into: '6.18'
+  note: A message ending at granule 47 is the full flit of 6.18.
+- id: '11.7'
+  merged_into: '4.6'
+  note: WriteData256 (8 granules) is the 32-byte write of 4.6; ReadData256 is 5.6.
+- id: '15.14'
+  merged_into: '9.9'
+  note: Manager-side B ID mismatch (split_bid_mismatch_err) is 9.9.
+- id: '15.15'
+  merged_into: '9.10'
+  note: Manager-side R ID mismatch (split_rid_mismatch_err) is 9.10.
+- id: '19.4'
+  merged_into: '9.9'
+  note: The MI0 ID-mismatch interrupt is the check of 9.9/9.10.
+- id: '16.7'
+  merged_into: '19.11'
+  note: Clearing write_resp_err is one of the W1C interrupt clears of 19.11.
+- id: '12.15'
+  merged_into: '14.7'
+  note: An RP at 256 bits with a 256-bit remote is the 256-bit bypass of 14.7.
+- id: '12.16'
+  merged_into: '14.8'
+  note: An RP at 512 bits with a 512-bit remote is the 512-bit bypass of 14.8.
+- id: '12.17'
+  merged_into: '14.9'
+  note: An RP at 1024 bits with a 1024-bit remote is the 1024-bit bypass of 14.9.
+
+# Malformed row.
+- id: '16.16'
+  title: B response presented zero cycles after the AW/W handshakes complete (issue 64)
+  note: The old row had no Test File column.
+
+# Performance targets: bandwidth items get a pass criterion against the
+# d2d-compare model (docs/perf_scenarios.yaml, uvm/env/perf/aou_perf_targets.svh).
+- id: '10.1'
+  title: >-
+    Sustained back-to-back writes at full rate (S1): each link delivers at least 97% of the
+    d2d_model bytes/cycle for the CONFIG, active PHY and traffic, never above it, with the
+    model's message mix
+  note: Was "Sustained back-to-back writes at full rate"; the criterion is the perf-targets gate (T1-P02..P04).
+- id: '10.2'
+  title: >-
+    Sustained back-to-back reads at full rate (S1): each link delivers at least 97% of the
+    d2d_model bytes/cycle for the CONFIG, active PHY and traffic, never above it, with the
+    model's message mix
+  note: Was "Sustained back-to-back reads at full rate"; the criterion is the perf-targets gate (T1-P02..P04).
+- id: '10.3'
+  title: >-
+    Simultaneous max-rate reads and writes (S1, 50/50): each link delivers at least 97% of
+    the d2d_model bytes/cycle, never above it, with the model's message mix
+  note: Was "Simultaneous max-rate reads and writes"; the criterion is the perf-targets gate (T1-P02..P04).
+- id: '10.8'
+  title: >-
+    Maximum flit rate: in every S1 window each link's delivered bytes/cycle is within 3% of
+    the d2d_model saturated value (the FDI duty is reported, not gated)
+  note: >-
+    Was "Maximum flit generation rate (flits/cycle)". Flits per cycle alone does not say the
+    flits are full; delivered bytes against the packing model does.
+- id: '10.10'
+  add: 'yes'
+  priority: P2
+  title: >-
+    Small transfers (S2): 1-beat reads and writes, one side and both, at least 97% of the
+    d2d_model bytes/cycle per link
+  note: New with the perf-targets plan (scenario S2).
+- id: '10.11'
+  add: 'yes'
+  priority: P2
+  title: >-
+    Partial-strobe writes (S3, WriteData) at least 97% of the d2d_model bytes/cycle per link;
+    the full-strobe reference is 10.1
+  note: New with the perf-targets plan (scenario S3).
+- id: '10.12'
+  add: 'yes'
+  priority: P2
+  title: >-
+    Burst-length sweep (S4) 1 to 256 beats through the DUT splitter, AxSIZE narrowed to stay
+    within 4 KB: at least 97% of the d2d_model bytes/cycle per link, the split visible in the
+    message mix
+  note: New with the perf-targets plan (scenario S4).
+- id: '10.13'
+  add: 'yes'
+  priority: P2
+  title: >-
+    All RPs at once (S5) with 0, 50 and 100% of the transactions on the widest RP: at least
+    97% of the d2d_model bytes/cycle per link
+  note: New with the perf-targets plan (scenario S5).
+
+# Coverage-closure plan decision D9: drops and a retitle.
+- id: '9.8'
+  dropped: The RTL has no RX incomplete-flit time-out, and on FDI the Adapter completes or cancels every flit (UCIe r1.1 8.2.4).
+  note: Coverage-closure decision D9. The run-list entry was blocked on the L1 driver's gap cap.
+- id: '22.5'
+  dropped: The bench integrates only AOU_TOP; AOU_CORE_TOP shares the same core, and 22.1-22.4 cover the bringup controller.
+  note: Coverage-closure decision D9.
+- id: '1.4'
+  dropped: PropertyReq on ActivateReq has no defined effect in v0.7 and is replaced by ProfileID/Rev/Opt in v0.8.
+  note: Coverage-closure decision D9. 2.7 and 2.10 (DeactivateReq PropertyReq) stay until the spec decides.
+- id: '12.13'
+  dropped: An asymmetric DEST_RP is a misconfiguration MAS 3.10.1 forbids, with undefined behaviour.
+  note: Coverage-closure decision D9. aou_dest_rp_asym_test still runs as BUGS/031 evidence.
+- id: '9.5'
+  title: 'Remote RX credit overrun: the remote die sends beyond the credit the DUT advertised (AoU 6.1)'
+  note: Coverage-closure decision D9; was "Internal check for negative credit count", which is not what the test does.
+
+# Coverage-closure plan decision D9: features with no item (gap analysis 4.3).
+# `added` cites the source; IDs continue each section's numbering.
+- id: '1.10'
+  added: 'MAS 7.3.2/7.3.4'
+  priority: P2
+  title: 'Activation waits while the RX FIFO holds data: ACTIVATE_START is not acted on until the RX FIFO drains (re-activation with the M port back-pressured)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '1.11'
+  added: 'MAS 7.3.2'
+  priority: P2
+  title: 'ACTIVATE_START set before FDI Active: activation starts on link-up and the bit self-clears'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '1.12'
+  added: 'MAS 7.3.5'
+  priority: P2
+  title: 'Each INT_ACTIVATE_START source: a pending TX request, the slave side not clean, a remote ActivateReq in DISABLED or ACTIVATE'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '1.13'
+  added: 'AoU Table 27; BUGS/012'
+  priority: P2
+  title: 'Reserved ACTIVATIONOP (4-15) received: dropped, no LinkReset (interim expectation)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '2.11'
+  added: 'AoU 8.2/8.4; BUGS/009, BUGS/033'
+  priority: P2
+  title: 'No credit message in DISABLED or after the sender''s DeactivateAck'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '2.12'
+  added: 'MAS 7.1'
+  priority: P2
+  title: 'DEACTIVATE_TIME_OUT_VALUE sweep: the DeactivateReq gate delay is 2^(v+3) cycles'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '2.13'
+  added: 'AoU 8.3.2/8.4; BUGS/032'
+  priority: P2
+  title: 'No DeactivateReq while the DUT''s own requests are outstanding'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '2.14'
+  added: 'AoU 8.4'
+  priority: P2
+  title: 'Requests received after DeactivateReq are still answered in DEACTIVATE'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '3.22'
+  added: 'AoU v0.7.1 6.4; MAS 3.9'
+  priority: P2
+  title: 'TX credit saturates on a remote over-grant (no wrap); TX max credit'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '3.23'
+  added: 'MAS 3.9'
+  priority: P2
+  title: 'Credit is returned only at RX FIFO dequeue: a back-pressured M port withholds credit'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '3.24'
+  added: 'AoU 6.4.3; MAS 3.9'
+  priority: P2
+  title: 'The initial CrdtGrant covers every class of every RP; header MsgCredit only afterwards'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '3.25'
+  added: 'MAS 3.4/3.9; integration guide parameters'
+  priority: P2
+  title: 'Non-default RX FIFO depths and RS_EN=0: maximum credit follows the depth'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '4.30'
+  added: 'AoU 5.2'
+  priority: P2
+  title: 'AxUSER/FLEX carriage: the DUT has no USER ports, sends FLEX as 0 and ignores it on receive'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '4.31'
+  added: 'AXI4 A3.3.1'
+  priority: P2
+  title: 'W data before AW on the S port is accepted'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.15'
+  added: 'AoU 6.4.1; BUGS/012'
+  priority: P2
+  title: 'A received message naming an RP at or above RP_COUNT (WriteResp, header MsgCredit, CrdtGrant) is dropped'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.16'
+  added: 'AoU Table 15, 4.4; BUGS/012'
+  priority: P2
+  title: 'Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: dropped, no LinkReset (interim expectation)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.17'
+  added: 'MAS 7.2.4; BUGS/028'
+  priority: P2
+  title: 'Debug FIFO holds four entries and drops the fifth; B and R pushed in one cycle'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.18'
+  added: 'MAS 7.2.4'
+  priority: P2
+  title: 'Debug FIFO access disabled: with RPn_ERROR_INFO_ACCESS_EN=0 the debug address is ordinary memory'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.19'
+  added: 'BUGS/035'
+  priority: P2
+  title: 'Debug FIFO read through an RP narrower than the remote die (two-beat read)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.20'
+  added: 'MAS 7.2.2; integration guide M_*_MO_CNT'
+  priority: P2
+  title: 'M-port ID and split tables full: back-pressure, no error'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.21'
+  added: 'MAS overview 2.1'
+  priority: P2
+  title: 'ReadData wider than the remote AXI width (a violation per the MAS; reaction unspecified)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '9.22'
+  added: 'MAS 7.2.2; BUGS/003'
+  priority: P2
+  title: 'Subordinate ID-check enable bit (AXI_SLV_ID_MISMATCH_ERR_RPn[22]) off and on'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '10.14'
+  added: 'MAS PPA tables 8/9; BUGS/006'
+  priority: P2
+  title: 'Numeric performance bounds: latency and efficiency per FDI width from the PPA tables'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '10.15'
+  added: 'AXI4 A3.2.1; UCIe r1.1 8.2.4'
+  priority: P2
+  title: 'Back-pressure on every AXI channel and on FDI trdy: throughput and correctness under stall'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '11.16'
+  added: 'integration guide; BUGS/016'
+  priority: P2
+  title: 'I_RESETN and I_PRESETN independent: each alone, in each order'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '11.17'
+  added: 'integration guide (APB bridge, CDC)'
+  priority: P2
+  title: 'PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '11.18'
+  added: 'RTL ASSERTION_ON sites'
+  priority: P2
+  title: 'Regression on a build with the RTL''s embedded ASSERTION_ON checks'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '11.19'
+  added: 'integration guide 8.7/3.13.1'
+  priority: P2
+  title: 'DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '12.20'
+  added: 'MAS 3.10.1; AoU 6.2'
+  priority: P2
+  title: 'Local and remote RP_COUNT differ: the effective count is the smaller'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '13.19'
+  added: 'RDL ARB_MODE; MAS 3.2.1'
+  priority: P2
+  title: 'ARB_MODE=3 (reserved) behaves as round-robin'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '13.20'
+  added: 'MAS 3.2.1'
+  priority: P2
+  title: 'PRx_PRIOR=0 is treated as 1'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '13.21'
+  added: 'MAS 3.2.1'
+  priority: P2
+  title: 'AXI_QOS_TO_HP at or below AXI_QOS_TO_NP (misconfiguration: the normal tier is empty)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '13.22'
+  added: 'RDL PRIOR_TIMER; MAS 3.2.1'
+  priority: P2
+  title: 'QoS timer extremes: TIMER_RESOLUTION and TIMER_THRESHOLD at 0 and at maximum'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '14.17'
+  added: 'integration guide parameters'
+  priority: P2
+  title: 'AXI_PEER_DIE_MAX_DATA_WD below 1024'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '16.17'
+  added: 'MAS 3.7.5; BUGS/005'
+  priority: P2
+  title: 'O_PENDING_CNT_OVER on a write at the early-response limit'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.13'
+  added: 'UCIe r1.1 8.3.3.4; BUGS/015'
+  priority: P2
+  title: 'Retrain while ENABLED with traffic is transparent to AoU (interim expectation)'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.14'
+  added: 'UCIe r1.1 8.3.3.7, Table 8-2; BUGS/002, BUGS/037'
+  priority: P2
+  title: 'LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.15'
+  added: 'UCIe r1.1 8.2.9; MAS 7.3.6'
+  priority: P2
+  title: 'L1 entry and exit with the MAS power-management sequence, including the clk_req wake'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.16'
+  added: 'UCIe r1.1 8.2.9; integration guide bringup gaps'
+  priority: P2
+  title: 'L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "L2 is not supported (documented bringup gap)" when the FDI corner runs showed the DUT never requests L2.
+- id: '18.17'
+  added: 'UCIe r1.1 8.3.3.5; BUGS/014, BUGS/038'
+  priority: P2
+  title: 'LinkReset: Adapter state and the DUT''s request, O_AOU_REQ_LINKRESET and its mask'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.18'
+  added: 'UCIe r1.1 8.3.3.6; integration guide bringup gaps'
+  priority: P2
+  title: 'Disabled: Adapter-initiated entry and exit'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.19'
+  added: 'UCIe r1.1 8.2.7'
+  priority: P2
+  title: 'rx_active request/status handshake: raise and fall rules'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.20'
+  added: 'UCIe r1.1 8.2.3.1'
+  priority: P2
+  title: 'wake_req/wake_ack handshake'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.21'
+  added: 'UCIe r1.1 8.2.8, Table 8-2'
+  priority: P2
+  title: 'pl_inband_pres drop'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.22'
+  added: 'UCIe r1.1 8.3.2'
+  priority: P2
+  title: 'Stall corners: stallreq mid-flit (ack at the boundary), stallreq while trdy=0, stallreq with LP mode'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.23'
+  added: 'UCIe r1.1 8.2.4/8.3.3'
+  priority: P2
+  title: 'pl_state_sts leaves Active mid-flit'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.24'
+  added: 'UCIe r1.1 Table 8-2; MAS 3.11'
+  priority: P2
+  title: 'Flit-cancel corners: during a multi-flit message, repeated cancel, cancel of the second half, cancel with stall'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.25'
+  added: 'MAS 2.1; integration guide TWO_PHY'
+  priority: P2
+  title: 'Two-PHY I_PHY_TYPE selection with PHY1 active: state and stall muxing for the second PHY'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '18.26'
+  added: 'UCIe r1.1 2.4.4/3.3.4'
+  priority: P2
+  title: 'Flit header fields: protocol ID, other header bits and CRC bytes are zero'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '22.6'
+  added: 'integration guide 6.6'
+  priority: P2
+  title: 'Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+- id: '22.7'
+  added: 'UCIe r1.1 8.3.3.8; BUGS/038'
+  priority: P2
+  title: 'Restart after link-down needs NOP to Active on lp_state_req'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.

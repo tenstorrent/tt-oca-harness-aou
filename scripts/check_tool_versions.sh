@@ -13,7 +13,7 @@
 #   bash scripts/check_tool_versions.sh --apply      # create branches + PRs
 #
 # Env:
-#   REPO            owner/name for PRs (default: tenstorrent/aou-rtl)
+#   REPO            owner/name for PRs (default: tenstorrent/tt-oca-harness-aou)
 #   DRY_RUN=1       with --apply, print actions without mutating git/gh
 
 set -euo pipefail
@@ -23,7 +23,7 @@ if [[ "${1:-}" == "--apply" ]]; then
   APPLY=1
 fi
 
-REPO="${REPO:-tenstorrent/aou-rtl}"
+REPO="${REPO:-tenstorrent/tt-oca-harness-aou}"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TOOL_VERSIONS="${ROOT}/.github/tool-versions.env"
 DRY_RUN="${DRY_RUN:-0}"
@@ -183,7 +183,7 @@ EOF
 
 ## Test plan
 - [ ] \`lint.yml\` Verilator job passes
-- [ ] \`cocotb.yml\` matrix passes
+- [ ] \`uvm-smoke.yml\` passes
 EOF
 )"
   else

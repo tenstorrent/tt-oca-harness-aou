@@ -1,0 +1,314 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The AoU T1 bench: AOU_TOP as u_dut in tb/tb_top.sv against the layered models
+# (docs/AOU_TB_ARCH.adoc). SV-UVM only (docs/DECISIONS.md D0): no cocotb twin.
+#
+# Two consumers read this file. Paths are repository-root relative, and the
+# bench sits at hw/ip/aou/dv in this repository and in tt-oca-harness alike.
+# Standalone, scripts/sim_cfg.py resolves them against the repository root
+# (hw/common/dv/vip/, the OCAH shared library, against .deps/ocah_lib) and the
+# Makefile compiles the ordered sources with the selected target's defines,
+# adding the pinned uvm-core and RTL/filelist.f itself (make build TB=t1
+# CONFIG=<target>). In tt-oca-harness (`--dut aou --framework uvm`) the runner
+# finds the bench by the hw/ip/<dut>/dv convention, takes the RTL from the `aou`
+# Bender target and the shared library from its own tree, and the native
+# profile's uvm overlay adds the `UVM` define.
+name = "aou"
+profile = "native"
+default_framework = "uvm"
+description = "AXI-over-UCIe bridge T1 bench (SV-UVM; VCS through the harness, VCS or Verilator standalone)"
+
+# The runner requires every implemented framework declared as a [frameworks.<name>]
+# table; the build, sim and targets of this one-framework bench stay in the shared
+# tables above and below, which the runner merges under it.
+[frameworks.uvm]
+description = "AoU T1 bench, SV-UVM (the only framework; the shared keys above are its build)"
+
+[testlist]
+path = "testlists/all.toml"
+format = "toml_list"
+
+[defaults]
+# Standalone `make build` and the harness default to the same target.
+target = "1x512-sp64"
+timeout_sec = 3600
+
+[native.stages.clean]
+kind = "clean"
+paths = ["{run_dir}", "hw/ip/aou/dv/build/uvm"]
+
+[build]
+top_module = "tb_top"
+top_file = "hw/ip/aou/dv/tb/tb_top.sv"
+filelist = "hw/ip/aou/dv/build/uvm/aou_uvm_compile.f"
+bender_filelist = "hw/ip/aou/dv/build/uvm/aou_uvm_bender.f"
+work_dir = "hw/ip/aou/dv/build/uvm"
+# The DUT: the harness's `aou` Bender target mirrors RTL/filelist.f.
+bender_targets = ["aou", "simulation"]
+# The OCAH shared framework library (aou_base_test / aou_base_test_seq extend
+# ocah_test / ocah_sequence), expanded ahead of the sources below.
+source_lists = ["hw/common/dv/vip/ocah_lib/uvm/sources.toml"]
+incdirs = [
+  "hw/ip/aou/dv/uvm/env/pkg",
+  "hw/ip/aou/dv/uvm/env/checkers",
+  "hw/ip/aou/dv/cov/sv",
+  "hw/ip/aou/dv/uvm/env/axi",
+  "hw/ip/aou/dv/uvm/env/fdi",
+  "hw/ip/aou/dv/uvm/env/l3",
+  "hw/ip/aou/dv/uvm/env/apb",
+  "hw/ip/aou/dv/uvm/env",
+  "hw/ip/aou/dv/uvm/seq_lib",
+  "hw/ip/aou/dv/uvm/tests/fdi",
+  "hw/ip/aou/dv/uvm/tests",
+]
+# Compile order is load-bearing (each package imports the ones before it):
+# the generated register model (make ral) -> the rule ledger -> functional
+# coverage -> AXI (stream A) -> FDI L1/L2 (B) -> AOU_FDI_CHECKER and its
+# wire packages -> L3 (C) -> APB and the register layer (D) -> the top's
+# status/irq/reset interfaces -> the shared env -> the T1 env (cfgs,
+# checkers, aou_base_test_seq) -> the sequence library -> the FDI bring-up
+# tests -> tb_top.sv, which `include`s uvm/tests/aou_tests.sv under UVM.
+sources = [
+  "hw/ip/aou/dv/uvm/env/gen/aou_core_csr_uvm_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/checkers/aou_rule_pkg.sv",
+  "hw/ip/aou/dv/cov/sv/aou_fc_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/axi/aou_axi_bus_if.sv",
+  "hw/ip/aou/dv/uvm/env/axi/aou_axi_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_mb_if.sv",
+  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_lsm_if.sv",
+  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/fdi/aou_lsm_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/checker/aou_fdi_wire_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/checker/aou_fdi_checker_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/checker/AOU_FDI_CHECKER.sv",
+  "hw/ip/aou/dv/uvm/env/checker/aou_fdi_checker_if.sv",
+  "hw/ip/aou/dv/uvm/env/checker/aou_fdi_chk_dir_tap.sv",
+  "hw/ip/aou/dv/uvm/env/l3/aou_l3_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/apb/aou_apb_if.sv",
+  "hw/ip/aou/dv/uvm/env/apb/aou_apb_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/apb/aou_reg_pkg.sv",
+  "hw/ip/aou/dv/tb/aou_status_if.sv",
+  "hw/ip/aou/dv/tb/aou_irq_if.sv",
+  "hw/ip/aou/dv/tb/aou_rst_if.sv",
+  "hw/ip/aou/dv/uvm/env/aou_env_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/aou_t1_env_pkg.sv",
+  "hw/ip/aou/dv/uvm/seq_lib/aou_seq_lib_pkg.sv",
+  "hw/ip/aou/dv/uvm/tests/fdi/aou_fdi_test_pkg.sv",
+]
+
+
+[build.vcs]
+# The simulator-shipped UVM closest to the pinned uvm-core 2020.3.1 the standalone
+# flow compiles (docs/DECISIONS.md D2). It reproduces the standalone runs seed for
+# seed, so a harness regression compares with a standalone one; the default
+# uvm-1.2 draws a different random stream from the same seed and does not.
+uvm_lib = "uvm-ieee-2020-2.0"
+
+[build.options]
+# Partition the build directory by input fingerprint (as the SEP bench does):
+# the targets share one work_dir and differ in defines, so without it a target
+# switch would overwrite the other target's simv and a multi-target regression
+# could run one target's model for another. Each unchanged target reuses its
+# build; a source or define change rebuilds only that fingerprint.
+cache_enabled = true
+
+[sim]
+# -covg_cont_on_error: an SV illegal_bins hit in the AXI4 coverage monitors would
+# otherwise stop the simulation before the scoreboard reports; the monitor rule
+# (AXI-R10, ...) judges it.
+args = ["-covg_cont_on_error"]
+
+# One run mode per test area (testlists/<area>.toml); the timeouts are the
+# longest run of the area on VCS with margin. Scenario plusargs stay on the
+# testlist entries (docs/OPEN_ITEMS.md).
+[run_modes.smoke]
+description = "Bring-up gate: aou_sanity_test and one basic test per area"
+timeout_sec = 1800
+args = []
+
+[run_modes.g1a]
+description = "G1a: FDI bring-up on the real DUT, the end-to-end slice, deactivation"
+timeout_sec = 1800
+args = []
+
+[run_modes.g1b]
+description = "G1b: remote activation, link events, low-power"
+timeout_sec = 1800
+args = []
+
+[run_modes.t1_api]
+description = "The T1 test-layer API: injection, SW and hard reset, slices"
+timeout_sec = 1800
+args = []
+
+[run_modes.fdi]
+description = "FDI L1/L2 against the DUT: bring-up, link error, link down, link stress"
+timeout_sec = 3600
+args = []
+
+[run_modes.datapath]
+description = "Data path (stream F): sizes, bursts, strobes, alignment, outstanding, packing"
+timeout_sec = 3600
+args = []
+
+[run_modes.features]
+description = "Features (stream F): splitting, aggregation, early BRESP, QoS, destination RP, LP mode"
+timeout_sec = 3600
+args = []
+
+[run_modes.stress]
+description = "Stress (stream F): QoS ordering, packing, patterns, addresses, the stress test"
+timeout_sec = 7200
+args = []
+
+[run_modes.link]
+description = "Credits and link (stream G): activation, deactivation, credit return, RX credits"
+timeout_sec = 3600
+args = []
+
+[run_modes.errors]
+description = "Error injection (stream G): malformed messages, ID mismatches, AXI error responses"
+timeout_sec = 3600
+args = []
+
+[run_modes.err_int]
+description = "Error and interrupt registers (stream G): every ERROR_INFO and INTERRUPT bit"
+timeout_sec = 3600
+args = []
+
+[run_modes.lifecycle]
+description = "Reset, low-power and link events (stream G)"
+timeout_sec = 3600
+args = []
+
+[run_modes.matrix]
+description = "Configuration matrix (stream J): multi-RP, data-width conversion"
+timeout_sec = 7200
+args = []
+
+[run_modes.perf]
+description = "Performance data (stream J): aou_perf_test against the model's targets"
+timeout_sec = 7200
+args = []
+
+[run_modes.assertions]
+description = "The RTL's ASSERTION_ON checks (plan 11.18), on the <CONFIG>-assert targets (the entries carry +rtl_asserts=1)"
+timeout_sec = 3600
+args = []
+
+# Defines every target shares. AOU_T1_AXI_AGENTS connects the AXI agents to the
+# DUT's ports (the Makefile's T1_AXI=0 drops it for a tied-off build).
+[target_defaults.default]
+defines = ["AOU_AXI_DATA_BYTES=64", "AOU_FDI_DATA_W=512", "AOU_T1_AXI_AGENTS"]
+
+# Build configurations (docs/DECISIONS.md D9; `make configs` prints this table).
+# Names: NxW = N remote ports (RPs) x W-bit RP AXI data width; mix = mixed RP
+# widths, and mix<digits> gives one digit per RP, RP0 first, its AXI data width in
+# 256-bit units (1 = 256, 2 = 512, 4 = 1024); sp<B> = single PHY with a B-byte
+# FDI data path (FDI_CONFIG 0 SP_32B, 1 SP_64B, 2 SP_128B); tp<B1>_<B2> = two
+# PHYs with B1- and B2-byte FDI (3 TP_32B_64B, 4 TP_64B_128B; built with
+# TWO_PHY); -p<W> = AXI_PEER_DIE_MAX_DATA_WD W bits (default 1024); -rxf =
+# non-default RX FIFO depths per RP and class with the RX FIFO register slices
+# off (AOU_RX_FIFO_ALT; the depths are AOU_T1_RX_DEPTH in
+# uvm/env/aou_t1_env_pkg.sv). Unused RPs repeat RP0's width because the DUT
+# sizes its ports to the widest of all four. The register bench
+# (aou_reg_sim_cfg.toml) carries the same targets so its DUT coverage merges
+# into T1's. <CONFIG>-assert adds the RTL's ASSERTION_ON checks (they $error
+# and $finish, so a firing assertion ends the run before the UVM report).
+# Every target names the bench's build root; the targets differ only in defines,
+# and [build.options] cache_enabled partitions that root by build fingerprint so
+# their models coexist. Standalone builds use build/<sim>-<tb>-<target> instead.
+[targets.1x512-sp64]
+description = "Default: one RP, the usual data path"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
+
+[targets.4x512-sp64]
+description = "Multi-RP behaviour (2.12) at one width"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
+
+[targets.3x512-sp64]
+description = "RP count that is not a power of two"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=3", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
+
+[targets.4xmix4211-sp128]
+description = "Mixed widths, every local width (2.14), 128-byte FDI"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=2"]
+
+[targets.4xmix2144-sp64]
+description = "Mixed widths, every local width, RP2/RP3 at 1024 bits, 64-byte FDI"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1"]
+
+[targets.1x256-sp32]
+description = "Narrowest RP and FDI (the RTL default FDI_CONFIG)"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=256", "AOU_RP0_DATA_W=256", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=0"]
+
+[targets.2xmix-tp64_128]
+description = "Two-PHY FDI (64/128 bytes), two RPs, mixed widths"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=4", "TWO_PHY"]
+
+[targets.2x512-tp32_64]
+description = "Two-PHY FDI (32/64 bytes), two RPs at one width"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=3", "TWO_PHY"]
+
+[targets.1x512-sp64-p512]
+description = "AXI_PEER_DIE_MAX_DATA_WD 512 (plan 14.17)"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "AOU_PEER_MAX_W=512"]
+
+[targets.2xmix-sp64-rxf]
+description = "Non-default RX FIFO depths, RX_*_FIFO_RS_EN=0 (3.25)"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1", "AOU_RX_FIFO_ALT"]
+
+# The assertion builds of testlists/assertions.toml (the five configurations the
+# ASSERTION_ON regression covers).
+[targets.1x256-sp32-assert]
+description = "1x256-sp32 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=256", "AOU_RP0_DATA_W=256", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=0", "ASSERTION_ON"]
+
+[targets.1x512-sp64-assert]
+description = "1x512-sp64 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "ASSERTION_ON"]
+
+[targets.2xmix-tp64_128-assert]
+description = "2xmix-tp64_128 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=4", "TWO_PHY", "ASSERTION_ON"]
+
+[targets.4x512-sp64-assert]
+description = "4x512-sp64 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "ASSERTION_ON"]
+
+[targets.4xmix4211-sp128-assert]
+description = "4xmix4211-sp128 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=2", "ASSERTION_ON"]

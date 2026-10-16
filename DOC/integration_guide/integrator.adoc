@@ -1438,161 +1438,143 @@ bringup FSM.
 [[aou-ig-verification-testbench]]
 == 7 Verification Testbench
 
-The verification flow is built on https://www.cocotb.org/[cocotb] and
-https://github.com/alexforencich/cocotbext-axi[[.monospaced]#++cocotbext-axi++#]. All
-verification IP is fetched from PyPI at install time -- no commercial
-VIP is required and no AXI VIP source is vendored into this repository.
-The default simulator is https://verilator.org/[Verilator] (open
-source); Synopsys VCS is supported transparently for users with a
-commercial license.
+The verification environment is the SystemVerilog UVM testbench in
+[.monospaced]#++hw/ip/aou/dv/++#. It uses no commercial VIP: every model is the
+bench's own, and the base classes come from the OCAH library of
+https://github.com/tenstorrent/tt-oca-harness[tt-oca-harness], fetched
+by [.monospaced]#++make setup++# together with Accellera UVM-core at a pinned
+commit. Synopsys VCS is the default simulator when it is on
+[.monospaced]#++PATH++#; https://verilator.org/[Verilator] 5.052 is the open-source
+flow and the one CI builds ([.monospaced]#++.github/workflows/uvm-smoke.yml++#).
 
-The harness ([.monospaced]#++VERIF/aou_cocotb_top.sv++#) instantiates two [.monospaced]#++AOU_CORE_TOP++#
-cores back-to-back via their 32B (256b) single-PHY FDI interfaces. Each
-DUT is overridden with [.monospaced]#++.FDI_CONFIG(packet_def_pkg::FDI_CFG_SP_32B)++# and
-the build does not define [.monospaced]#pass:c[+define+TWO_PHY]#, so only the PHY0 ports are
-connected. The two DUT instances use different AXI data widths (512b and
-256b) to exercise the width-interoperability path. The four AXI buses
-and two APB slave buses are exposed as flat top-level ports using
-[.monospaced]#++cocotbext-axi++#pass:[']s canonical signal naming ([.monospaced]#++s_axi_d1_*++#, [.monospaced]#++m_axi_d1_*++#,
-[.monospaced]#++s_axi_d2_*++#, [.monospaced]#++m_axi_d2_*++#, [.monospaced]#++apb1_*++#, [.monospaced]#++apb2_*++#) so the Python tests can
-use [.monospaced]#++AxiBus.from_prefix(dut, "<prefix>")++# and
-[.monospaced]#++ApbBus.from_prefix(dut, "<prefix>")++# directly. Refer to
-link:../../VERIF/README.md[[.monospaced]#++VERIF/README.md++#] for setup, watchdogs, and
-the test list.
+The bench sits at [.monospaced]#++hw/ip/aou/dv++#, the
+[.monospaced]#++hw/<group>/<dut>/dv++# path the tt-oca-harness convention expects, so
+the same sources, sim configs and testlists serve the standalone
+[.monospaced]#++Makefile++# flow here and the harness runner once this repository is
+vendored there. Refer to
+link:../../hw/ip/aou/dv/README.md[[.monospaced]#++hw/ip/aou/dv/README.md++#] for setup,
+the build configurations, regressions, coverage and the test list, and to
+link:../../hw/ip/aou/dv/docs/AOU_TB_ARCH.adoc[[.monospaced]#++docs/AOU_TB_ARCH.adoc++#]
+for the testbench architecture.
 
 [[aou-ig-architecture]]
 === 7.1 Architecture
 
+One bench with four tops. The main top, [.monospaced]#++tb/tb_top.sv++# (T1), puts
+[.monospaced]#++AOU_TOP++# against layered models of the remote die; the other three
+are smaller benches for the register file alone, the L3 protocol model
+against the FDI checker, and the AXI agents in loopback.
+
 ....
-                      AXI SI                              AXI MI
+                AXI SI (per RP)                          AXI MI (per RP)
   +------------------+             +------------------+             +------------------+
-  | cocotb AxiMaster |  -------->  |  AOU_CORE_TOP    |  -------->  | cocotb AxiRam    |
-  | s_axi_d1 (512b)  |      .      |  u_dut1          |             | m_axi_d1 (512b)  |
-  +------------------+      .      |  (AXI 512b)      |             +------------------+
-  +------------------+      .      +------------------+
-  | cocotb ApbMaster |..APB.......         |     ^
-  | apb1 (32b)       |     FDI 32B (256b)  |     | FDI 32B (256b)
-  +------------------+                     v     |
-                                 +------------------+             +------------------+
-  +------------------+           |  AOU_CORE_TOP    |  -------->  | cocotb AxiRam    |
-  | cocotb AxiMaster |  -------> |  u_dut2          |             | m_axi_d2 (256b)  |
-  | s_axi_d2 (256b)  |      .    |  (AXI 256b)      |             +------------------+
-  +------------------+      .    +------------------+
-  +------------------+      .            ^
-  | cocotb ApbMaster |..APB....          |
-  | apb2 (32b)       |                   |
-  +------------------+    fdi_flit_decoder x2 (gated by FDI_LOG)
+  | L4 AXI master    |  -------->  |     AOU_TOP      |  -------->  | L4 AXI slave     |
+  | agents           |             |     (DUT)        |             | agents (memory)  |
+  +------------------+             |                  |             +------------------+
+  +------------------+             |                  |
+  | APB agent + RAL  |..APB.......>|                  |
+  +------------------+             +------------------+
+                                     FDI LP  |  ^  FDI PL
+                                             v  |
+                                   +------------------+
+                                   | L1 FDI agent     |  flit-level drive and monitor
+                                   | L2 link state    |  PL link-state machine, bring-up
+                                   | L3 AoU protocol  |  remote-die AoU model
+                                   | L4 remote AXI    |  the remote die's AXI side
+                                   +------------------+
+                                   AOU_FDI_CHECKER (passive, on the FDI)
 ....
 
-The data flow for a write transaction initiated on [.monospaced]#++u_dut1++#pass:[']s AXI slave
-interface is:
+The remote die is modelled in four layers: L1 plays the Flit-Die
+Interface, L2 the PL link-state machine and bring-up, L3 the AoU protocol
+(message packing, credits, ordering), and L4 the AXI traffic on the remote
+side. AXI traffic entering a local RP is checked end to end against what
+the L4 remote model receives, and in the reverse direction. A passive
+[.monospaced]#++AOU_FDI_CHECKER++# watches the FDI in both directions; its rules, and
+those of the AXI, APB and register checkers, are listed with their IDs in
+[.monospaced]#++uvm/env/checkers/rules.csv++#.
 
-1.  The cocotb [.monospaced]#++AxiMaster++# on [.monospaced]#++s_axi_d1++# issues a 512b write.
-2.  [.monospaced]#++u_dut1++# packs the AXI transaction into AOU flit(s) and transmits
-via the 32B (256b) PHY0 FDI port.
-3.  [.monospaced]#++u_dut2++# receives the FDI data, unpacks it, and presents the
-transaction on its AXI MI.
-4.  The cocotb [.monospaced]#++AxiRam++# on [.monospaced]#++m_axi_d2++# accepts the write into its
-internal memory model.
-5.  A subsequent read to the same address returns the stored data back
-through the reverse FDI path.
-6.  The Python test compares the read data against the originally
-written payload byte-for-byte.
-
-The reverse direction (initiated from [.monospaced]#++s_axi_d2++# to [.monospaced]#++m_axi_d1++#) operates
-symmetrically.
-
-A separate test ([.monospaced]#++test_csr_reset_values++#) reads every register defined
-in [.monospaced]#++csr/aou-core.rdl++# over APB on both DUTs immediately after reset and
-_before_ APB activation, verifying that every sw-readable, reset-bearing
-field matches its RDL-defined reset value. The expected values are built
-at runtime by [.monospaced]#++systemrdl-compiler++#, so the check self-updates whenever
-the RDL changes and surfaces RDL ↔ RTL drift on every run.
+The DUT parameters of a build are selected by [.monospaced]#++CONFIG++#
+([.monospaced]#++1x512-sp64++# by default: one RP at 512 bits, a 64-byte single-PHY
+FDI). The other configurations cover one to four RPs, mixed RP widths of
+256/512/1024 bits, 32/64/128-byte FDI, two-PHY FDI and the non-default
+RX FIFO depths; [.monospaced]#++make configs++# prints the table.
 
 [[aou-ig-components]]
 === 7.2 Components
 
 [width="100%",cols="<34%,<33%,<33%",options="header",]
 |=======================================================================
-|Component |Instance / role |Description
-|[.monospaced]#++AOU_CORE_TOP++# |[.monospaced]#++u_dut1++# |DUT instance 1. AXI data width = 512b
-(default parameters). [.monospaced]#++FDI_CONFIG = FDI_CFG_SP_32B++# (256b PHY0; no
-TWO_PHY).
+|Component |Location |Description
+|[.monospaced]#++AOU_TOP++# |[.monospaced]#++tb/tb_top.sv++# |The DUT of the T1 bench, with the
+RP count, RP data widths and [.monospaced]#++FDI_CONFIG++# of the selected
+[.monospaced]#++CONFIG++#.
 
-|[.monospaced]#++AOU_CORE_TOP++# |[.monospaced]#++u_dut2++# |DUT instance 2. RP0-RP3 AXI data widths
-overridden to 256b. [.monospaced]#++FDI_CONFIG = FDI_CFG_SP_32B++#.
+|AXI agents (L4) |[.monospaced]#++uvm/env/axi/++# |AXI4 masters on the DUT's slave
+ports, memory-backed AXI4 slaves on its master ports, and the remote
+die's AXI side behind the L3 model; the protocol monitors and scoreboards
+check each transaction end to end.
 
-|[.monospaced]#++cocotbext.axi.AxiMaster++# |[.monospaced]#++s_axi_d1++#, [.monospaced]#++s_axi_d2++# |Drives AXI
-writes/reads on each DUTpass:[']s slave interface.
+|FDI agent (L1) and link-state agent (L2) |[.monospaced]#++uvm/env/fdi/l1/++#,
+[.monospaced]#++uvm/env/fdi/l2/++# |Drive and monitor the Flit-Die Interface; play the
+PL link-state machine and bring-up, link events and low-power entry.
 
-|[.monospaced]#++cocotbext.axi.AxiRam++# |[.monospaced]#++m_axi_d1++#, [.monospaced]#++m_axi_d2++# |Memory-backed AXI slave
-attached to each DUTpass:[']s master interface. Stores writes and serves reads.
+|AoU protocol model (L3) |[.monospaced]#++uvm/env/l3/++# |The remote die's AoU
+protocol: message packing and unpacking, credits, ordering.
 
-|[.monospaced]#++cocotbext.axi.ApbMaster++# |[.monospaced]#++apb1++#, [.monospaced]#++apb2++# |Drives the AOU activate
-write ([.monospaced]#++paddr=0x8++#, [.monospaced]#++pwdata=0x1++#) on each DUT after reset, and reads
-CSRs for the reset-value test.
+|APB agent and register model |[.monospaced]#++uvm/env/apb/++#,
+[.monospaced]#++uvm/env/gen/aou_core_csr_uvm_pkg.sv++# |Drives the APB port, activates
+the AOU, and reads and writes CSRs through the register model generated
+from [.monospaced]#++csr/aou-core.rdl++# (Section 8).
 
-|[.monospaced]#++fdi_flit_decoder++# |[.monospaced]#++u_fdi_dec1++#, [.monospaced]#++u_fdi_dec2++# |Passive FDI decoders.
-Log decoded flits to [.monospaced]#++dut1_fdi.log++# / [.monospaced]#++dut2_fdi.log++#. Built only when
-[.monospaced]#++FDI_LOG=1++# is passed to [.monospaced]#++make++#.
-|=======================================================================
+|[.monospaced]#++AOU_FDI_CHECKER++# and checkers |[.monospaced]#++uvm/env/checker/++#,
+[.monospaced]#++uvm/env/chk/++#, [.monospaced]#++uvm/env/perf/++# |Passive FDI protocol checker;
+the AXI, APB, register and performance checkers.
 
-Key testbench parameters:
+|Register bench |[.monospaced]#++tb/aou_reg_top.sv++# ([.monospaced]#++TB=reg++#)
+|[.monospaced]#++AOU_CORE_TOP++# with only its APB port driven; reset-value, bit-bash,
+access, reserved-field and alias tests against the register model.
 
-[cols="<,<,<",options="header",]
-|=======================================================================
-|Parameter |Value |Description
-|[.monospaced]#++CORE_CLK_PERIOD_NS++# |1 ns |Core clock period (AXI/FDI domain).
+|L3 unit bench, AXI self-test |[.monospaced]#++tb/aou_l3_unit_top.sv++#
+([.monospaced]#++TB=l3_unit++#), [.monospaced]#++tb/aou_axi_selftest_top.sv++#
+([.monospaced]#++TB=axi_selftest++#) |The L3 model and the FDI checker against each
+other without a DUT; the AXI agents in loopback.
 
-|[.monospaced]#++APB_CLK_PERIOD_NS++# |10 ns |APB clock period.
-
-|[.monospaced]#++D1_AXI_DATA_WIDTH++# |512 |[.monospaced]#++u_dut1++# AXI data width (bits).
-
-|[.monospaced]#++D2_AXI_DATA_WIDTH++# |256 |[.monospaced]#++u_dut2++# AXI data width (bits).
-
-|[.monospaced]#++AXI_ADDR_WIDTH++# |64 |AXI address width.
-
-|[.monospaced]#++AXI_ID_WIDTH++# |10 |AXI ID width.
-
-|[.monospaced]#++APB_ADDR_WIDTH++# / [.monospaced]#++APB_DATA_WIDTH++# |32 / 32 |APB widths on both DUT
-slaves.
-
-|[.monospaced]#++OVERALL_TIMEOUT_US++# |500 |Per-test sim-time backstop.
+|Testlists and grader |[.monospaced]#++testlists/++#, [.monospaced]#++scripts/run_list.py++#,
+[.monospaced]#++scripts/check_run.py++#, [.monospaced]#++expected_fail.yaml++# |TOML testlists
+(scenarios, seeds, groups such as [.monospaced]#++smoke++# and
+[.monospaced]#++functional++#); every run is graded, and failures caused by known DUT
+bugs are accepted as XFAIL when tied to the bug's GitHub issue.
 |=======================================================================
 
 [[aou-ig-running-the-testbench]]
 === 7.3 Running the Testbench
 
-From the repository root, set up the Python environment once and then
-invoke the testbench:
+From the bench directory, fetch the pinned dependencies once and then
+build and run:
 
 [source,bash]
 ----
-cd VERIF
-bash setup_cocotb_env.sh        # creates VERIF/venv/, installs cocotb + deps
-source venv/bin/activate
-make                            # Verilator (default), 8 parallel C++ jobs
-make SIM=vcs                    # Synopsys VCS
-make WAVES=1                    # waveform dump (FST/VCD or FSDB/VPD)
-make FDI_LOG=1                  # enable fdi_flit_decoder logs
-make clean                      # remove sim_build/ and generated artefacts
+cd hw/ip/aou/dv
+make setup                                   # uvm-core, OCAH library, z3, PeakRDL, pywellen into .deps/
+make test                                    # build TB=t1 CONFIG=1x512-sp64, run aou_sanity_test
+make build SIM=verilator                     # or SIM=vcs (default when vcs is on PATH)
+make run TEST=aou_dp_random_test SEED=3 PLUSARGS='+dp_dir=both'
+make run TEST=aou_sanity_test WAVES=1        # waves into the run directory (FSDB/FST)
+make build TB=reg && make run TB=reg TEST=aou_reg_access_test
+python3 scripts/run_list.py --items smoke    # the bring-up gate (4 scenarios)
+python3 scripts/run_list.py --items functional -j 16 --rid nightly
+make check-config                            # sim configs, testlists, rules, RAL and docs freshness
+make lint                                    # check-config, then Verible and Verilator lint
 ----
 
-A successful run prints [.monospaced]#++*** SIMULATION PASSED ***++# and writes
-[.monospaced]#++results.xml++# (junit). Per-phase watchdogs (reset, APB activate, APB
-read, AXI write, AXI read) name the stuck phase explicitly on stalls and
-dump a snapshot of the relevant signal values so the simulator never
-spins silently.
-
-You can also drive the flow via [.monospaced]#++pytest++#, which calls cocotbpass:[']s [.monospaced]#++runner++#
-API and parametrises across every simulator on [.monospaced]#++PATH++#:
-
-[source,bash]
-----
-pytest -v                       # all available simulators
-pytest -v -k verilator          # only Verilator
-SIM=vcs pytest -v               # force Synopsys VCS
-----
+Each run ends with a verdict ([.monospaced]#++PASS++#, [.monospaced]#++XFAIL++# or
+[.monospaced]#++FAIL++#) written to its run directory under [.monospaced]#++out/++#;
+[.monospaced]#++run_list.py++# collects them into [.monospaced]#++results.csv++# and exits
+non-zero unless every run is PASS or XFAIL. Builds and runs go through LSF
+when [.monospaced]#++bsub++# is available ([.monospaced]#++LSF=0++# runs on the current
+host). CI runs [.monospaced]#++make check-config++#, builds the T1 and register
+benches on Verilator and runs the [.monospaced]#++smoke++# group of each.
 
 [[aou-ig-ip-integration-collateral]]
 == 8. IP Integration Collateral
@@ -1625,11 +1607,13 @@ only -- [.monospaced]#++memoryMaps++# element)
 (also linked from xref:aou-ig-register-map[Section 4.1])
 |=======================================================================
 
-Note: the in-repo cocotb testbench (Section 7) does not consume the
-generated UVM package -- it parses [.monospaced]#++csr/aou-core.rdl++# directly via
-[.monospaced]#++systemrdl-compiler++# at runtime. The UVM package is shipped as
-collateral for integrators whose own verification environments are
-UVM-based.
+Note: the in-repo UVM testbench (Section 7) generates its own copy of
+the same model with the same PeakRDL command
+([.monospaced]#++hw/ip/aou/dv/scripts/regen_ral.sh++#, [.monospaced]#++make ral++#) and commits
+it as [.monospaced]#++hw/ip/aou/dv/uvm/env/gen/aou_core_csr_uvm_pkg.sv++#, so a
+[.monospaced]#++make lint++# there fails when the RDL and the committed model drift
+apart. The [.monospaced]#++INTEG/uvm/++# package is the collateral for integrators'
+own UVM environments.
 
 [[aou-ig-single-source-of-truth]]
 === 8.2 Single Source of Truth
@@ -1645,7 +1629,7 @@ csr/aou-core.rdl  ──(peakrdl)──>  IP-XACT register map   (INTEG/ipxact/g
                    ──(peakrdl)──>  Markdown                (DOC/csr/)
                    ──(peakrdl)──>  Interactive HTML         (DOC/csr/html/)
                    ──(peakrdl)──>  UVM register model      (INTEG/uvm/)
-                   ──(systemrdl-compiler, runtime)──>  CSR reset readback test (VERIF/)
+                   ──(peakrdl, make ral)──>  UVM register model of the testbench (hw/ip/aou/dv/uvm/env/gen/)
 ....
 
 To modify register definitions (addresses, field widths, access types,

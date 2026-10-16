@@ -1,0 +1,175 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Error injection (stream G).
+#
+# Error-injection tests (TB=t1); format as in link.yaml.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_invalid_actmsg_test.state-all.op-all"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+reseed = 2
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=all", "+op=all"]
+
+[[tests]]
+name = "aou_invalid_actmsg_test.state-enabled"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+reseed = 2
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=enabled"]
+
+[[tests]]
+name = "aou_invalid_actmsg_test.state-activate"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=activate"]
+
+[[tests]]
+name = "aou_invalid_actmsg_test.state-deactivate"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=deactivate"]
+
+[[tests]]
+name = "aou_invalid_actmsg_test.state-disabled"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=disabled"]
+
+[[tests]]
+name = "aou_invalid_actmsg_test.mask-1"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+mask=1"]
+
+# The Adapter enters LinkError as soon as lp_linkerror rises (fdi_enc=SPEC and a
+# DUT with lp_linkerror): the ActivateAck that follows is lost (BUGS/037).
+[[tests]]
+name = "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-1"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=deactivate", "+op=act_req", "+react_linkerror=1"]
+
+# T1-L30 (the Ack to an invalid ActivateReq is on FDI before lp_linkerror) with
+# pl_trdy holes and low runs, so the Ack's flit can still be inside the DUT's
+# TX output stage when the DUT decides to raise lp_linkerror (BUGS/037).
+[[tests]]
+name = "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+reseed = 4
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=deactivate", "+op=act_req", "+trdy=bursty", "+burst_max=8", "+reps=8"]
+
+[[tests]]
+name = "aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+reseed = 4
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=enabled", "+op=act_req", "+trdy=random", "+trdy_pct=40", "+reps=8"]
+
+[[tests]]
+name = "aou_linkreset_timeout_test.src-act_ack"
+module = { uvm = "aou_linkreset_timeout_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+src=act_ack"]
+
+[[tests]]
+name = "aou_linkreset_timeout_test.src-deact_ack"
+module = { uvm = "aou_linkreset_timeout_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+src=deact_ack"]
+
+[[tests]]
+name = "aou_linkreset_timeout_test.src-msgcredit"
+module = { uvm = "aou_linkreset_timeout_test" }
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+src=msgcredit"]
+
+[[tests]]
+name = "aou_linkreset_timeout_test.mask-1"
+module = { uvm = "aou_linkreset_timeout_test" }
+seed = 1
+reseed = 2
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+mask=1"]
+
+[[tests]]
+name = "aou_rx_msg_error_test"
+module = { uvm = "aou_rx_msg_error_test" }
+seed = 1
+reseed = 2
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+kind=all"]
+
+# Subordinate-side ID mismatch on every RP; 4x512-sp64 is where main #76 shows.
+[[tests]]
+name = "aou_slv_id_mismatch_test.4x512-sp64"
+module = { uvm = "aou_slv_id_mismatch_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["errors"]
+run_modes = ["errors"]
+
+[[tests]]
+name = "aou_slv_id_mismatch_test.1x512-sp64"
+module = { uvm = "aou_slv_id_mismatch_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["errors"]
+run_modes = ["errors"]
+
+[[groups]]
+name = "errors"
+expected_count = 16
+tests = [
+  "aou_invalid_actmsg_test.state-all.op-all",
+  "aou_invalid_actmsg_test.state-enabled",
+  "aou_invalid_actmsg_test.state-activate",
+  "aou_invalid_actmsg_test.state-deactivate",
+  "aou_invalid_actmsg_test.state-disabled",
+  "aou_invalid_actmsg_test.mask-1",
+  "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-1",
+  "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8",
+  "aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8",
+  "aou_linkreset_timeout_test.src-act_ack",
+  "aou_linkreset_timeout_test.src-deact_ack",
+  "aou_linkreset_timeout_test.src-msgcredit",
+  "aou_linkreset_timeout_test.mask-1",
+  "aou_rx_msg_error_test",
+  "aou_slv_id_mismatch_test.4x512-sp64",
+  "aou_slv_id_mismatch_test.1x512-sp64",
+]

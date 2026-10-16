@@ -1,0 +1,520 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Stress (stream F).
+#
+# Stress, corners, packing and data integrity (stream K, milestone M6): flit packing
+# under non-DUT-like L3 policies, data patterns and address corners, back-pressure
+# extremes on every AXI channel and the FDI, and QoS arbitration order with a TX
+# backlog (FEAT-R11..R14). TB=t1. An entry without config runs on every CONFIG.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_pack_test.pk-crossflit.remote_bytes-32"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=crossflit", "+remote_bytes=32"]
+
+[[tests]]
+name = "aou_pack_test.pk-crossflit"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=crossflit"]
+
+[[tests]]
+name = "aou_pack_test.pk-crossflit.remote_bytes-128"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=crossflit", "+remote_bytes=128"]
+
+[[tests]]
+name = "aou_pack_test.pk-mixed"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=mixed"]
+
+[[tests]]
+name = "aou_pack_test.pk-single"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=single"]
+
+[[tests]]
+name = "aou_pack_test.pk-full"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=full"]
+
+[[tests]]
+name = "aou_pack_test.pk-wresp48"
+module = { uvm = "aou_pack_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=wresp48"]
+
+[[tests]]
+name = "aou_pack_test.pk-rp"
+module = { uvm = "aou_pack_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=rp"]
+
+[[tests]]
+name = "aou_pack_test.pk-act"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=act"]
+
+[[tests]]
+name = "aou_pack_test.pk-crdt"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=crdt"]
+
+[[tests]]
+name = "aou_pack_test.pk-b2b"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=b2b"]
+
+[[tests]]
+name = "aou_pack_test.pk-prof"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=prof"]
+
+[[tests]]
+name = "aou_pattern_test.dp_pattern-walk1"
+module = { uvm = "aou_pattern_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_pattern=walk1"]
+
+[[tests]]
+name = "aou_pattern_test.dp_pattern-walk0"
+module = { uvm = "aou_pattern_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_pattern=walk0"]
+
+[[tests]]
+name = "aou_pattern_test.dp_pattern-ones"
+module = { uvm = "aou_pattern_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_pattern=ones"]
+
+[[tests]]
+name = "aou_pattern_test.dp_pattern-zeros"
+module = { uvm = "aou_pattern_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_pattern=zeros"]
+
+[[tests]]
+name = "aou_pattern_test.dp_pattern-checker"
+module = { uvm = "aou_pattern_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_pattern=checker"]
+
+[[tests]]
+name = "aou_pattern_test.dp_pattern-addr"
+module = { uvm = "aou_pattern_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_pattern=addr"]
+
+[[tests]]
+name = "aou_addr_test.dp_addr-4k"
+module = { uvm = "aou_addr_test" }
+seed = 1
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_addr=4k"]
+
+[[tests]]
+name = "aou_addr_test.dp_addr-zero"
+module = { uvm = "aou_addr_test" }
+seed = 1
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_addr=zero"]
+
+[[tests]]
+name = "aou_addr_test.dp_addr-top"
+module = { uvm = "aou_addr_test" }
+seed = 1
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_addr=top"]
+
+[[tests]]
+name = "aou_addr_test.dp_addr-sweep"
+module = { uvm = "aou_addr_test" }
+seed = 1
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+dp_addr=sweep"]
+
+[[tests]]
+name = "aou_stress_test.st_pol-sparse.st_crd-mixed"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_pol=sparse", "+st_crd=mixed"]
+
+[[tests]]
+name = "aou_stress_test.st_pol-random.st_crd-slow"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_pol=random", "+st_crd=slow"]
+
+[[tests]]
+name = "aou_stress_test.st_pol-split.st_crd-grant"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_pol=split", "+st_crd=grant"]
+
+[[tests]]
+name = "aou_stress_test.st_pol-min.st_crd-hdr"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_pol=min", "+st_crd=hdr"]
+
+[[tests]]
+name = "aou_stress_test.st_pol-max.st_bp-none"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_pol=max", "+st_bp=none"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-aw"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=aw"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-w"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=w"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-ar"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=ar"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-b"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=b"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-r"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=r"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-all"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=all"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-fdi"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=fdi"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-0"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=0"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-eq"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=eq"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-3"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=3"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=promote"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 4
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=sweep"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=2", "+qos_tiers=3", "+qos_bounds=1"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=2", "+qos_tiers=2", "+qos_timer=promote"]
+
+# PRIOR 0 is treated as 1 (MAS 3.2.1): a PRIOR-0 RP and a PRIOR-1 RP share a tier
+# (round-robin, FEAT-R14), and PRIOR-0 RPs rank below PRIOR 2 and 3 (FEAT-R11).
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-eq01"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=eq01"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-3.qos_prior0-1"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=3", "+qos_prior0=1"]
+
+# AXI_QOS_TO_HP at or below AXI_QOS_TO_NP: only High and Low remain, and a QoS at
+# or above HP is High (BUGS/049 interim).
+[[tests]]
+name = "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_bounds-inv"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 4
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=2", "+qos_tiers=2", "+qos_bounds=inv"]
+
+# Starvation timer extremes: THRESHOLD 0 promotes at once, RESOLUTION 0 with a short
+# threshold promotes (one cycle per unit, BUGS/049 interim),
+# THRESHOLD 0xFFFF never promotes within the test.
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-thr0"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=thr0"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-thr0"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=2", "+qos_tiers=2", "+qos_timer=thr0"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-res0"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=res0"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-max"
+module = { uvm = "aou_qos_order_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=max"]
+
+[[groups]]
+name = "stress"
+expected_count = 48
+tests = [
+  "aou_pack_test.pk-crossflit.remote_bytes-32",
+  "aou_pack_test.pk-crossflit",
+  "aou_pack_test.pk-crossflit.remote_bytes-128",
+  "aou_pack_test.pk-mixed",
+  "aou_pack_test.pk-single",
+  "aou_pack_test.pk-full",
+  "aou_pack_test.pk-wresp48",
+  "aou_pack_test.pk-rp",
+  "aou_pack_test.pk-act",
+  "aou_pack_test.pk-crdt",
+  "aou_pack_test.pk-b2b",
+  "aou_pack_test.pk-prof",
+  "aou_pattern_test.dp_pattern-walk1",
+  "aou_pattern_test.dp_pattern-walk0",
+  "aou_pattern_test.dp_pattern-ones",
+  "aou_pattern_test.dp_pattern-zeros",
+  "aou_pattern_test.dp_pattern-checker",
+  "aou_pattern_test.dp_pattern-addr",
+  "aou_addr_test.dp_addr-4k",
+  "aou_addr_test.dp_addr-zero",
+  "aou_addr_test.dp_addr-top",
+  "aou_addr_test.dp_addr-sweep",
+  "aou_stress_test.st_pol-sparse.st_crd-mixed",
+  "aou_stress_test.st_pol-random.st_crd-slow",
+  "aou_stress_test.st_pol-split.st_crd-grant",
+  "aou_stress_test.st_pol-min.st_crd-hdr",
+  "aou_stress_test.st_pol-max.st_bp-none",
+  "aou_stress_test.st_bp-aw",
+  "aou_stress_test.st_bp-w",
+  "aou_stress_test.st_bp-ar",
+  "aou_stress_test.st_bp-b",
+  "aou_stress_test.st_bp-r",
+  "aou_stress_test.st_bp-all",
+  "aou_stress_test.st_bp-fdi",
+  "aou_qos_order_test.arb_mode-0",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-eq",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-3",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep",
+  "aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1",
+  "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-eq01",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-3.qos_prior0-1",
+  "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_bounds-inv",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-thr0",
+  "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-thr0",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-res0",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-max",
+]

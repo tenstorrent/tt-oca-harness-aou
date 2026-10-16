@@ -1,0 +1,18 @@
+// SPDX-License-Identifier: Apache-2.0
+// SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+= AoU Design Verification Documentation
+:doctype: book
+:sectanchors:
+:sectlinks:
+:sectnums:
+:source-highlighter: highlight.js
+
+// The plans below cite the AoU specification (MAS v0.7 and v0.8, by section),
+// UCIe r1.1 chapter 8 for the FDI, AMBA AXI4 and APB for the buses, and this
+// repository's DOC/integration_guide/ and csr/aou-core.rdl for the integration
+// rules and the register map. The tables under gen/ are generated from the
+// testlists, the plan items and the sources by scripts/gen_dv_docs.py.
+include::AOU_TB_ARCH.adoc[leveloffset=0]
+include::AOU_VPLAN.adoc[leveloffset=0]
+include::AOU_FCOV.adoc[leveloffset=0]

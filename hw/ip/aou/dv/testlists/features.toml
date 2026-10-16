@@ -1,0 +1,445 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# Features (stream F).
+#
+# Feature tests: aggregator, early BRESP, splitting, QoS modes, DEST_RP, TX LP
+# mode and the rest. TB=t1. Width bypass (14.8) runs as an aou_dp_size_test entry.
+# Entries run on every configuration unless a pin says why not.
+#
+# Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
+# every list all.toml includes; a name carries the plusargs, target or area only
+# where the test alone would repeat.
+
+[[tests]]
+name = "aou_split_test.split_aw-15.split_ar-15.dp_len-0_1_3_7_15"
+module = { uvm = "aou_split_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=15", "+split_ar=15", "+dp_len=0,1,3,7,15"]
+
+[[tests]]
+name = "aou_split_test.split_aw-7.split_ar-7.dp_len-15_31"
+module = { uvm = "aou_split_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=7", "+split_ar=7", "+dp_len=15,31"]
+
+[[tests]]
+name = "aou_split_test.split_aw-15.split_ar-15.dp_len-31_63"
+module = { uvm = "aou_split_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=15", "+split_ar=15", "+dp_len=31,63"]
+
+[[tests]]
+name = "aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-0_15_63_255"
+module = { uvm = "aou_split_test" }
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=sweep", "+split_ar=sweep", "+dp_len=0,15,63,255"]
+
+[[tests]]
+name = "aou_split_test.split_aw-illegal.split_ar-illegal.dp_len-15_31"
+module = { uvm = "aou_split_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=illegal", "+split_ar=illegal", "+dp_len=15,31"]
+
+[[tests]]
+name = "aou_aggregator_test.agg_en-0"
+module = { uvm = "aou_aggregator_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+agg_en=0"]
+
+[[tests]]
+name = "aou_aggregator_test.agg_en-1"
+module = { uvm = "aou_aggregator_test" }
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+agg_en=1"]
+
+[[tests]]
+name = "aou_aggregator_test.agg_en-1.dp_n-1"
+module = { uvm = "aou_aggregator_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+agg_en=1", "+dp_n=1"]
+
+# 256-bit remote bursts aggregated onto the 1024-bit RP0 (the 512-bit RP2 too).
+[[tests]]
+name = "aou_aggregator_test.agg_en-1.dp_size-5.agg_need-32_128"
+module = { uvm = "aou_aggregator_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+agg_en=1", "+dp_size=5", "+agg_need=32:128"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-0.dp_buf_pct-50"
+module = { uvm = "aou_early_bresp_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=0", "+dp_buf_pct=50"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.dp_buf_pct-50"
+module = { uvm = "aou_early_bresp_test" }
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+dp_buf_pct=50"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.dp_buf_pct-50.dp_ids-same"
+module = { uvm = "aou_early_bresp_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+dp_buf_pct=50", "+dp_ids=same"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.early_err-1"
+module = { uvm = "aou_early_bresp_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+early_err=1"]
+
+[[tests]]
+name = "aou_qos_test.arb_mode-0"
+module = { uvm = "aou_qos_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+arb_mode=0"]
+
+[[tests]]
+name = "aou_qos_test.arb_mode-1"
+module = { uvm = "aou_qos_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+arb_mode=1"]
+
+[[tests]]
+name = "aou_qos_test.arb_mode-2.qos_bounds-1"
+module = { uvm = "aou_qos_test" }
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+arb_mode=2", "+qos_bounds=1"]
+
+[[tests]]
+name = "aou_qos_test.arb_mode-3"
+module = { uvm = "aou_qos_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+arb_mode=3"]
+
+# Pinned: port priority among RPs needs several RPs.
+[[tests]]
+name = "aou_qos_test.arb_mode-1.4x512-sp64"
+module = { uvm = "aou_qos_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+arb_mode=1"]
+
+[[tests]]
+name = "aou_dest_rp_test"
+module = { uvm = "aou_dest_rp_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+
+# Pinned: these permute DEST_RP over four and three RPs (the entry above runs everywhere).
+[[tests]]
+name = "aou_dest_rp_test.4x512-sp64"
+module = { uvm = "aou_dest_rp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 4
+tags = ["features"]
+run_modes = ["features"]
+
+[[tests]]
+name = "aou_dest_rp_test.3x512-sp64"
+module = { uvm = "aou_dest_rp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-0"
+module = { uvm = "aou_lp_mode_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+lp_mode=0"]
+
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-1.lp_thr-0"
+module = { uvm = "aou_lp_mode_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+lp_mode=1", "+lp_thr=0"]
+
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-1"
+module = { uvm = "aou_lp_mode_test" }
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+lp_mode=1"]
+
+# AOU-R31: with threshold 0 the DUT still returns every credit once idle
+# (MAS 7.1); main #49 stranded the last MsgCredit-header credit.
+[[tests]]
+name = "aou_lp_mode_test.lp_mode-1.lp_thr-0.dp_dir-l2r.dp_wr_pct-0.dp_n-64"
+module = { uvm = "aou_lp_mode_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+lp_mode=1", "+lp_thr=0", "+dp_dir=l2r", "+dp_wr_pct=0", "+dp_n=64"]
+
+# 16.11/16.12: the early table fills to 32 writes (AWREADY held) and drains as the
+# remote B responses arrive.
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.early_full-1.1x512-sp64"
+module = { uvm = "aou_early_bresp_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+early_full=1"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.early_full-1.4x512-sp64"
+module = { uvm = "aou_early_bresp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+early_full=1"]
+
+# 15.16: a different MAX_AWBURSTLEN/MAX_ARBURSTLEN on every RP, each RP's M-port
+# bursts checked against its own limit (FEAT-R01/R02 per RP).
+[[tests]]
+name = "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-15_31_63.4x512-sp64"
+module = { uvm = "aou_split_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 4
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=per_rp", "+split_ar=per_rp", "+dp_len=15,31,63"]
+
+[[tests]]
+name = "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-15_31_63.4xmix4211-sp128"
+module = { uvm = "aou_split_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=per_rp", "+split_ar=per_rp", "+dp_len=15,31,63"]
+
+# One burst in flight per RP, so even MAX_AxBURSTLEN 0 stays within the M port's 32
+# outstanding (BUGS/048 hits the deeper entries above).
+[[tests]]
+name = "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-7_15_31.dp_batch-1"
+module = { uvm = "aou_split_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=per_rp", "+split_ar=per_rp", "+dp_len=7,15,31", "+dp_batch=1"]
+
+# 15.17: 512-bit remote bursts on a 256-bit RP double their beat count before the
+# splitter, which must still cut them to MAX_AxBURSTLEN+1 RP beats.
+[[tests]]
+name = "aou_split_test.split_aw-15.split_ar-15.dp_len-7_15_31_63"
+module = { uvm = "aou_split_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=15", "+split_ar=15", "+dp_len=7,15,31,63"]
+
+[[tests]]
+name = "aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-15_31_63"
+module = { uvm = "aou_split_test" }
+target = "1x256-sp32"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+split_aw=sweep", "+split_ar=sweep", "+dp_len=15,31,63"]
+
+# 17.13: RPn_AXI_AGGREGATOR_EN on a random subset of the RPs (at least one on and
+# one off), each RP judged by its own setting.
+[[tests]]
+name = "aou_aggregator_test.agg_en-per_rp.4x512-sp64"
+module = { uvm = "aou_aggregator_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+agg_en=per_rp"]
+
+[[tests]]
+name = "aou_aggregator_test.agg_en-per_rp.4xmix4211-sp128"
+module = { uvm = "aou_aggregator_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+agg_en=per_rp"]
+
+# 16.14: EARLY_BRESP_EN inverted on every RP between two phases, once every write
+# is done and WRITE_RESP_DONE reads 1 (MAS 3.7.8).
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.early_toggle-1.dp_buf_pct-50"
+module = { uvm = "aou_early_bresp_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+early_toggle=1", "+dp_buf_pct=50"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-0.early_toggle-1.dp_buf_pct-50"
+module = { uvm = "aou_early_bresp_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=0", "+early_toggle=1", "+dp_buf_pct=50"]
+
+[[tests]]
+name = "aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50"
+module = { uvm = "aou_early_bresp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=per_rp", "+early_toggle=1", "+dp_buf_pct=50"]
+
+# 16.15: EARLY_BRESP_EN on a random subset of the RPs, each RP judged by its own.
+[[tests]]
+name = "aou_early_bresp_test.early_en-per_rp.dp_buf_pct-50"
+module = { uvm = "aou_early_bresp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=per_rp", "+dp_buf_pct=50"]
+
+# 16.17: the manager keeps an AW waiting at the early-response limit; MAS 3.7.5 says
+# O_PENDING_CNT_OVER fires and reaches the interrupt controller (FEAT-R21; BUGS/005).
+[[tests]]
+name = "aou_early_bresp_test.early_en-1.early_full-1.early_over-1"
+module = { uvm = "aou_early_bresp_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+early_en=1", "+early_full=1", "+early_over=1"]
+
+[[groups]]
+name = "features"
+expected_count = 39
+tests = [
+  "aou_split_test.split_aw-15.split_ar-15.dp_len-0_1_3_7_15",
+  "aou_split_test.split_aw-7.split_ar-7.dp_len-15_31",
+  "aou_split_test.split_aw-15.split_ar-15.dp_len-31_63",
+  "aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-0_15_63_255",
+  "aou_split_test.split_aw-illegal.split_ar-illegal.dp_len-15_31",
+  "aou_aggregator_test.agg_en-0",
+  "aou_aggregator_test.agg_en-1",
+  "aou_aggregator_test.agg_en-1.dp_n-1",
+  "aou_aggregator_test.agg_en-1.dp_size-5.agg_need-32_128",
+  "aou_early_bresp_test.early_en-0.dp_buf_pct-50",
+  "aou_early_bresp_test.early_en-1.dp_buf_pct-50",
+  "aou_early_bresp_test.early_en-1.dp_buf_pct-50.dp_ids-same",
+  "aou_early_bresp_test.early_en-1.early_err-1",
+  "aou_qos_test.arb_mode-0",
+  "aou_qos_test.arb_mode-1",
+  "aou_qos_test.arb_mode-2.qos_bounds-1",
+  "aou_qos_test.arb_mode-3",
+  "aou_qos_test.arb_mode-1.4x512-sp64",
+  "aou_dest_rp_test",
+  "aou_dest_rp_test.4x512-sp64",
+  "aou_dest_rp_test.3x512-sp64",
+  "aou_lp_mode_test.lp_mode-0",
+  "aou_lp_mode_test.lp_mode-1.lp_thr-0",
+  "aou_lp_mode_test.lp_mode-1",
+  "aou_lp_mode_test.lp_mode-1.lp_thr-0.dp_dir-l2r.dp_wr_pct-0.dp_n-64",
+  "aou_early_bresp_test.early_en-1.early_full-1.1x512-sp64",
+  "aou_early_bresp_test.early_en-1.early_full-1.4x512-sp64",
+  "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-15_31_63.4x512-sp64",
+  "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-15_31_63.4xmix4211-sp128",
+  "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-7_15_31.dp_batch-1",
+  "aou_split_test.split_aw-15.split_ar-15.dp_len-7_15_31_63",
+  "aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-15_31_63",
+  "aou_aggregator_test.agg_en-per_rp.4x512-sp64",
+  "aou_aggregator_test.agg_en-per_rp.4xmix4211-sp128",
+  "aou_early_bresp_test.early_en-1.early_toggle-1.dp_buf_pct-50",
+  "aou_early_bresp_test.early_en-0.early_toggle-1.dp_buf_pct-50",
+  "aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50",
+  "aou_early_bresp_test.early_en-per_rp.dp_buf_pct-50",
+  "aou_early_bresp_test.early_en-1.early_full-1.early_over-1",
+]

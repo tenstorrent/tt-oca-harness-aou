@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+schema_version = 1
+
+# The AXI self-test bench: the AXI L4 agents and scoreboard in loopback in
+# tb/aou_axi_selftest_top.sv, no DUT (uvm/tests/axi_selftest). The Bender target
+# is the T1 bench's so the runner's filelist stage has a graph to walk; the top
+# does not instantiate the RTL. Standalone: make build TB=axi_selftest. See
+# aou_sim_cfg.toml for how the paths are read.
+name = "aou_axi_selftest"
+profile = "native"
+default_framework = "uvm"
+description = "AXI-over-UCIe bridge AXI L4 agent and scoreboard self-test (no DUT, SV-UVM)"
+
+# The runner requires every implemented framework declared as a [frameworks.<name>]
+# table; the build, sim and targets of this one-framework bench stay in the shared
+# tables above and below, which the runner merges under it.
+[frameworks.uvm]
+description = "AoU AXI agent self-test bench, SV-UVM (the only framework)"
+
+[testlist]
+path = "testlists/axi_selftest.toml"
+format = "toml_list"
+
+[defaults]
+# The native profile defaults run_mode to smoke; this bench has one run mode.
+run_mode = "axi_selftest"
+target = "default"
+timeout_sec = 1800
+
+[native.stages.clean]
+kind = "clean"
+paths = ["{run_dir}", "hw/ip/aou/dv/build/uvm_axi_selftest"]
+
+[build]
+top_module = "aou_axi_selftest_top"
+top_file = "hw/ip/aou/dv/tb/aou_axi_selftest_top.sv"
+filelist = "hw/ip/aou/dv/build/uvm_axi_selftest/aou_axi_selftest_uvm_compile.f"
+bender_filelist = "hw/ip/aou/dv/build/uvm_axi_selftest/aou_axi_selftest_uvm_bender.f"
+work_dir = "hw/ip/aou/dv/build/uvm_axi_selftest"
+bender_targets = ["aou", "simulation"]
+incdirs = [
+  "hw/ip/aou/dv/uvm/tests/axi_selftest",
+  "hw/ip/aou/dv/cov/sv",
+  "hw/ip/aou/dv/uvm/env/pkg",
+  "hw/ip/aou/dv/uvm/env/axi",
+  "hw/ip/aou/dv/uvm/env",
+]
+sources = [
+  "hw/ip/aou/dv/cov/sv/aou_fc_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/axi/aou_axi_bus_if.sv",
+  "hw/ip/aou/dv/uvm/env/axi/aou_axi_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/aou_env_pkg.sv",
+  "hw/ip/aou/dv/uvm/tests/axi_selftest/aou_axi_selftest_pkg.sv",
+]
+
+
+[build.vcs]
+# The simulator-shipped UVM closest to the pinned uvm-core 2020.3.1 the standalone
+# flow compiles (docs/DECISIONS.md D2). It reproduces the standalone runs seed for
+# seed, so a harness regression compares with a standalone one; the default
+# uvm-1.2 draws a different random stream from the same seed and does not.
+uvm_lib = "uvm-ieee-2020-2.0"
+
+[build.options]
+# Partition the build directory by input fingerprint (as the SEP bench does):
+# the targets share one work_dir and differ in defines, so without it a target
+# switch would overwrite the other target's simv and a multi-target regression
+# could run one target's model for another. Each unchanged target reuses its
+# build; a source or define change rebuilds only that fingerprint.
+cache_enabled = true
+
+[run_modes.axi_selftest]
+description = "AXI agent and scoreboard self-tests: loopback, negative, scoreboard reset"
+timeout_sec = 1800
+args = []
+
+[target_defaults.default]
+defines = ["AOU_AXI_DATA_BYTES=64", "AOU_FDI_DATA_W=512", "AOU_RP_COUNT=4"]
+
+# Each target builds in its own directory (build_dir/work_dir): the targets differ
+# only in defines, so a shared work directory would hold one target's simv at a
+# time. Standalone builds use the Makefile's build/<sim>-<tb>-<target> instead.
+[targets.default]
+description = "The only configuration: four RPs' worth of AXI agents, no DUT"
+build_dir = "hw/ip/aou/dv/build/uvm_axi_selftest/default"
+work_dir = "hw/ip/aou/dv/build/uvm_axi_selftest/default"
+defines = []
