@@ -31,6 +31,7 @@ import os
 import queue
 import re
 import shlex
+import shutil
 import signal
 import subprocess
 import sys
@@ -44,6 +45,8 @@ import testlist  # noqa: E402
 
 UVM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 POLL_S = 1.0
+# GNU Make 4: $MAKE when set (as under make), else gmake where installed (macOS ships 3.81).
+MAKE = os.environ.get("MAKE") or shutil.which("gmake") or "make"
 # What `bsub -K` prints as a job is submitted and dispatched (the Makefile passes it through).
 JOB_ID_RE = re.compile(r"^Job <(\d+)> is submitted")
 JOB_START_RE = re.compile(r"^<<Starting on ")
@@ -106,7 +109,7 @@ def build_vars(args):
 
 def stale_warning(args):
     """make stale-check's warning for this build, or '' (current, no build, or make failed)."""
-    cmd = ["make", "-s", "--no-print-directory", "stale-check", *build_vars(args)]
+    cmd = [MAKE, "-s", "--no-print-directory", "stale-check", *build_vars(args)]
     try:
         p = subprocess.run(cmd, cwd=UVM_ROOT, capture_output=True, text=True, check=False)
     except OSError:
@@ -116,7 +119,7 @@ def stale_warning(args):
 
 def make_cmd(args, run, priority, queue_name):
     # The build was checked for staleness once at start; don't repeat it per run.
-    cmd = ["make", "--no-print-directory", "run", *build_vars(args), f"TEST={run.test}", f"SEED={run.seed}",
+    cmd = [MAKE, "--no-print-directory", "run", *build_vars(args), f"TEST={run.test}", f"SEED={run.seed}",
            f"RID={args.rid}", "STALE_CHECK=0"]
     if args.out_dir:
         cmd.append(f"OUT_DIR={args.out_dir}")
@@ -269,7 +272,7 @@ def remove_ctl(path):
 
 def job_hooks(args):
     """The site's commands for changing a submitted job (none unless it defines them)."""
-    cmd = ["make", "-s", "--no-print-directory", "job-hooks", f"TB={args.tb}", f"SIM={args.sim}",
+    cmd = [MAKE, "-s", "--no-print-directory", "job-hooks", f"TB={args.tb}", f"SIM={args.sim}",
            f"CONFIG={args.config}"]
     try:
         p = subprocess.run(cmd, cwd=UVM_ROOT, capture_output=True, text=True, check=False)

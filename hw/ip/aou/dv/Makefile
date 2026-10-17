@@ -134,6 +134,8 @@ BUILD_MEM ?= $(if $(filter vcs,$(SIM)),2,4)
 RUN_MEM ?= 1
 RUN_CPUS ?= 1
 METRICS := $(UVM_ROOT)/build/metrics.jsonl
+# Local jobs: GNU time -v where /usr/bin/time has it, BSD time -l otherwise (macOS).
+LOCAL_TIME_OPT := $(if $(shell /usr/bin/time -v true 2>/dev/null && echo gnu),-v,-l)
 # LSF_SITE_OPTS: host selection etc.; LSF_VCS_BUILD_OPTS: licence reservation for VCS compiles;
 # LSF_VERILATOR_BUILD_OPTS: extra options for Verilator compiles (e.g. to avoid hosts that
 # cannot build them).
@@ -247,6 +249,17 @@ endif
 ifeq ($(SIM),verilator)
 VERILATOR ?= verilator
 OBJCACHE ?= $(shell command -v ccache >/dev/null 2>&1 && echo ccache)
+# VL_HOST_CFLAGS and VL_HOST_LDFLAGS pass extra compiler and linker flags for the
+# host's toolchain; set them to use your own paths. On macOS they default to
+# pkg-config's paths for the lz4 that FST tracing needs, which is not on Apple
+# clang's default search path. The SDK's malloc/ directory is always added
+# there, since uvm-core includes <malloc.h>.
+ifeq ($(shell uname -s),Darwin)
+MACOS_SDK := $(shell xcrun --show-sdk-path 2>/dev/null)
+VL_SDK_CFLAGS := $(if $(MACOS_SDK),-isystem $(MACOS_SDK)/usr/include/malloc)
+VL_HOST_CFLAGS ?= $(shell pkg-config --cflags liblz4 2>/dev/null)
+VL_HOST_LDFLAGS ?= $(shell pkg-config --libs-only-L liblz4 2>/dev/null)
+endif
 SIMV := $(BUILD_DIR)/V$(TOP)
 COV_BUILD := --coverage-line --coverage-toggle --coverage-expr $(BUILD_DIR)/cov_scope.vlt
 COV_RUN = +verilator+coverage+file+$(RUN_DIR)/coverage.dat
@@ -257,7 +270,8 @@ OBJCACHE="$(OBJCACHE)" $(VERILATOR) --binary --timing --vpi -Wno-fatal --top-mod
   --Mdir $(BUILD_DIR) -j $(JOBS) --output-groups 16 -fno-dfg-peephole \
   $(if $(filter 1,$(WAVES_BUILD)),--trace-fst --trace-structs) \
   $(addprefix +define+,$(DEFINES)) $(if $(filter 1,$(COV)),$(COV_BUILD)) \
-  -CFLAGS "-DVM_TIMING=1 -I$(UVM_DPI_DIR)" \
+  -CFLAGS "-DVM_TIMING=1 -I$(UVM_DPI_DIR) $(VL_SDK_CFLAGS) $(VL_HOST_CFLAGS)" \
+  $(if $(VL_HOST_LDFLAGS),-LDFLAGS "$(VL_HOST_LDFLAGS)") \
   $(FLISTS) $(UVM_ROOT)/uvm_dpi_verilator.cc
 endef
 RUN_CMD = $(SIMV) +UVM_TESTNAME=$(TEST) +verilator+seed+$(SEED) $(if $(filter 1,$(COV)),$(COV_RUN)) $(FC_RUN) $(PLUSARGS)
@@ -364,7 +378,7 @@ if [ "$(LSF)" = 1 ]; then \
   rm -f $(5); $(LSF_BSUB) -J aou_$(1)_$(2) $(3) -o $(5) /usr/bin/time -v bash $(4); rc=$$?; \
   python3 $(UVM_ROOT)/scripts/job_metrics.py --kind $(1) --sim $(SIM) --name $(2) --rc $$rc --lsf-out $(5) >> $(METRICS); \
 else \
-  start=$$(date +%s); /usr/bin/time -o $(5) -v bash $(4); rc=$$?; \
+  start=$$(date +%s); /usr/bin/time -o $(5) $(LOCAL_TIME_OPT) bash $(4); rc=$$?; \
   python3 $(UVM_ROOT)/scripts/job_metrics.py --kind $(1) --sim $(SIM) --name $(2) --rc $$rc --wall-s $$(( $$(date +%s) - start )) --lsf-out $(5) >> $(METRICS); \
 fi; exit $$rc
 endef

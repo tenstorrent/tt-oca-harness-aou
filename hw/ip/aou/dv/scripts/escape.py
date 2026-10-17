@@ -27,12 +27,13 @@ UVM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(UVM_ROOT, "scripts"))
 import sim_cfg  # noqa: E402
 import testlist  # noqa: E402
+import run_list  # noqa: E402
 
 ERR = re.compile(r"^UVM_(ERROR|FATAL) .*@")
 
 
 def make(args, *extra):
-    cmd = ["make", "--no-print-directory", f"SIM={args.sim}", *extra]
+    cmd = [run_list.MAKE, "--no-print-directory", f"SIM={args.sim}", *extra]
     if args.lsf_extra_opts:
         cmd.append(f"LSF_EXTRA_OPTS={args.lsf_extra_opts}")
     # Started from `make escape`: the parent's command-line variables (MAKEFLAGS)
