@@ -1,4 +1,19 @@
-# AOU-RTL: AXI-over-UCIe Bridge IP
+<!-- markdownlint-disable MD033 -- HTML is required for the centered logo and badges -->
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="DOC/assets/oca_white.svg">
+    <img alt="Open Chiplet Atlas" src="DOC/assets/oca_black.svg" width="360">
+  </picture>
+</p>
+
+<h1 align="center">AOU-RTL: AXI-over-UCIe Bridge IP</h1>
+
+<p align="center">
+  <a href="https://github.com/tenstorrent/tt-oca-harness-aou/actions/workflows/uvm-smoke.yml"><img alt="UVM Smoke CI" src="https://img.shields.io/github/actions/workflow/status/tenstorrent/tt-oca-harness-aou/uvm-smoke.yml?branch=main&label=uvm%20smoke"></a>
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-blue.svg"></a>
+  <a href="DOC/MAS/index.adoc"><img alt="Documentation" src="https://img.shields.io/badge/docs-micro--architecture%20spec-brightgreen.svg"></a>
+</p>
+<!-- markdownlint-enable MD033 -->
 
 Open-source RTL implementation of the AXI-over-UCIe (AoU) protocol [[1]](#references), bridging AXI4 traffic [[3]](#references) over the Universal Chiplet Interconnect Express (UCIe) 3.0 Flit-Die Interface (FDI) [[2]](#references). This bridge enables native AXI transactions to traverse UCIe die-to-die interconnects, facilitating high-performance communication between heterogeneous chiplets in multi-die systems—such as CPUs, GPUs, AI accelerators, and custom IP blocks—without requiring protocol conversion through PCIe or CXL.
 
