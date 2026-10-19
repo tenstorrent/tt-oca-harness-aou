@@ -46,6 +46,9 @@ FAKE_MAKE = textwrap.dedent("""\
     if "stale-check" in sys.argv:
         print(os.environ.get("FAKE_STALE", ""), file=sys.stderr)
         sys.exit(0)
+    if "build-name" in sys.argv:
+        print("fake-build")
+        sys.exit(0)
     v = dict(a.split("=", 1) for a in sys.argv[1:] if "=" in a)
     if os.environ.get("FAKE_ARGS"):
         with open(os.environ["FAKE_ARGS"], "a") as fh:

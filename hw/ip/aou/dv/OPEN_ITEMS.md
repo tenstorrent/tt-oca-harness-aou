@@ -92,6 +92,14 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   FSM reset filter), the functional coverage report (`make fc_report`) and
   X-propagation builds (`XPROP`) exist standalone through the Makefile only.
   The harness's `--cov` and `coverage_policy.toml` are not wired.
+- **Arm Axi4PC.** The optional Axi4PC binding (`AXI4PC`, `.deps/BP063/`) is
+  compiled in by the Makefile only: the sim configs carry the bench's own
+  Axi4PC files (always compiled, inert without it) but not `tb/aou_axi4pc_arm.sv`
+  (which includes Arm's `Axi4PC.sv`) or the `AOU_AXI4PC` defines, because Arm's licence
+  keeps the file out of every tree and a source the runner cannot find would
+  break its build. Closing it takes a harness way to add a user-supplied
+  source and define to a target (an optional overlay or a target that names
+  `AXI4PC_DIR`), and a harness sweep with it on.
 - **Escape suite, `RTL_PATCH`, `FDI_ENC`.** `make escape` and the patched-RTL
   builds are standalone only. A harness equivalent needs targets that compile
   a patched copy of `RTL/` (`exclude_files` plus `sources`) and a replacement

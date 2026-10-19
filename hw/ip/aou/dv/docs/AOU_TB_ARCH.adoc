@@ -55,9 +55,13 @@ and `aou_base_test_seq` extends `ocah_sequence`. Nothing else of the library's
 VIP set (`ocah_env`, `ocah_scoreboard`, `ocah_checker`, `ocah_axi_vip`) is
 adopted; `OPEN_ITEMS.md` lists that migration.
 
-Arm's AXI4 protocol checker (BP063) can be bound to the DUT's AXI ports when
-the user supplies it (`AXI4PC_DIR`); nothing requires it. README "Optional:
-Arm AXI4 protocol assertions".
+Arm's AXI4 protocol checker (BP063) is bound to every T1 DUT AXI port, at
+that RP's width, when the user supplies it (`make setup AXI4PC_TGZ=<tarball>`
+unpacks it into `.deps/BP063/`, or `AXI4PC_DIR`); nothing requires it, and only
+the standalone Makefile compiles it in (OPEN_ITEMS.md). Its failures are
+`UVM_ERROR`s, its resets follow each port's reset and link events, and the
+rules a test breaks on purpose are expected. README "Optional: Arm AXI4
+protocol assertions".
 
 === DUT-Local Model Ownership
 
@@ -75,6 +79,7 @@ Every model is DUT-local to this bench and lives under `uvm/env/`:
 | `aou_env_pkg` (`uvm/env/`) | scoreboard | `aou_scoreboard`, `aou_env_cfg`, `aou_env`
 | `aou_t1_env_pkg` (`uvm/env/`) | T1 | `aou_t1_env`, its configs, the T1 checkers (`aou_t1_*_chk`, `chk/`), the performance monitor (`perf/`), `aou_base_test_seq`
 | `aou_rule_pkg` (`uvm/env/checkers/`) | all | Rule IDs, the per-run rule ledger (`rules.csv` is the inventory)
+| `aou_axi4pc_pkg` (`uvm/env/axi4pc/`) | AXI4 | Arm Axi4PC failures as UVM reports, the rules a test breaks on purpose, the stop after `+aou_axi4pc_max` (compiled always; Axi4PC itself only with BP063)
 | `aou_fc_pkg`, `aou_axi4_fc_pkg` (`cov/sv/`) | all | The functional-coverage service and the bound AXI4 coverage monitors
 |===
 
@@ -149,7 +154,7 @@ packages, and calls `run_test()`. `tb/aou_waves.sv` is bound for `WAVES=1`.
 | `aou_t1_l4a_adapter` | Implements L3's `aou_l4a_if_c` responder over `aou_remote_axi_model.execute()`
 | `aou_t1_remote_mgr` | Remote managers: AXI transactions that originate on the remote die and travel through L3 to the DUT's M ports
 | `aou_fdi_chk_adapter` | Turns `AOU_FDI_CHECKER`'s status ports into `AOU-R*` rule reports
-| T1 checkers | `aou_t1_act_chk` (T1-L30), `aou_t1_attr_chk` (attributes, exclusives, FLEX across the link), `aou_t1_crd_flow_chk` (T1-C01/C02), `aou_t1_crd_rr_chk` (T1-C03), `aou_t1_dbg_fifo_chk` (debug FIFO prediction), `aou_t1_early_tbl_chk` (FEAT-R15/R16), `aou_t1_mo_chk`, `aou_t1_orphan_chk`, `aou_t1_rx_fifo_chk`, `aou_t1_sw_reset_chk`; test-owned checkers in `uvm/env/chk/` (`aou_split_chk`, `aou_early_bresp_chk`, `aou_qos_order_chk`, `aou_mrp_chk`, `aou_flit_counter`)
+| T1 checkers | `aou_t1_act_chk` (T1-L30), `aou_t1_attr_chk` (attributes, exclusives, FLEX across the link), `aou_t1_crd_flow_chk` (T1-C01/C02), `aou_t1_crd_rr_chk` (T1-C03), `aou_t1_dbg_fifo_chk` (debug FIFO prediction), `aou_t1_early_tbl_chk` (FEAT-R15/R16), `aou_t1_mo_chk`, `aou_t1_orphan_chk`, `aou_t1_rx_fifo_chk`, `aou_t1_sw_reset_chk`, `aou_t1_axi4pc_ctl` (holds and releases the Axi4PC checkers on link events, expects the rules an injected orphan response trips); test-owned checkers in `uvm/env/chk/` (`aou_split_chk`, `aou_early_bresp_chk`, `aou_qos_order_chk`, `aou_mrp_chk`, `aou_flit_counter`)
 | `perf/` | `aou_perf_mon`, `aou_perf_chk`, `aou_perf_targets.svh`: throughput and latency windows for `aou_perf_test`, judged against targets from the d2d model (`scripts/perf_model.py`)
 | `aou_t1_xfer_cov` and the layer coverage classes | The covergroups and their copies in the coverage service (`AOU_FCOV.adoc`)
 |===

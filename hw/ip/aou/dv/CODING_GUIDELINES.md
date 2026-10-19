@@ -13,6 +13,10 @@ checks the rest.
 ## Structure
 
 - One class per file, named after the class (`aou_flit.svh` holds `aou_flit`).
+- Headers (`.svh`, `.vh`) are `` `include``d by the files that need them, never
+  listed in a filelist, a sim config or a compile command. No file may depend on
+  the order of the files around it for its macros: a macro it needs comes from an
+  `` `include`` or a `+define` on the compile.
 - One package per layer: `aou_fdi_pkg` (L1), `aou_lsm_pkg` (L2), `aou_l3_pkg`,
   `aou_axi_pkg` (L4a/L4b), `aou_env_pkg`, `aou_test_pkg`. A layer imports only
   layers below it.
@@ -81,7 +85,7 @@ checks the rest.
 
 - New files carry the SPDX header above.
 - Nothing from Avery, Synopsys SVT or Arm is committed. Arm's `Axi4PC` is
-  optional and lives in the git-ignored `tools/BP063/` (see README).
+  optional and lives in the git-ignored `.deps/BP063/` (see README).
 
 ## Commits
 

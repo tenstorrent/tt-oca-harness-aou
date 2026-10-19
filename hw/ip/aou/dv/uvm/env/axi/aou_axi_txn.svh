@@ -42,6 +42,15 @@ class aou_axi_txn extends uvm_sequence_item;
         ((({52'd0, addr[11:0]} >> size) + {56'd0, len}) < (64'd4096 >> size));
   }
 
+  // AXI4 A4.4, table A4-5: an allocate bit (AxCACHE[3:2]) needs Modifiable (AxCACHE[1]);
+  // the six encodings that break this are reserved.
+  constraint c_axi4_cache {
+    (cache[3:2] != 2'b00) -> cache[1];
+  }
+  // The ten AxCACHE encodings c_axi4_cache allows, for sequences that set cache directly.
+  static const bit [3:0] LEGAL_CACHE[10] = '{4'h0, 4'h1, 4'h2, 4'h3, 4'h6, 4'h7, 4'hA, 4'hB,
+                                            4'hE, 4'hF};
+
   // AXI4 A7.2.4: exclusive accesses are a power of two bytes up to 128, aligned
   // to their total size, and at most 16 beats.
   constraint c_exclusive {

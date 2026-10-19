@@ -9,7 +9,8 @@ schema_version = 1
 # UVM_ERROR/UVM_FATAL lines) while the same run passes on the clean build. Keys: test
 # (UVM class, or "none" for a compile-time catch), escape, signature, tb (t1 or reg;
 # default t1), target, args, seed, reseed, build (the simulator whose compile catches
-# it), note. [[escapes]] is this bench's own schema, not the harness's [[tests]].
+# it), axi4pc (true: caught by Arm's Axi4PC, NOT-RUN when the build has none), note.
+# [[escapes]] is this bench's own schema, not the harness's [[tests]].
 # GitHub #14, #15, #16, #35 are open; #27 (FDI_IF_WD*) went away with the
 # FDI_CONFIG refactor, #30 (scoped imports, #31) and #56 (testbench stimulus)
 # changed no behaviour: none of them has a fix to re-introduce.
@@ -104,3 +105,12 @@ escape = "mut_fdi_r16"
 target = "1x512-sp64"
 seed = 1
 signature = "FDI-R16: "
+
+[[escapes]]
+test = "aou_sanity_test"
+escape = "mut_axi4pc_awburst"
+target = "1x512-sp64"
+seed = 1
+signature = "\\[AXI4PC\\] \\S+\\.u_m_axi4pc\\.\\S+: AXI4_ERRM_AWBURST:"
+axi4pc = true
+note = "Arm Axi4PC fires on the M port; skipped (NOT-RUN) without BP063 in .deps/"

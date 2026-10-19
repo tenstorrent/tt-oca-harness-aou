@@ -8,7 +8,8 @@
 //
 // A request seen at the far side (the remote model for local requests, the M
 // port for remote ones) is matched to the requester's transaction by RP,
-// direction, ID and address: its start lies inside that transaction's bytes.
+// direction, ID and address: its start lies inside that transaction's bytes,
+// and same-ID pieces are taken in far-side order until they cover it.
 // Whichever side completes first waits for the other: normally the far side,
 // but a write answered early completes at the S port first. A requester
 // transaction that never matches (reset, a response the DUT made up) or a far
@@ -81,15 +82,28 @@ class aou_t1_attr_chk extends uvm_component;
     far_q[p][k].push_back(f);
   endfunction
 
+  // Bytes from the start address to the end of the last beat; split or resized
+  // pieces of one transaction add up to it.
+  static function longint unsigned span(aou_axi_txn t);
+    return longint'(t.beats()) * t.beat_bytes() -
+           longint'(t.addr & (64'(t.beat_bytes()) - 64'd1));
+  endfunction
+
+  // A later same-ID request can start inside an earlier one's bytes and reach
+  // the far side before the earlier response gets back, so pieces (queued in
+  // far-side order) are taken oldest first only until they cover n.
   function void take_near(int p, aou_axi_txn n);
     string k = key(n);
     aou_axi_txn got[$];
     aou_axi_txn rest[$];
+    longint unsigned have = 0;
     if (n.aborted || n.reset_outstanding) return;
     if (far_q[p].exists(k)) begin
       foreach (far_q[p][k][i]) begin
-        if (inside_of(n, far_q[p][k][i].addr)) got.push_back(far_q[p][k][i]);
-        else rest.push_back(far_q[p][k][i]);
+        if (have < span(n) && inside_of(n, far_q[p][k][i].addr)) begin
+          got.push_back(far_q[p][k][i]);
+          have += span(far_q[p][k][i]);
+        end else rest.push_back(far_q[p][k][i]);
       end
       far_q[p][k] = rest;
     end

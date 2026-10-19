@@ -367,9 +367,34 @@ list findings in files inherited from PR 80 and the vendored FDI checker.
 Arm's AXI4 protocol checker (`Axi4PC`, BP063) is free from Arm but can't be
 redistributed, so it isn't part of this repository and nothing requires it.
 To enable it, download BP063 from
-https://developer.arm.com/downloads/view/BP063 and unpack it into
-`tools/BP063/` at the repository root (git-ignored), or point `AXI4PC_DIR` at
-its `sva` directory.
+https://developer.arm.com/downloads/view/BP063 and unpack it into the
+git-ignored `.deps/BP063/` with `make setup AXI4PC_TGZ=<path to the tarball>`
+(`scripts/get_axi4pc.sh`), or point `AXI4PC_DIR` at its `sva` directory.
+
+When it is there, T1 builds compile `Axi4PC.sv` unmodified and bind one instance
+to each RP's DUT S and M ports (`tb/tb_top.sv`), in a separate `-axi4pc` build
+directory; `AXI4PC=0` leaves it out. The recommended MAX_WAIT rules are off,
+because the bench stalls READY on purpose. `AXI4PC_MAXBURSTS` (default 512) sizes
+its outstanding-burst tracking. Each RP is checked at its own data width.
+`tb/aou_axi4pc_msg.svh` turns Axi4PC failures into `UVM_ERROR`s (reporter
+`AXI4PC`), so a failing assertion fails the run on every simulator. A failing rule
+fires on every cycle, so after `+aou_axi4pc_max=<N>` of them (default 10, 1 stops
+at the first, 0 never stops) the run ends with `UVM_FATAL [AXI4PC] N Axi4PC
+violations, stopping`, `+aou_axi4pc_stop_cycles=<n>` clocks later (default 10;
+errors in those cycles are still reported), so the waves of a `WAVES=1` rerun show
+what followed. `check_run.py` judges the run by the errors before the fatal.
+
+Each checker's reset (`tb/aou_axi4pc_gate.sv`) is its port's reset: the DUT core
+reset (`I_RESETN` and `AOU_SW_RESET`), or `I_RESETN` alone with the BUGS/021 guard.
+After an `AOU_SW_RESET`, which the bench's agents don't see and which leaves the
+DUT's RX FIFOs alone, the checker leaves reset only once the port has no VALID up
+and nothing in flight. When the FDI
+link is lost while AoU isn't DISABLED, the transactions in flight can't complete, so
+`uvm/env/aou_t1_axi4pc_ctl.svh` holds every checker in reset from that event until its
+port's next reset (then as above), or to the end of the test; each hold and release
+is logged. The same component expects the rules a deliberately unmatched response
+from the local subordinate trips (`inject_orphan`, the ID-mismatch tests) on that
+port while it is presented (`uvm/env/axi4pc/aou_axi4pc_pkg.sv`).
 
 ## Coverage
 
@@ -683,6 +708,7 @@ into the git-ignored `.deps/`.
 | [PeakRDL](https://github.com/SystemRDL/PeakRDL), peakrdl-cli, [peakrdl-uvm](https://github.com/SystemRDL/PeakRDL-uvm) | Register model generated from `csr/aou-core.rdl` | LGPL-3.0 |
 | [systemrdl-compiler](https://github.com/SystemRDL/systemrdl-compiler) (PeakRDL dependency) | RDL front end | MIT |
 | [pywellen](https://pypi.org/project/pywellen/) 0.25.6 | FST/VCD reader for `scripts/waveq.py` and `scripts/axi_outstanding.py` | BSD-3-Clause |
+| Arm Axi4PC ([BP063](https://developer.arm.com/downloads/view/BP063)), optional; unpacked only from a tarball the user downloads (`AXI4PC_TGZ`) | AXI4 protocol assertions on the T1 DUT's AXI ports | Arm's, no redistribution |
 
 The APB interface assertions (`uvm/env/apb/aou_apb_if.sv`, rules `APB-R01`..`APB-R14`)
 are adapted from the interface checks of

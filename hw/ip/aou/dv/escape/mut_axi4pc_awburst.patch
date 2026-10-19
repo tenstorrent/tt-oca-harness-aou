@@ -1,0 +1,25 @@
+SPDX-License-Identifier: Apache-2.0
+Mutation mut_axi4pc_awburst (not a main fix): every RP's M port drives the reserved
+AWBURST 2'b11, so Arm's Axi4PC (AXI4_ERRM_AWBURST) must fire. Needs BP063 in .deps/.
+Applied to a build-time copy of RTL/ by make build ESCAPE=mut_axi4pc_awburst.
+
+--- a/RTL/AOU_CORE_RP.sv
++++ b/RTL/AOU_CORE_RP.sv
+@@ -376,6 +376,8 @@
+     logic [AXI_ADDR_WD-1:0]     w_err_info_awaddr;
+     logic [2:0]                 w_err_info_awsize;
+     logic [1:0]                 w_err_info_awburst;
++    logic [1:0]                 w_mut_awburst;
++    assign O_AOU_RX_AXI_M_AWBURST = 2'b11;
+     logic [3:0]                 w_err_info_awcache;
+     logic [2:0]                 w_err_info_awprot;
+     logic [AXI_LEN_WD-1:0]      w_err_info_awlen;
+@@ -564,7 +566,7 @@
+         .O_M_AWADDR                 ( {w_err_info_awaddr , O_AOU_RX_AXI_M_AWADDR}   ),
+         .O_M_AWLEN                  ( {w_err_info_awlen , O_AOU_RX_AXI_M_AWLEN}     ),
+         .O_M_AWSIZE                 ( {w_err_info_awsize , O_AOU_RX_AXI_M_AWSIZE}   ),
+-        .O_M_AWBURST                ( {w_err_info_awburst , O_AOU_RX_AXI_M_AWBURST} ),
++        .O_M_AWBURST                ( {w_err_info_awburst , w_mut_awburst} ),
+         .O_M_AWLOCK                 ( {w_err_info_awlock , O_AOU_RX_AXI_M_AWLOCK}   ),
+         .O_M_AWCACHE                ( {w_err_info_awcache , O_AOU_RX_AXI_M_AWCACHE} ),
+         .O_M_AWPROT                 ( {w_err_info_awprot , O_AOU_RX_AXI_M_AWPROT}   ),

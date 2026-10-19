@@ -39,7 +39,8 @@ TEST_DIRS = {
     "axi_selftest": ["uvm/tests/axi_selftest"],
 }
 CLASS_RE = re.compile(r"^\s*class\s+(\w+)\s+extends", re.M)
-ESCAPE_KEYS = {"test", "escape", "tb", "target", "args", "seed", "reseed", "build", "signature", "note"}
+ESCAPE_KEYS = {"test", "escape", "tb", "target", "args", "seed", "reseed", "build", "signature",
+               "axi4pc", "note"}
 
 
 def test_dirs(tb):

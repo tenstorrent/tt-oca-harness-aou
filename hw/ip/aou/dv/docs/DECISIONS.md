@@ -812,8 +812,9 @@ stale `simv`; nothing warns about it yet (Open items).
   opt out explicitly with the marker `public-ok`, for a pattern documented on
   purpose.
 - Licensed or member-only material is never committed: no Avery or Synopsys
-  SVT code, no Arm `Axi4PC` (BP063; each user downloads it into the git-ignored
-  `tools/BP063/`), no UCIe specification text. Specs are cited by section number.
+  SVT code, no Arm `Axi4PC` (BP063; each user downloads it and `make setup`
+  unpacks it into the bench's git-ignored `.deps/BP063/`), no UCIe
+  specification text. Specs are cited by section number.
 - New files carry the SPDX header.
 
 **Why.** The bench and its history go back to the public repository. History
@@ -825,7 +826,7 @@ references). *Site options and patterns in tracked files* (the pattern list woul
 itself leak the names).
 
 **Where.** `scripts/check_public.py`, `make check-public` (`PUBLIC_BASE`),
-`.gitignore` (`site/`, `tools/`), README "Public repository" and "Optional: Arm
+`.gitignore` (`site/`, `.deps/`), README "Public repository" and "Optional: Arm
 AXI4 protocol assertions", CODING_GUIDELINES.md "Licensing".
 
 **Consequences.** Run `make check-public` before anything leaves the site.

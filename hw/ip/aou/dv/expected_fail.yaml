@@ -223,8 +223,10 @@
 # BUGS/039: a CrdtGrant that starts in the last granule of a 64-byte RX chunk is decoded
 # before its second granule arrives when pl_valid has a bubble there, so the DUT takes
 # garbage for the second-granule credit fields. Too much credit shows as the DUT sending
-# beyond what the remote die granted; lost credit shows as a stall (no bug-specific
-# signature, so such a run stays FAIL).
+# beyond what the remote die granted; lost credit shows as a stall. A stall has no
+# bug-specific signature, so the T1-C02 cases below, each limited (when_re) to the CONFIG
+# and credit class whose lost grant was traced in waves to this decode, still need a
+# bug-specific BUGS/039 match in the same run (requires:); otherwise they stay FAIL.
 - test: aou_credit_return_test
   bug: BUGS/039
   check: 'AOU-R16: AOU_FDI_CHECKER VIOL_CRD_UNDERFLOW LP(DUT->peer)'
@@ -237,6 +239,96 @@
   requires: BUGS/039
   seed_dependent: true
   note: the L3 model's view of the same send
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check_re: 'T1-C02: RP\d+ has credit \(\d+ granules\) and a queued WRESP,'
+  when_re: 'rp_bytes=\x27\{\x27h40, \x27h80\}  remote_bytes=64 [\s\S]*credit epoch: method=AOU_CRM_(?!HDR)'
+  requires: BUGS/039
+  seed_dependent: true
+  note: >-
+    2xmix-tp64_128 (PHY0 64-byte chunks): the RP0 WRESP grant (epoch depth 1, returned on
+    consume) is lost, so the DUT holds a WriteResp with no credit for good (seed 3, waves
+    aou_credit_return_test.rid.wvc.seed.3: last RP0 WRESP at 5864.5 ns, then at 5876.5 ns
+    O_CRDTGRANT_VALID with w_rx_chunk_data_valid 0, misc idx 11, others 0; the DUT's
+    generate_rp_b_credit[0] count stays 0 while the remote die has 1 granule out)
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check_re: 'T1-C02: RP\d+ has credit \(\d+ granules\) and a queued WREQ,'
+  when_re: 'rp_bytes=\x27\{\x27h40, \x27h20, \x27h80, \x27h80\}  remote_bytes=64 [\s\S]*credit epoch: method=AOU_CRM_(?!HDR)'
+  requires: BUGS/039
+  seed_dependent: true
+  note: >-
+    4xmix2144-sp64: RP3 WDATA credit is lost (the second granule's fields start at WDATA RP3),
+    and the shared AW/W path waits on RP3's WriteData (BUGS/045), so every RP's writes stop
+    (+method=grant seed 2, waves aou_credit_return_test.rid.wvd.seed.2: decodes without a
+    valid chunk at 5955.5-6534.5 ns; from 7391.5 ns RP3 holds 6 WDATA granules in the DUT,
+    w_aou_tx_w_credit_valid 0x7, aligner r_aw_arb_grt 3 with r_s_wbusy_tt 1, while the remote
+    die has the full 30 out and T1-C01 sees no RP starved)
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the stalled class never drains
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-V06: not drained'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the stalled class never drains
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-T01: not drained'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the stalled class never drains
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-V04: remote (L3) not DISABLED'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the deactivation waits for the stalled messages (AoU 8.4)
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-V05: DUT not DISABLED'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the deactivation waits for the stalled messages (AoU 8.4)
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-L06: no INT_DEACTIVATE_START after a remote DeactivateReq'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the DUT still owes the stalled messages when the remote die asks to deactivate
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-V02: remote (L3) not ENABLED'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the next epoch cannot activate from the unfinished deactivation
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'T1-V03: DUT not ENABLED'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the next epoch cannot activate from the unfinished deactivation
+
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check: 'AXI-R17: at end of test'
+  requires: BUGS/039
+  seed_dependent: true
+  note: the stalled writes are still open at the end
 
 - test: aou_link_act_deact_test
   bug: BUGS/009
@@ -1932,6 +2024,12 @@
   seed_dependent: true
   note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
 
+- test: aou_t1_link_event_test
+  bug: BUGS/048
+  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
+  seed_dependent: true
+  note: a narrow RP (2xmix-sp64-rxf RP1, seed 2) splits the remote reads past M_RD_MO_CNT
+
 # Exclusive writes with early responses (aou_attr_test +attr_early=1 only).
 - test: aou_attr_test
   bug: BUGS/055
@@ -2285,3 +2383,82 @@
   requires: BUGS/021
   seed_dependent: true
   note: provisional; follow-on of the post-link-event corruption until 20261014-p2a-02 is triaged
+
+# BUGS/009 in aou_linkreset_timeout_test (+mask=1 seed 2 on 4xmix2144-sp64): the DUT
+# advertises credit after its DeactivateAck with CREDIT_MANAGE=1.
+- test: aou_linkreset_timeout_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: credits after DeactivateAck; which seeds reach it depends on the traffic at deactivation
+
+# Arm Axi4PC (AXI4PC=1 builds; README "Optional: Arm AXI4 protocol assertions") on the
+# same DUT violations the bench's own AXI rules report. Each is a follow-on of the
+# bug-specific entry that names the violation, so it never explains a run alone.
+
+# BUGS/029 item 4: with the subordinate checker off, the remote die's stray WriteResp
+# comes out on the S port as a B for no write (the bench's AXI-R07).
+- test: aou_id_mismatch_test
+  bug: BUGS/029
+  check_re: '\[AXI4PC\] \S+\.u_s_axi4pc\.\S+: AXI4_ERRS_BRESP_(AW|WLAST):'
+  requires: BUGS/029
+  seed_dependent: true
+  note: unrequested B on the S port (+side=sub +slv_en=0)
+
+# BUGS/031: RP0's responses come out on RP1's S port (the bench's AXI-R07/AXI-R08). With
+# no request behind them Axi4PC also finds no data lanes (RDATA_X), its read CAM
+# under/overflows, and the transactions it counted stay open at the end.
+- test: aou_dest_rp_asym_test
+  bug: BUGS/031
+  check_re: '\[AXI4PC\] \S+\.u_s_axi4pc\.\S+: AXI4_(ERRS_BRESP_(AW|WLAST)|ERRS_RID|ERRS_RDATA_X|AUX_RCAM_(UNDERFLOW|OVERFLOW)|ERRS_(BRESP|RLAST)_ALL_DONE_EOS):'
+  requires: BUGS/031
+  seed_dependent: true
+  note: another RP's B or R on this S port
+
+# BUGS/025: the extra 32-byte beat crosses 4KB (the bench's AXI-R10).
+- test: aou_pack_test
+  bug: BUGS/025
+  check_re: '\[AXI4PC\] \S+\.u_m_axi4pc\.\S+: AXI4_ERRM_AWADDR_BOUNDARY:'
+  requires: BUGS/025
+  seed_dependent: true
+  note: M-port INCR write across 4KB from the downsizer
+
+# BUGS/021, BUGS/024: after a link-event recovery the checker is back on once the port is
+# idle, and the cut bursts or the orphan-R deadlock leave later transactions open at the
+# end (the bench's AXI-R17 follow-on).
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
+  requires: BUGS/021
+  seed_dependent: true
+  note: transactions open at the end of the test, as AXI-R17
+
+- test: aou_link_event_test
+  bug: BUGS/024
+  check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
+  requires: BUGS/024
+  seed_dependent: true
+  note: transactions open at the end of the test, as AXI-R17
+
+- test: aou_reset_test
+  bug: BUGS/021
+  check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
+  requires: BUGS/021
+  seed_dependent: true
+  note: transactions open at the end of the test, as AXI-R17
+
+- test: aou_reset_test
+  bug: BUGS/024
+  check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
+  requires: BUGS/024
+  seed_dependent: true
+  note: transactions open at the end of the test, as AXI-R17
+
+# BUGS/039: a write stalled for good by lost credit is still open at the end (AXI-R17).
+- test: aou_credit_return_test
+  bug: BUGS/039
+  check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
+  requires: BUGS/039
+  seed_dependent: true
+  note: transactions open at the end of the test, as AXI-R17

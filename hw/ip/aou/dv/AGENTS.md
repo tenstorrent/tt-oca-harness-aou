@@ -22,6 +22,15 @@ so nothing may be added that works only through it.
 
 - Work from `hw/ip/aou/dv`. `make setup` once (uvm-core, the OCAH library, z3, PeakRDL,
   pywellen into `.deps/`).
+- **Arm Axi4PC is optional but worth having.** If `.deps/BP063/` is empty or
+  missing, ask the user once whether they want Arm's AXI4 protocol checker.
+  It's free from https://developer.arm.com/downloads/view/BP063, but the
+  download needs an Arm account and acceptance of Arm's licence, so the user
+  downloads it, or points you at a BP063 tarball they already have.
+  `make setup AXI4PC_TGZ=<tarball>` unpacks it into the git-ignored
+  `.deps/BP063/`; never commit or redistribute it. T1 builds then bind it to
+  every DUT AXI port (README "Optional: Arm AXI4 protocol assertions"). Without
+  it the bench runs, but only its own subset of AXI4 rules.
 - **Site specifics** (simulator modules to load, LSF options, where bug drafts
   go, internal tools) are in `site/SITE.md` and `site/site.mk` when present.
   `site/` is git-ignored and never committed; read `site/SITE.md` first if it
@@ -193,7 +202,7 @@ so nothing may be added that works only through it.
   it, note the choice in the draft, and tie any resulting failure to it in
   `expected_fail.yaml`.
 - Nothing from Avery, Synopsys SVT or Arm is committed (Arm's `Axi4PC` lives in
-  the git-ignored `tools/BP063/`).
+  the git-ignored `.deps/BP063/`).
 - Commits: short subject, `verif:` prefix, one concern per commit, tests with the
   code they exercise. Never push; the integrator merges, and runs
   `make check-public` before anything goes to the public repository.
