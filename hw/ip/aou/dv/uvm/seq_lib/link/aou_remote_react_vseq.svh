@@ -68,7 +68,7 @@ class aou_remote_react_vseq extends aou_link_base_vseq;
     while (!(env.l3.model.lnk.state == AOU_LS_ENABLED && env.status.enabled) &&
            !(env.lsm.drv.state == LSM_RESET && !link_is_up())) begin
       wait_cycles(1);
-      if (++n == cfg.act_timeout) break;
+      if (++n >= cfg.act_timeout) break;
     end
     if (!link_is_up()) begin
       bit rcvd = env.status.rises["INT_ACTIVATE_START"] != int_act;
