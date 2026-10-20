@@ -288,8 +288,11 @@ for timing closure.
 
 |RP3_AXI_DATA_WD |parameter |512 |AXI data width for RP3 (bits).
 
-|AXI_PEER_DIE_MAX_DATA_WD |parameter |1024 |Maximum peer data width
-(bits).
+|AXI_PEER_DIE_MAX_DATA_WD |localparam |1024 |Width of the widest AoU data
+message (WriteData1024 / ReadData1024), which sizes the RX data path. The
+receiver cannot know the remote die's AXI data width, so this is fixed at the
+AoU maximum and is not an integration parameter: AOU_CORE accepts every legal
+message width from any remote die.
 
 |APB_ADDR_WD |parameter |32 |APB address width. Only [.monospaced]#++PADDR[15:0]++# is decoded (xref:aou-ig-apb-slave-interface[Section 3.2]).
 
