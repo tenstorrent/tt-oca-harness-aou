@@ -36,7 +36,7 @@ def side(kind, beats, width, partial=False, count=1, offset=0):
 class ModelTest(unittest.TestCase):
     def test_spec_check(self):
         """d2d_model's own AoU spec reproduction: 24/24 within 0.2 %."""
-        m, _ = pm.model()
+        m = pm.model()
         rows = m.check_aou_spec(verbose=False)
         self.assertEqual(len(rows), 24)
         self.assertEqual([r for r in rows if abs(r[4]) >= 0.002], [])
@@ -82,7 +82,7 @@ class ModelTest(unittest.TestCase):
 
     def test_symmetric_matches_bidir(self):
         """A partner pattern equal to the local one is the model's bidir scenario."""
-        m, _ = pm.model()
+        m = pm.model()
         s = side("W", 4, 64) + side("R", 4, 64)
         r = pm.model_window(64, s, s)
         ref = m.run_dirs(m.AoU(m.Config()), m.Scenario("b", pm._txns(m, s), bidir=True))
@@ -143,7 +143,7 @@ class ModelTest(unittest.TestCase):
 
     def test_committed_table_current(self):
         """uvm/env/perf/aou_perf_targets.svh matches the live model (make perf_check drift)."""
-        _, table = pm.read_svh()
+        table = pm.read_svh()
         opt = any(k.split("|")[2] == "S6" for k in table)
         fresh = {pm.key_of(r): r for r in pm.gen_targets(optional=opt)}
         self.assertEqual(set(fresh), set(table))
@@ -208,9 +208,8 @@ class TableTest(unittest.TestCase):
     def test_svh_round_trip(self):
         with tempfile.TemporaryDirectory() as d:
             p = os.path.join(d, "t.svh")
-            pm.write_svh(self.ROWS, "abc123", p)
-            h, t = pm.read_svh(p)
-        self.assertEqual(h, "abc123")
+            pm.write_svh(self.ROWS, p)
+            t = pm.read_svh(p)
         self.assertEqual(t["1x512-sp64|0|S2|sm_wr|r2l"]["reason"], 'measured \\"pad\\"')
         self.assertEqual(t["1x512-sp64|0|S1|bw_wr|l2r"]["model"], 53.8947)
         self.assertEqual(t["1x512-sp64|0|S1|bw_wr|l2r"]["eps"], 256)

@@ -71,8 +71,8 @@ class aou_perf_chk extends uvm_component;
       n_links++;
       n_fail++;
       `uvm_error(get_type_name(), $sformatf({"T1-P02: NO_TARGET %s: link measured %0.3f B/cycle; ",
-                                             "aou_perf_targets (d2d_model %s) has no target"},
-                                            k, r.bpc[l], aou_perf_targets::model_hash))
+                                             "aou_perf_targets has no target"},
+                                            k, r.bpc[l]))
       return;
     end
     n_links++;
@@ -137,7 +137,7 @@ class aou_perf_chk extends uvm_component;
   endfunction
 
   function void report_phase(uvm_phase phase);
-    `uvm_info(get_type_name(), $sformatf("PERF_GATE %0d links judged, %0d failed (d2d_model %s)",
-                                         n_links, n_fail, aou_perf_targets::model_hash), UVM_LOW)
+    `uvm_info(get_type_name(), $sformatf("PERF_GATE %0d links judged, %0d failed",
+                                         n_links, n_fail), UVM_LOW)
   endfunction
 endclass

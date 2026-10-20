@@ -94,14 +94,14 @@ def fmt(vals):
 
 def model_section(out_dir, rid=None):
     """One row per (run, bandwidth window, link): measured against the model."""
-    mhash, table = perf_model.read_svh()
+    table = perf_model.read_svh()
     rows = [r for r in perf_model.judge_runs(out_dir, table)
             if rid_ok(os.path.join(out_dir, r["run"]), rid)]
     if not rows:
         return []
     lines = ["## Against the model", "",
              "Steady-state application bytes per cycle on each link (l2r: DUT TX, r2l: DUT RX)",
-             f"from perf.json, against d2d_model {mhash or '(no table)'}. Gate: PASS, or BELOW",
+             "from perf.json, against the committed d2d_model targets. Gate: PASS, or BELOW",
              "(T1-P02, under (1 - tol) x model), ABOVE (T1-P03), MIX (T1-P04), SHORT (steady",
              "state under min_ss_flits), NO_TARGET. Run: the run's verdict against",
              "expected_fail.yaml.", "",
