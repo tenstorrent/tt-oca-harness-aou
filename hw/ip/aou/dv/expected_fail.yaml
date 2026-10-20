@@ -235,7 +235,8 @@
   seed_dependent: true
   note: >-
     CREDIT_MANAGE=1: the DUT returns RDATA/WRESP credit after its own DeactivateAck, as the
-    MAS documents (4xmix2144-sp64 +method=grant seeds 3 and 7)
+    MAS documents (4xmix2144-sp64 +method=grant seed 60, where it is the only finding; seeds 2
+    and 3 show it beside a credit underflow)
 
 # BUGS/039: a CrdtGrant that starts in the last granule of a 64-byte RX chunk is decoded
 # before its second granule arrives when pl_valid has a bubble there, so the DUT takes
@@ -248,7 +249,7 @@
   bug: BUGS/039
   check: 'AOU-R16: AOU_FDI_CHECKER VIOL_CRD_UNDERFLOW LP(DUT->peer)'
   seed_dependent: true
-  note: the DUT sends on credit it decoded from a stale second granule (4xmix2144-sp64 +method=grant seed 1)
+  note: the DUT sends on credit it decoded from a stale second granule (4xmix2144-sp64 +method=grant seed 2)
 
 - test: aou_credit_return_test
   bug: BUGS/039
@@ -356,7 +357,9 @@
     still in the DUT's TX backlog, crosses it on the link, and is open when the DUT sends
     DeactivateReq (MAS 7.3.5/7.3.6 re-activation vs AoU v0.8 8.4). Matches only when every
     unanswered request on that RP arrived after L3's DeactivateReq; any other AOU-R33 fails.
-    4x512-sp64 VCS +who=both +order=simul +deact_who=both +credit_manage=0 +busy=1 seed 3
+    4x512-sp64 VCS +who=both +order=simul +deact_who=both +credit_manage=0 +busy=1 seed 3 on an earlier stimulus stream; not reached since, with
+    those args on seeds 1-60 nor with the scenarios' own args (none, and +who=both +order=simul
+    +deact_who=both +busy=0) on seeds 1-20
 
 - test: aou_link_act_deact_test
   bug: BUGS/033
@@ -364,7 +367,8 @@
   seed_dependent: true
   note: >-
     CREDIT_MANAGE=0: the DUT puts an RDATA/WRESP MsgCredit in the flit that carries
-    its DeactivateAck (v0.7 8.4, MAS 7.3.1); seeds 6 and 15 (CONFIG=4x512-sp64, Verilator)
+    its DeactivateAck (v0.7 8.4, MAS 7.3.1); CONFIG=4x512-sp64 Verilator seeds 15 and 60,
+    VCS seeds 20 and 34 (+deact_who=remote +credit_manage=0 +busy=1)
 
 - test: aou_link_act_deact_test
   bug: BUGS/033
@@ -846,7 +850,8 @@
   note: >-
     CREDIT_MANAGE=1: the final deactivation lands while the DUT still owes RDATA/WRESP
     credit and it returns it after its DeactivateAck, as the MAS documents (Verilator
-    +event=retrain seed 1)
+    +event=retrain seed 1 on an earlier stimulus stream; not reached since, on 1x512-sp64 VCS
+    and Verilator seeds 1-60 nor in the two-PHY retrain scenarios, seeds 1-20)
 
 - test: aou_zero_credit_test
   bug: BUGS/009
@@ -1017,8 +1022,9 @@
   note: >-
     AOU_FDI_CHECKER's view of the same flit: an RDATA MsgCredit accepted in the cycle the
     remote DeactivateReq arrives shares the flit of the DUT's DeactivateAck, which completes
-    the deactivation, so the L3 model reports it "in DISABLED" (4x512-sp64 VCS seed 1, waves
-    rid.wp12tri, CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
+    the deactivation, so the L3 model reports it "in DISABLED" (4x512-sp64 VCS seeds 25 and
+    52 on the current stimulus; first seen at seed 1 of an earlier one, waves rid.wp12tri,
+    CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
 
 # BUGS/034: enabling TX_LP_MODE while a TX flit is in progress abandons the flit
 # after its first beat (FDI-R02); seen in 2xmix-tp64_128 and 1x256-sp32.

@@ -37,3 +37,11 @@
   `B``_BIN(b128, 128, 128) `B``_BIN(b256, 256, 256)
 `define AOU_XFER_FC_SPLIT(B) `B``_BIN(whole, 0, 0) `B``_BIN(split, 1, 1)
 `define AOU_XFER_FC_X_SPLIT(B) `B``_XIGN("b128|b256,split")
+// Small requests (AxSIZE 0..4, 1 to 16 bytes). 4- and 8-byte register accesses
+// are the usual ones; 1-, 2- and 16-byte ones are rare by design
+// (+small_size_wt), so their bins carry the tag "rare" instead of reading as
+// ordinary holes.
+`define AOU_XFER_FC_SMALL(B) \
+  `B``_BIN(b1, 0, 0) `B``_BIN(b2, 1, 1) `B``_BIN(b4, 2, 2) `B``_BIN(b8, 3, 3) `B``_BIN(b16, 4, 4)
+`define AOU_XFER_FC_SMALL_RARE(B) `B``_TAG("b1|b2|b16", "rare")
+`define AOU_XFER_FC_X_SMALL_RARE(B) `B``_TAG("*,*,b1|b2|b16", "rare")

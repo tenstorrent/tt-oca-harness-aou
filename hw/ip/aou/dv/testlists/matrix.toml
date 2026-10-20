@@ -1106,10 +1106,70 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=128", "+remote_wreq=dut_like"]
 
+# Small requests in the width pairings: every DUT x remote pairing of the two
+# 4xmix builds sees 5% small requests both ways, and the directed sweep runs
+# under a mixed remote on 4xmix2144-sp64.
+[[tests]]
+name = "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32"
+module = { uvm = "aou_dp_random_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both", "+small_size_pct=5", "+remote_bytes=32,128,64,32"]
+
+[[tests]]
+name = "aou_dp_random_test.small_size_pct-5.remote_bytes-128_64_32_128"
+module = { uvm = "aou_dp_random_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both", "+small_size_pct=5", "+remote_bytes=128,64,32,128"]
+
+[[tests]]
+name = "aou_dp_random_test.small_size_pct-5.remote_bytes-64_32_128_64"
+module = { uvm = "aou_dp_random_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both", "+small_size_pct=5", "+remote_bytes=64,32,128,64"]
+
+[[tests]]
+name = "aou_small_size_test.remote_bytes-128_64_32_128.4xmix2144-sp64"
+module = { uvm = "aou_small_size_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128,64,32,128"]
+
+# An exclusive kept whole: 64-byte exclusives (two 256-bit beats at most) with
+# the remote splitter's maximum burst length at 1 (aou_t1_l4a_adapter).
+[[tests]]
+name = "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128"
+module = { uvm = "aou_attr_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
+
 [[groups]]
 name = "matrix"
-expected_count = 108
+expected_count = 113
 tests = [
+  "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-128_64_32_128",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-64_32_128_64",
+  "aou_small_size_test.remote_bytes-128_64_32_128.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-1.4x512-sp64",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-2.4x512-sp64",
@@ -1226,8 +1286,9 @@ tests = [
 # (triage record of the width matrix; plan 2.14, 14.17, 15.17).
 [[groups]]
 name = "width_pairs"
-expected_count = 37
+expected_count = 43
 tests = [
+  "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-64.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-128_128_64_64",
@@ -1265,4 +1326,9 @@ tests = [
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-dut_like",
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix2144-sp64",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-128_64_32_128",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-64_32_128_64",
+  "aou_small_size_test.remote_bytes-128_64_32_128.4xmix2144-sp64",
+  "aou_small_size_test.remote_bytes-32_128_64_128",
 ]

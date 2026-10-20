@@ -53,11 +53,12 @@ class aou_axi_txn extends uvm_sequence_item;
   static const bit [3:0] LEGAL_CACHE[10] = '{4'h0, 4'h1, 4'h2, 4'h3, 4'h6, 4'h7, 4'hA, 4'hB,
                                             4'hE, 4'hF};
 
-  // AXI4 A7.2.4: exclusive accesses are a power of two bytes up to 128, aligned
-  // to their total size, and at most 16 beats.
+  // AXI4 A7.2.4: exclusive accesses are a power of two bytes, aligned to their
+  // total size, and at most 16 beats. AXI allows up to 128 bytes; this bench
+  // models at most 64, the project's limit.
   constraint c_exclusive {
     lock -> ((burst != AOU_AXI_FIXED) && (len inside {8'd0, 8'd1, 8'd3, 8'd7, 8'd15}) &&
-             ((({24'd0, len} + 32'd1) << size) <= 32'd128) &&
+             ((({24'd0, len} + 32'd1) << size) <= 32'd64) &&
              ((addr & (((64'd1 + {56'd0, len}) << size) - 64'd1)) == 64'd0));
   }
 

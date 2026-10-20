@@ -4,8 +4,9 @@
 // Exclusive accesses end to end (plan 4.25, 5.23), then the data-path traffic
 // of aou_dp_vseq. With `excl` set, every RP runs, from the local S port and
 // from the remote die at once, these rounds for each exclusive shape the
-// narrower of the two buses allows (AXI4 A7.2.4: 2^n bytes up to 128, at most
-// 16 beats, aligned to the total size). Both subordinates (the remote model
+// narrower of the two buses allows (AXI4 A7.2.4 allows 2^n bytes up to 128,
+// at most 16 beats, aligned to the total size; this bench models exclusives
+// of at most 64 bytes, the project's limit). Both subordinates (the remote model
 // and the local memory) keep an exclusive monitor, so the DUT only has to
 // carry AxLOCK and EXOKAY:
 //   exclusive read A, exclusive write A (same ID)           -> EXOKAY, EXOKAY
@@ -60,8 +61,8 @@ class aou_attr_vseq extends aou_dp_vseq;
     int unsigned bus = (cfg.rp_bytes[r] < cfg.remote_bytes_of(r)) ? cfg.rp_bytes[r] :
                                                                     cfg.remote_bytes_of(r);
     // (AxSIZE, AxLEN) pairs; those wider than the bus are skipped.
-    int unsigned shapes[9][2] = '{'{0, 0}, '{2, 3}, '{3, 15}, '{4, 7}, '{5, 3}, '{6, 1},
-                                  '{7, 0}, '{3, 0}, '{5, 0}};
+    int unsigned shapes[8][2] = '{'{0, 0}, '{2, 3}, '{3, 7}, '{4, 3}, '{5, 1}, '{6, 0},
+                                  '{3, 0}, '{5, 0}};
     bit [9:0] idb = 10'(10'h100 + 16 * r);
     bit [63:0] base = EXCL_BASE + 64'(r) * 64'h1_0000 + (l2r ? 64'h0 : 64'h8000);
     string who = $sformatf("RP%0d %s", r, l2r ? "local->remote" : "remote->local");

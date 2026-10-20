@@ -224,6 +224,20 @@ the DUT is held to v0.7.1's rule (at most one Activation message per flit, at G0
 remote die's own flits follow v0.8 either way. Further v0.8-only DUT checks belong
 behind the same switch.
 
+Traffic and remote-die knobs (run time, any T1 test):
+- `+small_size_pct=N`: N% of requests are small, register-like accesses
+  (AxSIZE below 5), both from the S ports and from the remote die. The default
+  is 0: ordinary random requests are 32 bytes up to the bus (AxSIZE 5 or more),
+  so small ones come only from this knob, a test's own size list or the
+  directed tests (`aou_dp_size_test`, `aou_small_size_test`, `aou_dw_test`). `+small_size_wt=w0,w1,w2,w3,w4` weights AxSIZE 0..4 (default
+  2,4,45,45,4), and `+small_burst_pct=N` (default 10) makes N% of them 2-4 beats
+  instead of one. They live in `aou_axi_rand_seq`, which `aou_dp_seq` extends.
+- `+remote_bytes=N` or `N0,N1,..`: the remote die's AXI data bytes.
+- `+remote_wreq=awsize|upsize|dut_like`: how the remote die sizes its
+  WriteReqs and WriteData; all three are legal.
+- `+remote_max_burst=2^n`: the remote splitter's longest burst (default 256).
+  `+remote_max_burst_rand=1` re-picks it whenever the remote is idle.
+
 FDI corner knobs (run time, `testlists/fdi.toml`): `+fdi_trdy=always|random|holes|bursty`,
 `+fdi_stall_pct=N` stand-alone stalls, `+fdi_stall_mid_pct=N` the share raised
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between

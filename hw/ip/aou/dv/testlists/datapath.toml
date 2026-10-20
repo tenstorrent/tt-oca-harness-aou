@@ -310,10 +310,45 @@ tags = ["datapath"]
 run_modes = ["datapath"]
 args = ["+chan=ilv"]
 
+# Small requests (AxSIZE below 5, 1 to 16 bytes; register-like accesses):
+# aou_small_size_test sweeps every small size, unaligned with partial strobes,
+# both ways; +small_size_pct=N (aou_axi_rand_seq, also in aou_dp_seq) mixes N%
+# of them into random traffic, weighted to 4- and 8-byte accesses.
+[[tests]]
+name = "aou_small_size_test"
+module = { uvm = "aou_small_size_test" }
+seed = 1
+reseed = 2
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = []
+
+[[tests]]
+name = "aou_small_size_test.remote_bytes-32_128_64_128"
+module = { uvm = "aou_small_size_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+remote_bytes=32,128,64,128"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.small_size_pct-5"
+module = { uvm = "aou_dp_random_test" }
+seed = 1
+reseed = 3
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+dp_dir=both", "+small_size_pct=5"]
+
 [[groups]]
 name = "datapath"
-expected_count = 32
+expected_count = 35
 tests = [
+  "aou_small_size_test",
+  "aou_small_size_test.remote_bytes-32_128_64_128",
+  "aou_dp_random_test.dp_dir-both.small_size_pct-5",
   "aou_dp_size_test.dp_size-0_1_2_3_4_5_6",
   "aou_dp_size_test.dp_size-7.remote_bytes-128.dp_dir-r2l",
   "aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r",

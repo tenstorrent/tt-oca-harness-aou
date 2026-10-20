@@ -7,6 +7,7 @@
 `include "features/aou_dest_rp_chk.svh"
 `include "datapath/aou_dp_base_test.svh"
 `include "datapath/aou_dp_size_test.svh"
+`include "datapath/aou_small_size_test.svh"
 `include "datapath/aou_dp_burst_test.svh"
 `include "datapath/aou_dp_wstrb_test.svh"
 `include "datapath/aou_dp_unaligned_test.svh"

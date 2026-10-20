@@ -16,7 +16,11 @@
 //   the request gets one response: the worst BRESP of its sub-bursts, or
 //   ReadData packed from them. The spec leaves splitting to the
 //   implementation. A legal burst never crosses 4KB; the split guards that too.
-//   An exclusive request is never split (its reservation covers the whole).
+//   An exclusive request is never split (its reservation covers the whole),
+//   so it may exceed the maximum burst length: legal AXI, since nothing makes
+//   a subordinate split. Exclusives are at most 64 bytes here, so at most two
+//   beats on a 256-bit bus. split_cg counts such a request as "whole" at the
+//   current maximum (b1, whole for a 2-beat exclusive at a maximum of 1).
 // - ReadData is packed at the requester's ARSIZE (spec §5.7: the responder
 //   converts), each beat with the worst response of the native beats under it.
 // - +remote_max_burst_rand=1 (off by default) picks a new maximum from the

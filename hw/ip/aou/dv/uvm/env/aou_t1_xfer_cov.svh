@@ -22,6 +22,9 @@
 //   they cover the DUT's upsizers and downsizers, per direction.
 // - split_cg: the remote model's splitter, by its maximum burst length and
 //   whether the request was split (sampled by aou_t1_l4a_adapter).
+// - small_cg: requests below 32 bytes (AxSIZE 0..4) by path and direction,
+//   from the same requester samples as width_cg; 1-, 2- and 16-byte bins are
+//   tagged "rare".
 class aou_t1_xfer_cov extends uvm_component;
   `uvm_component_utils(aou_t1_xfer_cov)
 
@@ -117,6 +120,19 @@ class aou_t1_xfer_cov extends uvm_component;
     x_pair_size: cross cp_path, cp_dir, cp_dut, cp_rem, cp_size;
   endgroup
 
+  covergroup small_cg;
+    cp_path: coverpoint cv_path {
+      `AOU_XFER_FC_PATH(AOU_FC_CG)
+    }
+    cp_dir: coverpoint cv_dir {
+      `AOU_XFER_FC_DIR(AOU_FC_CG)
+    }
+    cp_small: coverpoint cv_size {
+      `AOU_XFER_FC_SMALL(AOU_FC_CG)
+    }
+    x_small: cross cp_path, cp_dir, cp_small;
+  endgroup
+
   covergroup split_cg;
     cp_max: coverpoint cv_max {
       `AOU_XFER_FC_MAX_BURST(AOU_FC_CG)
@@ -132,6 +148,7 @@ class aou_t1_xfer_cov extends uvm_component;
   protected aou_fc_group fc_chan;
   protected aou_fc_group fc_width;
   protected aou_fc_group fc_split;
+  protected aou_fc_group fc_small;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -142,6 +159,7 @@ class aou_t1_xfer_cov extends uvm_component;
     chan_cg = new();
     width_cg = new();
     split_cg = new();
+    small_cg = new();
     fc_declare();
   endfunction
 
@@ -184,6 +202,15 @@ class aou_t1_xfer_cov extends uvm_component;
       void'(fc_width.add_cross("x_pair_req", "cp_path cp_dut cp_rem cp_req"));
       p = fc_width.add_cross("x_pair_size", "cp_path cp_dir cp_dut cp_rem cp_size");
       `AOU_XFER_FC_X_SIZE(AOU_FC_REG)
+    end
+    fc_small = db.group("xfer.small_cg", fresh);
+    if (fresh) begin
+      p = fc_small.cp("cp_path"); `AOU_XFER_FC_PATH(AOU_FC_REG)
+      p = fc_small.cp("cp_dir"); `AOU_XFER_FC_DIR(AOU_FC_REG)
+      p = fc_small.cp("cp_small"); `AOU_XFER_FC_SMALL(AOU_FC_REG)
+      `AOU_XFER_FC_SMALL_RARE(AOU_FC_REG)
+      p = fc_small.add_cross("x_small", "cp_path cp_dir cp_small");
+      `AOU_XFER_FC_X_SMALL_RARE(AOU_FC_REG)
     end
     fc_split = db.group("xfer.split_cg", fresh);
     if (fresh) begin
@@ -241,6 +268,10 @@ class aou_t1_xfer_cov extends uvm_component;
     cv_req = (t.beat_bytes() < own) ? 1 : 0;
     width_cg.sample();
     fc_width.sample(cv_path, cv_dir, cv_dut, cv_rem, cv_size, cv_req);
+    if (t.size < 3'd5) begin
+      small_cg.sample();
+      fc_small.sample(cv_path, cv_dir, cv_size);
+    end
   endfunction
 
   function void take_tb(aou_msg m);

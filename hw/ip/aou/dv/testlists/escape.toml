@@ -24,14 +24,6 @@ seed = 1
 signature = "T1-V05: DUT not DISABLED"
 
 [[escapes]]
-test = "aou_lp_mode_traffic_test"
-escape = "pr28"
-target = "1x512-sp64"
-args = ["+threshold=0"]
-seed = 1
-signature = "T1-V05: DUT not DISABLED"
-
-[[escapes]]
 test = "none"
 escape = "pr46"
 build = "questa"

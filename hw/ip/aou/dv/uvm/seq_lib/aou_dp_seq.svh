@@ -24,6 +24,7 @@ class aou_dp_seq extends aou_axi_rand_seq;
     aou_axi_txn t;
     int unsigned bsz;
     get_knobs();
+    small_plusargs();
     pick_slots();
     bsz = (knobs.batch == 0) ? num_slots : knobs.batch;
     if (bsz > num_slots) bsz = num_slots;
@@ -121,8 +122,19 @@ class aou_dp_seq extends aou_axi_rand_seq;
     int unsigned bytes;
     int unsigned off;
     bit wr = knobs.attr_sweep ? (n_shape % 2 == 0) : ($urandom_range(99) < wr_pct);
-    sz = knobs.full_size ? msz : pick(knobs.sizes, 0, msz);
+    bit [2:0] ssz;
+    bit [7:0] sln;
+    // Without a size list: 32 bytes up to the bus; small sizes come from
+    // +small_size_pct below (or a list that names them).
+    sz = knobs.full_size ? msz :
+         (knobs.sizes.size() > 0) ? pick(knobs.sizes, 0, msz) :
+         (msz < 5) ? msz : $urandom_range(msz, 5);
     ln = pick(knobs.lens, 0, (knobs.lens.size() > 0) ? 255 : int'(max_len));
+    // +small_size_pct (aou_axi_rand_seq): a register-like access instead.
+    if (!knobs.full_size && pick_small(ssz, sln)) begin
+      sz = 32'(ssz);
+      ln = 32'(sln);
+    end
     n_shape++;
     nb = 1 << sz;
     // Keep the burst inside the 4KB slot.

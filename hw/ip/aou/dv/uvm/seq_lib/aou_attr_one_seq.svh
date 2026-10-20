@@ -33,6 +33,12 @@ class aou_attr_one_seq extends aou_axi_base_seq;
     t.cache = cache;
     t.prot  = prot;
     t.qos   = qos;
+    // The fields are set directly, so aou_axi_txn::c_exclusive doesn't apply:
+    // hold an exclusive to the bench's limit of 64 bytes here.
+    if (lock && t.beats() * t.beat_bytes() > 64)
+      `uvm_fatal(get_type_name(), $sformatf(
+                 "exclusive of %0d bytes (AxSIZE %0d, AxLEN %0d) exceeds the 64-byte limit",
+                 t.beats() * t.beat_bytes(), size, len))
     if (dir == AOU_AXI_WR) t.fill_wdata(AOU_AXI_STRB_FULL);
     send(t);
     wait_all();

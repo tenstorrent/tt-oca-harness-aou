@@ -320,8 +320,17 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 440
+expected_count = 449
 tests = [
+  "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
+  "aou_small_size_test",
+  "aou_small_size_test.remote_bytes-32_128_64_128",
+  "aou_dp_random_test.dp_dir-both.small_size_pct-5",
+  "aou_stress_test.st_bp-all.small_size_pct-5",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-128_64_32_128",
+  "aou_dp_random_test.small_size_pct-5.remote_bytes-64_32_128_64",
+  "aou_small_size_test.remote_bytes-128_64_32_128.4xmix2144-sp64",
   "aou_sanity_test",
   "aou_t1_slice_test",
   "aou_t1_deact_test",
