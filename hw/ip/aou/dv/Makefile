@@ -142,7 +142,8 @@ JOBS ?= 8
 # Builds and runs go to LSF (LSF=0 runs them on this host). Requests are sized from
 # build/metrics.jsonl, which records every job's CPU, peak memory and run time.
 # Measured on T1 builds: Verilator up to 3.1 GB per process (8 in parallel), VCS
-# 0.6 GB; simulations under 0.4 GB. Memory is in GB.
+# 0.6 GB; simulations under 0.4 GB. BUILD_MEM and RUN_MEM are numbers of GB, and the
+# request carries the unit (mem=<N>GB): some sites read a bare number as GB, others as MB.
 LSF ?= $(if $(shell command -v bsub 2>/dev/null),1,0)
 LSF_QUEUE ?= normal
 BUILD_MEM ?= $(if $(filter vcs,$(SIM)),2,4)
@@ -381,11 +382,11 @@ endif
 
 # LSF resources per job type.
 ifeq ($(SIM),vcs)
-LSF_BUILD_RES := -n 2 -R "rusage[mem=$(BUILD_MEM)]" $(LSF_VCS_BUILD_OPTS)
+LSF_BUILD_RES := -n 2 -R "rusage[mem=$(BUILD_MEM)GB]" $(LSF_VCS_BUILD_OPTS)
 else
-LSF_BUILD_RES := -n $(JOBS) -R "span[hosts=1] rusage[mem=$(BUILD_MEM)]" $(LSF_VERILATOR_BUILD_OPTS)
+LSF_BUILD_RES := -n $(JOBS) -R "span[hosts=1] rusage[mem=$(BUILD_MEM)GB]" $(LSF_VERILATOR_BUILD_OPTS)
 endif
-LSF_RUN_RES := -n $(RUN_CPUS) -R "rusage[mem=$(RUN_MEM)]"
+LSF_RUN_RES := -n $(RUN_CPUS) -R "rusage[mem=$(RUN_MEM)GB]"
 
 # $(call submit,kind,name,lsf-resources,script,lsf-output): run a script through LSF
 # (or locally with LSF=0) and append its resource usage to $(METRICS).

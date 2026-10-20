@@ -303,7 +303,9 @@ Builds and runs are submitted to LSF when `bsub` is available (`LSF=0` runs
 them on the current host). Load the simulator modules first; the job inherits
 the environment. Requests default to what the jobs actually use: `BUILD_MEM` 4 GB
 for Verilator (`JOBS=8` build threads) and 2 GB for VCS, and `RUN_MEM=1` GB with
-`RUN_CPUS=1` per simulation. VCS compiles also reserve a VCS licence through LSF. Every build and run appends its CPU time,
+`RUN_CPUS=1` per simulation. Both are numbers of GB, and the LSF request always
+carries the unit (`rusage[mem=<N>GB]`), since a bare number means GB on some clusters
+and MB on others. VCS compiles also reserve a VCS licence through LSF. Every build and run appends its CPU time,
 peak memory and run time to `build/metrics.jsonl`, which is what the defaults
 are tuned from.
 
