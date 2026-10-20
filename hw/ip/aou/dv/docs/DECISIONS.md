@@ -532,9 +532,11 @@ yet carries the `blocked` tag and its reason in the sidecar; `run_list.py` and
 ## D9. Build configurations
 
 **Decision.** `CONFIG` selects the T1 (and register bench) build parameters: RP
-count, data width per RP, `FDI_CONFIG` and, where it is not the default 1024,
-`AXI_PEER_DIE_MAX_DATA_WD`, `TX_NXT_PACKING_EN` (and, in `-rxf`, the RX FIFO
-parameters). Thirteen configurations exist:
+count, data width per RP, `FDI_CONFIG`, `TX_NXT_PACKING_EN` (and, in `-rxf`, the RX FIFO
+parameters). Ten configurations exist (three more, `1x512-sp64-p512`,
+`4xmix4211-sp128-p512` and `4xmix4211-sp128-p256`, built
+`AXI_PEER_DIE_MAX_DATA_WD` below 1024 until that parameter became a localparam
+fixed at the AoU maximum; see the amendment below):
 
 | CONFIG | RPs | RP widths | FDI_CONFIG | Purpose |
 |---|---|---|---|---|
@@ -546,10 +548,7 @@ parameters). Thirteen configurations exist:
 | 1x256-sp32 | 1 | 256 | 0 (SP_32B) | Narrowest RP and FDI |
 | 2xmix-tp64_128 | 2 | 512, 1024 | 4 (TP_64B_128B) | Two-PHY FDI, two RPs, mixed widths |
 | 2x512-tp32_64 | 2 | 512 each | 3 (TP_32B_64B) | Two-PHY FDI with a 256-bit PHY0, two RPs at one width |
-| 1x512-sp64-p512 | 1 | 512 | 1 (SP_64B) | `AXI_PEER_DIE_MAX_DATA_WD` 512 (plan 14.17) |
 | 1x512-sp64-nxt | 1 | 512 | 1 (SP_64B) | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
-| 4xmix4211-sp128-p512 | 4 | 1024, 512, 256, 256 | 2 (SP_128B) | `AXI_PEER_DIE_MAX_DATA_WD` 512 below a 1024-bit RP (plan 14.17) |
-| 4xmix4211-sp128-p256 | 4 | 1024, 512, 256, 256 | 2 (SP_128B) | `AXI_PEER_DIE_MAX_DATA_WD` 256 below 1024- and 512-bit RPs (plan 14.17) |
 | 2xmix-sp64-rxf | 2 | 1024, 256 | 1 (SP_64B) | Non-default RX FIFO depths, RX FIFO register slices off |
 
 Names describe the configuration and refer to nothing else:
@@ -560,9 +559,6 @@ Names describe the configuration and refer to nothing else:
 - `sp<B>`: single PHY with a B-byte FDI data path (`FDI_CFG_SP_<B>B`).
 - `tp<B1>_<B2>`: two PHYs with B1- and B2-byte FDI (`FDI_CFG_TP_<B1>B_<B2>B`,
   built with `TWO_PHY`).
-- `-p<W>`: `AXI_PEER_DIE_MAX_DATA_WD` of W bits (`CONFIG_PEER_W`); without it
-  the RTL default, 1024. The remote die is then never wider than W bits
-  (`aou_t1_env_cfg::finalize()` limits `+remote_bytes`).
 - `-nxt`: `TX_NXT_PACKING_EN` 1 (`AOU_TX_NXT_PACKING=1`): the other value of the
   AOU_TX_CORE output-stage parameter, a registered flit chunk computed from the
   packer's look-ahead state. Every other build takes the RTL default, 0.
@@ -593,13 +589,21 @@ gain. The integration guide puts no constraint on RP widths per `FDI_CONFIG`, so
 pair alone. Every pairing of a local RP width and a remote RP width (256, 512,
 1024) is legal, and the remote's width is not known when the DUT is built, so
 the remote width is a run-time knob (`+remote_bytes`, per RP) and the mixed
-builds cover all nine pairings. `AXI_PEER_DIE_MAX_DATA_WD` is the integrator's
+builds cover all nine pairings. `AXI_PEER_DIE_MAX_DATA_WD` was the integrator's
 promise that the remote die sends no WriteData wider than it; the default 1024
-allows every pairing. It gets three restricted builds (the bench limits the
+allows every pairing. It got three restricted builds (the bench limited the
 remote die to the parameter): `1x512-sp64-p512`; `4xmix4211-sp128-p512`, where
-a 1024-bit RP is wider than the parameter and its own reads still get
+a 1024-bit RP was wider than the parameter and its own reads still got
 ReadData1024 (AoU 5.7: ReadData follows ARSIZE); and `4xmix4211-sp128-p256`,
 the largest ratio (a 1024-bit ReadData path over a 256-bit WriteData path).
+
+**Amendment (2026-10-20).** `AXI_PEER_DIE_MAX_DATA_WD` is a localparam fixed at
+1024, the widest AoU data message: a receiver cannot know the remote die's AXI
+width, so the RX data path is sized for the maximum and there is no promise for
+an integrator to make. The three restricted builds, their matrix scenarios and
+plan item 14.17 are retired; the remote die model stays bounded at 128 bytes
+(`AOU_T1_PEER_MAX_BYTES`), and the nine width pairings remain covered by the
+mixed builds through `+remote_bytes`.
 
 **Rejected.** *One configuration* (misses the converters and the other FDI
 widths). *A full cross product* (cost). *Names after a purpose or another bench*

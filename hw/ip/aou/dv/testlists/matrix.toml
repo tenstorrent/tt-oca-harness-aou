@@ -730,40 +730,6 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+mrp_scn=crd_rr"]
 
-# AXI_PEER_DIE_MAX_DATA_WD 512 (plan 14.17): a remote die at most 512 bits
-# wide, at and below the RP width (4xmix4211-sp128-p512, below the scenarios'
-# width pairings, puts a wider RP over it). A 256-bit peer does not elaborate,
-# so it has no configuration. Every run is an expected failure (expected_fail.yaml).
-[[tests]]
-name = "aou_dp_random_test.dp_dir-both.1x512-sp64-p512"
-module = { uvm = "aou_dp_random_test" }
-target = "1x512-sp64-p512"
-seed = 1
-reseed = 3
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+dp_dir=both"]
-
-[[tests]]
-name = "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512"
-module = { uvm = "aou_dp_size_test" }
-target = "1x512-sp64-p512"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+dp_size=0,1,2,3,4,5,6"]
-
-[[tests]]
-name = "aou_dw_test.remote_bytes-32.1x512-sp64-p512"
-module = { uvm = "aou_dw_test" }
-target = "1x512-sp64-p512"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+remote_bytes=32"]
-
 # TX_NXT_PACKING_EN 1 (target -nxt): the TX packer's registered output stage,
 # the other value of the AOU_TX_CORE parameter (default 0 everywhere else).
 # The link gate, mixed-direction traffic, the flit packing scenarios and
@@ -876,7 +842,6 @@ args = ["+remote_rp_count=3"]
 # sends full-width remote bursts through the downsizer and the splitter at a
 # large and a small MAX_AxBURSTLEN (MAS 3.5.2, 3.6; aou_split_chk). The remote
 # model converts too (aou_t1_l4a_adapter), and +remote_max_burst makes it split.
-# The -p512 runs put a 1024-bit RP over a 512-bit AXI_PEER_DIE_MAX_DATA_WD.
 [[tests]]
 name = "aou_split_test.remote_bytes-128.split-255.4xmix4211-sp128"
 module = { uvm = "aou_split_test" }
@@ -947,36 +912,6 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=128", "+dp_align=aligned", "+remote_max_burst=4"]
 
-[[tests]]
-name = "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512"
-module = { uvm = "aou_dw_test" }
-target = "4xmix4211-sp128-p512"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+remote_bytes=32"]
-
-[[tests]]
-name = "aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512"
-module = { uvm = "aou_dw_test" }
-target = "4xmix4211-sp128-p512"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+remote_bytes=64"]
-
-[[tests]]
-name = "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512"
-module = { uvm = "aou_dp_random_test" }
-target = "4xmix4211-sp128-p512"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+dp_dir=both"]
-
 # Remote write sizing. A writer may raise the WriteReq size above AWSIZE, and
 # WriteData may use any DLENGTH of at least max(the WriteReq size, 256 bits).
 # The remote model's default packs at AWSIZE (the minimal legal choice);
@@ -985,7 +920,7 @@ args = ["+dp_dir=both"]
 # DUT does. Both are legal; dut_like also drives the 1024-to-256 downsizer with
 # unaligned narrow writes. +remote_max_burst_rand=1
 # re-picks the remote splitter's maximum burst length whenever the remote is
-# idle. The -p256 build puts the 1024- and 512-bit RPs over a 256-bit peer.
+# idle.
 [[tests]]
 name = "aou_split_test.remote_bytes-64.split-3.4xmix4211-sp128"
 module = { uvm = "aou_split_test" }
@@ -1035,26 +970,6 @@ reseed = 2
 tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=128", "+remote_wreq=upsize"]
-
-[[tests]]
-name = "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256"
-module = { uvm = "aou_dw_test" }
-target = "4xmix4211-sp128-p256"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+remote_bytes=32"]
-
-[[tests]]
-name = "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256"
-module = { uvm = "aou_dp_random_test" }
-target = "4xmix4211-sp128-p256"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-args = ["+dp_dir=both"]
 
 [[tests]]
 name = "aou_dw_test.remote_bytes-128.remote_max_burst_rand-1"
@@ -1163,7 +1078,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 113
+expected_count = 105
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1243,9 +1158,6 @@ tests = [
   "aou_perf_test.perf_mode-drain.2x512-tp32_64",
   "aou_mrp_test.mrp_scn-crd_rr.4x512-sp64",
   "aou_mrp_test.mrp_scn-crd_rr.4xmix4211-sp128",
-  "aou_dp_random_test.dp_dir-both.1x512-sp64-p512",
-  "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512",
-  "aou_dw_test.remote_bytes-32.1x512-sp64-p512",
   "aou_sanity_test.1x512-sp64-nxt",
   "aou_dp_random_test.dp_dir-both.1x512-sp64-nxt",
   "aou_pack_test.pk-crossflit.1x512-sp64-nxt",
@@ -1263,16 +1175,11 @@ tests = [
   "aou_split_test.remote_bytes-128.split-255.4xmix2144-sp64",
   "aou_split_test.remote_bytes-128.split-15.4xmix2144-sp64",
   "aou_dw_test.remote_bytes-128.remote_max_burst-4.4xmix4211-sp128",
-  "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512",
-  "aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512",
-  "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512",
   "aou_split_test.remote_bytes-64.split-3.4xmix4211-sp128",
   "aou_split_test.remote_bytes-64.split-255.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-upsize",
   "aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix2144-sp64",
-  "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256",
-  "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256",
   "aou_dw_test.remote_bytes-128.remote_max_burst_rand-1",
   "aou_dw_down1024_test.remote_wreq-dut_like.4xmix2144-sp64",
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128",
@@ -1281,12 +1188,11 @@ tests = [
 ]
 
 # The nine DUT x remote RP width pairings, both directions, narrower requests,
-# the downsizer with the splitter, every legal remote write sizing, and the
-# restricted peer-width builds
-# (triage record of the width matrix; plan 2.14, 14.17, 15.17).
+# the downsizer with the splitter and every legal remote write sizing
+# (triage record of the width matrix; plan 2.14, 15.17).
 [[groups]]
 name = "width_pairs"
-expected_count = 43
+expected_count = 35
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32.4xmix4211-sp128",
@@ -1301,9 +1207,6 @@ tests = [
   "aou_dw_test.remote_bytes-128_32_32_64",
   "aou_dw_test.remote_bytes-128.dp_align-aligned.4xmix2144-sp64",
   "aou_dw_down1024_test.4xmix2144-sp64",
-  "aou_dp_random_test.dp_dir-both.1x512-sp64-p512",
-  "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512",
-  "aou_dw_test.remote_bytes-32.1x512-sp64-p512",
   "aou_split_test.remote_bytes-128.split-255.4xmix4211-sp128",
   "aou_split_test.remote_bytes-128.split-3.4xmix4211-sp128",
   "aou_split_test.remote_bytes-64.split-15.4xmix4211-sp128",
@@ -1311,16 +1214,11 @@ tests = [
   "aou_split_test.remote_bytes-128.split-255.4xmix2144-sp64",
   "aou_split_test.remote_bytes-128.split-15.4xmix2144-sp64",
   "aou_dw_test.remote_bytes-128.remote_max_burst-4.4xmix4211-sp128",
-  "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512",
-  "aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512",
-  "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512",
   "aou_split_test.remote_bytes-64.split-3.4xmix4211-sp128",
   "aou_split_test.remote_bytes-64.split-255.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-upsize",
   "aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix2144-sp64",
-  "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256",
-  "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256",
   "aou_dw_test.remote_bytes-128.remote_max_burst_rand-1",
   "aou_dw_down1024_test.remote_wreq-dut_like.4xmix2144-sp64",
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128",

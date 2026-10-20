@@ -359,7 +359,7 @@ FDI_PHY_BYTES = {0: [32], 1: [64], 2: [128], 3: [32, 64], 4: [64, 128]}
 
 
 def config_row(cfg, name):
-    """RP count, RP widths, FDI_CONFIG, PHYs, peer width and purpose of a T1 target."""
+    """RP count, RP widths, FDI_CONFIG, PHYs and purpose of a T1 target."""
     defs = target_defines(cfg, name)
     n = int(define_value(defs, "AOU_RP_COUNT", "1"))
     base = define_value(defs, "AOU_RP_DATA_W", "512")
@@ -372,7 +372,6 @@ def config_row(cfg, name):
         "fdi": fdi,
         "fdi_name": FDI_NAMES.get(fdi, str(fdi)),
         "phys": 2 if fdi in (3, 4) else 1,
-        "peer_w": int(define_value(defs, "AOU_PEER_MAX_W", "1024")),
         "assert": "ASSERTION_ON" in defs,
         "description": cfg["targets"][name].get("description", ""),
     }
@@ -385,17 +384,16 @@ def t1_configs(cfg=None):
 
 
 def print_configs(cfg):
-    fmt = "%-17s %-3s %-20s %-12s %-4s %-5s %s"
-    print(fmt % ("CONFIG", "RPs", "RP widths", "FDI_CONFIG", "PHYs", "Peer", "Purpose"))
+    fmt = "%-17s %-3s %-20s %-12s %-4s %s"
+    print(fmt % ("CONFIG", "RPs", "RP widths", "FDI_CONFIG", "PHYs", "Purpose"))
     for n, r in t1_configs(cfg).items():
         print(fmt % (n, r["rp_count"], "/".join(map(str, r["rp_widths"])), r["fdi_name"],
-                     r["phys"], r["peer_w"], r["description"]))
+                     r["phys"], r["description"]))
     print()
     print("NxW: N remote ports (RPs) x W-bit RP AXI data width; mix: mixed RP widths (listed);")
     print("mix<digits>: one digit per RP, RP0 first, its width in 256-bit units (1=256, 2=512, 4=1024);")
     print("sp<B>: single PHY, B-byte FDI (FDI_CFG_SP_<B>B); tp<B1>_<B2>: two PHYs, B1- and B2-byte FDI")
-    print("(FDI_CFG_TP_<B1>B_<B2>B, built with TWO_PHY); -p<W>: AXI_PEER_DIE_MAX_DATA_WD W bits")
-    print("(Peer column; 1024 without the suffix); -rxf: non-default RX FIFO depths, RS_EN=0.")
+    print("(FDI_CFG_TP_<B1>B_<B2>B, built with TWO_PHY); -rxf: non-default RX FIFO depths, RS_EN=0.")
     print("<CONFIG>-assert: the same build with the RTL's ASSERTION_ON checks compiled in.")
 
 

@@ -5,8 +5,7 @@
 //
 // T1 top (tb_top, no ports): AOU_TOP as u_dut against layered models. Build
 // configuration comes from defines (aou_sim_cfg.toml targets; Makefile CONFIG): AOU_RP_COUNT, AOU_RP<n>_DATA_W (per RP; default
-// AOU_RP_DATA_W), AOU_FDI_CONFIG, AOU_PEER_MAX_W (AXI_PEER_DIE_MAX_DATA_WD, default
-// 1024), AOU_TX_NXT_PACKING (TX_NXT_PACKING_EN, default 0), TWO_PHY for the
+// AOU_RP_DATA_W), AOU_FDI_CONFIG, AOU_TX_NXT_PACKING (TX_NXT_PACKING_EN, default 0), TWO_PHY for the
 // two-PHY FDI configurations, and
 // AOU_RX_FIFO_ALT for non-default RX FIFO depths with the register slices off
 // (aou_t1_env_pkg::AOU_T1_RX_DEPTH). Every interface is registered in
@@ -37,9 +36,6 @@
 `ifndef AOU_FDI_CONFIG
 `define AOU_FDI_CONFIG 1
 `endif
-`ifndef AOU_PEER_MAX_W
-`define AOU_PEER_MAX_W 1024
-`endif
 `ifndef AOU_TX_NXT_PACKING
 `define AOU_TX_NXT_PACKING 0
 `endif
@@ -61,7 +57,6 @@ module tb_top;
     return (r == 0) ? RPW0 : (r == 1) ? RPW1 : (r == 2) ? RPW2 : RPW3;
   endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
-  localparam int PEER_W     = `AOU_PEER_MAX_W;
   localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
   localparam int BUS_W      = 1024;
   localparam int AXI_W      = 1024;
@@ -388,7 +383,6 @@ module tb_top;
       .RP1_AXI_DATA_WD(RPW1),
       .RP2_AXI_DATA_WD(RPW2),
       .RP3_AXI_DATA_WD(RPW3),
-      .AXI_PEER_DIE_MAX_DATA_WD(PEER_W),
       .TX_NXT_PACKING_EN(NXT_PACK)
 `ifdef AOU_RX_FIFO_ALT
       ,

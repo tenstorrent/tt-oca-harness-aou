@@ -127,8 +127,8 @@ into one book with Asciidoctor.
 ## Build configurations
 
 `CONFIG` selects the build parameters of the T1 bench (`TB=t1`) and the register
-bench (`TB=reg`): RP count, AXI data width per RP, `FDI_CONFIG` and, in `-p<W>`
-and `-nxt` configurations, `AXI_PEER_DIE_MAX_DATA_WD` and `TX_NXT_PACKING_EN`. Build and
+bench (`TB=reg`): RP count, AXI data width per RP, `FDI_CONFIG` and, in `-nxt`
+configurations, `TX_NXT_PACKING_EN`. Build and
 output directories are named after it (`build/vcs-t1-1x512-sp64`,
 `out/vcs-t1-1x512-sp64`). `make configs` prints this table.
 
@@ -142,10 +142,7 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `1x256-sp32` | 1 | 256 | FDI_CFG_SP_32B | 1 | Narrowest RP and FDI (the RTL's default FDI_CONFIG) |
 | `2xmix-tp64_128` | 2 | 512, 1024 | FDI_CFG_TP_64B_128B | 2 | Two-PHY FDI, two RPs, mixed widths |
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
-| `1x512-sp64-p512` | 1 | 512 | FDI_CFG_SP_64B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 512 (plan 14.17) |
 | `1x512-sp64-nxt` | 1 | 512 | FDI_CFG_SP_64B | 1 | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
-| `4xmix4211-sp128-p512` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 512 below a 1024-bit RP (plan 14.17) |
-| `4xmix4211-sp128-p256` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 256 below 1024- and 512-bit RPs (plan 14.17) |
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
 
 Reading a name:
@@ -157,8 +154,6 @@ Reading a name:
 - `sp<B>`: a single PHY with a B-byte FDI data path (`FDI_CFG_SP_<B>B`).
 - `tp<B1>_<B2>`: two PHYs with B1- and B2-byte FDI data paths
   (`FDI_CFG_TP_<B1>B_<B2>B`, built with `TWO_PHY`).
-- `-p<W>`: `AXI_PEER_DIE_MAX_DATA_WD` of W bits (1024, the RTL default,
-  without it). A `+remote_bytes` above W/8 is limited to W/8.
 - `-nxt`: `TX_NXT_PACKING_EN` 1 (`AOU_TX_NXT_PACKING=1`): the TX flit packer
   computes each chunk from its look-ahead state and registers it before the FDI
   output; the default (0) drives the chunk combinationally from the granule ring.

@@ -186,5 +186,5 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   `aou_sanity_test` included (scoreboard data mismatches, AXI-S02, and the AXI
   read-channel rules AXI-R08/R09 trip across tests), in the baseline and after
   the move alike; the comparison treats these as unchanged FAIL, not as
-  degradations. They are not in `expected_fail.yaml` and need a bug draft or a
-  bench fix by the owner before the target can be graded green.
+  degradations. (Since retired: `AXI_PEER_DIE_MAX_DATA_WD` is a localparam
+  fixed at 1024 and the target no longer exists.)

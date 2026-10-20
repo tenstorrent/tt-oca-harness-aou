@@ -6,14 +6,11 @@
 // Register-only bench: AOU_CORE_TOP with its APB port driven by the APB agent and
 // every other input held idle (no AXI traffic, FDI link in Reset). Built with
 // make TB=reg until the T1 top hosts the register tests. The DUT parameters a
-// target sets through defines (AOU_PEER_MAX_W, AOU_TX_NXT_PACKING; aou_reg_sim_cfg.toml)
+// target sets through defines (AOU_TX_NXT_PACKING; aou_reg_sim_cfg.toml)
 // reach the DUT here as in tb_top, so a target's register runs are built on
 // the DUT configuration they are labelled with.
 `timescale 1ns/1ps
 
-`ifndef AOU_PEER_MAX_W
-`define AOU_PEER_MAX_W 1024
-`endif
 `ifndef AOU_TX_NXT_PACKING
 `define AOU_TX_NXT_PACKING 0
 `endif
@@ -26,7 +23,6 @@ module aou_reg_top;
   localparam int RP_COUNT = `AOU_RP_COUNT;
   localparam int AXI_W = 8 * `AOU_AXI_DATA_BYTES;
   localparam int FDI_W = `AOU_FDI_DATA_W;
-  localparam int PEER_W = `AOU_PEER_MAX_W;
   localparam int NXT_PACK = `AOU_TX_NXT_PACKING;
 
   logic clk;
@@ -81,7 +77,6 @@ module aou_reg_top;
       .RP1_AXI_DATA_WD(AXI_W),
       .RP2_AXI_DATA_WD(AXI_W),
       .RP3_AXI_DATA_WD(AXI_W),
-      .AXI_PEER_DIE_MAX_DATA_WD(PEER_W),
       .TX_NXT_PACKING_EN(NXT_PACK)
   ) u_dut (
       .I_CLK    (clk),

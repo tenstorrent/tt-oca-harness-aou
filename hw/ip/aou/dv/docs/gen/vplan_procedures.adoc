@@ -478,10 +478,7 @@ directions at once (+dp_dir=both; D41). +dp_profile picks a profile
 | `aou_dp_random_test.dp_dir-both` | `+dp_dir=both` | 1-5 |  | 10.3,7.16,8.9,8.10
 | `aou_dp_random_test.dp_dir-both.dp_profile-stall` | `+dp_dir=both +dp_profile=stall` | 1-3 |  | 7.16
 | `aou_dp_random_test.dp_dir-both.small_size_pct-5` | `+dp_dir=both +small_size_pct=5` | 1-3 |  | 4.1,5.1,14.10,14.11
-| `aou_dp_random_test.dp_dir-both.1x512-sp64-p512` | `+dp_dir=both` | 1-3 | `1x512-sp64-p512` | 14.17
 | `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt` | `+dp_dir=both` | 1-3 | `1x512-sp64-nxt` | 10.3,7.16,8.9,8.10
-| `aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512` | `+dp_dir=both` | 1-2 | `4xmix4211-sp128-p512` | 14.17
-| `aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256` | `+dp_dir=both` | 1-2 | `4xmix4211-sp128-p256` | 14.17
 | `aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32` | `+dp_dir=both +small_size_pct=5 +remote_bytes=32,128,64,32` | 1-2 | `4xmix4211-sp128` | 4.1,5.1,14.10,14.11
 | `aou_dp_random_test.small_size_pct-5.remote_bytes-128_64_32_128` | `+dp_dir=both +small_size_pct=5 +remote_bytes=128,64,32,128` | 1-2 | `4xmix2144-sp64` | 4.1,5.1,14.10,14.11
 | `aou_dp_random_test.small_size_pct-5.remote_bytes-64_32_128_64` | `+dp_dir=both +small_size_pct=5 +remote_bytes=64,32,128,64` | 1-2 | `4xmix4211-sp128` | 4.1,5.1,14.10,14.11
@@ -507,7 +504,6 @@ directions at once (+dp_dir=both; D41). +dp_profile picks a profile
 * 12.16: Test RP with 512-bit AXI data width
 * 14.10: Verify WLAST regenerated correctly for single-beat
 * 14.11: Verify WLAST regenerated correctly for multi-beat burst
-* 14.17: AXI_PEER_DIE_MAX_DATA_WD below 1024
 * 18.2: Configure `FDI_CFG_SP_64B`; verify 64-byte chunks
 * 18.22: Stall corners: stallreq mid-flit (ack at the boundary), stallreq while trdy=0, stallreq with LP mode
 * 18.24: Flit-cancel corners: during a multi-flit message, repeated cancel, cancel of the second half, cancel with stall
@@ -807,7 +803,6 @@ scoreboard checks bytes, OKAY responses and RLAST on every transfer (4.22,
 | `aou_dp_size_test.dp_size-0_1_2_3_4_5_6` | `+dp_size=0,1,2,3,4,5,6` | 1-3 |  | 4.1,4.2,4.3,4.4,4.5,4.6,4.7,4.22,5.1,5.2,5.3,5.4,5.5,5.6,5.7,5.18,5.20,7.1,7.2,7.10,11.13,14.8
 | `aou_dp_size_test.dp_size-7.remote_bytes-128.dp_dir-r2l` | `+dp_size=7 +remote_bytes=128 +dp_dir=r2l` | 1-2 |  | 4.8,5.8,7.3,14.6
 | `aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r` | `+dp_size=6 +dp_len=1 +dp_dir=l2r` | 1-2 |  | 4.8,5.8,7.3
-| `aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512` | `+dp_size=0,1,2,3,4,5,6` | 1-2 | `1x512-sp64-p512` | 14.17
 |===
 
 *Plan items.*
@@ -838,7 +833,6 @@ scoreboard checks bytes, OKAY responses and RLAST on every transfer (4.22,
 * 11.13: AWLEN=0 / ARLEN=0 (single beat)
 * 14.6: Local 512-bit receives 1024-bit remote data; verify downsizing
 * 14.8: Local and remote both 512-bit; verify bypass path
-* 14.17: AXI_PEER_DIE_MAX_DATA_WD below 1024
 
 [[aou-proc-aou_dp_burst_test]]
 ===== 20. `aou_dp_burst_test`
@@ -3085,14 +3079,10 @@ DLENGTH and that every targeted conversion happened.
 | `aou_dw_test.remote_bytes-32.2x512-tp32_64` | `+remote_bytes=32` | 1-2 | `2x512-tp32_64` | 14.1,14.13,14.10,14.11,14.14,14.15,14.16
 | `aou_dw_test.remote_bytes-64.2x512-tp32_64` | `+remote_bytes=64` | 1-2 | `2x512-tp32_64` | 14.8,14.10,14.11,14.14,14.15,14.16,18.4
 | `aou_dw_test.remote_bytes-128.2x512-tp32_64` | `+remote_bytes=128` | 1-2 | `2x512-tp32_64` | 14.6,14.12,14.10,14.11,14.14,14.15,14.16
-| `aou_dw_test.remote_bytes-32.1x512-sp64-p512` | `+remote_bytes=32` | 1-2 | `1x512-sp64-p512` | 14.17
 | `aou_dw_test.remote_bytes-128.remote_max_burst-4.4xmix4211-sp128` | `+remote_bytes=128 +dp_align=aligned +remote_max_burst=4` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
-| `aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512` | `+remote_bytes=32` | 1-2 | `4xmix4211-sp128-p512` | 14.17
-| `aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512` | `+remote_bytes=64` | 1-2 | `4xmix4211-sp128-p512` | 14.17
 | `aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix4211-sp128` | `+remote_bytes=128 +remote_wreq=upsize` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
 | `aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-upsize` | `+remote_bytes=32,128,64,32 +remote_wreq=upsize` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
 | `aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix2144-sp64` | `+remote_bytes=128 +remote_wreq=upsize` | 1-2 | `4xmix2144-sp64` | 14.10,14.11
-| `aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256` | `+remote_bytes=32` | 1-2 | `4xmix4211-sp128-p256` | 14.17
 | `aou_dw_test.remote_bytes-128.remote_max_burst_rand-1` | `+remote_bytes=128 +remote_max_burst_rand=1` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
 | `aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128` | `+remote_bytes=128 +remote_wreq=dut_like` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
 | `aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-dut_like` | `+remote_bytes=32,128,64,32 +remote_wreq=dut_like` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
@@ -3123,7 +3113,6 @@ DLENGTH and that every targeted conversion happened.
 * 14.14: Verify DLEN field correctly routes to width adapter
 * 14.15: Verify ARSIZE routes read response to correct adapter
 * 14.16: Verify narrow R data duplicated to match local bus width
-* 14.17: AXI_PEER_DIE_MAX_DATA_WD below 1024
 * 18.1: Configure `FDI_CFG_SP_32B`; verify 32-byte chunks
 * 18.3: Configure `FDI_CFG_SP_128B`; verify 128-byte chunks
 * 18.4: Configure `FDI_CFG_TP_32B_64B` with `+define+TWO_PHY`

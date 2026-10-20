@@ -133,6 +133,8 @@ def apply_corrections(items, corrections):
                 continue
             if not c.get("note"):
                 errors.append(f"correction for {c['id']} has no note")
+            if "dropped" in c:  # an added item later retired keeps its number
+                item["dropped"] = c["dropped"]
             item["note"] = c.get("note")
             continue
         if item is None:

@@ -388,7 +388,8 @@
   added: 'integration guide parameters'
   priority: P2
   title: 'AXI_PEER_DIE_MAX_DATA_WD below 1024'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  dropped: AXI_PEER_DIE_MAX_DATA_WD is a localparam fixed at 1024, the widest AoU data message; the RX data path is always sized for a 1024-bit remote die and there is no narrower build to test.
+  note: Coverage-closure gap analysis 4.3 (decision D9) added it when the parameter was configurable; retired with the parameter (DECISIONS D9 amendment, 2026-10-20).
 - id: '16.17'
   added: 'MAS 3.7.5; BUGS/005'
   priority: P2

@@ -151,7 +151,7 @@ class aou_t1_env_cfg extends uvm_object;
   // Pushes the shared settings into the agent configs. The env calls it at
   // build, after the test has configured.
   function void finalize();
-    // The remote die is no wider than the DUT's AXI_PEER_DIE_MAX_DATA_WD.
+    // The remote die is no wider than the widest AoU data message (1024 bits).
     if (remote_bytes > AOU_T1_PEER_MAX_BYTES) begin
       `uvm_info(get_type_name(), $sformatf("remote die %0d bytes wide, limited to the peer's %0d",
                                            remote_bytes, AOU_T1_PEER_MAX_BYTES), UVM_LOW)

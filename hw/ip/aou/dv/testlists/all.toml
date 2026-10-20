@@ -320,7 +320,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 449
+expected_count = 441
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -687,9 +687,6 @@ tests = [
   "aou_perf_test.perf_mode-drain.2x512-tp32_64",
   "aou_mrp_test.mrp_scn-crd_rr.4x512-sp64",
   "aou_mrp_test.mrp_scn-crd_rr.4xmix4211-sp128",
-  "aou_dp_random_test.dp_dir-both.1x512-sp64-p512",
-  "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512",
-  "aou_dw_test.remote_bytes-32.1x512-sp64-p512",
   "aou_sanity_test.1x512-sp64-nxt",
   "aou_dp_random_test.dp_dir-both.1x512-sp64-nxt",
   "aou_pack_test.pk-crossflit.1x512-sp64-nxt",
@@ -703,16 +700,11 @@ tests = [
   "aou_split_test.remote_bytes-128.split-255.4xmix2144-sp64",
   "aou_split_test.remote_bytes-128.split-15.4xmix2144-sp64",
   "aou_dw_test.remote_bytes-128.remote_max_burst-4.4xmix4211-sp128",
-  "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512",
-  "aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512",
-  "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512",
   "aou_split_test.remote_bytes-64.split-3.4xmix4211-sp128",
   "aou_split_test.remote_bytes-64.split-255.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-upsize",
   "aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix2144-sp64",
-  "aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256",
-  "aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256",
   "aou_dw_test.remote_bytes-128.remote_max_burst_rand-1",
   "aou_dw_down1024_test.remote_wreq-dut_like.4xmix2144-sp64",
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128",

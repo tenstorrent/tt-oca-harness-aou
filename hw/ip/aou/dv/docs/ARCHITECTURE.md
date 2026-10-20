@@ -67,10 +67,7 @@ all configurations and the naming legend are in README "Build configurations"
 | 1x256-sp32 | 1 | 256 | SP_32B | narrowest RP and FDI (the RTL defaults' FDI) |
 | 2xmix-tp64_128 | 2 | 512, 1024 | TP_64B_128B (TWO_PHY) | two-PHY FDI, 2 RPs, mixed widths |
 | 2x512-tp32_64 | 2 | 512 | TP_32B_64B (TWO_PHY) | two-PHY FDI with a 256-bit PHY0, 2 RPs at one width |
-| 1x512-sp64-p512 | 1 | 512 | SP_64B | AXI_PEER_DIE_MAX_DATA_WD 512 (remote die at most 512 bits) |
 | 1x512-sp64-nxt | 1 | 512 | SP_64B | TX_NXT_PACKING_EN 1 (registered TX packer output stage) |
-| 4xmix4211-sp128-p512 | 4 | 1024, 512, 256, 256 | SP_128B | AXI_PEER_DIE_MAX_DATA_WD 512 with a 1024-bit RP (remote die at most 512 bits; the DUT's own reads still get ReadData1024) |
-| 4xmix4211-sp128-p256 | 4 | 1024, 512, 256, 256 | SP_128B | AXI_PEER_DIE_MAX_DATA_WD 256 below the 1024- and 512-bit RPs (remote die at most 256 bits) |
 | 2xmix-sp64-rxf | 2 | 1024, 256 | SP_64B | non-default RX FIFO depths, RX FIFO register slices off |
 
 The configurations are a pairwise set rather than a cross product: every pair

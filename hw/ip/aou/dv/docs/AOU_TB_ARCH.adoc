@@ -121,7 +121,7 @@ tb_top                                  tb/tb_top.sv (no ports)
 `tb_top` has no ports. It generates the core and APB clocks, holds both resets
 at power-on while the clocks run, instantiates `AOU_TOP` as `u_dut` with the
 parameters the target's defines select (`AOU_RP_COUNT`, `AOU_RP<n>_DATA_W`,
-`AOU_FDI_CONFIG`, `AOU_PEER_MAX_W`, `TWO_PHY`, `AOU_RX_FIFO_ALT`; `[targets.<name>]`
+`AOU_FDI_CONFIG`, `TWO_PHY`, `AOU_RX_FIFO_ALT`; `[targets.<name>]`
 in `aou_sim_cfg.toml`), ties off the DUT's bring-up pins, and binds the
 interfaces. One parameterisation per interface type (the widest width, the
 real width in the agent's config) gives one virtual-interface type per bus on
@@ -223,8 +223,8 @@ bypass pairing.
 
 Build-time variation is the target: ten `[targets.<name>]` in
 `aou_sim_cfg.toml` form a pairwise set over RP count (1 to 4), local width
-(256, 512, 1024, mixed), FDI width (256, 512, 1024, both two-PHY pairs), the
-peer width limit and the RX FIFO depths (README "Build configurations",
+(256, 512, 1024, mixed), FDI width (256, 512, 1024, both two-PHY pairs) and
+the RX FIFO depths (README "Build configurations",
 `make configs`). A scenario without `target` runs on every target
 (`run_list.py --target`); one pinned by `target` runs there only.
 

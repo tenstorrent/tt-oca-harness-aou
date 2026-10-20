@@ -71,12 +71,9 @@ package aou_t1_env_pkg;
   // How the remote die sizes its WriteReqs (aou_t1_remote_mgr_driver).
   typedef enum int {AOU_RWREQ_AWSIZE, AOU_RWREQ_UPSIZE, AOU_RWREQ_DUT_LIKE} aou_t1_rwreq_e;
 
-  // AXI_PEER_DIE_MAX_DATA_WD in bytes (Makefile CONFIG: AOU_PEER_MAX_W, default 1024)
-`ifdef AOU_PEER_MAX_W
-  localparam int AOU_T1_PEER_MAX_BYTES = `AOU_PEER_MAX_W / 8;
-`else
+  // The widest AoU data message, 1024 bits (the DUT's AXI_PEER_DIE_MAX_DATA_WD, a
+  // localparam): the remote die model is never wider than this.
   localparam int AOU_T1_PEER_MAX_BYTES = 128;
-`endif
 
   function automatic int unsigned aou_t1_rp_bytes(int unsigned r);
     case (r)
