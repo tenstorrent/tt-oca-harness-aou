@@ -16,6 +16,8 @@ class aou_t1_status extends uvm_component;
   int unsigned       rises[string];
   bit                enabled;     // O_AOU_ACTIVATE_ST_ENABLED, sampled
   bit                disabled;    // O_AOU_ACTIVATE_ST_DISABLED, sampled
+  int unsigned       n_enabled;   // entries into ENABLED, so a waiter that samples
+  int unsigned       n_disabled;  // the level late still sees a short visit
   uvm_event          state_ev;
   bit                act_ok;      // result of wait_act_state()
   uvm_event          act_start_ev;    // INT_ACTIVATE_START rose
@@ -66,6 +68,8 @@ class aou_t1_status extends uvm_component;
         continue;
       end
       if (vif.mon_cb.act_st_enabled !== enabled || vif.mon_cb.act_st_disabled !== disabled) begin
+        if (vif.mon_cb.act_st_enabled === 1'b1 && !enabled) n_enabled++;
+        if (vif.mon_cb.act_st_disabled === 1'b1 && !disabled) n_disabled++;
         enabled = vif.mon_cb.act_st_enabled === 1'b1;
         disabled = vif.mon_cb.act_st_disabled === 1'b1;
         state_ev.trigger();

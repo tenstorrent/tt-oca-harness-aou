@@ -11,3 +11,4 @@
 `include "link/aou_rx_credit_vseq.svh"
 `include "link/aou_act_rx_drain_vseq.svh"
 `include "link/aou_deact_ctrl_vseq.svh"
+`include "link/aou_remote_react_vseq.svh"

@@ -13,7 +13,7 @@
 | 1.3 | Verify behavior when ActivateAck not received within `ack_time_out_value`; verify `act_ack_err` and `INT_REQ_LINKRESET` | P2 | `aou_linkreset_timeout_test.src-act_ack`
 | 1.4 | Test activation with `property_req` field set | P2 | dropped: PropertyReq on ActivateReq has no defined effect in v0.7 and is replaced by ProfileID/Rev/Opt in v0.8.
 | 1.5 | Send malformed activation message; verify `invalid_actmsg_err` and `invalid_actmsg_info` capture | P2 | `aou_invalid_actmsg_test.state-all.op-all`, `aou_invalid_actmsg_test.state-deactivate`, `aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-1`, `aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8`, `aou_invalid_actmsg_test.state-disabled`
-| 1.6 | Perform activate → deactivate → activate sequence multiple times | P1 | `aou_act_after_deact_test`, `aou_act_after_deact_test.credit_manage-1.busy-1`, `aou_link_act_deact_test`, `aou_t1_deact_test`, `aou_t1_hard_reset_test`, `aou_t1_remote_act_test`, `aou_t1_sw_reset_test`
+| 1.6 | Perform activate → deactivate → activate sequence multiple times | P1 | `aou_act_after_deact_test`, `aou_act_after_deact_test.credit_manage-1.busy-1`, `aou_link_act_deact_test`, `aou_remote_react_test`, `aou_t1_deact_test`, `aou_t1_hard_reset_test`, `aou_t1_remote_act_test`, `aou_t1_sw_reset_test`
 | 1.7 | Verify `activate_state_enabled` and `activate_state_disabled` CSR status bits | P0 | `aou_link_act_deact_test`, `aou_t1_deact_test`, `aou_t1_remote_act_test`, `aou_t1_slice_test`
 | 1.8 | Send deactivate while in activate; verify interrupt request linkreset | P2 | `aou_invalid_actmsg_test.state-activate`, `aou_invalid_actmsg_test.state-all.op-all`
 | 1.9 | Send ActivateReq while ENABLED; INVALID_ACTMSG and INT_REQ_LINKRESET, the ActivateAck is still sent | P2 | `aou_invalid_actmsg_test.state-all.op-all`, `aou_invalid_actmsg_test.state-enabled`, `aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8`
@@ -161,7 +161,7 @@
 | 6.17 | Verify `msg_credit` correctly set in bytes 128-129 | P0 | merged into 3.2
 | 6.18 | Pack exactly 48 granules (flit completely full) | P1 | `aou_pack_test.pk-full`, `aou_pack_test.pk-full.1x512-sp64-nxt`, `aou_pack_test.pk-wresp48`
 | 6.19 | Pack messages from different RPs in same flit | P1 | `aou_pack_test.pk-rp`
-| 6.20 | Verify rules for activation messages | P1 | `aou_act_after_deact_test`, `aou_act_after_deact_test.credit_manage-1.busy-1`, `aou_pack_test.pk-act`
+| 6.20 | Verify rules for activation messages | P1 | `aou_act_after_deact_test`, `aou_act_after_deact_test.credit_manage-1.busy-1`, `aou_pack_test.pk-act`, `aou_remote_react_test`
 | 6.21 | Verify rules for misc messages | P1 | `aou_pack_test.pk-act`
 |===
 ==== 2.7 Data Integrity Tests
@@ -433,7 +433,7 @@
 | 18.14 | LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery | P2 | `aou_link_event_test.event-linkerror`
 | 18.15 | L1 entry and exit with the MAS power-management sequence, including the clk_req wake | P2 | `aou_link_event_test.event-clk_wake`, `aou_link_event_test.event-l1`
 | 18.16 | L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested | P2 | `aou_fdi_t1_link_stress_test`, `aou_fdi_t1_link_stress_test.fdi_rx_early-40`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40`
-| 18.17 | LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask | P2 | `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-teardown_int`
+| 18.17 | LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask | P2 | `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-teardown_int`, `aou_remote_react_test`
 | 18.18 | Disabled: Adapter-initiated entry and exit | P2 | `aou_fdi_t1_linkdown_spec_test`, `aou_link_event_test.event-disabled`
 | 18.19 | rx_active request/status handshake: raise and fall rules | P2 | `aou_fdi_t1_link_stress_test.fdi_rx_early-40`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40`, `aou_t1_slice_test`
 | 18.20 | wake_req/wake_ack handshake | P2 | `aou_t1_slice_test`

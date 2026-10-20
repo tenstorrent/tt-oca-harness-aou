@@ -115,13 +115,23 @@ class aou_t1_sw_isr extends uvm_component;
     s.start(null);
   endtask
 
-  // Waits for ENABLED (en=1) or DISABLED; ok_r[en] = 0 when cancelled, on
-  // INT_REQ_LINKRESET or after state_timeout cycles.
-  protected task wait_state(bit en, int unsigned g);
+  // The DUT has been ENABLED (en=1) or DISABLED since the service began
+  // (entries counted from n0). DISABLED can last only a few cycles when the
+  // remote die re-activates at once (AoU 8.4), less than the APB write that
+  // precedes the wait, so the level alone can miss it.
+  protected function bit reached(bit en, int unsigned n0);
+    return (en ? status.enabled : status.disabled) ||
+           (en ? status.n_enabled : status.n_disabled) != n0;
+  endfunction
+
+  // Waits for ENABLED (en=1) or DISABLED, reached since entry count n0;
+  // ok_r[en] = 0 when cancelled, on INT_REQ_LINKRESET or after state_timeout
+  // cycles.
+  protected task wait_state(bit en, int unsigned g, int unsigned n0);
     int unsigned n = 0;
     ok_r[en] = 1'b1;
     tmo_r[en] = 1'b0;
-    while ((en ? status.enabled : status.disabled) != 1'b1) begin
+    while (!reached(en, n0)) begin
       @(status.vif.mon_cb);
       if (g != gen || status.vif.mon_cb.int_req_linkreset === 1'b1 || ++n >= state_timeout) begin
         ok_r[en] = 1'b0;
@@ -133,8 +143,8 @@ class aou_t1_sw_isr extends uvm_component;
 
   // Clears the interrupt a timed-out service left pending once its state
   // arrives; a reset or LinkReset recovery (cancel()) ends the wait.
-  protected task late_clear(bit act, int unsigned g);
-    while ((act ? status.enabled : status.disabled) != 1'b1) begin
+  protected task late_clear(bit act, int unsigned g, int unsigned n0);
+    while (!reached(act, n0)) begin
       @(status.vif.mon_cb);
       if (g != gen) return;
     end
@@ -145,6 +155,7 @@ class aou_t1_sw_isr extends uvm_component;
 
   protected task service(bit act);
     int unsigned g = gen;
+    int unsigned n0 = act ? status.n_enabled : status.n_disabled;
     busy++;
     if (act) n_act++;
     else n_deact++;
@@ -155,7 +166,7 @@ class aou_t1_sw_isr extends uvm_component;
                 act ? "ACTIVATE_START" : "DEACTIVATE_START"), UVM_LOW)
       write_field(act ? rm.aou_init.activate_start : rm.aou_init.deactivate_start, 1);
     end
-    wait_state(act, g);
+    wait_state(act, g, n0);
     // Requests issued from here on wake the link again (7.3.5 INT_ACTIVATE_START
     // condition 2, 7.3.6).
     if (!act) hold_requests(1'b0);
@@ -167,7 +178,7 @@ class aou_t1_sw_isr extends uvm_component;
                 act ? "INT_ACTIVATE_START" : "INT_DEACTIVATE_START"), UVM_LOW)
       if (tmo_r[act])
         fork
-          late_clear(act, g);
+          late_clear(act, g, n0);
         join_none
     end
     done();

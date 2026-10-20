@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 228
+expected_count = 229
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -232,6 +232,7 @@ tests = [
   "aou_zero_credit_test.credit-wresp.deact-1",
   "aou_deact_ctrl_test.mode-tov",
   "aou_deact_ctrl_test.mode-property",
+  "aou_remote_react_test",
   "aou_invalid_actmsg_test.state-all.op-all",
   "aou_invalid_actmsg_test.state-enabled",
   "aou_invalid_actmsg_test.state-activate",
@@ -321,7 +322,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 414
+expected_count = 415
 tests = [
   "aou_sanity_test",
   "aou_t1_slice_test",
@@ -516,6 +517,7 @@ tests = [
   "aou_zero_credit_test.credit-wresp.deact-1",
   "aou_deact_ctrl_test.mode-tov",
   "aou_deact_ctrl_test.mode-property",
+  "aou_remote_react_test",
   "aou_invalid_actmsg_test.state-all.op-all",
   "aou_invalid_actmsg_test.state-enabled",
   "aou_invalid_actmsg_test.state-activate",

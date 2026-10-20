@@ -193,7 +193,7 @@
 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-res0` | `aou_qos_order_test` | `+arb_mode=1 +qos_tiers=2 +qos_timer=res0` | 1-3 | `4x512-sp64` | 13.22 | 
 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-max` | `aou_qos_order_test` | `+arb_mode=1 +qos_tiers=2 +qos_timer=max` | 1-3 | `4x512-sp64` | 13.22 | 
 |===
-===== `testlists/link.toml` (39 scenarios)
+===== `testlists/link.toml` (40 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -236,6 +236,7 @@
 | `aou_zero_credit_test.credit-wresp.deact-1` | `aou_zero_credit_test` | `+credit=wresp +deact=1` | 1-2 |  | 2.5 | 
 | `aou_deact_ctrl_test.mode-tov` | `aou_deact_ctrl_test` | `+mode=tov` | 1-3 |  | 2.12 | 
 | `aou_deact_ctrl_test.mode-property` | `aou_deact_ctrl_test` | `+mode=property` | 1-2 |  | 2.10 | 
+| `aou_remote_react_test` | `aou_remote_react_test` |  | 1-3 |  | 1.6,6.20,18.17 | 
 |===
 ===== `testlists/errors.toml` (16 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]

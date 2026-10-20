@@ -1014,6 +1014,64 @@ root from the bench's position (the Makefile, the two shell scripts,
 `sim_cfg.py`) is four levels deep now; a script that assumed one level would
 have reached `hw/ip/aou`.
 
+## D18. The system resets both dies after an FDI link-down
+
+**Decision.**
+
+- When the FDI link goes down (LinkReset, LinkError or Disabled, started by
+  the DUT, the Adapter or the remote die, including the DUT's own teardown
+  after a deactivation), the bench's software and system model resets both
+  dies while the link is down: AOU_SW_RESET on the DUT (the bring-up
+  controller, outside AOU_CORE, keeps its state) and the remote die's reset
+  of its AoU state (`reset_flush()`). Software then reprograms the last
+  `program_cfg()` and the dies activate again from DISABLED.
+- It applies unless both dies are cleanly DISABLED with no activation message
+  pending or in flight in either direction (`aou_quiet()`: the DUT and the
+  remote DISABLED, the remote's activation queue empty). A received
+  ActivateReq or a queued ActivateAck keeps the DUT out of DISABLED, so those
+  cases reset. The DUT's own last DeactivateAck leaves it DISABLED once
+  handed to TX; that case is covered by the remote, which cannot be DISABLED
+  until it receives that Ack. Non-activation messages still in a TX path
+  when both are DISABLED (a CrdtGrant permitted after DeactivateAck) are not
+  seen; one would surface as a checker failure, not be hidden.
+  Ordinary deactivate-then-relink flows are quiet and unchanged.
+- `relink()` applies it, and so does `link_event()` for a link-down the
+  Adapter brings back up by itself; that hook re-activates the dies itself,
+  so a test that wants to drive re-activation after such an event sets
+  `+sysrst_on_linkdown=0`. `recover()` and `sw_reset()` already reset the DUT
+  for the error LinkReset (MAS 7.3.6). `cfg.sysrst_on_linkdown`
+  (`+sysrst_on_linkdown=0`) turns it off.
+- AOU_FDI_CHECKER resets all of its state on every FDI Reset.
+
+**Why.**
+
+- The owners' documents assign AOU_SW_RESET only to the LinkReset that
+  AOU_CORE requests itself (MAS 7.3.6, integration guide 6.5.3). They are
+  silent on the other link-downs, and the RTL never clears its activation
+  state on one.
+- AoU v0.8 reads as the interface state not surviving an FDI reset (9.1/9.2,
+  8.3.3, 8.2/8.4). UCIe flushes the Adapters' pipelines on LinkReset and
+  Disabled, so a message in flight across the reset may be lost.
+- The project's principle is to keep the hardware simple and let software or a
+  system reset controller own clearing state.
+- Without the reset, an exchange split across the reset (the DUT's queued
+  ActivateAck going out after the relink) is out of sequence under a checker
+  that starts afresh at the reset.
+
+**Rejected.**
+
+- *A checker activation epoch that survives an FDI reset* (gated on the
+  DUT's own DISABLED). The state before the reset may be what caused it, and
+  the checker would trust the device under check about when to forget its
+  model.
+- *Resetting on every link-down.* That would churn every deactivate-and-relink
+  test for no gain, because a quiet interface has nothing to clear.
+- *An RTL change that clears the activation FSM on link-down.* It is neither
+  sufficient (the queued TX flit survives) nor documented.
+
+The owner question is open (038/011): who resets AOU_CORE after a link-down it
+did not request, and must a flit already in its TX path be dropped?
+
 ## Open items
 
 - **Functional coverage stages FC2 and FC3.** FC1 (the counting service, every

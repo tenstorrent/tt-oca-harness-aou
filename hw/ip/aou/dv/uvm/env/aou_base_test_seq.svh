@@ -26,6 +26,12 @@ class aou_base_test_seq extends ocah_sequence;
   // every simulator).
   bit                    link_ok;
   bit                    l3_ok;
+  int unsigned           n_sysrst;    // system resets on an FDI link-down (sys_reset())
+  bit                    sysrst_done; // the last relink() reset both dies
+  protected aou_t1_feature_cfg last_prog; // the last program_cfg(), reapplied after a reset
+  // Longest wait from the AOU_SW_RESET write to the core reset (sw_reset()); the
+  // DUT may first wait for its AXI handshakes to complete.
+  localparam int unsigned SW_RESET_WAIT_CYCLES = 10000;
 
   function new(string name = "aou_base_test_seq");
     super.new(name);
@@ -267,6 +273,7 @@ class aou_base_test_seq extends ocah_sequence;
   // through the register sequences
   // ---------------------------------------------------------------------
   task program_cfg(aou_t1_feature_cfg f);
+    last_prog = f;
     for (int unsigned r = 0; r < cfg.n_rp; r++) begin
       if (f.split_ar[r] >= 0 || f.split_aw[r] >= 0) begin
         aou_reg_split_seq s = aou_reg_split_seq::type_id::create("split");
@@ -554,6 +561,20 @@ class aou_base_test_seq extends ocah_sequence;
   // ---------------------------------------------------------------------
   task link_event(aou_lsm_ev_e kind, int unsigned cycles = 0);
     aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("ev");
+    // A link-down the Adapter brings back up by itself while AoU state is in
+    // use: the system resets both dies while the link is down, then they
+    // activate again (cfg.sysrst_on_linkdown).
+    if (cfg.lsm_cfg.rebringup_after_down && kind inside {LSM_EV_LINKERROR, LSM_EV_LINK_RESET,
+        LSM_EV_DISABLED} && sysrst_due()) begin
+      cfg.lsm_cfg.rebringup_after_down = 1'b0;
+      link_event(kind, cycles);
+      cfg.lsm_cfg.rebringup_after_down = 1'b1;
+      sys_reset();
+      link_event(LSM_EV_BRINGUP);
+      if (last_prog != null) program_cfg(last_prog);
+      activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
+      return;
+    end
     s.ev_kind = kind;
     s.ev_cycles = cycles;
     `uvm_info(get_type_name(), {"link event ", kind.name()}, UVM_LOW)
@@ -568,10 +589,80 @@ class aou_base_test_seq extends ocah_sequence;
 
   // Brings a link the DUT left down back up: an Adapter LinkReset and
   // bringup, or only the bringup when the Adapter already took the link to
-  // Reset (fdi_enc=SPEC: its answer to the DUT's LinkReset request).
+  // Reset (fdi_enc=SPEC: its answer to the DUT's LinkReset request). If AoU
+  // state is still in use, the system resets both dies while the link is
+  // down (sys_reset()); both are then DISABLED and the caller activates them
+  // as after any relink. Returns with sysrst_done set when it reset them.
   task relink();
-    link_event(cfg.lsm_cfg.fdi_enc == AOU_FDI_ENC_SPEC && env.lsm.drv.state == LSM_RESET ?
-               LSM_EV_BRINGUP : LSM_EV_LINK_RESET);
+    bit spec_down = cfg.lsm_cfg.fdi_enc == AOU_FDI_ENC_SPEC && env.lsm.drv.state == LSM_RESET;
+    sysrst_done = 1'b0;
+    if (!sysrst_due()) begin
+      link_event(spec_down ? LSM_EV_BRINGUP : LSM_EV_LINK_RESET);
+      return;
+    end
+    if (!spec_down) begin
+      bit keep = cfg.lsm_cfg.rebringup_after_down;
+      cfg.lsm_cfg.rebringup_after_down = 1'b0;
+      link_event(LSM_EV_LINK_RESET);
+      cfg.lsm_cfg.rebringup_after_down = keep;
+    end
+    sys_reset();
+    link_event(LSM_EV_BRINGUP);
+    if (last_prog != null) program_cfg(last_prog);
+    sysrst_done = 1'b1;
+  endtask
+
+  // Both dies cleanly DISABLED with no activation message pending or in
+  // flight in either direction. A message the DUT has handed to its TX path
+  // or received leaves it out of DISABLED (it moves on the hand-over), and
+  // one on its way to or queued in the remote die leaves the remote out of
+  // DISABLED or its queue non-empty, so the two states and the remote's queue
+  // cover every place an activation message can be.
+  function bit aou_quiet();
+    return env.status.disabled && env.l3.model.lnk.state == AOU_LS_DISABLED &&
+           env.l3.model.lnk.out_q.size() == 0;
+  endfunction
+
+  function bit sysrst_due();
+    return cfg.sysrst_on_linkdown && !aou_quiet();
+  endfunction
+
+  // The system's reset of both dies on an FDI link-down, with the link down:
+  // software resets AOU_CORE (AOU_SW_RESET, as in the MAS 7.3.6 LinkReset
+  // sequence; the bring-up controller is outside AOU_CORE and keeps its state)
+  // and the remote die resets its own AoU state. Messages queued on either
+  // side before the reset are void (AoU v0.8 reading: the interface state
+  // does not survive an FDI reset).
+  task sys_reset();
+    n_sysrst++;
+    `uvm_info(get_type_name(),
+              $sformatf("FDI link down, AoU in use (DUT %s, remote %s, %0d queued): system reset",
+                        env.status.disabled ? "DISABLED" : "active",
+                        env.l3.model.lnk.state.name(), env.l3.model.lnk.out_q.size()), UVM_LOW)
+    env.sw_isr.cancel();
+    env.sw_isr.wait_idle();
+    sw_reset_core();
+  endtask
+
+  // AOU_SW_RESET and the environment's matching flush (both dies), the link
+  // already down. The flush follows the core reset, which the DUT may delay
+  // until its AXI handshakes complete; a core reset that never comes is T1-L31.
+  task sw_reset_core();
+    env.sw_reset_window(1'b1);
+    fork
+      write_field(p_sequencer.regs.aou_con0.aou_sw_reset, 1);
+      begin
+        env.rst.wait_core_reset(SW_RESET_WAIT_CYCLES);
+        if (!env.rst.core_reset_seen)
+          `uvm_error(get_type_name(), $sformatf(
+                     {"T1-L31: AOU_SW_RESET did not put the DUT core in reset within %0d ",
+                      "cycles; flushing anyway"}, SW_RESET_WAIT_CYCLES))
+        env.sw_reset_window(1'b0);
+        env.reset_flush(AOU_T1_RST_BOTH, 1'b0);
+      end
+    join
+    wait_cycles(20);
+    p_sequencer.regs.reset();
   endtask
 
   // L3 error injection. kind: bad_type (arg: kind of bad granule), rsvd
@@ -657,17 +748,21 @@ class aou_base_test_seq extends ocah_sequence;
   // interim: every SFR and the activation state reset, the bit clears itself),
   // the remote die drops its activation state, the link comes back up,
   // software reprograms and both dies activate again.
+  // The env flushes on the first core clock that samples the core in reset. The
+  // request (with the RTL's AXI guard), then the reset and the guard's drain, let no
+  // new handshake start on the DUT's AXI ports, so every request handshaked before
+  // the flush went to the old core (reset_outstanding) and every one after it goes
+  // to the new core and is tracked normally. Flushing later would abort a request
+  // the new core had accepted; it still goes out on the next activation, and the
+  // far side pairs it with another request (DP-R05). The APB write can complete
+  // after the drain has ended, so it is not the boundary. The local managers keep
+  // issuing throughout, so requests do arrive during the reset and the drain.
   task sw_reset(aou_t1_feature_cfg reprogram = null, bit reactivate = 1'b1);
     bit rebringup = cfg.lsm_cfg.rebringup_after_down;
     cfg.lsm_cfg.rebringup_after_down = 1'b0;
     link_event(LSM_EV_LINK_RESET);
     cfg.lsm_cfg.rebringup_after_down = rebringup;
-    env.sw_reset_window(1'b1);
-    write_field(p_sequencer.regs.aou_con0.aou_sw_reset, 1);
-    env.sw_reset_window(1'b0);
-    wait_cycles(20);
-    env.reset_flush(AOU_T1_RST_BOTH, 1'b0);
-    p_sequencer.regs.reset();
+    sw_reset_core();
     link_event(LSM_EV_BRINGUP);
     if (reprogram != null) program_cfg(reprogram);
     if (reactivate) activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);

@@ -23,6 +23,7 @@ class aou_t1_reset_agent extends uvm_component;
   aou_apb_cfg        apb_cfg;                        // set by the env
   bit                unquiesced_ok;                  // a deliberate violation is in progress
   int unsigned       n_violations;
+  bit                core_reset_seen;                // result of wait_core_reset()
 
   // PCLK cycles of continuous quiet the bridge must show, and the longest wait.
   localparam int unsigned QUIET_PCLKS = 4;
@@ -102,6 +103,21 @@ class aou_t1_reset_agent extends uvm_component;
 
   task release_apb();
     if (apb_cfg != null) apb_cfg.hold = 1'b0;
+  endtask
+
+  // Waits for a core clock edge that samples the DUT's core in reset (core_rst_n
+  // low: I_RESETN or AOU_SW_RESET), at most `bound` core clocks; core_reset_seen
+  // says which (a member: tasks cannot write outputs after waiting on every
+  // simulator).
+  task wait_core_reset(int unsigned bound);
+    core_reset_seen = 1'b0;
+    repeat (bound) begin
+      @(vif.mon_cb);
+      if (vif.mon_cb.core_rst_n === 1'b0) begin
+        core_reset_seen = 1'b1;
+        return;
+      end
+    end
   endtask
 
   // Quiesces the APB side (quiesce_apb), holds the selected reset(s) low for

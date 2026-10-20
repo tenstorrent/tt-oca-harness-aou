@@ -36,6 +36,18 @@ class aou_t1_env_cfg extends uvm_object;
   int unsigned   l1_gap_pct = 10;
   bit            l1_cancel_mix = 1'b0;     // cancel plans over every shape, repeats included
 
+  // System model on an FDI link-down (LinkReset, LinkError or Disabled,
+  // whoever started it, including the DUT's own teardown after a
+  // deactivation). The owners' documents assign AOU_SW_RESET only to the
+  // LinkReset AOU_CORE requests itself (MAS 7.3.6) and are silent on the
+  // rest; AoU v0.8 reads as the interface state not surviving an FDI reset.
+  // With this set, software or the system reset controller resets both dies
+  // (AOU_SW_RESET, the remote die's reset) while the link is down, unless
+  // both are cleanly DISABLED with no activation message pending or in
+  // flight; the dies then activate again from DISABLED.
+  // +sysrst_on_linkdown=0 turns it off (docs/DECISIONS.md D18).
+  bit            sysrst_on_linkdown = 1'b1;
+
   // Check enables
   bit            sb_en = 1'b1;
   // aou_t1_attr_chk: request attributes, exclusive responses and FLEX across the link.
