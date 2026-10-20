@@ -48,7 +48,7 @@ python3 scripts/run_list.py --items smoke    # the bring-up gate (4 scenarios)
 python3 scripts/run_list.py --items functional -j 16 --rid nightly
 python3 scripts/run_list.py --target 4x512-sp64 -j 16   # every scenario on one target
 make check-config                            # sim configs, testlists, rules, RAL and docs freshness (what CI runs before building)
-make lint                                    # check-config, then Verible and Verilator lint
+make lint                                    # check-config, Verible and Verilator lint, FDI checker guards
 ```
 
 `--items` takes a scenario name or a testlist group (`smoke`, `ci`, the areas `g1a`,

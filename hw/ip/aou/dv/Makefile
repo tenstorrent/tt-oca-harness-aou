@@ -551,6 +551,7 @@ lint: check-config
 	verilator --lint-only -Wall --timing \
 	  --top-module $(shell $(call LINT_CFG,t1) top) $(addprefix +define+,$(call LINT_DEFINES,t1) AOU_TX_NXT_PACKING=1) \
 	  $(UVM_ROOT)/lint/verilator_lint.vlt $(call LINT_FLIST,t1)
+	bash $(UVM_ROOT)/scripts/check_checker_elaboration.sh
 
 test: build
 	@$(MAKE) --no-print-directory run
