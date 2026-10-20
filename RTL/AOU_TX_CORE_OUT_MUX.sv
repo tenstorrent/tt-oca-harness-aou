@@ -35,6 +35,7 @@ module AOU_TX_CORE_OUT_MUX #(
     input                                   I_PHY_TYPE,
 
     output logic                            O_FDI_PL_TRDY,
+    output logic                            O_CHUNK_PARTIAL,
     input  logic [FDI_IF_WD-1:0]            I_FDI_LP_DATA,
     input  logic                            I_FDI_LP_VALID,
 
@@ -59,6 +60,13 @@ assign O_FDI_LP_0_DATA = I_PHY_TYPE ? 'd0 :
 
 assign O_FDI_PL_TRDY = I_PHY_TYPE ? I_FDI_PL_1_TRDY :
                        (I_FDI_PL_0_TRDY & r_phase);
+
+// O_CHUNK_PARTIAL: part of the current chunk is already on the narrower PHY
+// and the rest is still owed (with today's 2:1 split, the lower half has been
+// sent and the chunk is acknowledged only with the upper half), so
+// I_FDI_LP_VALID must stay high until O_FDI_PL_TRDY or the flit is truncated
+// mid-chunk.
+assign O_CHUNK_PARTIAL = ~I_PHY_TYPE & r_phase;
 
 always_ff @(posedge I_CLK or negedge I_RESETN) begin
     if (!I_RESETN) begin

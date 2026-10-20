@@ -453,6 +453,7 @@ logic [RP_CNT-1:0][40*WF1024b_G-1:0]  w_writedata_wo_strb_message_rp;
 
 logic                       w_flit_fifo_valid;
 logic                       w_flit_fifo_ready;
+logic                       w_flit_fifo_chunk_partial;
 
 logic                       w_ring_buffer_ready;
 logic                       r_ring_buffer_ready;
@@ -1057,13 +1058,18 @@ logic w_lp_mode_thres_val;
 assign w_lp_mode_thres_val = (I_AOU_TX_LP_MODE_THRESHOLD == 'b0) ?  {w_flit_header_credit_valid || r_msgcredit_port_valid} : w_flit_fifo_valid_out_valid;
 
 
-assign w_flit_fifo_valid = w_lp_engaged
+// w_flit_fifo_chunk_partial: the OUT_MUX has sent part of a chunk (the lower half,
+// with today's 2:1 split) that is not yet acknowledged. r_flit_packing_state only
+// holds valid from chunk 1 on, so without this term an LP-engaged trigger
+// (TX_LP_MODE, threshold or credit) falling during chunk 0 would cut the flit
+// after one FDI beat.
+assign w_flit_fifo_valid = w_flit_fifo_chunk_partial || (w_lp_engaged
     ? ((r_cur_granule_start != r_cur_flit_for_fifo_start) ||
          (r_flit_packing_state != '0) ||
          (r_tx_activation_valid && w_lp_mode_thres_val))
       : ((r_cur_granule_start != r_cur_flit_for_fifo_start) ||
          (r_flit_packing_state != '0) ||
-         r_tx_activation_valid);
+         r_tx_activation_valid));
 
 
 assign O_AOU_TX_PENDING = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_aou_fifo_bvalid
@@ -1224,6 +1230,7 @@ generate if (FDI_PACK_WD != 1024) begin : g_pack_4step
             .I_PHY_TYPE          ( I_PHY_TYPE           ),
 
             .O_FDI_PL_TRDY       ( w_flit_fifo_ready    ),
+            .O_CHUNK_PARTIAL     ( w_flit_fifo_chunk_partial ),
             .I_FDI_LP_DATA       ( w_flit_fifo_in_data  ),
             .I_FDI_LP_VALID      ( w_flit_fifo_valid    ),
 
@@ -1289,6 +1296,7 @@ generate if (FDI_PACK_WD != 1024) begin : g_pack_4step
                 .I_PHY_TYPE          ( 1'b0                 ),
 
                 .O_FDI_PL_TRDY       ( w_flit_fifo_ready    ),
+                .O_CHUNK_PARTIAL     ( w_flit_fifo_chunk_partial ),
                 .I_FDI_LP_DATA       ( w_flit_fifo_in_data  ),
                 .I_FDI_LP_VALID      ( w_flit_fifo_valid    ),
 
@@ -1320,6 +1328,8 @@ generate if (FDI_PACK_WD != 1024) begin : g_pack_4step
             logic [FDI_IF_WD0-1:0]               w_flit_fifo_in_data;
 
             assign w_flit_fifo_in_data = w_flit_chunk;
+
+            assign w_flit_fifo_chunk_partial = 1'b0;
 
             AOU_REV_RS #(
                 .DATA_WIDTH         (FDI_IF_WD0)
@@ -1491,6 +1501,7 @@ end else begin : g_pack_2step
             .I_PHY_TYPE          ( I_PHY_TYPE           ),
 
             .O_FDI_PL_TRDY       ( w_flit_fifo_ready    ),
+            .O_CHUNK_PARTIAL     ( w_flit_fifo_chunk_partial ),
             .I_FDI_LP_DATA       ( w_flit_fifo_in_data  ),
             .I_FDI_LP_VALID      ( w_flit_fifo_valid    ),
 
@@ -1536,6 +1547,8 @@ end else begin : g_pack_2step
         );
     `else
         // Single-PHY + 2-step packing (FDI_IF_WD0 = 1024): direct REV_RS.
+        assign w_flit_fifo_chunk_partial = 1'b0;
+
         AOU_REV_RS #(
             .DATA_WIDTH         (FDI_IF_WD0)
         ) u_aou_tx_core_phy0_rs
