@@ -5,14 +5,11 @@ INTEG/ipxact/gen/
 INTEG/ipxact/schema/
 INTEG/uvm/
 logs/
-# Optional Verilator/UVM flow
+# Optional Verilator/UVM flow; .deps/ also holds Arm's Axi4PC (BP063), which is
+# licensed and not redistributable
 hw/ip/aou/dv/.deps/
 hw/ip/aou/dv/build/
 hw/ip/aou/dv/out/
-
-# Arm AXI4 protocol assertions (BP063): licensed, not redistributable
-/tools/BP063*
-/tools/**/Axi4PC*
 
 # Site-specific settings (LSF options, agent notes, public-check patterns), never committed
 hw/ip/aou/dv/site

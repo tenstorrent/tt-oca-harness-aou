@@ -15,10 +15,6 @@ class aou_dp_seq extends aou_axi_rand_seq;
   protected bit [9:0]    next_id;
   protected int unsigned n_attr[2] = '{0, 0};   // attr_sweep steps: writes, reads
 
-  // AXI4 A4.4 Table A4-5: the AxCACHE encodings that are not reserved.
-  static const bit [3:0] LEGAL_CACHE[10] = '{4'h0, 4'h1, 4'h2, 4'h3, 4'h6, 4'h7, 4'hA, 4'hB,
-                                              4'hE, 4'hF};
-
   function new(string name = "aou_dp_seq");
     super.new(name);
   endfunction
@@ -151,7 +147,7 @@ class aou_dp_seq extends aou_axi_rand_seq;
     if (knobs.attr_sweep) begin
       int unsigned k = n_attr[wr ? 0 : 1];
       n_attr[wr ? 0 : 1] = k + 1;
-      t.cache = LEGAL_CACHE[k % 10];
+      t.cache = aou_axi_txn::LEGAL_CACHE[k % 10];
       t.prot  = 3'(k);
       t.qos   = 4'(k);
     end

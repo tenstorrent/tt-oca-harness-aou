@@ -30,7 +30,7 @@ class aou_axi_unaligned_wr_seq extends aou_axi_base_seq;
           t.size  = 3'(s);
           t.burst = (off % 2 == 1 && !p_sequencer.cfg.incr_only) ? AOU_AXI_FIXED : AOU_AXI_INCR;
           t.lock  = 1'b0;
-          t.cache = 4'(off);
+          t.cache = aou_axi_txn::LEGAL_CACHE[off % 10];
           t.prot  = 3'(s);
           t.qos   = 4'(off >> 2);
           if (t.dir == AOU_AXI_WR) t.fill_wdata(AOU_AXI_STRB_FULL);

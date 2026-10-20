@@ -23,6 +23,7 @@ package aou_t1_env_pkg;
   import aou_core_csr_uvm_pkg::*;
   import aou_rule_pkg::*;
   import aou_fc_pkg::*;
+  import aou_axi4pc_pkg::*;
   `include "aou_t1_xfer_fc_bins.svh"
 
 `ifdef TWO_PHY
@@ -179,6 +180,7 @@ package aou_t1_env_pkg;
   `include "aou_t1_reads_seq.svh"
   `include "aou_t1_sw_isr.svh"
   `include "aou_t1_orphan_chk.svh"
+  `include "aou_t1_axi4pc_ctl.svh"
   `include "aou_t1_mo_fc_bins.svh"
   `include "aou_t1_mo_chk.svh"
   `include "aou_t1_sw_reset_chk.svh"

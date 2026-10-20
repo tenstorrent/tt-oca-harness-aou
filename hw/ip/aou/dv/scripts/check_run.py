@@ -22,6 +22,10 @@ one message (a rule ID and the transaction's size and address, say).
 An entry with `when_re:` (a regular expression) applies only to runs whose log
 matches it, e.g. one CONFIG of a test that runs on several: elsewhere it neither
 explains errors nor reports XPASS.
+
+The UVM_FATAL that stops a run after +aou_axi4pc_max Axi4PC errors
+(uvm/env/axi4pc/aou_axi4pc_pkg.sv) adds nothing of its own: the run is judged
+by the errors before it.
 """
 
 import argparse
@@ -30,6 +34,7 @@ import sys
 
 ERR_RE = re.compile(r"^#?\s*(UVM_ERROR|UVM_FATAL)\s+(?!:)(.*)$")
 TEST_RE = re.compile(r"\+UVM_TESTNAME=(\S+)|Running test (\S+)\.\.\.")
+AXI4PC_STOP_RE = re.compile(r"\[AXI4PC\] \d+ Axi4PC violations, stopping")
 
 
 def load_entries(path):
@@ -65,6 +70,7 @@ def judge(text, log, expected, test=None):
         return [f"FAIL: no UVM report summary (crash, kill or timeout): {log}"]
 
     errors = [m.group(0).strip() for m in map(ERR_RE.match, text.splitlines()) if m]
+    errors = [e for e in errors if not AXI4PC_STOP_RE.search(e)]
     entries = [e for e in load_entries(expected) if e.get("test") == test
                and (not e.get("when_re") or re.search(e["when_re"], text, re.M))]
     used, bugs = set(), set()

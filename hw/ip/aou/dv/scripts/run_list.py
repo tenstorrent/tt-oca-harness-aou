@@ -104,6 +104,8 @@ def build_vars(args):
         out.append(f"ESCAPE={args.escape}")
     if args.rtl_patch:
         out.append(f"RTL_PATCH={args.rtl_patch}")
+    if args.axi4pc:
+        out.append(f"AXI4PC={args.axi4pc}")
     return out
 
 
@@ -426,6 +428,8 @@ def main():
                          "a --target ending in -assert")
     ap.add_argument("--reseed", type=int, default=None,
                     help="run at most N seeds of each scenario (default: its reseed)")
+    ap.add_argument("--axi4pc", default="", choices=["", "0", "1"],
+                    help="make AXI4PC for the build (default: make's, on when .deps/BP063/ is there)")
     ap.add_argument("--escape", default="", help="run on the ESCAPE=<id> build (escape/)")
     ap.add_argument("--rtl-patch", default="", help="run on the RTL_PATCH=<absolute path> build")
     ap.add_argument("--fdi-enc", default="", choices=["", "SPEC", "RTL"],
@@ -481,6 +485,8 @@ def main():
                 lst = lists_of.setdefault(e["list"], len(lists_of))
                 if e["blocked"]:
                     print(f"skip   {e['name']}: blocked: {e['blocked']}")
+                elif e["tb_fixed"] and e["tb"] != args.tb:
+                    print(f"skip   {e['name']}: tb {e['tb']} (running {args.tb})")
                 elif args.tb in ("t1", "reg") and e["target"] and e["target"] != args.target:
                     print(f"skip   {e['name']}: target {e['target']} (running {args.target})")
                 else:
@@ -495,10 +501,12 @@ def main():
             print(f"run    {r.name} seed={r.seed} {r.plusargs}")
         print(f"{len(runs)} run(s)")
         return 0
-    build = f"{args.sim}-{args.tb}" + (f"-{args.config}" if args.tb in ("t1", "reg") else "") + \
-            ("-cov" if args.cov == "1" else "") + ("-assert" if args.rtl_assert else "") + \
-            (f"-esc-{args.escape}" if args.escape else "") + \
-            (f"-fix-{os.path.splitext(os.path.basename(args.rtl_patch))[0]}" if args.rtl_patch else "")
+    # From make, so the name follows every build variant (-axi4pc is on by default when BP063 is there).
+    p = subprocess.run([MAKE, "-s", "--no-print-directory", "build-name", *build_vars(args)],
+                       cwd=UVM_ROOT, capture_output=True, text=True, check=False)
+    if p.returncode or not p.stdout.split():
+        ap.error(f"make build-name: {(p.stderr.strip() or 'no build name').splitlines()[-1]}")
+    build = p.stdout.split()[-1]
     out_dir = os.path.abspath(args.out_dir) if args.out_dir else os.path.join(UVM_ROOT, "out", build)
     if args.out_dir:
         args.out_dir = out_dir

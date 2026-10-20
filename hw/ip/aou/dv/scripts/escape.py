@@ -9,7 +9,8 @@ An entry catches its bug when the clean run passes (PASS/XFAIL) and the escape
 run fails with an error line matching the entry's signature. A bug is CAUGHT
 when one of its entries catches it, else ESCAPED. Entries with `build: <sim>`
 are caught only by that simulator's compile; they count as NOT-RUN unless
-that simulator is the one selected.
+that simulator is the one selected. Entries with `axi4pc = true` are caught by
+Arm's Axi4PC and count as NOT-RUN when the build has none (no BP063, or AXI4PC=0).
 
 Builds go through `make build` (LSF), runs through `make run`. The report is
 printed and written to out/escape/escape_report.md. Exit status 1 when a bug
@@ -103,7 +104,16 @@ def main():
         e["plusargs"] = " ".join(e.get("args", []))
         e["seeds"] = testlist.seeds_of(e)
         entries.append(e)
-    sim_entries = [e for e in entries if not e.get("build")]
+    for e in entries:
+        if e.get("axi4pc"):
+            rc, out = make(args, "build-name", *build_args(e["tb"], e["config"], ""))
+            if rc != 0 or not out.split():
+                print(out[-3000:])
+                return 1
+            if "axi4pc" not in out.split()[-1].split("-"):
+                e["result"] = "NOT-RUN"
+                print(f"skip   {e['escape']}: needs Arm Axi4PC (.deps/BP063)", flush=True)
+    sim_entries = [e for e in entries if not e.get("build") and "result" not in e]
 
     if not args.no_build:
         keys = set()
@@ -178,6 +188,9 @@ def main():
         lines.append(f"| {r[0]} | {r[1]} | {r[2]} | {r[3]}/{r[4]} | {r[5]} | {r[6]} | {r[7]} | "
                      f"{r[8]} | {r[9].replace('|', '/')} | {os.path.relpath(r[10], UVM_ROOT) if r[10] else ''} |")
     for e in entries:
+        if e.get("axi4pc") and e.get("result") == "NOT-RUN":
+            lines.append(f"| {e['escape']} | {e['test']} | | | | | | NOT-RUN | "
+                         f"needs Arm Axi4PC (.deps/BP063) | |")
         if e.get("build"):
             lines.append(f"| {e['escape']} | ({e['build']} build) | | | | | | "
                          f"{e.get('result', 'NOT-RUN')} | {e.get('note', '')} | |")

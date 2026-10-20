@@ -57,6 +57,9 @@ module tb_top;
   localparam int RPW01      = (RPW0 > RPW1) ? RPW0 : RPW1;
   localparam int RPW23      = (RPW2 > RPW3) ? RPW2 : RPW3;
   localparam int RP_DATA_W  = (RPW01 > RPW23) ? RPW01 : RPW23;
+  function automatic int rp_w(int r);
+    return (r == 0) ? RPW0 : (r == 1) ? RPW1 : (r == 2) ? RPW2 : RPW3;
+  endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
   localparam int PEER_W     = `AOU_PEER_MAX_W;
   localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
@@ -165,6 +168,22 @@ module tb_top;
 `endif
   end
 
+  // The reset of the DUT's AXI port logic (AOU_CORE: every S and M port pin except
+  // the S-port R payload, which AOU_FIFO_RP holds on I_RESETN): the core reset,
+  // I_RESETN and AOU_SW_RESET. With the BUGS/021 guard the pins see I_RESETN only.
+`ifdef AOU_DUT_SW_RESET_GUARD
+  wire axi_port_rst_n = rst_n;
+`else
+  wire axi_port_rst_n = rst.core_rst_n;
+`endif
+  aou_axi4pc_ctl_if axi4pc_ctl (.clk(clk));
+  initial axi4pc_ctl.chk_scope = $sformatf("%m.g_axi4pc");
+`ifdef AOU_DUT_SW_RESET_GUARD
+  assign axi4pc_ctl.guard = 1'b1;
+`else
+  assign axi4pc_ctl.guard = 1'b0;
+`endif
+
   // ---------------------------------------------------------------------------
   // Interfaces
   // ---------------------------------------------------------------------------
@@ -181,7 +200,9 @@ module tb_top;
   aou_fdi_checker_if               fdi_chk (.clk(clk));
 
   // ---------------------------------------------------------------------------
-  // AXI: per-RP interfaces to the DUT's packed [RP_COUNT-1:0] ports.
+  // AXI: per-RP interfaces to the DUT's packed [RP_COUNT-1:0] ports. Each RP is
+  // connected at its own width, as a narrower bus plugged into the DUT's wider
+  // slot: the DUT inputs above it are tied to 0, its outputs there are unread.
   // ---------------------------------------------------------------------------
   localparam int SW = RP_DATA_W / 8;
 
@@ -210,6 +231,7 @@ module tb_top;
   logic [RP_COUNT-1:0][SW-1:0]        m_wstrb;
 
   for (genvar r = 0; r < RP_COUNT; r++) begin : g_rp
+    localparam int W = rp_w(r);
     // S port: the manager agent drives AW/W/AR and BREADY/RREADY.
     assign s_awid[r]    = s_axi[r].awid;
     assign s_awaddr[r]  = s_axi[r].awaddr;
@@ -222,8 +244,8 @@ module tb_top;
     assign s_awqos[r]   = s_axi[r].awqos;
     assign s_awvalid[r] = s_axi[r].awvalid;
     assign s_axi[r].awready = s_awready[r];
-    assign s_wdata[r]   = s_axi[r].wdata[RP_DATA_W-1:0];
-    assign s_wstrb[r]   = s_axi[r].wstrb[SW-1:0];
+    assign s_wdata[r]   = RP_DATA_W'(s_axi[r].wdata[W-1:0]);
+    assign s_wstrb[r]   = SW'(s_axi[r].wstrb[W/8-1:0]);
     assign s_wlast[r]   = s_axi[r].wlast;
     assign s_wvalid[r]  = s_axi[r].wvalid;
     assign s_axi[r].wready = s_wready[r];
@@ -243,7 +265,7 @@ module tb_top;
     assign s_arvalid[r] = s_axi[r].arvalid;
     assign s_axi[r].arready = s_arready[r];
     assign s_axi[r].rid    = s_rid[r];
-    assign s_axi[r].rdata  = AXI_W'(s_rdata[r]);
+    assign s_axi[r].rdata  = AXI_W'(s_rdata[r][W-1:0]);
     assign s_axi[r].rresp  = s_rresp[r];
     assign s_axi[r].rlast  = s_rlast[r];
     assign s_axi[r].rvalid = s_rvalid[r];
@@ -261,8 +283,8 @@ module tb_top;
     assign m_axi[r].awqos   = m_awqos[r];
     assign m_axi[r].awvalid = m_awvalid[r];
     assign m_awready[r] = m_axi[r].awready;
-    assign m_axi[r].wdata   = AXI_W'(m_wdata[r]);
-    assign m_axi[r].wstrb   = (AXI_W / 8)'(m_wstrb[r]);
+    assign m_axi[r].wdata   = AXI_W'(m_wdata[r][W-1:0]);
+    assign m_axi[r].wstrb   = (AXI_W / 8)'(m_wstrb[r][W/8-1:0]);
     assign m_axi[r].wlast   = m_wlast[r];
     assign m_axi[r].wvalid  = m_wvalid[r];
     assign m_wready[r]  = m_axi[r].wready;
@@ -282,7 +304,7 @@ module tb_top;
     assign m_axi[r].arvalid = m_arvalid[r];
     assign m_arready[r] = m_axi[r].arready;
     assign m_rid[r]     = m_axi[r].rid;
-    assign m_rdata[r]   = m_axi[r].rdata[RP_DATA_W-1:0];
+    assign m_rdata[r]   = RP_DATA_W'(m_axi[r].rdata[W-1:0]);
     assign m_rresp[r]   = m_axi[r].rresp;
     assign m_rlast[r]   = m_axi[r].rlast;
     assign m_rvalid[r]  = m_axi[r].rvalid;
@@ -608,6 +630,7 @@ module tb_top;
     uvm_config_db #(virtual aou_status_if)::set(null, "*", "status", status);
     uvm_config_db #(virtual aou_irq_if)::set(null, "*", "irq", irq);
     uvm_config_db #(virtual aou_rst_if)::set(null, "*", "rst", rst);
+    uvm_config_db #(virtual aou_axi4pc_ctl_if)::set(null, "*", "axi4pc_ctl", axi4pc_ctl);
     uvm_config_db #(virtual aou_fdi_checker_if)::set(null, "*", "fdi_chk", fdi_chk);
     run_test();
   end
@@ -615,5 +638,64 @@ module tb_top;
 
   // fc.json for scripts/fc_report.py, when the run passes +aou_fc_json (make run COV=1).
   final aou_fc_pkg::aou_fc_db::write_requested();
+
+`ifdef AOU_AXI4PC
+  // ---------------------------------------------------------------------------
+  // Arm Axi4PC (BP063, optional; Makefile AXI4PC) on each RP's DUT S and M ports, at
+  // the RP's own width (g_rp). tb/aou_axi4pc_msg.svh reports its failures as UVM
+  // errors. AoU has no REGION or USER signals and no low-power interface.
+  // The bench stalls READY on purpose, so the recommended MAX_WAIT rules are off.
+  // ARESETn comes from tb/aou_axi4pc_gate.sv: the port's reset (axi_port_rst_n),
+  // held after a reset only the DUT saw and after a link event (aou_t1_axi4pc_ctl).
+  // ---------------------------------------------------------------------------
+`define AOU_AXI4PC_PORT(P) \
+    aou_axi4pc_gate u_``P``_gate ( \
+      .clk(clk), .bus_rst_n(rst_n), .port_rst_n(axi_port_rst_n), .off_set(axi4pc_ctl.off_set), \
+      .awvalid(P``_awvalid[r]), .awready(P``_awready[r]), .wvalid(P``_wvalid[r]), \
+      .wready(P``_wready[r]), .wlast(P``_wlast[r]), .bvalid(P``_bvalid[r]), \
+      .bready(P``_bready[r]), .arvalid(P``_arvalid[r]), .arready(P``_arready[r]), \
+      .rvalid(P``_rvalid[r]), .rready(P``_rready[r]), .rlast(P``_rlast[r]), \
+      .chk_rst_n(P``_chk_rst_n), .off(axi4pc_ctl.P``_off[r]) \
+    ); \
+    Axi4PC #( \
+      .DATA_WIDTH(rp_w(r)), .WID_WIDTH(10), .RID_WIDTH(10), .ADDR_WIDTH(64), \
+      .AWUSER_WIDTH(1), .WUSER_WIDTH(1), .BUSER_WIDTH(1), .ARUSER_WIDTH(1), .RUSER_WIDTH(1), \
+      .MAXRBURSTS(`AOU_AXI4PC_MAXBURSTS), .MAXWBURSTS(`AOU_AXI4PC_MAXBURSTS), \
+      .RecMaxWaitOn(1'b0) \
+    ) u_``P``_axi4pc ( \
+      .ACLK(clk), .ARESETn(P``_chk_rst_n), \
+      .AWID(P``_awid[r]), .AWADDR(P``_awaddr[r]), .AWLEN(P``_awlen[r]), \
+      .AWSIZE(P``_awsize[r]), .AWBURST(P``_awburst[r]), .AWLOCK(P``_awlock[r]), \
+      .AWCACHE(P``_awcache[r]), .AWPROT(P``_awprot[r]), .AWQOS(P``_awqos[r]), \
+      .AWREGION(4'b0), .AWUSER(1'b0), .AWVALID(P``_awvalid[r]), .AWREADY(P``_awready[r]), \
+      .WLAST(P``_wlast[r]), .WDATA(P``_wdata[r][rp_w(r)-1:0]), .WSTRB(P``_wstrb[r][rp_w(r)/8-1:0]), .WUSER(1'b0), \
+      .WVALID(P``_wvalid[r]), .WREADY(P``_wready[r]), \
+      .BID(P``_bid[r]), .BRESP(P``_bresp[r]), .BUSER(1'b0), \
+      .BVALID(P``_bvalid[r]), .BREADY(P``_bready[r]), \
+      .ARID(P``_arid[r]), .ARADDR(P``_araddr[r]), .ARLEN(P``_arlen[r]), \
+      .ARSIZE(P``_arsize[r]), .ARBURST(P``_arburst[r]), .ARLOCK(P``_arlock[r]), \
+      .ARCACHE(P``_arcache[r]), .ARPROT(P``_arprot[r]), .ARQOS(P``_arqos[r]), \
+      .ARREGION(4'b0), .ARUSER(1'b0), .ARVALID(P``_arvalid[r]), .ARREADY(P``_arready[r]), \
+      .RID(P``_rid[r]), .RLAST(P``_rlast[r]), .RDATA(P``_rdata[r][rp_w(r)-1:0]), .RRESP(P``_rresp[r]), \
+      .RUSER(1'b0), .RVALID(P``_rvalid[r]), .RREADY(P``_rready[r]), \
+      .CACTIVE(1'b1), .CSYSREQ(1'b1), .CSYSACK(1'b1) \
+    );
+  for (genvar r = 0; r < RP_COUNT; r++) begin : g_axi4pc
+    logic s_chk_rst_n;
+    logic m_chk_rst_n;
+    `AOU_AXI4PC_PORT(s)
+    `AOU_AXI4PC_PORT(m)
+  end
+  for (genvar r = RP_COUNT; r < 8; r++) begin : g_axi4pc_none
+    assign axi4pc_ctl.s_off[r] = 1'b0;
+    assign axi4pc_ctl.m_off[r] = 1'b0;
+  end
+  assign axi4pc_ctl.present = 1'b1;
+`undef AOU_AXI4PC_PORT
+`else
+  assign axi4pc_ctl.present = 1'b0;
+  assign axi4pc_ctl.s_off = '0;
+  assign axi4pc_ctl.m_off = '0;
+`endif
 
 endmodule : tb_top

@@ -178,7 +178,7 @@ lists.
 Free from Arm (https://developer.arm.com/downloads/view/BP063), licensed for
 checking compatibility of one's own products. It may not be sublicensed or
 redistributed, so it is never committed: users unpack it into the git-ignored
-`tools/BP063/`. It works on VCS.
+`.deps/BP063/` (`make setup AXI4PC_TGZ=<tarball>`). It works on VCS.
 
 On Verilator 5.052 it crashed at AoU widths until we found a Verilator
 code-generation bug. The DFG peephole pass turns a guarded array read into an

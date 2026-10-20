@@ -77,6 +77,11 @@ class aou_axi_sub_driver extends uvm_component;
     return orph_id[0].size() + orph_id[1].size();
   endfunction
 
+  // Orphans queued or presented on one channel (rd: R, else B).
+  function int unsigned orphans_pending_on(bit rd);
+    return orph_id[rd].size();
+  endfunction
+
   task run_phase(uvm_phase phase);
     drive_idle();
     forever begin
