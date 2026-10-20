@@ -102,7 +102,10 @@ import packet_def_pkg::*;
     parameter   RP2_AXI_DATA_WD             = 512,
     parameter   RP3_AXI_DATA_WD             = 512,
 
-    parameter   AXI_PEER_DIE_MAX_DATA_WD    = 1024,
+    // The widest data message AoU defines (WriteData1024/ReadData1024). The receiver
+    // cannot know the remote die's AXI width, so the RX data path is sized for the
+    // maximum and this is not an integration parameter.
+    localparam  AXI_PEER_DIE_MAX_DATA_WD    = 1024,
 
     parameter   APB_ADDR_WD                 = 32,
     parameter   APB_DATA_WD                 = 32,
@@ -422,8 +425,6 @@ import packet_def_pkg::*;
         .RP1_AXI_DATA_WD           ( RP1_AXI_DATA_WD              ),
         .RP2_AXI_DATA_WD           ( RP2_AXI_DATA_WD              ),
         .RP3_AXI_DATA_WD           ( RP3_AXI_DATA_WD              ),
-
-        .AXI_PEER_DIE_MAX_DATA_WD  ( AXI_PEER_DIE_MAX_DATA_WD     ),
 
         .APB_ADDR_WD               ( APB_ADDR_WD                  ),
         .APB_DATA_WD               ( APB_DATA_WD                  ),
