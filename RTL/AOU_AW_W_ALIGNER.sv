@@ -58,6 +58,8 @@ module AOU_AW_W_ALIGNER #(
     input       [AXI_SLV_NUM-1:0]                       I_S_WVALID,
     output      [AXI_SLV_NUM-1:0]                       O_S_WREADY,
 
+    output      [AXI_SLV_NUM-1:0]                       O_AW_RP_READY,
+
     output      [1:0]                                   O_M_AW_RP_SEL,
     output wire [AXI_ID_WD-1:0]                         O_M_AWID,
     output wire [AXI_ADDR_WD-1: 0]                      O_M_AWADDR,
@@ -70,6 +72,7 @@ module AOU_AW_W_ALIGNER #(
     output wire                                         O_M_AWVALID,
     input                                               I_M_AWREADY,      
 
+    output      [1:0]                                   O_M_W_RP_SEL,
     output wire [AXI_DATA_WD-1: 0]                      O_M_WDATA,
     output wire [AXI_STRB_WD-1: 0]                      O_M_WSTRB,
     output wire                                         O_M_WSTRB_FULL,
@@ -79,47 +82,49 @@ module AOU_AW_W_ALIGNER #(
 
 );
 
-reg  [RP_SEL_WD-1: 0]                           r_aw_arb_grt    ;
-wire [RP_SEL_WD-1: 0]                           w_aw_arb_grt_mux;
-
-reg                                             r_s_wbusy_tt    ; 
+// Each RP's W burst follows its own AW, and W beats of different RPs may interleave
+// (every WriteData message carries its RP). One RP waiting for WDATA credit therefore
+// holds only its own next AW, never the shared AW path (AoU v0.7 RP independence).
+logic [AXI_SLV_NUM-1:0]                         r_wbusy         ;
+logic [AXI_SLV_NUM-1:0]                         w_aw_sel_oh     ;
+logic                                           w_aw_busy       ;
+logic                                           w_aw_hs         ;
+logic [AXI_SLV_NUM-1:0]                         w_w_new         ;
+logic [AXI_SLV_NUM-1:0]                         w_w_open        ;
+logic [AXI_SLV_NUM-1:0]                         w_w_open_nxt    ;
+// [q][p] = 1: q's open burst was opened before p's
+logic [AXI_SLV_NUM-1:0][AXI_SLV_NUM-1:0]        r_w_older       ;
+logic [AXI_SLV_NUM-1:0][AXI_SLV_NUM-1:0]        w_w_older       ;
+logic [AXI_SLV_NUM-1:0]                         w_w_req         ;
+logic [AXI_SLV_NUM-1:0]                         w_w_grant       ;
+logic [AXI_SLV_NUM-1:0]                         w_w_last_hs     ;
+logic [RP_SEL_WD-1: 0]                          w_w_sel         ;
 
 wire                                            w_no_awvalid    ;
 
-//--------------------------------------------------------------
-assign w_aw_arb_grt_mux = r_s_wbusy_tt ? r_aw_arb_grt : I_S_AW_RP_SEL[RP_SEL_WD-1:0];
-
 genvar p;
 //==============================================================
-//                          AW, W, B
+//                          AW
 //==============================================================
-
-always_ff @(posedge I_CLK or negedge I_RESETN) begin
-    if (~I_RESETN) begin
-        r_s_wbusy_tt <= 'd0;
-        r_aw_arb_grt <= 'd0;   
-    end else begin
-        if ((I_S_AWVALID & O_S_AWREADY)) begin
-            if (I_S_WVALID[w_aw_arb_grt_mux] & O_S_WREADY[w_aw_arb_grt_mux] & I_S_WLAST[w_aw_arb_grt_mux])
-                r_s_wbusy_tt <= 1'b0;
-            else begin
-                r_s_wbusy_tt <= 1'b1;
-                r_aw_arb_grt <= I_S_AW_RP_SEL[RP_SEL_WD-1:0];
-            end
-
-        end else begin
-            if (r_s_wbusy_tt & I_S_WVALID[w_aw_arb_grt_mux] & O_S_WREADY[w_aw_arb_grt_mux] & I_S_WLAST[w_aw_arb_grt_mux])
-                r_s_wbusy_tt <=1'b0;
-        end
-    end
+always_comb begin
+    w_aw_sel_oh = '0;
+    w_aw_sel_oh[I_S_AW_RP_SEL[RP_SEL_WD-1:0]] = 1'b1;
 end
 
-generate
-if(RP_SEL_WD==1) 
-    assign O_M_AW_RP_SEL   = {1'b0, w_aw_arb_grt_mux};
-else
-    assign O_M_AW_RP_SEL   = w_aw_arb_grt_mux;    
-endgenerate
+assign w_aw_busy       = |(r_wbusy & w_aw_sel_oh);
+assign w_no_awvalid    = ~I_S_AWVALID;
+
+assign O_S_AWREADY     = ~w_aw_busy & (I_M_AWREADY | w_no_awvalid);
+assign O_M_AWVALID     = ~w_aw_busy & I_S_AWVALID;
+assign w_aw_hs         = I_S_AWVALID & O_S_AWREADY;
+
+assign O_AW_RP_READY   = ~r_wbusy;
+
+if(RP_SEL_WD==1) begin : g_aw_rp_sel_1b
+    assign O_M_AW_RP_SEL   = {1'b0, I_S_AW_RP_SEL[0]};
+end else begin : g_aw_rp_sel
+    assign O_M_AW_RP_SEL   = I_S_AW_RP_SEL;
+end
 assign O_M_AWID        = I_S_AWID    ;
 assign O_M_AWADDR      = I_S_AWADDR  ;
 assign O_M_AWLEN       = I_S_AWLEN   ;
@@ -129,26 +134,68 @@ assign O_M_AWCACHE     = I_S_AWCACHE ;
 assign O_M_AWPROT      = I_S_AWPROT  ;
 assign O_M_AWQOS       = I_S_AWQOS   ;
 
-assign O_M_WDATA       = I_S_WDATA[w_aw_arb_grt_mux ] ;
-assign O_M_WSTRB       = I_S_WSTRB[w_aw_arb_grt_mux] ;
-assign O_M_WLAST       = I_S_WLAST[w_aw_arb_grt_mux] ;
-assign O_M_WSTRB_FULL  = I_S_WSTRB_FULL[w_aw_arb_grt_mux] ;
+//==============================================================
+//                          W
+//==============================================================
+// The first beat may go in the same cycle as its AW, as before. Bursts go out in
+// AW order (oldest first), as before; a younger RP's beat goes only while every
+// older open burst has no beat it can send (no WVALID or no WDATA credit).
+assign w_w_new         = w_aw_sel_oh & {AXI_SLV_NUM{w_aw_hs}};
+assign w_w_open        = r_wbusy | w_w_new;
+assign w_w_req         = w_w_open & I_S_WVALID;
 
-assign O_M_AWVALID     = ~r_s_wbusy_tt & I_S_AWVALID;
-
-assign O_M_WVALID      = ((~r_s_wbusy_tt & I_S_AWVALID & O_S_AWREADY) | r_s_wbusy_tt) & I_S_WVALID[w_aw_arb_grt_mux];
-
-assign  w_no_awvalid    = ~I_S_AWVALID;
-
-assign O_S_AWREADY = ~r_s_wbusy_tt & (( I_M_AWREADY) | w_no_awvalid) ;
-
-generate
-    for(p = 0; p < AXI_SLV_NUM; p = p + 1) begin
-        assign O_S_WREADY[p]  = ((~r_s_wbusy_tt & ((w_aw_arb_grt_mux == p) & I_S_AWVALID & O_S_AWREADY) ) |
-                                (r_s_wbusy_tt & ((w_aw_arb_grt_mux == p) ))) & I_M_WREADY;
-
+always_comb begin
+    for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
+        for (int unsigned i = 0; i < AXI_SLV_NUM; i++) begin
+            w_w_older[q][i] = r_w_older[q][i] | (r_wbusy[q] & w_w_new[i]);
+        end
     end
-endgenerate
+end
+
+always_comb begin
+    w_w_grant = '0;
+    w_w_sel   = '0;
+    for (int unsigned i = 0; i < AXI_SLV_NUM; i++) begin
+        if (w_w_req[i]) begin
+            w_w_grant[i] = 1'b1;
+            for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
+                if (w_w_req[q] & w_w_older[q][i]) w_w_grant[i] = 1'b0;
+            end
+        end
+        if (w_w_grant[i]) w_w_sel = i[RP_SEL_WD-1:0];
+    end
+end
+
+if(RP_SEL_WD==1) begin : g_w_rp_sel_1b
+    assign O_M_W_RP_SEL    = {1'b0, w_w_sel};
+end else begin : g_w_rp_sel
+    assign O_M_W_RP_SEL    = w_w_sel;
+end
+
+assign O_M_WDATA       = I_S_WDATA[w_w_sel] ;
+assign O_M_WSTRB       = I_S_WSTRB[w_w_sel] ;
+assign O_M_WLAST       = I_S_WLAST[w_w_sel] ;
+assign O_M_WSTRB_FULL  = I_S_WSTRB_FULL[w_w_sel] ;
+assign O_M_WVALID      = |w_w_grant;
+
+    for(p = 0; p < AXI_SLV_NUM; p = p + 1) begin : g_wready
+        assign O_S_WREADY[p]  = w_w_grant[p] & I_M_WREADY;
+    end
+
+assign w_w_last_hs     = O_S_WREADY & I_S_WVALID & I_S_WLAST;
+
+assign w_w_open_nxt    = w_w_open & ~w_w_last_hs;
+
+always_ff @(posedge I_CLK or negedge I_RESETN) begin
+    if (~I_RESETN) begin
+        r_wbusy   <= '0;
+        r_w_older <= '0;
+    end else begin
+        r_wbusy   <= w_w_open_nxt;
+        for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
+            r_w_older[q] <= w_w_older[q] & w_w_open_nxt & {AXI_SLV_NUM{w_w_open_nxt[q]}};
+        end
+    end
+end
 
 endmodule
-
