@@ -66,7 +66,7 @@ class aou_base_test extends ocah_test;
     void'($value$plusargs("remote_rp_count=%d", cfg.remote_rp_count));
     void'($value$plusargs("rx_fifo_slack=%d", cfg.rx_fifo_slack));
     // AOU_FDI_CHECKER knows only the DUT's RP_COUNT and would report the credits
-    // a larger remote die advertises for its own extra RPs (BUGS/018).
+    // a larger remote die advertises for its own extra RPs (BUGS/062).
     if (cfg.remote_rp_count > cfg.n_rp) cfg.fdi_chk_en = 1'b0;
     if ($value$plusargs("remote_bytes=%s", rb)) cfg.set_remote_bytes(rb);
     cfg.l1_plusargs();

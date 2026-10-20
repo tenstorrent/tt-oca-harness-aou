@@ -95,12 +95,15 @@ class aou_unpacker extends uvm_object;
     ledger_chk("AOU-R9");
     if (f.fdid != cfg.fdid)
       viol("AOU-R9", f, 0, $sformatf("FDId %0d, expected %0d", f.fdid, cfg.fdid));
-    // A header advertising nothing names no plane (BUGS/018 interim; the
-    // DUT puts RP3 in zero-credit headers during activation).
-    if (f.msg_credit[13:0] != 0) ledger_chk("AOU-R14");
-    if (f.msg_credit[13:0] != 0 && int'(f.msg_credit[15:14]) >= sender_rp_count())
+    // The RP field is bound in every header, including one that advertises
+    // nothing, which names RP0 (MAS 3.9).
+    ledger_chk("AOU-R14");
+    if (int'(f.msg_credit[15:14]) >= sender_rp_count())
       viol("AOU-R14", f, 0, $sformatf("MsgCredit names RP%0d of %0d", f.msg_credit[15:14],
                                       sender_rp_count()));
+    else if (f.msg_credit[13:0] == 0 && f.msg_credit[15:14] != 0)
+      viol("AOU-R14", f, 0, $sformatf("MsgCredit advertising nothing names RP%0d, not RP0",
+                                      f.msg_credit[15:14]));
 
     if (carry_g.size() > 0) begin
       int unsigned owed = carry_need - carry_g.size();

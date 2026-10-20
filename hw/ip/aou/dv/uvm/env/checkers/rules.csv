@@ -120,7 +120,7 @@ AOU-R10,via AOU-R3,by construction (L3 packer),DUT,AXI traffic travels only as d
 AOU-R11,aou_unpacker,aou_fdi_chk_adapter,DUT,RsvdZero fields are zero; CrdtGrant fields of an unimplemented RP are zero,AoU 5.x 6.4.2 Table 26
 AOU-R12,aou_unpacker,,N/A,v0.8 only: Basic Profile ActivateReq ProfileID/Rev/Opt are zero (the v0.7 ActivateReq has no profile fields),AoU v0.8 11.1
 AOU-R13,aou_l3_model,,DUT,ReadData DLENGTH matches the ARSIZE of its ReadReq (256 below 256 bits),AoU 5.7
-AOU-R14,aou_unpacker,aou_fdi_chk_adapter,DUT,RP fields (messages and MsgCredit) stay below the implemented RP count,AoU 6.4.1
+AOU-R14,aou_unpacker,aou_fdi_chk_adapter,DUT,RP fields (messages and MsgCredit) stay below the implemented RP count; a MsgCredit advertising nothing names RP0,AoU 6.4.1; MAS 3.9
 AOU-R15,via AOU-R24,,DUT,The receiver advertises all five credit classes for every RP (the DUT's initial CrdtGrant must cover each),AoU 6.1
 AOU-R16,aou_l3_model,aou_fdi_chk_adapter,DUT,No credited message starts without credit for all its granules (consumed at start),AoU 6.1
 AOU-R17,via AOU-R16,by construction (L3 packer),DUT,"WriteData and WriteDataFull draw on WDATACRED (the model charges both to WDATA, so misuse overruns it)",AoU 6.1
