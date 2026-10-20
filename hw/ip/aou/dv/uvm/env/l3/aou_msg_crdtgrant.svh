@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// CrdtGrant Misc message (Table 19, Figure 20): 2 granules. After MSGTYPE and
-// MISCOP come the credit fields class by class (WREQ, RREQ, WDATA, RDATA) for
+// CrdtGrant Misc message (v0.8 Table 18; v0.7 Table 19, Figure 20): 2 granules.
+// After MSGTYPE and MISCOP come the credit fields class by class (WREQ, RREQ, WDATA, RDATA) for
 // RP0..3, three bits each, then WRESP for RP0..3 at two bits, then RsvdZero17.
 // Each field carries the source RP's credits.
 class aou_msg_crdtgrant extends aou_msg;

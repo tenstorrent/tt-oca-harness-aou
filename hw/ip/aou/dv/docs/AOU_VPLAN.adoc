@@ -234,9 +234,14 @@ v0.7), 4.16, 4.17, 5.16, 5.17 (WRAP bursts: the DUT supports INCR only and AoU
 carries no `AxBURST`; `AXI-R19` flags any other burst as a stimulus error),
 6.16 and 9.7 (no FDID field exists in this RTL), 9.8 (no RX incomplete-flit
 time-out; the adapter completes or cancels every flit), 12.13 (an asymmetric
-DEST_RP is a misconfiguration the specification forbids; `aou_dest_rp_asym_test`
-records the interim expectation, BUGS/031), 22.5 (`AOU_CORE_TOP` without the
-bring-up controller is not integrated by this bench).
+DEST_RP is a misconfiguration the specification forbids), 22.5
+(`AOU_CORE_TOP` without the bring-up controller is not integrated by this
+bench). AoU v0.8 decides where it and v0.7 differ, and stimulus it leaves
+undefined is not run: 9.5 (a remote credit overrun has no defined receiver
+reaction) and 9.21 (ReadData wider than ARSIZE is a peer violation
+with no defined reaction) are dropped; 9.3, 9.4, 1.13, 9.15 and 9.16
+check only that the testbench reports the malformed message, after which
+software recovers; 2.10 sends PropertyReq 0 only.
 
 * *Blocked scenarios.* `aou_perf_test` S4 (narrow-`AxSIZE` long bursts) is
   blocked while the WriteData size versus DLENGTH reading and a ReadData

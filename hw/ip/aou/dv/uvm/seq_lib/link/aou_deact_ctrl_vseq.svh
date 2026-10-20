@@ -10,11 +10,12 @@
 //   aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46; the
 //   quiet-window reading is the BUGS/057 interim).
 // +mode=property (plan 2.10; BUGS/010, which covers the bit too): the remote
-//   die deactivates with PropertyReq 0 and 1 (+prop fixes it). Software holds
-//   off DEACTIVATE_START, so the DUT stays in DEACTIVATE while the test reads
-//   INT_DEACTIVATE_PROPERTY back: the PropertyReq received, and 0 before any
-//   DeactivateReq and again in the next ENABLED epoch (T1-L45, interim
-//   expectation). Its value once DISABLED is only logged.
+//   die deactivates with PropertyReq 0, the only value it may send (the bit is
+//   reserved on DeactivateReq in v0.7 and RsvdZero in v0.8, which defines no
+//   reaction to a set bit). Software holds off DEACTIVATE_START, so the DUT
+//   stays in DEACTIVATE while the test reads INT_DEACTIVATE_PROPERTY back: 0
+//   before any DeactivateReq, in DEACTIVATE and again in the next ENABLED epoch
+//   (T1-L45, interim expectation). Its value once DISABLED is only logged.
 class aou_deact_ctrl_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_deact_ctrl_vseq)
 
@@ -66,14 +67,7 @@ class aou_deact_ctrl_vseq extends aou_link_base_vseq;
   // 2.10
   // ---------------------------------------------------------------------
   task property_loops();
-    int fixed = arg_int("prop", -1);
-    bit props[$];
-    if (fixed >= 0) props.push_back(1'(fixed));
-    else begin
-      props = '{1'b0, 1'b1};
-      props.shuffle();
-    end
-    foreach (props[i]) property_once(props[i]);
+    property_once(1'b0);
   endtask
 
   task property_once(bit prop);
@@ -89,8 +83,6 @@ class aou_deact_ctrl_vseq extends aou_link_base_vseq;
     check_traffic(4);
     // The DUT stays in DEACTIVATE until the test sets DEACTIVATE_START itself.
     env.sw_isr.enable = 1'b0;
-    // PropertyReq is reserved on DeactivateReq (AoU v0.7 Table 26, BUGS/010).
-    if (prop) expect_event("AOU-R11", 1, 0);
     cfg.l3_cfg.deact_prop = prop;
     env.l3.model.lnk.request_deactivate();
     env.l3.model.maybe_release_deact();

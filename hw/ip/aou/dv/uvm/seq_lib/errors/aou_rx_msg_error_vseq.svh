@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Malformed messages from the remote die, one kind per case, between bursts
-// of checked traffic. The spec defines no receiver reaction (BUGS/012); the
-// interim expectation is that the DUT drops what it cannot decode, raises
-// no interrupt and no LinkReset, and later traffic completes with correct
-// data. Each injection must be reported by the testbench's own checkers
-// (the model's TX decode and AOU_FDI_CHECKER), which proves it reached the
-// wire.
+// of checked traffic. This tests the testbench, not the DUT: each injection
+// must be reported by the testbench's own checkers (the model's TX decode and
+// AOU_FDI_CHECKER), which proves it reached the wire. AoU v0.8 defines no
+// receiver reaction (8.3.3 makes error detection implementation-defined;
+// see there), so nothing is expected of the DUT: after each injection software
+// recovers (LinkError, AOU_SW_RESET, re-activation, as for any link error)
+// before checked traffic resumes.
 //   bad_type    reserved MSGTYPE 0111b..1111b          AOU-R3
 //   bad_miscop  reserved MISCOP                         AOU-R3
 //   bad_actop   reserved ACTIVATIONOP                   AOU-R3
@@ -74,18 +75,11 @@ class aou_rx_msg_error_vseq extends aou_link_base_vseq;
       pause_traffic();
       inject_kind(kinds[i]);
       wait_cycles(1000);
-      check_no_linkreset(kinds[i]);
+      recover();
       resume_traffic();
       check_traffic(num_txns);
     end
     sw_deactivate();
-  endtask
-
-  task check_no_linkreset(string kind);
-    aou_core rm = p_sequencer.regs;
-    check_field(rm.lp_linkreset.invalid_actmsg_err, 0, "T1-L18", {kind, " (BUGS/012 interim)"});
-    check_field(rm.lp_linkreset.msgcredit_err, 0, "T1-L18", {kind, " (BUGS/012 interim)"});
-    check_field(rm.aou_init.activate_state_enabled, 1, "T1-L18", {kind, " (BUGS/012 interim)"});
   endtask
 
   task inject_kind(string kind);

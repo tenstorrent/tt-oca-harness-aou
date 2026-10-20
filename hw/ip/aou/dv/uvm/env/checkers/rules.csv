@@ -112,8 +112,8 @@ AOU-R2,via AOU-R11,by construction (L3 packer),DUT,Every message is a whole numb
 AOU-R3,aou_unpacker,aou_fdi_chk_adapter,DUT,A MsgStart granule decodes to a defined MSGTYPE/MISCOP/ACTIVATIONOP/DLENGTH,AoU 4.3.2 Table 1/15/27 5.4
 AOU-R4,aou_unpacker,aou_fdi_chk_adapter,DUT,No MsgStart inside the body of a message in the same flit,AoU 4.4
 AOU-R5,aou_unpacker,,DUT,A message spanning flits continues at G0 of the next flit with no MsgStart in the continuation,AoU 4.4
-AOU-R6,aou_unpacker,aou_fdi_chk_adapter,DUT,At most one Activation message per flit and only at G0 (v0.8: alone in its flit),AoU 4.4
-AOU-R7,aou_unpacker,,N/A,v0.8 only: at most 2 non-Activation Misc messages per half-flit (checked with spec_rev=v0.8; the DUT is v0.7),AoU v0.8 4.4
+AOU-R6,aou_unpacker,aou_fdi_chk_adapter,DUT,At most one Activation message per flit and only at G0 (v0.7.1; always); with +v0p8: alone in its flit (v0.8 addition),AoU v0.7.1 4.4; AoU v0.8 4.4
+AOU-R7,aou_unpacker,,DUT,At most 2 non-Activation Misc messages per half-flit (v0.8 addition; on the DUT only with +v0p8),AoU v0.8 4.4
 AOU-R8,aou_unpacker,,DUT,ActivateReq and ActivateAck from one side are in different flits,AoU 9.2
 AOU-R9,aou_unpacker,aou_fdi_chk_adapter,DUT,Flit FDId names the bridge pair under test,AoU 4.3.1
 AOU-R10,via AOU-R3,by construction (L3 packer),DUT,AXI traffic travels only as defined AoU messages (a DUT message must decode to a defined type),AoU 4.4
@@ -132,7 +132,7 @@ AOU-R22,by construction (aou_credit_mgr decode),,MODEL,"*CRED decode per Table 1
 AOU-R23,n/a,,N/A,Unimplemented channels start with zero credit (the DUT has no asymmetric channel configuration),AoU 6.3
 AOU-R24,aou_l3_model,,DUT,After activation the DUT sends a CrdtGrant covering every class of every RP,AoU 6.4.3; MAS 3.9
 AOU-R25,by construction (aou_l3_model),,MODEL,Misc messages are never credit-checked (the model charges no credit for Misc; a DUT that did could not be told apart),AoU 6.4.1
-AOU-R26,aou_l3_model,,DUT,No credits or credited messages in DISABLED; no credits after one's DeactivateAck (see BUGS/009),AoU 8.2/8.4
+AOU-R26,aou_l3_model,,DUT,"No credits or credited messages in DISABLED (the flit carrying the DUT's own DeactivateAck may carry request credits); no response credits after its DeactivateAck unless CREDIT_MANAGE=1 (MAS); request credits (WREQ/RREQ and, interim, WDATA) are permitted after it (v0.8 8.4)",AoU v0.8 8.4
 AOU-R27,via AOU-R40,by construction (aou_link_ctrl),DUT,ActivateReq sent or received moves DISABLED to ACTIVATE (a DUT that did not move answers out of sequence),AoU 8.4
 AOU-R28,aou_l3_model,,DUT,A received ActivateReq is answered with ActivateAck (end-of-test check),AoU 8.4
 AOU-R29,aou_l3_model,aou_fdi_chk_adapter,DUT,"Credits are sent only after one's own ActivateAck; AOU_FDI_CHECKER also reports response credits after one's own DeactivateAck and any credit in DISABLED (request credits after it are permitted, v0.8 8.4)",AoU v0.8 8.4
@@ -192,7 +192,7 @@ T1-L14,aou_invalid_actmsg_vseq,,DUT,An invalid activation message raises INT_REQ
 T1-L15,aou_invalid_actmsg_vseq,,DUT,"Neither an invalid ActivateReq nor an invalid ActivateAck is answered: the out-of-step message is an error and nothing is transmitted",AoU v0.8 8.3.3 / 8.4; MAS software-operation 7.2.3
 T1-L16,aou_invalid_actmsg_vseq,,DUT,An opcode the MAS permits raises no LinkReset and no answer (BUGS/013 interim),MAS software-operation 7.2.3
 T1-L17,aou_linkreset_timeout_vseq,,DUT,A time-out does not fire before 2^(value+18) cycles,MAS software-operation 7.1/7.2.3
-T1-L18,aou_rx_msg_error_vseq,,DUT,A malformed received message raises no LinkReset and leaves AoU ENABLED (BUGS/012 interim),AoU 4.4/5.x; BUGS/012
+T1-L18,n/a,,N/A,Retired (spec v0.8): a malformed received message has no defined receiver reaction (8.3.3 detection is implementation-defined); aou_rx_msg_error_vseq now only proves the testbench checkers see each injection,AoU v0.8 8.3.3
 T1-L19,aou_link_event_vseq,,DUT,Retrain and clk_req wake leave AoU ENABLED (BUGS/015 interim),UCIe r1.1 8.3.3.4; BUGS/015
 T1-L20,aou_lp_mode_traffic_vseq,,DUT,With TX_LP_MODE=0 the DUT keeps sending flits while idle,MAS software-operation 7.1 Low Power mode
 T1-L21,aou_lp_mode_traffic_vseq,,DUT,TX_LP_MODE=1 with threshold 0 sends no flit while idle,MAS software-operation 7.1 Low Power mode
@@ -222,7 +222,7 @@ T1-E09,aou_int_vseq,,DUT,Every provoked early-response error got an early OKAY,M
 T1-E10,aou_int_vseq,,DUT,Reading or writing 0 leaves a W1C status bit and its interrupt set; writing 1 clears both,MAS interrupts-errors 4; csr/aou-core.rdl
 T1-E11,aou_int_vseq,,DUT,WRITE_EARLY_RESPONSE_RPn captures the failing ID and type and clears them with WRITE_RESP_ERR,MAS architecture 3.7.3/3.7.9
 T1-E12,aou_int_vseq,,DUT,Simultaneous interrupt sources are all captured and clear independently,MAS interrupts-errors 4
-T1-E13,aou_credit_violation_vseq,,DUT,Reads beyond the advertised RREQ credit leave reads within it answered and raise no LinkReset (BUGS/030 interim),AoU 6.1; BUGS/030
+T1-E13,n/a,,N/A,Retired (spec v0.8): reads beyond the advertised credit are a sender violation with no defined receiver reaction; aou_credit_violation_test removed,AoU v0.8 6.1
 T1-E14,aou_before_enable_vseq,,DUT,A request before activation waits and raises INT_ACTIVATE_START,AoU 8.4; MAS software-operation 7.3.5
 DP-R02,aou_dw_chk,,DUT,An S-port read beat whose ReadData is narrower than the RP carries that ReadData replicated across the bus,MAS 3.3 (R 4M1S FIFO); plan 14.16
 DP-R03,aou_dw_chk,,DUT,WriteData the DUT sends carries the DLENGTH of its RP's AXI data width,MAS 3.5.2
@@ -234,7 +234,7 @@ DP-R08,aou_t1_attr_chk,,DUT,FLEX is 0 in every AXI message the DUT sends (it has
 T1-M01,aou_mrp_chk,,DUT,Per RP the DUT sends one request per S-port transaction and one WriteResp/last ReadData per remote transaction; idle RPs carry no AXI message,MAS 3.10; AoU RP field; plan 12.1-12.8/12.19
 T1-M02,aou_mrp_chk,,DUT,With every RP backlogged no RP starves: when the first RP has sent all its requests the others have sent at least 25% of theirs,MAS 3.2.1 (round-robin arbitration); plan 12.6/12.8
 T1-M03,aou_mrp_chk,,DUT,A slowed RP does not hold back the others: they complete while it still has transactions outstanding,MAS 3.4 (per-RP FIFOs and credits); plan 12.x
-T1-M04,aou_dest_rp_asym_vseq,,DUT,With asymmetric DEST_RP no transaction of the remapped RP completes (its responses come back on the other plane),MAS 3.10.1; BUGS/031 interim; plan 12.13
+T1-M04,n/a,,N/A,"Retired (spec v0.8 decision): an asymmetric DEST_RP is a configuration MAS 3.10.1 forbids, with undefined behaviour; aou_dest_rp_asym_test removed",MAS 3.10.1
 T1-C01,aou_t1_crd_flow_chk,,DUT,"Independent per-RP progress: while another RP has work queued without credit, a credit class does not stall for block_cycles (env cfg crd_block_cycles or +crd_block_cycles, default 256 cycles the Adapter takes a beat) with an RP holding credit and work of that class at its AXI input (BUGS/045)",AoU 6.1 (credits per RP and class); MAS 3.9; plan 3.15/12.14
 T1-C02,aou_t1_crd_flow_chk,,DUT,"Work conservation: a credit class does not stall for idle_cycles (crd_idle_cycles, default 4096) while an RP holds credit and work of that class at its AXI input; the DUT uses the credit it holds",AoU 6.1; plan 8.3/8.6
 T1-C03,aou_t1_crd_rr_chk,aou_mrp_vseq,DUT,With several RPs owed credit the DUT advertises them in header MsgCredit round robin: the first N grants name each of the N owed RPs once,MAS 3.9 (credit advertisement); plan 3.19
@@ -252,9 +252,10 @@ T1-L29,aou_t1_sw_reset_chk,,DUT,An RX W beat pending at the release of AOU_SW_RE
 T1-DFT01,aou_t1_sw_reset_chk,,DUT,"With TIEL_DFT_MODESCAN=1 the core reset (w_DFTED_sw_resetn) stays de-asserted, AOU_SW_RESET written or not (BUGS/052 interim: the guide text; the RTL disagrees)",integration guide 3.13.1; BUGS/052
 T1-DFT02,aou_dft_scan_vseq,,DUT,"With TIEL_DFT_MODESCAN=1 the SFRs keep their values and an AOU_SW_RESET write resets nothing (the software reset path is neutralised)",integration guide 3.13.1
 T1-L31,aou_base_test_seq,,DUT,"AOU_SW_RESET puts the DUT core in reset (core_rst_n low) within 10000 core cycles of the write, so sw_reset() can flush the env at that edge",MAS software-operation 7.3.6 AOU_SW_RESET
+T1-L32,aou_act_flit_vseq,,DUT,Local requests issued while DISABLED activate the link (MAS 7.3.5 INT_ACTIVATE_START),MAS software-operation 7.3.5
 T1-L40,aou_t1_rx_fifo_chk,,DUT,"The DUT sends no ActivateReq while more than a slack of remote WriteReq/ReadReq per RP still wait for its M port (the RX FIFO is emptied before activation)",MAS software-operation 7.3.2/7.3.4; plan 1.10
 T1-L43,aou_link_act_deact_vseq,,DUT,"ACTIVATE_START written while the FDI link is down reads back 1 with the DUT still DISABLED (read-back in the test; activation after link-up is T1-V02/T1-V03)",MAS software-operation 7.1/7.3.2; plan 1.11
-T1-L45,aou_deact_ctrl_vseq,,DUT,"INT_DEACTIVATE_PROPERTY reads 0 in ENABLED and the received PropertyReq while in DEACTIVATE after a remote DeactivateReq (interim expectation; the bit is undocumented)",csr/aou-core.rdl AOU_INIT; BUGS/010; plan 2.10
+T1-L45,aou_deact_ctrl_vseq,,DUT,"INT_DEACTIVATE_PROPERTY reads 0 in ENABLED and while in DEACTIVATE after a remote DeactivateReq with PropertyReq 0 (interim expectation; the bit is undocumented, and v0.8 makes PropertyReq RsvdZero)",csr/aou-core.rdl AOU_INIT; BUGS/010; plan 2.10
 T1-L46,aou_t1_rx_fifo_chk,,DUT,"A DeactivateReq (PropertyReq 0) comes at least 2^(DEACTIVATE_TIME_OUT_VALUE+3) cycles (less a TX pipeline slack) after the DUT's last credited message",MAS software-operation 7.1 AOU_INIT.DEACTIVATE_TIME_OUT_VALUE; BUGS/057 interim; plan 2.12
 T1-L47,aou_t1_rx_fifo_chk,,DUT,"With CREDIT_MANAGE=0 the DUT sends DeactivateReq only once it has answered every remote request older than the link crossing time",MAS software-operation 7.1 (DEACTIVATE_START condition 1)/7.3.1; plan 2.5
 T1-LP01,aou_t1_lp_mode_vseq,,DUT,With TX_LP_MODE=0 the DUT keeps sending flits in an idle window (at least window/16),MAS software-operation 7.1 Low Power mode

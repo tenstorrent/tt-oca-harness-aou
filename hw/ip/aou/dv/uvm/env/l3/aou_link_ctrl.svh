@@ -21,6 +21,7 @@ class aou_link_ctrl extends uvm_object;
   aou_link_state_e prev_state = AOU_LS_DISABLED;
   bit req_sent, req_rcvd, ack_sent, ack_rcvd;
   bit dreq_sent, dreq_rcvd, dack_sent, dack_rcvd;
+  int unsigned dack_hold;       // received flits left before our DeactivateAck
   bit grant_due;       // initial CrdtGrant owed after our ActivateAck
   bit want_deact;      // DeactivateReq wanted once our requests complete
   int unsigned enabled_cnt;
@@ -156,14 +157,25 @@ class aou_link_ctrl extends uvm_object;
       AOU_ACT_ACK:   ack_rcvd = 1'b1;
       AOU_DEACT_REQ: begin
         dreq_rcvd = 1'b1;
-        if (cfg.auto_deactivate) want_deact = 1'b1;
-        if (cfg.auto_deact_ack) queue_op(AOU_DEACT_ACK);
+        if (cfg.deact_ack_hold != 0) dack_hold = cfg.deact_ack_hold;
+        else answer_deact_req();
       end
       AOU_DEACT_ACK: dack_rcvd = 1'b1;
       default: ;
     endcase
     update_state();
     return 1'b1;
+  endfunction
+
+  function void answer_deact_req();
+    if (cfg.auto_deactivate) want_deact = 1'b1;
+    if (cfg.auto_deact_ack) queue_op(AOU_DEACT_ACK);
+  endfunction
+
+  // One received flit of a held DeactivateAck (cfg.deact_ack_hold).
+  function void tick_dack_hold();
+    if (dack_hold == 0 || state != AOU_LS_DEACTIVATE) return;
+    if (--dack_hold == 0) answer_deact_req();
   endfunction
 
   function void update_state();
@@ -186,6 +198,7 @@ class aou_link_ctrl extends uvm_object;
     {dreq_sent, dreq_rcvd, dack_sent, dack_rcvd} = 4'b0;
     grant_due = 1'b0;
     want_deact = 1'b0;
+    dack_hold = 0;
     epoch++;
     crd.reset_link();
   endfunction

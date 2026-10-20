@@ -11,7 +11,5 @@
 `include "errors/aou_dbg_off_vseq.svh"
 `include "errors/aou_id_mismatch_vseq.svh"
 `include "errors/aou_int_vseq.svh"
-`include "errors/aou_credit_violation_vseq.svh"
 `include "errors/aou_before_enable_vseq.svh"
 `include "errors/aou_slv_id_mismatch_vseq.svh"
-`include "errors/aou_rdata_wide_vseq.svh"

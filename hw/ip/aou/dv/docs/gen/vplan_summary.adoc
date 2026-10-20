@@ -193,7 +193,7 @@
 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-res0` | `aou_qos_order_test` | `+arb_mode=1 +qos_tiers=2 +qos_timer=res0` | 1-3 | `4x512-sp64` | 13.22 | 
 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-max` | `aou_qos_order_test` | `+arb_mode=1 +qos_tiers=2 +qos_timer=max` | 1-3 | `4x512-sp64` | 13.22 | 
 |===
-===== `testlists/link.toml` (40 scenarios)
+===== `testlists/link.toml` (43 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -233,10 +233,13 @@
 | `aou_zero_credit_test.credit-rreq.deact-1` | `aou_zero_credit_test` | `+credit=rreq +deact=1` | 1-2 |  | 2.5 | 
 | `aou_zero_credit_test.credit-wdata.deact-1` | `aou_zero_credit_test` | `+credit=wdata +deact=1` | 1-2 |  | 2.5 | 
 | `aou_zero_credit_test.credit-rdata.deact-1` | `aou_zero_credit_test` | `+credit=rdata +deact=1` | 1-2 |  | 2.5 | 
+| `aou_zero_credit_test.credit-wresp.deact-1.grant-2` | `aou_zero_credit_test` | `+credit=wresp +deact=1 +grant=2` | 1-2 |  | 2.5 | 
 | `aou_zero_credit_test.credit-wresp.deact-1` | `aou_zero_credit_test` | `+credit=wresp +deact=1` | 1-2 |  | 2.5 | 
 | `aou_deact_ctrl_test.mode-tov` | `aou_deact_ctrl_test` | `+mode=tov` | 1-3 |  | 2.12 | 
 | `aou_deact_ctrl_test.mode-property` | `aou_deact_ctrl_test` | `+mode=property` | 1-2 |  | 2.10 | 
 | `aou_remote_react_test` | `aou_remote_react_test` |  | 1-3 |  | 1.6,6.20,18.17 | 
+| `aou_act_flit_test.mode-act_req.v0p8` | `aou_act_flit_test` | `+mode=act_req +v0p8` | 1-3 |  | 1.12 | 
+| `aou_act_flit_test.mode-deact_rsp.v0p8` | `aou_act_flit_test` | `+mode=deact_rsp +v0p8` | 1-3 |  | 2.14 | 
 |===
 ===== `testlists/errors.toml` (16 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
@@ -259,7 +262,7 @@
 | `aou_slv_id_mismatch_test.4x512-sp64` | `aou_slv_id_mismatch_test` |  | 1-2 | `4x512-sp64` | 9.11,9.12 | 
 | `aou_slv_id_mismatch_test.1x512-sp64` | `aou_slv_id_mismatch_test` |  | 1 | `1x512-sp64` | 9.11,9.12 | 
 |===
-===== `testlists/err_int.toml` (33 scenarios)
+===== `testlists/err_int.toml` (29 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -271,7 +274,6 @@
 | `aou_axi_err_resp_test.part-fifo.dbg_len-max` | `aou_axi_err_resp_test` | `+part=fifo +dbg_len=max` | 1 |  | 9.13,9.14 | 
 | `aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0` | `aou_axi_err_resp_test` | `+part=fifo +dbg_len=3 +max_awburstlen=0 +max_arburstlen=0` | 1-2 |  | 9.13,9.14 | 
 | `aou_before_enable_test` | `aou_before_enable_test` |  | 1-2 |  | 9.6,1.12 | 
-| `aou_credit_violation_test` | `aou_credit_violation_test` |  | 1 |  | 9.5 | BUGS/030 (expected_fail.yaml)
 | `aou_id_mismatch_test.side-mgr.kind-b` | `aou_id_mismatch_test` | `+side=mgr +kind=b` | 1 |  | 9.9 | 
 | `aou_id_mismatch_test.side-mgr.kind-r` | `aou_id_mismatch_test` | `+side=mgr +kind=r` | 1 |  | 9.10 | 
 | `aou_id_mismatch_test.side-mgr.kind-b.mask-1` | `aou_id_mismatch_test` | `+side=mgr +kind=b +mask=1` | 1 |  | 19.8 | 
@@ -293,9 +295,6 @@
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5` | `aou_axi_err_resp_test` | `+T1_VSEQ=aou_dbg_off_vseq +dbg_on=5` | 1-2 | `4x512-sp64` | 9.18,9.13,9.14 | 
 | `aou_axi_err_resp_test.part-fifo.1x256-sp32` | `aou_axi_err_resp_test` | `+part=fifo` | 1-3 | `1x256-sp32` | 9.19 | 
 | `aou_axi_err_resp_test.part-fifo.4xmix4211-sp128` | `aou_axi_err_resp_test` | `+part=fifo` | 1-2 | `4xmix4211-sp128` | 9.19 | 
-| `aou_rdata_wide_test.1x512-sp64` | `aou_rdata_wide_test` |  | 1-2 | `1x512-sp64` | 9.21 | 
-| `aou_rdata_wide_test.1x256-sp32` | `aou_rdata_wide_test` |  | 1-2 | `1x256-sp32` | 9.21 | 
-| `aou_rdata_wide_test.4xmix4211-sp128` | `aou_rdata_wide_test` |  | 1-2 | `4xmix4211-sp128` | 9.21 | 
 |===
 ===== `testlists/lifecycle.toml` (34 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
@@ -336,7 +335,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | BUGS/052 (expected_fail.yaml)
 |===
-===== `testlists/matrix.toml` (88 scenarios)
+===== `testlists/matrix.toml` (86 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -362,8 +361,6 @@
 | `aou_mrp_test.mrp_scn-indep.4xmix2144-sp64` | `aou_mrp_test` | `+mrp_scn=indep` | 1-3 | `4xmix2144-sp64` | 12.8,12.18,12.19 | 
 | `aou_mrp_test.mrp_scn-indep.2xmix-tp64_128` | `aou_mrp_test` | `+mrp_scn=indep` | 1-2 | `2xmix-tp64_128` | 12.6,12.18,12.19 | 
 | `aou_dest_rp_dup_test` | `aou_dest_rp_dup_test` |  | 1-3 | `4x512-sp64` | 12.12 | 
-| `aou_dest_rp_asym_test.4x512-sp64` | `aou_dest_rp_asym_test` |  | 1-3 | `4x512-sp64` |  | BUGS/031 (expected_fail.yaml)
-| `aou_dest_rp_asym_test.2xmix-tp64_128` | `aou_dest_rp_asym_test` |  | 1-2 | `2xmix-tp64_128` | 12.18 | BUGS/031 (expected_fail.yaml)
 | `aou_dw_test.remote_bytes-32.4xmix4211-sp128` | `aou_dw_test` | `+remote_bytes=32` | 1-3 | `4xmix4211-sp128` | 14.1,14.2,14.7,14.13,12.18,14.10,14.11,14.14,14.15,14.16 | 
 | `aou_dw_test.remote_bytes-64.4xmix4211-sp128` | `aou_dw_test` | `+remote_bytes=64` | 1-3 | `4xmix4211-sp128` | 14.3,14.4,14.8,14.12,14.13,12.18,14.10,14.11,14.14,14.15,14.16,18.3 | 
 | `aou_dw_test.remote_bytes-128_128_64_64` | `aou_dw_test` | `+remote_bytes=128,128,64,64` | 1-3 | `4xmix4211-sp128` | 14.4,14.6,14.9,14.12,12.18,14.10,14.11,14.14,14.15,14.16 | 
@@ -516,7 +513,7 @@
 | `aou_reg_access_test.pclk_ps-1013` | `aou_reg_access_test` | `+pclk_ps=1013` | 1 |  | 11.17 | BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)
 |===
 ==== L3 protocol-model unit bench (no DUT)
-===== `testlists/l3_unit.toml` (8 scenarios)
+===== `testlists/l3_unit.toml` (10 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -525,6 +522,8 @@
 | `aou_l3_crossflit_test` | `aou_l3_crossflit_test` |  | 1 |  |  | 
 | `aou_l3_dest_rp_test` | `aou_l3_dest_rp_test` |  | 1 |  |  | 
 | `aou_l3_inject_test` | `aou_l3_inject_test` |  | 1 |  |  | 
+| `aou_l3_inject_test.L3_INJECT-req_after_dreq` | `aou_l3_inject_test` | `+L3_INJECT=req_after_dreq` | 1 |  |  | 
+| `aou_l3_inject_test.L3_INJECT-rsp_after_dack` | `aou_l3_inject_test` | `+L3_INJECT=rsp_after_dack` | 1 |  |  | 
 | `aou_l3_link_test` | `aou_l3_link_test` |  | 1 |  |  | 
 | `aou_l3_loopback_test` | `aou_l3_loopback_test` |  | 1 |  |  | 
 | `aou_l3_unit_env_test` | `aou_l3_unit_env_test` |  | 1 |  |  | 

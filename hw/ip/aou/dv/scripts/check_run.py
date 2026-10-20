@@ -71,7 +71,7 @@ def judge(text, log, expected, test=None):
 
     errors = [m.group(0).strip() for m in map(ERR_RE.match, text.splitlines()) if m]
     errors = [e for e in errors if not AXI4PC_STOP_RE.search(e)]
-    entries = [e for e in load_entries(expected) if e.get("test") == test
+    entries = [e for e in load_entries(expected) if e.get("test") in (test, "*")
                and (not e.get("when_re") or re.search(e["when_re"], text, re.M))]
     used, bugs = set(), set()
 

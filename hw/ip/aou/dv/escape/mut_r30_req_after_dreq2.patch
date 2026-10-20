@@ -1,0 +1,61 @@
+SPDX-License-Identifier: Apache-2.0
+Mutation mut_r30_req_after_dreq2 (not a main fix): with CREDIT_MANAGE=1 the
+DeactivateReq leaves at DEACTIVATE_START without the S-port and timer gates,
+requests stay enabled after it, and the DUT's DeactivateAck waits while the S
+port is busy. Requests then follow the DUT's own DeactivateReq, which
+AOU_FDI_CHECKER's VIOL_MSG_ORDER (AOU-R30) and the L3 model's AOU-R34 must catch
+(v0.8 8.4). Needs +sw_hold_on_deact=0 and +l3_deact_ack_hold=N to reach it.
+Applied to a build-time copy of RTL/ by make build ESCAPE=mut_r30_req_after_dreq2.
+
+--- a/RTL/AOU_ACTIVATION_CTRL.sv
++++ b/RTL/AOU_ACTIVATION_CTRL.sv
+@@ -208,13 +208,13 @@
+     if(~I_RESETN)begin
+         r_deactivate_start_1d <= 1'b0;
+     end else if (I_CREDIT_MANAGE_TYPE) begin
+-        r_deactivate_start_1d <= I_DEACTIVATE_START & w_time_out_done & w_deactivate_en & I_SLV_BUS_CLEANY_COMPLETE;        
++        r_deactivate_start_1d <= I_DEACTIVATE_START & w_deactivate_en;        
+     end else begin
+         r_deactivate_start_1d <= I_DEACTIVATE_START & w_axi_rsp_completed_safe & w_time_out_done & w_deactivate_en & ((~r_rx_deactivate_req & I_SLV_BUS_CLEANY_COMPLETE) | (r_rx_deactivate_req));
+     end
+ end
+ 
+-assign  w_deactivate_start_rising_edge_detect   = I_CREDIT_MANAGE_TYPE ? ~r_deactivate_start_1d & (I_DEACTIVATE_START & w_time_out_done & w_deactivate_en & I_SLV_BUS_CLEANY_COMPLETE) :
++assign  w_deactivate_start_rising_edge_detect   = I_CREDIT_MANAGE_TYPE ? ~r_deactivate_start_1d & (I_DEACTIVATE_START & w_deactivate_en) :
+                                                   ~r_deactivate_start_1d & (I_DEACTIVATE_START & w_axi_rsp_completed_safe & w_time_out_done & w_deactivate_en & ((~r_rx_deactivate_req & I_SLV_BUS_CLEANY_COMPLETE) | (r_rx_deactivate_req)));
+ 
+ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+@@ -403,6 +403,10 @@
+ assign  w_sdata0                = w_activate_related0 ? {ACTIVATE_REQ, 1'b0} : w_deactivate_start_rising_edge_detect ? {DEACTIVATE_REQ, 1'b0} :  {DEACTIVATE_REQ, 1'b1};
+ assign  w_svalid1               = w_activate_related1 | w_deactivate_related1;
+ assign  w_sdata1                = w_activate_related1 ? {ACTIVATE_ACK, 1'b0} : {DEACTIVATE_ACK, 1'b0};
++logic   w_mut_actmsg_mvalid;
++logic   w_mut_hold_ack;
++assign  w_mut_hold_ack          = (O_ACTMSG_ACTIVATION_OP == DEACTIVATE_ACK) & ~I_SLV_BUS_CLEANY_COMPLETE;
++assign  O_ACTMSG_VALID          = w_mut_actmsg_mvalid & ~w_mut_hold_ack;
+ 
+ AOU_SYNC_FIFO_NS1M #(
+     .FIFO_WIDTH      (4 + 1),   //ACTIVATION_OP + PROPERTYREQ
+@@ -417,9 +421,9 @@
+     .I_SDATA         ( {w_sdata1, w_sdata0}                             ),
+     .O_SREADY        (                                                  ),
+ 
+-    .I_MREADY        ( I_ACTMSG_READY                                   ),
++    .I_MREADY        ( I_ACTMSG_READY & ~w_mut_hold_ack                 ),
+     .O_MDATA         ( {O_ACTMSG_ACTIVATION_OP, O_ACTMSG_PROPERTYREQ}   ), 
+-    .O_MVALID        ( O_ACTMSG_VALID                                   ),
++    .O_MVALID        ( w_mut_actmsg_mvalid                              ),
+     
+     .O_S_EMPTY_CNT   (                                                  ),
+     .O_M_DATA_CNT    (                                                  )
+@@ -434,8 +438,8 @@
+                                     | (((r_cur_st == DEACTIVATE) | (r_cur_st == ENABLED)) & ~(r_rx_deactivate_req));
+ 
+ assign O_TX_REQ_CREDITED_MESSAGE_EN = ((r_cur_st == ACTIVATE) & (r_tx_activate_req & r_rx_activate_ack & r_rx_activate_req & (((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID)|r_tx_activate_ack)))
+-                                  | ((r_cur_st == ENABLED) & (~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY))))
+-                                  | ((r_cur_st == DEACTIVATE) & (~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY))));
++                                  | (r_cur_st == ENABLED)
++                                  | (r_cur_st == DEACTIVATE);
+ 
+ //Read Data, Write response message
+ assign O_RSP_CRD_ADVERTISE_EN       = I_CREDIT_MANAGE_TYPE ? ((r_cur_st == ACTIVATE) & (r_rx_activate_ack | (((O_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & O_ACTMSG_VALID & I_ACTMSG_READY))))

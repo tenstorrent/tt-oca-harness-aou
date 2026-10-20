@@ -8,13 +8,35 @@
 # UVM_ERROR it reports matches one of its entries. Seeds change which writes hit
 # the bug, not whether. An entry with `requires: <bug>` is a generic follow-on
 # symptom: it counts only when a bug-specific entry (one without `requires:`) for
-# that bug matched in the same run. `check_re:` (a regular expression) replaces
+# that bug matched in the same run. `test: '*'` makes an entry apply to every test,
+# for a DUT bug that every run reaches. `check_re:` (a regular expression) replaces
 # `check:` when the signature spans several fields of one message. `when_re:` (a
 # regular expression) limits an entry to runs whose log matches it, such as one
 # CONFIG or active PHY of aou_perf_test (its PERF_GATE lines carry the key).
 # AOU_FDI_CHECKER's AOU-R29/AOU-R30 reports end in the DUT's CREDIT_MANAGE: the
 # BUGS/009 LP(DUT->peer) entries match CREDIT_MANAGE=1 only, since with 0 the MAS
-# forbids credits after DeactivateAck and such a report is BUGS/033 or new.
+# forbids credits after DeactivateAck and such a report is a new finding. Under AoU
+# v0.8 8.4 the checker permits ReadData/WriteResp after one's own DeactivateReq and
+# request credits after one's own DeactivateAck, so the credit-order entries left are the
+# response credits after it (v0.8 is silent; the checker keeps v0.7's rule as the
+# interim).
+
+- test: aou_link_act_deact_test
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
+
+# AoU v0.8 4.4 puts an Activation message
+# alone in its flit (v0.7.1 asks only for G0). On every activation the DUT sends its initial
+# CrdtGrant in the flit of its ActivateAck, so with +v0p8 the L3 model reports AOU-R6 in every
+# T1 test; `test: '*'` applies the entry to all of them, and `when_re` to +v0p8 runs only.
+# Only two layouts are covered: the ActivateAck with the CrdtGrant, and a
+# DeactivateReq followed only by responses. Any other message beside an Activation still
+# fails the run.
 
 - test: aou_reg_bit_bash_test
   bug: BUGS/003
@@ -160,7 +182,8 @@
   seed_dependent: true
   note: >-
     CREDIT_MANAGE=1: the DUT returns RDATA/WRESP credit after its DeactivateAck as
-    the MAS asks; AOU_FDI_CHECKER follows v0.7 8.4 and reports it.
+    the MAS asks; v0.8 8.4 is silent on response credits after the Ack and
+    AOU_FDI_CHECKER keeps v0.7's rule as the interim.
 
 - test: aou_t1_deact_test
   bug: BUGS/009
@@ -168,9 +191,27 @@
   seed_dependent: true
   note: >-
     CREDIT_MANAGE=1 (reset value): the DUT advertises RDATA/WRESP credits after its
-    DeactivateAck as the MAS documents; AOU_FDI_CHECKER follows AoU v0.7 8.4, which forbids
-    any credit after one's own DeactivateAck. Seen only when the deactivation lands while
+    DeactivateAck as the MAS documents; v0.8 8.4 is silent on response credits after
+    one's own DeactivateAck and AOU_FDI_CHECKER keeps v0.7's rule as the interim. Seen only when the deactivation lands while
     credits are still owed.
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
+
+- test: aou_credit_return_test
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
 
 - test: aou_invalid_actmsg_test
   bug: BUGS/023
@@ -187,30 +228,6 @@
     the restarted activation advertises the whole RX buffer again while the remote die,
     still ENABLED, holds the first advertisement; with the 4xmix builds' 1024-bit RP buffers the sum
     passes AOU_FDI_CHECKER's 2048-credit counter
-
-- test: aou_link_act_deact_test
-  bug: BUGS/009
-  check: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: >-
-    the remote model answers a DUT write after its own DeactivateReq (v0.8 8.4, MAS
-    CREDIT_MANAGE=1); AOU_FDI_CHECKER calls it out of order
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: >-
-    CREDIT_MANAGE=1 (RDL reset value) on a software deactivation between cases: the remote model,
-    like the DUT, returns RDATA/WRESP credit after its own DeactivateAck (4x512-sp64 +mask=1 seed 1)
-
-- test: aou_credit_return_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: >-
-    CREDIT_MANAGE=1 (RDL reset value): the remote model, like the DUT, returns
-    RDATA/WRESP credit after its own DeactivateAck; AOU_FDI_CHECKER follows v0.7 8.4
 
 - test: aou_credit_return_test
   bug: BUGS/009
@@ -331,12 +348,6 @@
   note: the stalled writes are still open at the end
 
 - test: aou_link_act_deact_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: the same rule seen on the remote model's credits (CREDIT_MANAGE=1)
-
-- test: aou_link_act_deact_test
   bug: BUGS/032
   check_re: 'AOU-R33: \[l3\] DeactivateReq: (\d+) write\(s\), (\d+) read\(s\) on RP\d unanswered \(\1 write\(s\), \2 read\(s\) received after our DeactivateReq\)'
   seed_dependent: true
@@ -363,15 +374,6 @@
   note: >-
     the same flit seen by AOU_FDI_CHECKER; the BUGS/009 entry above covers only
     CREDIT_MANAGE=1 (4x512-sp64 Verilator seed 15, +deact_who=remote +credit_manage=0 +busy=1)
-
-- test: aou_link_act_deact_test
-  bug: BUGS/009
-  check_re: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
-  seed_dependent: true
-  note: >-
-    CREDIT_MANAGE=1: the DUT answers a remote write with WriteResp in the flit of its own
-    DeactivateReq (v0.8 8.4 and the MAS allow it, v0.7 8.4 and AOU_FDI_CHECKER do not);
-    1x256-sp32 VCS seed 4
 
 # AOU_SW_RESET and link-loss recovery (aou_reset_test, aou_link_event_test). Each
 # bug has bug-specific checks; the generic symptoms it causes (traffic stalls,
@@ -908,12 +910,6 @@
   seed_dependent: true
   note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck (deactivation stuck after BUGS/021, +when=queued)
 
-- test: aou_reset_test
-  bug: BUGS/009
-  check: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: the remote model answers DUT writes after its own DeactivateReq (v0.8 8.4, MAS CREDIT_MANAGE=1)
-
 # Entries added on the integration branch by streams I, J, K and L.
 - test: aou_fdi_t1_linkerror_spec_test
   bug: BUGS/002
@@ -975,16 +971,6 @@
   check: 'T1-E06: INT_MI0_ID_MISMATCH is 1, expected 0'
   seed_dependent: true
 
-- test: aou_credit_violation_test
-  bug: BUGS/030
-  check: 'T1-E13: '
-  note: ReadReqs beyond the advertised credit overwrite the DUT's RX buffer; the rest are never answered
-
-- test: aou_credit_violation_test
-  bug: BUGS/030
-  check: 'AXI-S04: remote->local beat 0 lane 0 (addr 50000'
-  note: reads within the credit come back with the data of the overflowing reads' addresses
-
 # BUGS/033 in aou_pack_test +pk=act (CREDIT_MANAGE=0): a MsgCredit in the flit of the
 # DUT's DeactivateAck.
 - test: aou_pack_test
@@ -1002,22 +988,15 @@
 
 # aou_act_after_deact_test on multi-RP and narrow-FDI builds: the deactivation lands
 # while credits and responses are still moving.
-- test: aou_act_after_deact_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: >-
-    +credit_manage=1: the remote model returns RDATA/WRESP credit after its own
-    DeactivateAck as the MAS documents for CREDIT_MANAGE=1; AOU_FDI_CHECKER follows v0.7 8.4
-    (3x512-sp64 VCS/Verilator, 4x512-sp64 and 1x256-sp32 Verilator)
 
 - test: aou_act_after_deact_test
-  bug: BUGS/009
-  check_re: 'AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
   seed_dependent: true
   note: >-
-    +credit_manage=1: the DUT answers a remote request after its own DeactivateReq (v0.8 8.4
-    and the MAS allow it, v0.7 8.4 and AOU_FDI_CHECKER do not); 3x512-sp64 seed 2
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
 
 - test: aou_act_after_deact_test
   bug: BUGS/033
@@ -1040,31 +1019,6 @@
     remote DeactivateReq arrives shares the flit of the DUT's DeactivateAck, which completes
     the deactivation, so the L3 model reports it "in DISABLED" (4x512-sp64 VCS seed 1, waves
     rid.wp12tri, CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
-
-# BUGS/031: asymmetric DEST_RP (illegal per MAS 3.10.1). The remote die answers
-# RP0's requests on plane 1 and the DUT presents those B/R on RP1's S port,
-# where nothing is outstanding.
-- test: aou_dest_rp_asym_test
-  bug: BUGS/031
-  check: 'AXI-R07: B ID'
-  note: RP1's S-port monitor sees a B for an RP0 write
-
-- test: aou_dest_rp_asym_test
-  bug: BUGS/031
-  check: 'matches no outstanding write'
-  note: RP1's manager driver, same B
-
-- test: aou_dest_rp_asym_test
-  bug: BUGS/031
-  check: 'AXI-R08: R ID'
-  seed_dependent: true
-  note: RP1's S-port monitor sees an R for an RP0 read
-
-- test: aou_dest_rp_asym_test
-  bug: BUGS/031
-  check: 'matches no outstanding read'
-  seed_dependent: true
-  note: RP1's manager driver, same R
 
 # BUGS/034: enabling TX_LP_MODE while a TX flit is in progress abandons the flit
 # after its first beat (FDI-R02); seen in 2xmix-tp64_128 and 1x256-sp32.
@@ -1182,30 +1136,6 @@
   check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
   seed_dependent: true
   note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_credit_violation_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
-
-- test: aou_credit_violation_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_credit_violation_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_credit_violation_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
 
 - test: aou_fdi_t1_linkdown_spec_test
   bug: BUGS/001
@@ -1556,12 +1486,6 @@
   seed_dependent: true
   note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
 
-- test: aou_credit_violation_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
 - test: aou_fdi_t1_linkdown_spec_test
   bug: BUGS/001
   check: 'FDI-R50: no lp_state_req=Active in'
@@ -1635,12 +1559,6 @@
   note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
 
 - test: aou_credit_return_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_credit_violation_test
   bug: BUGS/038
   check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
   seed_dependent: true
@@ -2146,10 +2064,13 @@
   note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
 
 - test: aou_rx_credit_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
   seed_dependent: true
-  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
 
 - test: aou_rx_credit_test
   bug: BUGS/033
@@ -2173,10 +2094,13 @@
   note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
 
 - test: aou_act_rx_drain_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
   seed_dependent: true
-  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
 
 - test: aou_act_rx_drain_test
   bug: BUGS/033
@@ -2200,10 +2124,22 @@
   note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
 
 - test: aou_deact_ctrl_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
   seed_dependent: true
-  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
+
+- test: aou_zero_credit_test
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
+    credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
+    (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
 
 - test: aou_deact_ctrl_test
   bug: BUGS/033
@@ -2221,18 +2157,28 @@
   note: the same flit seen by AOU_FDI_CHECKER
 
 - test: aou_zero_credit_test
-  bug: BUGS/009
-  check: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL(peer->DUT)'
-  seed_dependent: true
-  note: the same rule on the remote model's credits (CREDIT_MANAGE=1)
-
-- test: aou_zero_credit_test
   bug: BUGS/033
   check: 'AOU-R26: [l3] DUT MsgCredit'
   seed_dependent: true
   note: >-
     a MsgCredit in the flit of the DUT's DeactivateAck, reported "after its DeactivateAck" or,
     when that Ack completes the deactivation, "in DISABLED" (WDATA on 2x512-tp32_64)
+
+# Tests that reach a remote-initiated deactivation: CREDIT_MANAGE=1 (reset value), RDATA credits in and
+# after the DUT's DeactivateAck flit (VCS 4xmix2144-sp64 aou_int_test seeds 1 and 2,
+# 3x512-sp64 aou_t1_remote_act_test seed 1).
+
+- test: aou_int_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
+
+- test: aou_t1_remote_act_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck as the MAS asks
 
 - test: aou_zero_credit_test
   bug: BUGS/033
@@ -2260,6 +2206,44 @@
   seed_dependent: true
   note: provisional; follow-on of the post-link-event corruption until 20261014-p2a-02 is triaged
 
+- test: '*'
+  bug: BUGS/059
+  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: ActivateAck CrdtGrant( \(\+1 continuing\))?$'
+  when_re: 'DUT rules: AoU v0\.8 \(\+v0p8\)'
+  seed_dependent: true
+  note: >-
+    the DUT's initial CrdtGrant at G1 of its ActivateAck flit (v0.8 4.4; v0.7 allowed it);
+    the TX activation gate places the Activation at G0 of an empty ring but lets later
+    messages follow it in the same flit
+
+- test: '*'
+  bug: BUGS/059
+  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: DeactivateReq( (WriteResp|ReadData\d+))+( \(\+1 continuing\))?$'
+  when_re: 'DUT rules: AoU v0\.8 \(\+v0p8\)'
+  seed_dependent: true
+  note: >-
+    the same TX gate: pending responses (legal after the DeactivateReq, v0.8 8.4) packed
+    into the DeactivateReq's flit (4x512-sp64 aou_act_after_deact_test +credit_manage=1
+    +busy=1 seed 2)
+
+- test: aou_act_flit_test
+  bug: BUGS/059
+  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: (ActivateAck|DeactivateReq) '
+  when_re: 'DUT rules: AoU v0\.8 \(\+v0p8\)'
+  note: >-
+    +v0p8: the stimulus this test exists for. Requests held across the activation leave in the
+    ActivateAck's flit, and responses in the DeactivateReq's; the DUT follows v0.7.1 (Activation
+    at G0 only)
+
+- test: aou_act_flit_test
+  bug: BUGS/060
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER PL\(peer->DUT\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    testbench (the remote model, not the DUT): +mode=deact_rsp deactivates with CREDIT_MANAGE=1
+    while the remote die's reads are open, and the remote model returns RDATA/WRESP credit after
+    its own DeactivateAck; AOU_FDI_CHECKER's interim keeps v0.7's rule and reports it
+
 # BUGS/009 in aou_linkreset_timeout_test (+mask=1 seed 2 on 4xmix2144-sp64): the DUT
 # advertises credit after its DeactivateAck with CREDIT_MANAGE=1.
 - test: aou_linkreset_timeout_test
@@ -2271,16 +2255,6 @@
 # Arm Axi4PC (AXI4PC=1 builds; README "Optional: Arm AXI4 protocol assertions") on the
 # same DUT violations the bench's own AXI rules report. Each is a follow-on of the
 # bug-specific entry that names the violation, so it never explains a run alone.
-
-# BUGS/031: RP0's responses come out on RP1's S port (the bench's AXI-R07/AXI-R08). With
-# no request behind them Axi4PC also finds no data lanes (RDATA_X), its read CAM
-# under/overflows, and the transactions it counted stay open at the end.
-- test: aou_dest_rp_asym_test
-  bug: BUGS/031
-  check_re: '\[AXI4PC\] \S+\.u_s_axi4pc\.\S+: AXI4_(ERRS_BRESP_(AW|WLAST)|ERRS_RID|ERRS_RDATA_X|AUX_RCAM_(UNDERFLOW|OVERFLOW)|ERRS_(BRESP|RLAST)_ALL_DONE_EOS):'
-  requires: BUGS/031
-  seed_dependent: true
-  note: another RP's B or R on this S port
 
 # BUGS/021, BUGS/024: after a link-event recovery the checker is back on once the port is
 # idle, and the cut bursts or the orphan-R deadlock leave later transactions open at the

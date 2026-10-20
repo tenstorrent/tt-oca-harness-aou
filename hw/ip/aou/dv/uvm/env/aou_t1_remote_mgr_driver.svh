@@ -14,9 +14,6 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   aou_l3_agent l3;
   bit [1:0]    wire_rp = 2'd0; // RP field of our requests: the DUT's plane
   int unsigned full_pct = 30;  // WriteDataFull when every lane is strobed
-  // Error injection: the next inj_no_credit ReadReqs go out with
-  // ignore_credits set (they still get tracked and checked).
-  int unsigned inj_no_credit;
   uvm_analysis_port #(aou_axi_txn) ap;
 
   int unsigned n_wr;
@@ -117,10 +114,6 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   protected function void send_read(aou_axi_txn t);
     aou_msg_rreq rq = aou_msg_rreq::type_id::create("rreq");
     fill_req(rq, t);
-    if (inj_no_credit > 0) begin
-      inj_no_credit--;
-      rq.ignore_credits = 1'b1;
-    end
     l3.send(rq);
   endfunction
 

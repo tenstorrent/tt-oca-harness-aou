@@ -19,6 +19,13 @@
 // Adapter's pl_trdy policy on every PHY (aou_fdi_cfg), over what the test sets;
 // the L1 stall and cancel knobs of aou_t1_env_cfg::l1_plusargs().
 // +remote_rp_count=N the remote die's RP count (default: the DUT's);
+// +sw_hold_on_deact=0 software keeps issuing requests after DEACTIVATE_START
+// (MAS 7.3.5 broken on purpose); +l3_deact_ack_hold=N the remote die holds its
+// DeactivateAck, and its own deactivation, for N received flits after the
+// DUT's DeactivateReq, still granting request credit meanwhile (with both, a
+// DUT that sends requests after its own DeactivateReq gets the credit to do so);
+// +v0p8 holds the DUT to the expectations only AoU v0.8 adds (aou_t1_env_cfg::v0p8;
+// today AOU-R6/AOU-R7, the 4.4 Misc placement);
 // +rx_fifo_slack=N messages aou_t1_rx_fifo_chk allows past an RX FIFO.
 class aou_base_test extends ocah_test;
   `uvm_component_utils(aou_base_test)
@@ -56,6 +63,7 @@ class aou_base_test extends ocah_test;
 
   function void build_phase(uvm_phase phase);
     string rb;
+    string v0p8;
     super.build_phase(phase);
     cfg = aou_t1_env_cfg::type_id::create("cfg");
     cfg.randomize_knobs();
@@ -69,6 +77,12 @@ class aou_base_test extends ocah_test;
     // AOU_FDI_CHECKER knows only the DUT's RP_COUNT and would report the credits
     // a larger remote die advertises for its own extra RPs (BUGS/062).
     if (cfg.remote_rp_count > cfg.n_rp) cfg.fdi_chk_en = 1'b0;
+    void'($value$plusargs("sw_hold_on_deact=%d", cfg.sw_hold_on_deact));
+    if ($value$plusargs("v0p8%s", v0p8)) cfg.v0p8 = (v0p8 != "=0");  // +v0p8 or +v0p8=0|1
+    cfg.l3_cfg.v0p8 = cfg.v0p8;
+    `uvm_info(get_type_name(), cfg.v0p8 ? "DUT rules: AoU v0.8 (+v0p8)" :
+              "DUT rules: AoU v0.7.1 Misc placement", UVM_LOW)
+    void'($value$plusargs("l3_deact_ack_hold=%d", cfg.l3_cfg.deact_ack_hold));
     if ($value$plusargs("remote_bytes=%s", rb)) cfg.set_remote_bytes(rb);
     cfg.l1_plusargs();
     if (AOU_T1_N_PHY > 1) begin

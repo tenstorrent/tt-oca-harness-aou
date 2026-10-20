@@ -8,8 +8,9 @@ class aou_l3_cfg extends uvm_object;
   aou_spec_rev_e     spec_rev = AOU_SPEC_V07;
   int unsigned       rp_count = 1;
   // The DUT's RP count; 0: the same as ours. When they differ the link uses the
-  // smaller (MAS 3.10.1): AXI messages stay below it, and each side's credits
-  // may name any of its own RPs (the other side ignores the ones it lacks).
+  // smaller (MAS 3.10.1, AoU v0.8 6.2): AXI messages stay below it, and when we
+  // are the larger side we advertise no credit for the RPs beyond it. A larger
+  // DUT cannot be configured down, so its extra-RP credits are ignored here.
   int unsigned       peer_rp_count = 0;
   bit [1:0]          fdid = 2'd0;
   // FH byte 0 placed in every TX flit (Protocol Identifier in [7:6]); L1 may
@@ -50,11 +51,26 @@ class aou_l3_cfg extends uvm_object;
   bit                auto_ack = 1'b1;
   bit                auto_deactivate = 1'b1;
   bit                auto_deact_ack = 1'b1;
+  // Received flits by which our DeactivateAck, and our own deactivation, are
+  // held after the peer's DeactivateReq (0: at once). "In a timely manner"
+  // (8.4) sets no bound; a stimulus knob, not a mode.
+  int unsigned       deact_ack_hold;
   bit                ack_first;              // our Ack before our own Req
+  // Our next Activation message waits until our initial CrdtGrant has gone
+  // (with ack_first: Ack, grant, then Req, so the peer has credit before it
+  // sends the last activation message).
+  bit                act_req_after_grant;
   bit                initial_grant = 1'b1;   // CrdtGrant right after our ActivateAck
   // Send credited messages once ActivateReq is sent and ActivateAck received
   // (9.2) instead of waiting for ENABLED (8.4).
   bit                send_after_ack_rcvd;
+  // Hold the DUT to AoU v0.8-only expectations whatever the wire format
+  // (+v0p8, aou_t1_env_cfg::v0p8). Today that is the v0.8 4.4 Misc placement on
+  // the DUT's flits: an Activation message alone in its flit (AOU-R6) and at
+  // most 2 other Misc per half-flit (AOU-R7). Off, the DUT is held to v0.7.1:
+  // at most one Activation message per flit, at G0. Our own flits always
+  // follow and are checked against v0.8.
+  bit                v0p8 = 1'b0;
   // v0.8: an out-of-sequence Req/Ack moves the link to ERROR (8.3.3).
   bit                error_state_en = 1'b1;
 
@@ -78,12 +94,6 @@ class aou_l3_cfg extends uvm_object;
   // Our DEST_RP map: a response to a DUT request on our plane p goes to the
   // DUT's plane dest_rp[p] (MAS 3.10).
   bit [1:0]          dest_rp[AOU_RP_MAX] = '{2'd0, 2'd1, 2'd2, 2'd3};
-  // Error injection: the next rdata_wide[p] DUT reads on our plane p that need
-  // less than ReadData1024 are answered with ReadData1024 anyway, the requested
-  // bytes repeated across the beat (MAS overview: read data wider than the
-  // requester's AXI width is a violation).
-  int unsigned       rdata_wide[AOU_RP_MAX];
-  int unsigned       n_rdata_wide;   // reads answered that way
 
   aou_packer_policy  pol;
   aou_l3_rule_chk    chk;

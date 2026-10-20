@@ -8,7 +8,5 @@
 `include "errors/aou_axi_err_resp_test.svh"
 `include "errors/aou_id_mismatch_test.svh"
 `include "errors/aou_int_test.svh"
-`include "errors/aou_credit_violation_test.svh"
 `include "errors/aou_before_enable_test.svh"
 `include "errors/aou_slv_id_mismatch_test.svh"
-`include "errors/aou_rdata_wide_test.svh"

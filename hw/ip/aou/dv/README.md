@@ -215,6 +215,13 @@ without the trigger.
 asynchronous (integration guide 8.5.3), so the testlists try slow (40000),
 fast (600) and near-equal (1013) PCLK:CLK ratios (plan 11.17).
 
+`+v0p8` holds the DUT to expectations that only AoU v0.8 adds; the DUT implements
+v0.7.1. Today that is the 4.4 Misc placement on the DUT's flits: AOU-R6 (an Activation
+message alone in its flit) and AOU-R7 (at most 2 other Misc per half-flit). Without it
+the DUT is held to v0.7.1's rule (at most one Activation message per flit, at G0). The
+remote die's own flits follow v0.8 either way. Further v0.8-only DUT checks belong
+behind the same switch.
+
 FDI corner knobs (run time, `testlists/fdi.toml`): `+fdi_trdy=always|random|holes|bursty`,
 `+fdi_stall_pct=N` stand-alone stalls, `+fdi_stall_mid_pct=N` the share raised
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between

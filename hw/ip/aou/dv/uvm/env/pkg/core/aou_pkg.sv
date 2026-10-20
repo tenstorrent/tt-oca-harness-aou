@@ -64,7 +64,7 @@ package aou_pkg;
     MSGTYPE_WRITERESP     = 4'b0101,
     MSGTYPE_WRITEDATAFULL = 4'b0110,
     // Not a real wire encoding (the protocol reserves 0b0111-0b1111). This
-    // item carries the protocol header's MsgCredit field (spec Section 6.3.1)
+    // item carries the protocol header's MsgCredit field (spec 6.4.1)
     // from the FDI monitor to the smoke peer, since MsgCredit
     // is per-flit header state, not a message that starts at a granule.
     MSGTYPE_HDRCREDIT      = 4'b1111
@@ -170,7 +170,7 @@ package aou_pkg;
     return (n == 0 || n == 1 || n == 4 || n == 8);
   endfunction
 
-  // *CRED encodings, Table 18 (3-bit form; 2-bit WRESPCRED uses the first
+  // *CRED encodings, v0.8 Table 17 (3-bit form; 2-bit WRESPCRED uses the first
   // four entries only).
   function automatic logic [2:0] credit_enc3(input int unsigned n);
     case (n)
@@ -302,7 +302,7 @@ package aou_pkg;
   // ---------------------------------------------------------------------
 
   // WriteReq / ReadReq -- Table 2/3, Figure 6/7. 3 granules, PROFEXTLEN=0,
-  // PROF=0 (Base Profile -- PROF/PROFEXTLEN must be ignored per spec 5.8).
+  // PROF=0 (Base Profile -- PROF/PROFEXTLEN must be ignored per v0.7 5.8; v0.8 has no PROFEXTLEN).
   function automatic void pack_req(
       output logic [2:0][39:0] g, input msgtype_e msgtype, input logic [1:0] rp,
       input logic lock, input logic [9:0] id, input logic [2:0] size,
@@ -618,7 +618,7 @@ package aou_pkg;
     {msgtype, rp, rsvd2, profextlen, prof, bid, bresp, rsvd4} = g;
   endfunction
 
-  // Misc/Activation -- Table 26/27, Figure 19. 1 granule.
+  // Misc/Activation -- v0.7 Table 26/27, Figure 19. 1 granule.
   function automatic void pack_activation(
       output logic [39:0] g, input activationop_e op, input logic property_req);
     g = {MSGTYPE_MISC, MISCOP_ACTIVATION, op, property_req, 28'b0};

@@ -186,6 +186,7 @@ class aou_t1_env extends uvm_env;
     early_tbl.vif = new[cfg.n_rp];
     foreach (s_mgr[r]) early_tbl.vif[r] = s_mgr[r].cfg.vif;
     if (fdi_chk != null) fdi_chk.credit_manage = regs.model.aou_con0.credit_manage;
+    l3.model.credit_manage = regs.model.aou_con0.credit_manage;
     lsm.mon.ap.connect(axi4pc.lsm_imp);
     axi4pc.m_drv = new[cfg.n_rp];
     foreach (m_sub[r]) axi4pc.m_drv[r] = m_sub[r].drv;

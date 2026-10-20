@@ -8,7 +8,9 @@
 // before ActivateAck (AOU-R29), credited traffic in DISABLED (AOU-R26), a
 // DeactivateReq with requests unanswered (AOU-R33, with the requests that
 // crossed our own DeactivateReq counted apart), a request after DeactivateReq
-// (AOU-R34), and v0.8's ERROR state with its recovery.
+// (AOU-R34), credits after the DUT's DeactivateAck (AOU-R26, v0.8 8.4: request
+// credits are permitted, response credits and any credit in a later DISABLED
+// flit are not), and v0.8's ERROR state with its recovery.
 class aou_l3_link_test extends aou_l3_unit_base_test;
   `uvm_component_utils(aou_l3_link_test)
 
@@ -24,6 +26,8 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     early_credit_and_traffic();
     deact_rules();
     deact_crossing();
+    deact_credit_rules();
+    act_alone_v08();
     error_v08();
     phase.drop_objection(this);
   endtask
@@ -206,6 +210,106 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     expect_true(chk.count("AOU-R33") == 1, "DeactivateReq with a crossing write is AOU-R33");
     expect_true(b.dut_wr_late[0] == 0, "the DUT's DeactivateReq closes the crossing window");
     chk.unexpect_rule("AOU-R33");
+    chk.clear_counts();
+  endfunction
+
+  // One flit from B to A, with B's header MsgCredit replaced by mc (-1: as built).
+  function void b_to_a(aou_l3_model a, aou_l3_model b, int mc = -1, bit empty = 1'b0);
+    aou_flit f;
+    b.pk.inj_msg_credit = mc;
+    b.pk.inj_empty = empty;
+    f = b.pk.build();
+    b.post_tx(f);
+    a.rx_flit(copy_flit(f));
+  endfunction
+
+  function void a_to_b(aou_l3_model a, aou_l3_model b);
+    aou_flit f = a.pk.build();
+    a.post_tx(f);
+    b.rx_flit(copy_flit(f));
+  endfunction
+
+  // A judges B (the DUT side). MsgCredit RP0: WREQ=1 is 16'h0001, RDATA=1 is
+  // 16'h0200 ({RP, WRESP, RDATA, WDATA, RREQ, WREQ}).
+  function void deact_credit_rules();
+    aou_l3_model a, b;
+    // A deactivates; B's DeactivateAck leaves both in DEACTIVATE.
+    pair(a, b);
+    a.lnk.request_activate();
+    void'(exchange(a, b));
+    chk.clear_counts();
+    chk.expect_rule("AOU-R26");
+    a.lnk.request_deactivate();
+    a.maybe_release_deact();
+    a_to_b(a, b);
+    b_to_a(a, b, 'h0001);
+    expect_true(b.lnk.dack_sent && a.lnk.dack_rcvd, "B's DeactivateAck is out");
+    expect_true(chk.count("AOU-R26") == 0,
+                "a request credit in the DeactivateAck's flit is permitted");
+    b_to_a(a, b, 'h0001);
+    expect_true(chk.count("AOU-R26") == 0, "a request credit after the DeactivateAck is permitted");
+    b_to_a(a, b, 'h0200);
+    expect_true(chk.count("AOU-R26") == 1, "a response credit after the DeactivateAck is AOU-R26");
+    void'(exchange(a, b));
+    both(a, b, AOU_LS_DISABLED, "A's deactivation completes");
+    b_to_a(a, b, 'h0001, 1'b1);
+    expect_true(chk.count("AOU-R26") == 2, "a request credit in a later DISABLED flit is AOU-R26");
+    chk.clear_counts();
+    // B deactivates; its DeactivateAck completes the teardown, and the flit
+    // carrying it may still carry request credits.
+    pair(a, b);
+    a.lnk.request_activate();
+    void'(exchange(a, b));
+    chk.clear_counts();
+    b.lnk.request_deactivate();
+    b.maybe_release_deact();
+    b_to_a(a, b);
+    a_to_b(a, b);
+    a_to_b(a, b);
+    expect_true(a.lnk.dreq_sent && b.lnk.dreq_rcvd, "A's DeactivateReq is out");
+    b_to_a(a, b, 'h0201);
+    expect_true(a.lnk.state == AOU_LS_DISABLED, "B's DeactivateAck takes A to DISABLED");
+    expect_true(chk.count("AOU-R26") == 1,
+                "in the completing Ack's flit: WREQ credit permitted, RDATA credit AOU-R26");
+    chk.unexpect_rule("AOU-R26");
+    chk.clear_counts();
+  endfunction
+
+  // v0.8 4.4 under the v0.7 wire format: another message in the flit of an
+  // Activation message is AOU-R6 (the DUT's DeactivateReq with a WriteResp)
+  // when the receiver holds its peer to v0.8 (v0p8, +v0p8 in the T1 bench), and
+  // legal under v0.7.1 otherwise.
+  function void act_alone_v08();
+    act_alone_case(1'b0);
+    act_alone_case(1'b1);
+  endfunction
+
+  function void act_alone_case(bit v0p8);
+    aou_l3_model a, b;
+    aou_msg_wresp x = aou_msg_wresp::type_id::create("x");
+    aou_granule_t g[$];
+    aou_flit f;
+    pair(a, b);
+    a.cfg.v0p8 = v0p8;
+    a.lnk.request_activate();
+    void'(exchange(a, b));
+    chk.clear_counts();
+    if (v0p8) chk.expect_rule("AOU-R6");
+    b.lnk.request_deactivate();
+    b.maybe_release_deact();
+    f = b.pk.build();
+    b.post_tx(f);
+    x.to_granules(g);
+    f.g[1] = g[0];
+    f.msg_start[1] = 1'b1;
+    a.rx_flit(copy_flit(f));
+    if (v0p8)
+      expect_true(chk.count("AOU-R6") == 1,
+                  "v0.8: a WriteResp in the DeactivateReq's flit is AOU-R6");
+    else
+      expect_true(chk.count("AOU-R6") == 0,
+                  "v0.7.1: a WriteResp may share the DeactivateReq's flit");
+    if (v0p8) chk.unexpect_rule("AOU-R6");
     chk.clear_counts();
   endfunction
 

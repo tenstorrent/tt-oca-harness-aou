@@ -48,10 +48,13 @@ class aou_credit_mgr extends uvm_object;
 
   // Entry to DISABLED (8.2): credits from the partner are discarded and the
   // credits to advertise return to the free space of the modelled buffer.
+  // Only RPs both dies have get any: when we have more, we are the more
+  // capable side and are configured down to the DUT's count (v0.8 6.2), so
+  // our credit fields for the others stay zero (6.4.2).
   function void reset_link();
     for (int unsigned r = 0; r < AOU_RP_MAX; r++) begin
       for (int unsigned c = 0; c < AOU_CC_NUM; c++) begin
-        int unsigned d = (r < cfg.rp_count && !cfg.rx_starve[r][c]) ? cfg.rx_depth[c] : 0;
+        int unsigned d = (r < cfg.eff_rp_count() && !cfg.rx_starve[r][c]) ? cfg.rx_depth[c] : 0;
         tx_cred[r][c] = 0;
         tx_full[r][c] = 0;
         rx_outstanding[r][c] = 0;

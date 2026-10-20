@@ -61,6 +61,11 @@ class aou_t1_env_cfg extends uvm_object;
   // 0 only in a negative test that declares what follows. Drain: it also
   // waits for every response first.
   bit            sw_hold_on_deact = 1'b1;
+  // +v0p8: hold the DUT to expectations that only AoU v0.8 adds (the DUT
+  // implements v0.7.1). Today: the 4.4 Misc placement, AOU-R6 (an Activation
+  // message alone in its flit) and AOU-R7 (at most 2 other Misc per
+  // half-flit). Further v0.8-only DUT checks belong behind the same switch.
+  bit            v0p8;
   bit            sw_drain_before_deact = 1'b0;
   // With CREDIT_MANAGE=0 the remote die (L3) deactivates as a MAS partner
   // would (aou_l3_cfg::cm0_deact); 0 restores the AoU-only remote die.

@@ -124,3 +124,13 @@ escape = "mut_aou_r29_crd_in_disabled"
 target = "1x512-sp64"
 seed = 1
 signature = "AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP|AOU-R26: \\[l3\\] DUT \\w+ \\w+ RP\\d+=\\d+ in DISABLED"
+# v0.8 8.4 forbids requests after one's own DeactivateReq. The bench reaches that only
+# with software that keeps issuing after DEACTIVATE_START and a peer that holds its
+# DeactivateAck while still granting request credit.
+[[escapes]]
+test = "aou_zero_credit_test"
+escape = "mut_r30_req_after_dreq2"
+target = "1x512-sp64"
+args = ["+credit=rreq", "+deact=1", "+credit_manage=1", "+sw_hold_on_deact=0", "+l3_deact_ack_hold=500"]
+seed = 1
+signature = "AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER LP|AOU-R34: \\[l3\\] DUT [RW]REQ at flit#\\d+ G\\d+ after its DeactivateReq"

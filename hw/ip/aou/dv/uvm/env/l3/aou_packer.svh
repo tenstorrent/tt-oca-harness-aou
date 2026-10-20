@@ -198,13 +198,14 @@ class aou_packer extends uvm_object;
       carry_msg = null;
     end
 
-    if (gp == 0 && lnk.out_q.size() > 0 && lnk.state != AOU_LS_ERROR) begin
+    if (gp == 0 && lnk.out_q.size() > 0 && lnk.state != AOU_LS_ERROR &&
+        !(cfg.act_req_after_grant && lnk.grant_due && adv_any())) begin
       aou_msg_act a = lnk.out_q.pop_front();
       place(f, a, 0);
       lnk.on_sent(a);
       gp = a.num_granules();
       nmsgs++;
-      alone = cfg.pol.act_alone || cfg.spec_rev == AOU_SPEC_V08;
+      alone = 1'b1;   // v0.8 4.4: nothing else in an Activation's flit
     end
 
     if (meth == AOU_CRM_MIXED) meth = aou_cred_method_e'($urandom_range(0, 2));

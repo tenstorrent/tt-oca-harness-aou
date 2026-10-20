@@ -207,13 +207,14 @@
   note: Coverage-closure decision D9.
 - id: '1.4'
   dropped: PropertyReq on ActivateReq has no defined effect in v0.7 and is replaced by ProfileID/Rev/Opt in v0.8.
-  note: Coverage-closure decision D9. 2.7 and 2.10 (DeactivateReq PropertyReq) stay until the spec decides.
+  note: Coverage-closure decision D9. v0.8 makes PropertyReq RsvdZero; 2.7 keeps the DUT's own DeactivateReq and 2.10 the register with PropertyReq 0 only.
 - id: '12.13'
   dropped: An asymmetric DEST_RP is a misconfiguration MAS 3.10.1 forbids, with undefined behaviour.
-  note: Coverage-closure decision D9. aou_dest_rp_asym_test still runs as BUGS/031 evidence.
+  note: Coverage-closure decision D9. aou_dest_rp_asym_test removed (spec v0.8 decision, 2026-10-20).
 - id: '9.5'
   title: 'Remote RX credit overrun: the remote die sends beyond the credit the DUT advertised (AoU 6.1)'
-  note: Coverage-closure decision D9; was "Internal check for negative credit count", which is not what the test does.
+  dropped: 'AoU v0.8 6.1 binds the sender only; the receiver''s reaction to a credit overrun is undefined.'
+  note: 'Spec v0.8 decision (2026-10-20): aou_credit_violation_test removed. Coverage-closure D9 had retitled it "Remote RX credit overrun".'
 
 # Coverage-closure plan decision D9: features with no item (gap analysis 4.3).
 # `added` cites the source; IDs continue each section's numbering.
@@ -235,12 +236,12 @@
 - id: '1.13'
   added: 'AoU Table 27; BUGS/012'
   priority: P2
-  title: 'Reserved ACTIVATIONOP (4-15) received: dropped, no LinkReset (interim expectation)'
+  title: 'Reserved ACTIVATIONOP (4-15) received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '2.11'
   added: 'AoU 8.2/8.4; BUGS/009, BUGS/033'
   priority: P2
-  title: 'No credit message in DISABLED or after the sender''s DeactivateAck'
+  title: 'No credit message in DISABLED; no response credit after the sender''s DeactivateAck (request credits after it are permitted, v0.8 8.4)'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '2.12'
   added: 'MAS 7.1'
@@ -290,12 +291,12 @@
 - id: '9.15'
   added: 'AoU 6.4.1; BUGS/012'
   priority: P2
-  title: 'A received message naming an RP at or above RP_COUNT (WriteResp, header MsgCredit, CrdtGrant) is dropped'
+  title: 'A received message naming an RP at or above RP_COUNT (WriteResp, header MsgCredit, CrdtGrant): the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.16'
   added: 'AoU Table 15, 4.4; BUGS/012'
   priority: P2
-  title: 'Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: dropped, no LinkReset (interim expectation)'
+  title: 'Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.17'
   added: 'MAS 7.2.4; BUGS/028'
@@ -321,7 +322,8 @@
   added: 'MAS overview 2.1'
   priority: P2
   title: 'ReadData wider than the remote AXI width (a violation per the MAS; reaction unspecified)'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  dropped: 'AoU v0.8 5.7 makes ReadData wider than ARSIZE a peer violation with no defined reaction.'
+  note: Coverage-closure gap analysis 4.3 (decision D9). Spec v0.8 decision (2026-10-20) removed aou_rdata_wide_test.
 - id: '9.22'
   added: 'MAS 7.2.2; BUGS/003'
   priority: P2
@@ -360,7 +362,7 @@
 - id: '12.20'
   added: 'MAS 3.10.1; AoU 6.2'
   priority: P2
-  title: 'Local and remote RP_COUNT differ: the effective count is the smaller'
+  title: 'Local and remote RP_COUNT differ: the effective count is the smaller, and a larger remote die is configured down to it (AoU v0.8 6.2)'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '13.19'
   added: 'RDL ARB_MODE; MAS 3.2.1'

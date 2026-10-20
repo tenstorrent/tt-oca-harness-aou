@@ -17,6 +17,9 @@ class aou_l3_model extends uvm_object;
   aou_unpacker    rx_unp;
   aou_unpacker    tx_unp;
   aou_l3_cov      cov;
+  // The DUT's AOU_CON0.CREDIT_MANAGE (set by the T1 env; null elsewhere). Credit-order
+  // reports end in it, as AOU_FDI_CHECKER's do, so an expected-fail entry can tell the modes.
+  uvm_reg_field   credit_manage;
 
   uvm_event       work_ev;
   int unsigned    work_gen;
@@ -48,6 +51,8 @@ class aou_l3_model extends uvm_object;
   int unsigned    rx_msgs;
   int unsigned    tx_msgs;
   int             grant_epoch = -1;  // lnk.epoch of the DUT's last CrdtGrant
+  // The flit being received carries the DUT's DeactivateAck (peer_adv_ok).
+  bit             dut_dack_flit;
   string          name_tag = "remote";
 
   function new(string name = "aou_l3_model");
@@ -311,6 +316,7 @@ class aou_l3_model extends uvm_object;
     f.msgs = rx_unp.done;
 
     // 1. Activation messages: at G0, so before everything else in the flit.
+    dut_dack_flit = 1'b0;
     foreach (rx_unp.done[i]) begin
       if ($cast(a, rx_unp.done[i])) rx_act(a);
     end
@@ -328,6 +334,7 @@ class aou_l3_model extends uvm_object;
       sample_grants(f, AOU_L3_RX);
     end
     void'(crd.tick());
+    lnk.tick_dack_hold();
     maybe_release_deact();
     kick();
   endfunction
@@ -356,17 +363,41 @@ class aou_l3_model extends uvm_object;
     end
     if (!lnk.on_rcvd(a))
       viol("AOU-R40", $sformatf("DUT %s while %s", a.kind(), lnk.state.name()));
+    else if (a.op == AOU_DEACT_ACK)
+      dut_dack_flit = 1'b1;
   endfunction
 
-  // Credits may come from the DUT after its ActivateAck and not after its
-  // DeactivateAck (8.4); rsp classes optionally beyond (MAS CREDIT_MANAGE=1).
+  // Credits may come from the DUT after its ActivateAck (8.4) and never in
+  // DISABLED (8.4). After its DeactivateAck, v0.8 8.4 permits request credits;
+  // WriteData counts as a request class here (interim: 8.4 does not say). The
+  // flit carrying that Ack is after it, so it may carry them even when the Ack
+  // completes the teardown. Response credits after the Ack: v0.8 is silent;
+  // v0.7 forbade them, the MAS allows them with CREDIT_MANAGE=1.
+  static function bit req_class(aou_cred_class_e c);
+    return c inside {AOU_CC_WREQ, AOU_CC_RREQ, AOU_CC_WDATA};
+  endfunction
+
   function bit peer_adv_ok(aou_cred_class_e c, output string why);
     why = "";
-    if (lnk.state == AOU_LS_DISABLED) why = "in DISABLED";
-    else if (!lnk.ack_rcvd) why = "before its ActivateAck";
-    else if (lnk.dack_rcvd && !(c inside {AOU_CC_RDATA, AOU_CC_WRESP} &&
-                                cfg.resp_credits_after_deact_ack)) why = "after its DeactivateAck";
+    if (lnk.state == AOU_LS_DISABLED) begin
+      if (!(req_class(c) && dut_dack_flit)) why = "in DISABLED";
+    end else if (!lnk.ack_rcvd) why = "before its ActivateAck";
+    else if (lnk.dack_rcvd && !req_class(c) &&
+             !(c inside {AOU_CC_RDATA, AOU_CC_WRESP} && cfg.resp_credits_after_deact_ack))
+      why = "after its DeactivateAck";
     return why == "";
+  endfunction
+
+  // A permitted credit that funds our counters: request credits after the
+  // DUT's DeactivateAck are useless to us (our DeactivateReq preceded it) and
+  // DISABLED resets the counters anyway.
+  function bit peer_adv_funds(aou_cred_class_e c);
+    return !(req_class(c) && (lnk.dack_rcvd || dut_dack_flit));
+  endfunction
+
+  function string cm_sfx();
+    if (credit_manage == null) return "";
+    return $sformatf(" CREDIT_MANAGE=%0d", credit_manage.get_mirrored_value());
   endfunction
 
   function void rx_hdr_credit(bit [15:0] mc);
@@ -381,9 +412,9 @@ class aou_l3_model extends uvm_object;
         ledger_chk("AOU-R29");
         if (!peer_adv_ok(aou_cred_class_e'(c), why)) begin
           viol(why == "before its ActivateAck" ? "AOU-R29" : "AOU-R26",
-               $sformatf("DUT MsgCredit %s RP%0d=%0d %s", aou_cc_name(aou_cred_class_e'(c)), r,
-                         n[c], why));
-        end else begin
+               $sformatf("DUT MsgCredit %s RP%0d=%0d %s%s", aou_cc_name(aou_cred_class_e'(c)), r,
+                         n[c], why, cm_sfx()));
+        end else if (peer_adv_funds(aou_cred_class_e'(c))) begin
           rx_tx_grant(r, aou_cred_class_e'(c), n[c]);
         end
       end
@@ -408,9 +439,9 @@ class aou_l3_model extends uvm_object;
         if (n != 0) begin
           if (!peer_adv_ok(aou_cred_class_e'(c), why))
             viol(why == "before its ActivateAck" ? "AOU-R29" : "AOU-R26",
-                 $sformatf("DUT CrdtGrant %s RP%0d=%0d %s", aou_cc_name(aou_cred_class_e'(c)),
-                           r, n, why));
-          else
+                 $sformatf("DUT CrdtGrant %s RP%0d=%0d %s%s", aou_cc_name(aou_cred_class_e'(c)),
+                           r, n, why, cm_sfx()));
+          else if (peer_adv_funds(aou_cred_class_e'(c)))
             rx_tx_grant(r, aou_cred_class_e'(c), n);
         end
       end

@@ -260,27 +260,17 @@ class aou_l3_agent extends uvm_component;
   task serve_read(aou_msg_rreq rq, int unsigned t);
     bit [1023:0] data[$];
     bit [1:0] resp[$];
-    bit wide = 1'b0;
     int unsigned epoch = resp_epoch;
     model.consume(rq);
     cfg.l4a.handle_read(rq, data, resp);
     wait_turn(1, int'(rq.rp), rq.id, t, epoch);
     if (epoch != resp_epoch) return;
-    if (cfg.rdata_wide[rq.rp] > 0 && aou_dl_for_size(rq.size) != AOU_DL_1024) begin
-      cfg.rdata_wide[rq.rp]--;
-      cfg.n_rdata_wide++;
-      wide = 1'b1;
-    end
     foreach (data[i]) begin
       aou_msg_rdata d = aou_msg_rdata::type_id::create("d");
       d.rp = cfg.dest_rp[rq.rp];
       d.id = rq.id;
-      d.dlength = wide ? AOU_DL_1024 : aou_dl_for_size(rq.size);
+      d.dlength = aou_dl_for_size(rq.size);
       d.data = data[i];
-      if (wide) begin
-        int unsigned nb = aou_dl_bits(aou_dl_for_size(rq.size));
-        for (int unsigned b = nb; b < 1024; b++) d.data[b] = data[i][b % nb];
-      end
       d.resp = (i < resp.size()) ? resp[i] : 2'b00;
       d.last = (i == data.size() - 1);
       model.send(d);

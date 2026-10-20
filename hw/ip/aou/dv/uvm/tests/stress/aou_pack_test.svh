@@ -36,7 +36,10 @@ class aou_pack_test extends aou_dp_base_test;
       "crossflit": begin
         k.sizes = '{5, 6, 7};
         k.lens = '{0, 1, 3};
-        k.n = 96;
+        // The DUT's ReadData256 crossing a flit (TX:span_R8) comes from its own
+        // packing, 1-9 times in 96 transactions, and none in one seed once the
+        // remote die's Activation travels alone (v0.8 4.4); 128 gives margin.
+        k.n = 128;
       end
       "mixed", "full": begin
         k.sizes = '{0, 2, 4, 6};

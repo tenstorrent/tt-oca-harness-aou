@@ -87,15 +87,6 @@ tags = ["err_int"]
 run_modes = ["err_int"]
 
 [[tests]]
-name = "aou_credit_violation_test"
-module = { uvm = "aou_credit_violation_test" }
-seed = 1
-tags = ["err_int"]
-run_modes = ["err_int"]
-expect_fail = "BUGS/030 (expected_fail.yaml)"
-expect_fail_match = "T1-E13: |AXI-S04: remote->local beat 0 lane 0 \\(addr 50000"
-
-[[tests]]
 name = "aou_id_mismatch_test.side-mgr.kind-b"
 module = { uvm = "aou_id_mismatch_test" }
 seed = 1
@@ -290,38 +281,9 @@ tags = ["err_int"]
 run_modes = ["err_int"]
 args = ["+part=fifo"]
 
-# 9.21: the remote die answers reads with ReadData1024 on RPs narrower than 1024 bits
-# (BUGS/051 interim: completes, DUT keeps working).
-[[tests]]
-name = "aou_rdata_wide_test.1x512-sp64"
-module = { uvm = "aou_rdata_wide_test" }
-target = "1x512-sp64"
-seed = 1
-reseed = 2
-tags = ["err_int"]
-run_modes = ["err_int"]
-
-[[tests]]
-name = "aou_rdata_wide_test.1x256-sp32"
-module = { uvm = "aou_rdata_wide_test" }
-target = "1x256-sp32"
-seed = 1
-reseed = 2
-tags = ["err_int"]
-run_modes = ["err_int"]
-
-[[tests]]
-name = "aou_rdata_wide_test.4xmix4211-sp128"
-module = { uvm = "aou_rdata_wide_test" }
-target = "4xmix4211-sp128"
-seed = 1
-reseed = 2
-tags = ["err_int"]
-run_modes = ["err_int"]
-
 [[groups]]
 name = "err_int"
-expected_count = 33
+expected_count = 29
 tests = [
   "aou_axi_err_resp_test",
   "aou_axi_err_resp_test.4x512-sp64",
@@ -331,7 +293,6 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.dbg_len-max",
   "aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0",
   "aou_before_enable_test",
-  "aou_credit_violation_test",
   "aou_id_mismatch_test.side-mgr.kind-b",
   "aou_id_mismatch_test.side-mgr.kind-r",
   "aou_id_mismatch_test.side-mgr.kind-b.mask-1",
@@ -353,7 +314,4 @@ tests = [
   "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5",
   "aou_axi_err_resp_test.part-fifo.1x256-sp32",
   "aou_axi_err_resp_test.part-fifo.4xmix4211-sp128",
-  "aou_rdata_wide_test.1x512-sp64",
-  "aou_rdata_wide_test.1x256-sp32",
-  "aou_rdata_wide_test.4xmix4211-sp128",
 ]

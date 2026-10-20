@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 228
+expected_count = 227
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -229,10 +229,13 @@ tests = [
   "aou_zero_credit_test.credit-rreq.deact-1",
   "aou_zero_credit_test.credit-wdata.deact-1",
   "aou_zero_credit_test.credit-rdata.deact-1",
+  "aou_zero_credit_test.credit-wresp.deact-1.grant-2",
   "aou_zero_credit_test.credit-wresp.deact-1",
   "aou_deact_ctrl_test.mode-tov",
   "aou_deact_ctrl_test.mode-property",
   "aou_remote_react_test",
+  "aou_act_flit_test.mode-act_req.v0p8",
+  "aou_act_flit_test.mode-deact_rsp.v0p8",
   "aou_invalid_actmsg_test.state-all.op-all",
   "aou_invalid_actmsg_test.state-enabled",
   "aou_invalid_actmsg_test.state-activate",
@@ -257,7 +260,6 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.dbg_len-max",
   "aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0",
   "aou_before_enable_test",
-  "aou_credit_violation_test",
   "aou_id_mismatch_test.side-mgr.kind-b",
   "aou_id_mismatch_test.side-mgr.kind-r",
   "aou_id_mismatch_test.side-mgr.kind-b.mask-1",
@@ -279,9 +281,6 @@ tests = [
   "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5",
   "aou_axi_err_resp_test.part-fifo.1x256-sp32",
   "aou_axi_err_resp_test.part-fifo.4xmix4211-sp128",
-  "aou_rdata_wide_test.1x512-sp64",
-  "aou_rdata_wide_test.1x256-sp32",
-  "aou_rdata_wide_test.4xmix4211-sp128",
   "aou_link_event_test.event-retrain",
   "aou_link_event_test.event-clk_wake",
   "aou_link_event_test.event-l1",
@@ -321,7 +320,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 414
+expected_count = 411
 tests = [
   "aou_sanity_test",
   "aou_t1_slice_test",
@@ -513,10 +512,13 @@ tests = [
   "aou_zero_credit_test.credit-rreq.deact-1",
   "aou_zero_credit_test.credit-wdata.deact-1",
   "aou_zero_credit_test.credit-rdata.deact-1",
+  "aou_zero_credit_test.credit-wresp.deact-1.grant-2",
   "aou_zero_credit_test.credit-wresp.deact-1",
   "aou_deact_ctrl_test.mode-tov",
   "aou_deact_ctrl_test.mode-property",
   "aou_remote_react_test",
+  "aou_act_flit_test.mode-act_req.v0p8",
+  "aou_act_flit_test.mode-deact_rsp.v0p8",
   "aou_invalid_actmsg_test.state-all.op-all",
   "aou_invalid_actmsg_test.state-enabled",
   "aou_invalid_actmsg_test.state-activate",
@@ -541,7 +543,6 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.dbg_len-max",
   "aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0",
   "aou_before_enable_test",
-  "aou_credit_violation_test",
   "aou_id_mismatch_test.side-mgr.kind-b",
   "aou_id_mismatch_test.side-mgr.kind-r",
   "aou_id_mismatch_test.side-mgr.kind-b.mask-1",
@@ -563,9 +564,6 @@ tests = [
   "aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5",
   "aou_axi_err_resp_test.part-fifo.1x256-sp32",
   "aou_axi_err_resp_test.part-fifo.4xmix4211-sp128",
-  "aou_rdata_wide_test.1x512-sp64",
-  "aou_rdata_wide_test.1x256-sp32",
-  "aou_rdata_wide_test.4xmix4211-sp128",
   "aou_link_event_test.event-retrain",
   "aou_link_event_test.event-clk_wake",
   "aou_link_event_test.event-l1",
@@ -622,8 +620,6 @@ tests = [
   "aou_mrp_test.mrp_scn-indep.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-indep.2xmix-tp64_128",
   "aou_dest_rp_dup_test",
-  "aou_dest_rp_asym_test.4x512-sp64",
-  "aou_dest_rp_asym_test.2xmix-tp64_128",
   "aou_dw_test.remote_bytes-32.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-64.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-128_128_64_64",

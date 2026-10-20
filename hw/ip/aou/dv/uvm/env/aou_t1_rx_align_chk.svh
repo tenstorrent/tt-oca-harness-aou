@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // T1-C42: the DUT's RX flit framing matches the Adapter's. Every flit carries
-// one header MsgCredit, at bytes 128-129 (AoU 6.2 Table 16), so the DUT takes
+// one header MsgCredit, at bytes 128-129 (AoU 6.4.1 Table 16), so the DUT takes
 // exactly one MsgCredit per flit delivered to it, in order, with that flit's
 // value. The L1 monitor of the PHY that feeds the RX path names the delivered
 // flits (after cancel rollback); the DUT side is a white-box tap of the RX

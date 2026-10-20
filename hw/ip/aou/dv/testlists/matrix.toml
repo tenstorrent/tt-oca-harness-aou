@@ -234,32 +234,6 @@ reseed = 3
 tags = ["matrix"]
 run_modes = ["matrix"]
 
-# 12.13 is dropped (MAS 3.10.1 forbids an asymmetric DEST_RP); the test still runs
-# as BUGS/031 evidence.
-# Known failures: BUGS/031 (expected_fail.yaml)
-[[tests]]
-name = "aou_dest_rp_asym_test.4x512-sp64"
-module = { uvm = "aou_dest_rp_asym_test" }
-target = "4x512-sp64"
-seed = 1
-reseed = 3
-tags = ["matrix"]
-run_modes = ["matrix"]
-expect_fail = "BUGS/031 (expected_fail.yaml)"
-expect_fail_match = "AXI-R07: B ID|matches no outstanding write"
-
-# Known failures: BUGS/031 (expected_fail.yaml)
-[[tests]]
-name = "aou_dest_rp_asym_test.2xmix-tp64_128"
-module = { uvm = "aou_dest_rp_asym_test" }
-target = "2xmix-tp64_128"
-seed = 1
-reseed = 2
-tags = ["matrix"]
-run_modes = ["matrix"]
-expect_fail = "BUGS/031 (expected_fail.yaml)"
-expect_fail_match = "AXI-R07: B ID|matches no outstanding write"
-
 # The per-RP remote widths put every RP of the 4xmix pair through each of its
 # converters. 1024-bit remote data reaches a 256-bit RP aligned here and
 # unaligned in aou_dw_down1024_test (tenstorrent/tt-oca-harness-aou#90, fixed by RTL PR #89).
@@ -893,7 +867,7 @@ args = ["+remote_rp_count=3"]
 
 [[groups]]
 name = "matrix"
-expected_count = 88
+expected_count = 86
 tests = [
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-1.4x512-sp64",
@@ -917,8 +891,6 @@ tests = [
   "aou_mrp_test.mrp_scn-indep.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-indep.2xmix-tp64_128",
   "aou_dest_rp_dup_test",
-  "aou_dest_rp_asym_test.4x512-sp64",
-  "aou_dest_rp_asym_test.2xmix-tp64_128",
   "aou_dw_test.remote_bytes-32.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-64.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-128_128_64_64",

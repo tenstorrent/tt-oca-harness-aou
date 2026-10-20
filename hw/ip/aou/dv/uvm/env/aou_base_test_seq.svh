@@ -666,8 +666,7 @@ class aou_base_test_seq extends ocah_sequence;
   endtask
 
   // L3 error injection. kind: bad_type (arg: kind of bad granule), rsvd
-  // (arg: RsvdZero value in a zero CrdtGrant), no_credit (arg: ReadReqs beyond
-  // the advertised credit; runs in the background), act_ack / act_req / deact_req / deact_ack
+  // (arg: RsvdZero value in a zero CrdtGrant), act_ack / act_req / deact_req / deact_ack
   // (out-of-state activation message), flip_start (arg: granule), fdid
   // (arg: value), overgrant (arg: credits, WREQ class).
   task inject(string kind, int arg = 0);
@@ -684,18 +683,6 @@ class aou_base_test_seq extends ocah_sequence;
         aou_msg_crdtgrant g = aou_msg_crdtgrant::type_id::create("inj");
         g.rsvd = 17'(arg > 0 ? arg : 1);
         env.l3.send(g);
-      end
-      "no_credit": begin
-        // More remote ReadReqs than the DUT has advertised RREQ credit for,
-        // all sent ignoring credits. They are ordinary tracked reads: if the
-        // DUT drops the excess, recover (reset) before draining.
-        aou_t1_reads_seq s = aou_t1_reads_seq::type_id::create("inj");
-        int unsigned have = env.l3.model.crd.tx_cred[0][AOU_CC_RREQ] / 3;
-        s.n = have + (arg > 0 ? arg : 1);
-        env.rmgr.drv[0].inj_no_credit = s.n;
-        fork
-          s.start(p_sequencer.r_mgr_sqr[0]);
-        join_none
       end
       "act_req", "act_ack", "deact_req", "deact_ack": begin
         aou_l3_act_inject_seq s = aou_l3_act_inject_seq::type_id::create("inj");

@@ -4,7 +4,7 @@
 // AoU protocol-layer types, geometry, credit encoding and message lengths.
 // Encodings follow the AoU specification v0.7 (v0.8 deltas behind
 // aou_spec_rev_e). Granules are 40-bit values whose bit 39 is the first bit on
-// the wire (spec 5.7/5.8: bytes count up, bits count down, fields MSB first).
+// the wire (v0.8 5.8, v0.7 5.7: bytes count up, bits count down, fields MSB first).
 
 localparam int AOU_FLIT_BYTES   = 256;
 localparam int AOU_GRANULES     = 48;
@@ -117,7 +117,7 @@ function automatic bit [1:0] aou_dl_for_size(bit [2:0] size);
   return AOU_DL_1024;
 endfunction
 
-// Credit encoding, Table 17/18. WRESPCRED is two bits (0/1/4/8).
+// Credit encoding, v0.8 Table 17 (v0.7 Table 18). WRESPCRED is two bits (0/1/4/8).
 function automatic int unsigned aou_cred_dec3(bit [2:0] enc);
   case (enc)
     3'd0: return 0;
