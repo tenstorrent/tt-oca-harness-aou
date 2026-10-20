@@ -359,6 +359,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
         vif.mgr_cb.wvalid <= 1'b1;
         do @(vif.mgr_cb); while (vif.mgr_cb.wready !== 1'b1);
       end
+      it.txn.t_wlast = $time;
       it.w_done = 1'b1;
       vif.mgr_cb.wvalid <= 1'b0;
     end

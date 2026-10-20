@@ -24,6 +24,8 @@ class aou_axi_txn extends uvm_sequence_item;
   bit [1:0]          rresp[];
   bit [1:0]          bresp;
   time               t_addr, t_done;
+  // Write: WLAST handshake (set by aou_axi_mgr_driver; 0 until then).
+  time               t_wlast;
   // Set when a reset ended the transaction before its response (reset_flush);
   // response fields are then meaningless.
   bit                aborted;
@@ -206,6 +208,7 @@ class aou_axi_txn extends uvm_sequence_item;
     bresp      = t.bresp;
     t_addr     = t.t_addr;
     t_done     = t.t_done;
+    t_wlast    = t.t_wlast;
     aborted    = t.aborted;
     reset_outstanding = t.reset_outstanding;
   endfunction

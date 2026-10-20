@@ -162,7 +162,7 @@ FEAT-R07,aou_early_bresp_vseq,,DUT,Remote error after an early B: INT_EARLY_RESP
 FEAT-R08,aou_lp_mode_vseq,,DUT,Idle FDI flits: continuous with TX_LP_MODE=0; none with TX_LP_MODE=1/threshold 0; periodic heartbeat otherwise,SW op Low Power mode; RDL AOU_CON0
 FEAT-R09,aou_dest_rp_chk,,DUT,AXI messages the DUT sends carry DEST_RP of the local RP,MAS 3.10.2
 FEAT-R10,aou_dest_rp_chk,,DUT,CrdtGrant credits use the source (local) RP slot not DEST_RP,MAS 3.10.2
-FEAT-R11,not checked,,DUT,Port/AXI QoS: with requests of two tiers queued the higher tier is sent first (until the starvation timer promotes),MAS 3.2.1
+FEAT-R11,not checked,,DUT,"Port/AXI QoS: with requests of two tiers queued the higher tier is sent first (until the starvation timer promotes); WriteData only for writes whose W data was queued too",MAS 3.2.1
 DP-R01,aou_msg_stats,,DUT,A packing scenario produced the layout it targets (WriteResp sharing a flit; flit-spanning messages; given message sizes),AoU v0.7 4.x; test plan 6.2/6.9/11.6/11.7
 T1-T01,aou_base_test,,DUT,Nothing is outstanding at the end of the test (scoreboard drained),ARCHITECTURE.md scoreboard rule
 T1-T02,aou_base_test,,DUT,The scoreboard checked at least min_l2r local->remote transactions (a test whose traffic never reached it fails),test self-check; ARCHITECTURE.md scoreboard rule

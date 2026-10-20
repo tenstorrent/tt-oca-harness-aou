@@ -465,9 +465,80 @@ tags = ["stress"]
 run_modes = ["stress"]
 args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=max"]
 
+# The same order rounds with mixed RP widths and data FIFO depths.
+[[tests]]
+name = "aou_qos_order_test.arb_mode-0.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=0"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-eq.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=eq"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=3"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=promote"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 4
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=1", "+qos_tiers=2", "+qos_timer=sweep"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=2", "+qos_tiers=3", "+qos_bounds=1"]
+
+[[tests]]
+name = "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote.4xmix4211-sp128"
+module = { uvm = "aou_qos_order_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+arb_mode=2", "+qos_tiers=2", "+qos_timer=promote"]
+
 [[groups]]
 name = "stress"
-expected_count = 48
+expected_count = 55
 tests = [
   "aou_pack_test.pk-crossflit.remote_bytes-32",
   "aou_pack_test.pk-crossflit",
@@ -517,4 +588,11 @@ tests = [
   "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-thr0",
   "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-res0",
   "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-max",
+  "aou_qos_order_test.arb_mode-0.4xmix4211-sp128",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-eq.4xmix4211-sp128",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote.4xmix4211-sp128",
+  "aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep.4xmix4211-sp128",
+  "aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128",
+  "aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote.4xmix4211-sp128",
 ]

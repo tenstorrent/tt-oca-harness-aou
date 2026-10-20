@@ -155,6 +155,7 @@ class aou_qos_order_vseq extends aou_dp_vseq;
     aou_burst_seq seqs[$];
     int           order[$];
     bit           inq[bit [63:0]];
+    bit           inq_w[bit [63:0]];
     time          t_from;
     time          t_rel;
     foreach (tier[p]) if (tier[p] != 0) order.push_back(p);
@@ -186,10 +187,15 @@ class aou_qos_order_vseq extends aou_dp_vseq;
     release_tx();
     wait fork;
     foreach (seqs[i]) foreach (seqs[i].done_q[k])
-      if (seqs[i].done_q[k].t_addr < t_rel) inq[seqs[i].done_q[k].addr] = 1'b1;
+      if (seqs[i].done_q[k].t_addr < t_rel) begin
+        inq[seqs[i].done_q[k].addr] = 1'b1;
+        if (seqs[i].dir == AOU_AXI_WR && seqs[i].done_q[k].t_wlast < t_rel)
+          inq_w[seqs[i].done_q[k].addr] = 1'b1;
+      end
     `uvm_info(get_type_name(), $sformatf(
-        "round %0d: tiers %p, %0d of %0d requests accepted before release",
-                                         r, tier, inq.num(), n * 2 * order.size()), UVM_LOW)
-    chk.check_round(t_from, tier, inq, exp, $sformatf("round %0d", r));
+        "round %0d: tiers %p, %0d of %0d requests (%0d writes with data) accepted before release",
+                                         r, tier, inq.num(), n * 2 * order.size(), inq_w.num()),
+              UVM_LOW)
+    chk.check_round(t_from, tier, inq, inq_w, exp, $sformatf("round %0d", r));
   endtask
 endclass

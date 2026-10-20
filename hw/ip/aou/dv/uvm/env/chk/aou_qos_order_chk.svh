@@ -6,15 +6,21 @@
 // then calls check_round() with each RP's tier and the addresses the S ports
 // accepted before release_tx(). Per message class (ReadReq, WriteReq,
 // WriteData), with a = first and b = last backlogged message of a tier:
-// - FEAT-R11: no lower-tier message between a and b (no promotion expected);
+// - FEAT-R11: no lower-tier message between a and b (no promotion expected).
+//   For WriteData, a and b count only writes whose W data the S port had
+//   also accepted before release: QoS orders requests (MAS 3.2.1), and the
+//   DUT may send a lower tier's WriteData while a higher tier's open burst
+//   has no beat to send yet (other RPs' bursts may go on meanwhile);
 // - FEAT-R12: with a short starvation timer the lowest tier is promoted and
 //   gets in between the highest tier's a and b;
 // - FEAT-R14: equal tiers (round-robin) never grant one RP twice in a row
 //   while the other still has a backlogged request;
 // - FEAT-R13: the round really had both tiers waiting at the arbiter (a
 //   backlogged lower-tier message after a), else it proves nothing.
-// Requests carry the address, so the local RP is (addr - base) / stride;
-// WriteData follows its WriteReq on the same wire RP (single-beat writes).
+// Requests carry the address, so the local RP is (addr - base) / stride.
+// WriteData carries no address: the k-th WriteData on a wire RP belongs to the k-th
+// WriteReq on it (single-beat writes). It can precede its WriteReq, in the
+// same flit, so it is matched when the round is checked, not on arrival.
 class aou_qos_order_chk extends uvm_component;
   `uvm_component_utils(aou_qos_order_chk)
 
@@ -23,6 +29,8 @@ class aou_qos_order_chk extends uvm_component;
     bit [3:0]  mt;
     int        rp;      // local RP, -1 if unknown
     bit [63:0] addr;
+    int        wrp;     // WriteData: wire RP and index among its WriteData
+    int        widx;
   } ent_t;
 
   typedef enum int {QOS_ORDER, QOS_PROMOTE, QOS_RR} expect_e;
@@ -33,8 +41,8 @@ class aou_qos_order_chk extends uvm_component;
   ent_t        ents[$];
   int unsigned n_rounds;
   int unsigned n_checked[3];
-  protected int wire2local[4] = '{-1, -1, -1, -1};
   protected bit [63:0] wreq_addr[4][$];
+  protected int unsigned n_wdata[4];
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -55,14 +63,13 @@ class aou_qos_order_chk extends uvm_component;
     if ($cast(rq, m) && m.msg_type inside {AOU_MT_WREQ, AOU_MT_RREQ}) begin
       e.addr = rq.addr;
       e.rp = local_rp(rq.addr);
-      if (m.msg_type == AOU_MT_WREQ) begin
-        wire2local[m.rp] = e.rp;
-        wreq_addr[m.rp].push_back(rq.addr);
-      end
+      if (m.msg_type == AOU_MT_WREQ) wreq_addr[m.rp].push_back(rq.addr);
     end else if (m.msg_type inside {AOU_MT_WDATA, AOU_MT_WDATAF}) begin
-      e.rp = wire2local[m.rp];
-      if (wreq_addr[m.rp].size() > 0) e.addr = wreq_addr[m.rp].pop_front();
+      e.wrp = int'(m.rp);
+      e.widx = int'(n_wdata[m.rp]++);
     end else return;
+    `uvm_info(get_type_name(), $sformatf("%s wire RP%0d addr %0h (WriteData #%0d)", cname(e.mt),
+                                         m.rp, e.addr, e.widx), UVM_HIGH)
     ents.push_back(e);
   endfunction
 
@@ -81,14 +88,23 @@ class aou_qos_order_chk extends uvm_component;
 
   // tier[r]: 0 = RP r not in the round, else higher is served first. inq:
   // addresses the S ports accepted before release (the backlog).
-  function void check_round(time t_from, int tier[4], bit inq[bit [63:0]], expect_e exp,
-                            string tag);
+  // inq_w: the writes among them whose W data was accepted before release too.
+  function void check_round(time t_from, int tier[4], bit inq[bit [63:0]],
+                            bit inq_w[bit [63:0]], expect_e exp, string tag);
     bit [3:0] classes[3] = '{AOU_MT_RREQ, AOU_MT_WREQ, AOU_MT_WDATA};
     flush();
+    foreach (ents[i]) begin
+      if (ents[i].mt inside {AOU_MT_WDATA, AOU_MT_WDATAF} && ents[i].rp < 0 &&
+          ents[i].widx < wreq_addr[ents[i].wrp].size()) begin
+        ents[i].addr = wreq_addr[ents[i].wrp][ents[i].widx];
+        ents[i].rp = local_rp(ents[i].addr);
+      end
+    end
     n_rounds++;
     foreach (classes[c]) begin
       ent_t s[$];
       bit   q[$];
+      bit   qd[$];
       int   hi = 0;
       int   lo = 99;
       int   hrp = -1;
@@ -100,6 +116,8 @@ class aou_qos_order_chk extends uvm_component;
         if (tier[ents[i].rp] == 0) continue;
         s.push_back(ents[i]);
         q.push_back(inq.exists(ents[i].addr));
+        qd.push_back(classes[c] == AOU_MT_WDATA ? inq.exists(ents[i].addr) &&
+                     inq_w.exists(ents[i].addr) : inq.exists(ents[i].addr));
       end
       if (s.size() == 0) continue;
       foreach (tier[r]) begin
@@ -113,7 +131,7 @@ class aou_qos_order_chk extends uvm_component;
       if (lrp < 0) continue;
       n_checked[c]++;
       if (exp == QOS_RR) check_rr(s, q, hrp, lrp, tag, classes[c]);
-      else check_tiers(s, q, tier, exp, hi, lo, tag, classes[c]);
+      else check_tiers(s, q, qd, tier, exp, hi, lo, tag, classes[c]);
     end
   endfunction
 
@@ -143,8 +161,9 @@ class aou_qos_order_chk extends uvm_component;
     end
   endfunction
 
-  protected function void check_tiers(ent_t s[$], bit q[$], int tier[4], expect_e exp, int hi,
-                                      int lo, string tag, bit [3:0] mt);
+  // qd: q narrowed for FEAT-R11 (see the header; equal to q except for WriteData).
+  protected function void check_tiers(ent_t s[$], bit q[$], bit qd[$], int tier[4],
+                                      expect_e exp, int hi, int lo, string tag, bit [3:0] mt);
     string seq = seq2string(s, q, tier);
     int a, b, n_between;
     bit backlog = 1'b0;
@@ -171,7 +190,7 @@ class aou_qos_order_chk extends uvm_component;
     // Every pair of tiers, not just the extremes.
     for (int t1 = hi; t1 > 0; t1--) begin
       int a1, b1;
-      bounds(s, q, tier, t1, a1, b1);
+      bounds(s, qd, tier, t1, a1, b1);
       if (a1 < 0) continue;
       for (int i = a1 + 1; i < b1; i++) begin
         if (tier[s[i].rp] < t1) begin

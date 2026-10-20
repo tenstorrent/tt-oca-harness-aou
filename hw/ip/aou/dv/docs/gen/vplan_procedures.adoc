@@ -1646,6 +1646,13 @@ priorities) puts every RP in one tier.
 | `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-thr0` | `+arb_mode=2 +qos_tiers=2 +qos_timer=thr0` | 1-2 | `4x512-sp64` | 13.22
 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-res0` | `+arb_mode=1 +qos_tiers=2 +qos_timer=res0` | 1-3 | `4x512-sp64` | 13.22
 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-max` | `+arb_mode=1 +qos_tiers=2 +qos_timer=max` | 1-3 | `4x512-sp64` | 13.22
+| `aou_qos_order_test.arb_mode-0.4xmix4211-sp128` | `+arb_mode=0` | 1-2 | `4xmix4211-sp128` | 13.1,13.2
+| `aou_qos_order_test.arb_mode-1.qos_tiers-eq.4xmix4211-sp128` | `+arb_mode=1 +qos_tiers=eq` | 1-2 | `4xmix4211-sp128` | 13.1,13.4
+| `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128` | `+arb_mode=1 +qos_tiers=3` | 1-3 | `4xmix4211-sp128` | 13.4,13.5,13.6,13.7,13.16,13.17,13.18
+| `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote.4xmix4211-sp128` | `+arb_mode=1 +qos_tiers=2 +qos_timer=promote` | 1-2 | `4xmix4211-sp128` | 13.8
+| `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep.4xmix4211-sp128` | `+arb_mode=1 +qos_tiers=2 +qos_timer=sweep` | 1-4 | `4xmix4211-sp128` | 13.9,13.10
+| `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128` | `+arb_mode=2 +qos_tiers=3 +qos_bounds=1` | 1-3 | `4xmix4211-sp128` | 13.11,13.14,13.16,13.17,13.18
+| `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote.4xmix4211-sp128` | `+arb_mode=2 +qos_tiers=2 +qos_timer=promote` | 1-2 | `4xmix4211-sp128` | 13.15
 | `aou_qos_order_test.arb_mode-1.qos_tiers-3.rtl_asserts-1` | `+arb_mode=1 +qos_tiers=3 +rtl_asserts=1` | 1 | `4x512-sp64-assert` | 11.18
 |===
 

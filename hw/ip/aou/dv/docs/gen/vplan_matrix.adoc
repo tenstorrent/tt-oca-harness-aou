@@ -305,24 +305,24 @@
 [cols="1,5,1,4",options="header"]
 |===
 | Item | Requirement | Priority | Scenarios
-| 13.1 | Configure `arb_mode=0`; verify round-robin between valid RPs | P1 | `aou_qos_order_test.arb_mode-0`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq`, `aou_qos_test.arb_mode-0`, `aou_qos_test.arb_mode-3`
-| 13.2 | Round-robin between RP0 and RP1 with equal traffic | P1 | `aou_qos_order_test.arb_mode-0`, `aou_qos_test.arb_mode-1.4x512-sp64`
+| 13.1 | Configure `arb_mode=0`; verify round-robin between valid RPs | P1 | `aou_qos_order_test.arb_mode-0`, `aou_qos_order_test.arb_mode-0.4xmix4211-sp128`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq.4xmix4211-sp128`, `aou_qos_test.arb_mode-0`, `aou_qos_test.arb_mode-3`
+| 13.2 | Round-robin between RP0 and RP1 with equal traffic | P1 | `aou_qos_order_test.arb_mode-0`, `aou_qos_order_test.arb_mode-0.4xmix4211-sp128`, `aou_qos_test.arb_mode-1.4x512-sp64`
 | 13.3 | Round-robin among all 4 RPs with equal traffic | P2 | `aou_qos_test.arb_mode-1.4x512-sp64`
-| 13.4 | Configure `arb_mode=1`; set `rp*_prior` levels | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq`, `aou_qos_test.arb_mode-1`, `aou_qos_test.arb_mode-1.4x512-sp64`
-| 13.5 | RP with high priority gets precedence | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_test.arb_mode-1.4x512-sp64`
-| 13.6 | Verify normal priority behavior | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_test.arb_mode-1.4x512-sp64`
-| 13.7 | Verify low priority behavior | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_test.arb_mode-1.4x512-sp64`
-| 13.8 | Verify low-priority RP promoted after timeout | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote`
-| 13.9 | Test various `timer_threshold` values | P2 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep`
-| 13.10 | Test various `timer_resolution` values | P2 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep`
-| 13.11 | Configure `arb_mode=2`; use AXI QoS field for priority | P1 | `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_test.arb_mode-2.qos_bounds-1`
+| 13.4 | Configure `arb_mode=1`; set `rp*_prior` levels | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq.4xmix4211-sp128`, `aou_qos_test.arb_mode-1`, `aou_qos_test.arb_mode-1.4x512-sp64`
+| 13.5 | RP with high priority gets precedence | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_test.arb_mode-1.4x512-sp64`
+| 13.6 | Verify normal priority behavior | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_test.arb_mode-1.4x512-sp64`
+| 13.7 | Verify low priority behavior | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_test.arb_mode-1.4x512-sp64`
+| 13.8 | Verify low-priority RP promoted after timeout | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote`, `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-promote.4xmix4211-sp128`
+| 13.9 | Test various `timer_threshold` values | P2 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep`, `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep.4xmix4211-sp128`
+| 13.10 | Test various `timer_resolution` values | P2 | `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep`, `aou_qos_order_test.arb_mode-1.qos_tiers-2.qos_timer-sweep.4xmix4211-sp128`
+| 13.11 | Configure `arb_mode=2`; use AXI QoS field for priority | P1 | `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128`, `aou_qos_test.arb_mode-2.qos_bounds-1`
 | 13.12 | axi_qos_to_hp boundary; a QoS value equal to the threshold is high priority (>=, reset 0xA) | P1 | `aou_qos_test.arb_mode-2.qos_bounds-1`
 | 13.13 | axi_qos_to_np boundary; a QoS value equal to the threshold is normal priority (>=, reset 0x5) | P1 | `aou_qos_test.arb_mode-2.qos_bounds-1`
-| 13.14 | Mix of high/normal/low QoS transactions | P1 | `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_test.arb_mode-2.qos_bounds-1`
-| 13.15 | Verify starvation prevention with AXI QoS mode | P1 | `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote`
-| 13.16 | Verify QoS arbitration on AW channel | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`
-| 13.17 | Verify QoS arbitration on W channel | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`
-| 13.18 | Verify QoS arbitration on AR channel | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`
+| 13.14 | Mix of high/normal/low QoS transactions | P1 | `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128`, `aou_qos_test.arb_mode-2.qos_bounds-1`
+| 13.15 | Verify starvation prevention with AXI QoS mode | P1 | `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote`, `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote.4xmix4211-sp128`
+| 13.16 | Verify QoS arbitration on AW channel | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128`
+| 13.17 | Verify QoS arbitration on W channel | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128`
+| 13.18 | Verify QoS arbitration on AR channel | P1 | `aou_qos_order_test.arb_mode-1.qos_tiers-3`, `aou_qos_order_test.arb_mode-1.qos_tiers-3.4xmix4211-sp128`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1`, `aou_qos_order_test.arb_mode-2.qos_tiers-3.qos_bounds-1.4xmix4211-sp128`
 | 13.19 | ARB_MODE=3 (reserved) behaves as round-robin | P2 | `aou_qos_test.arb_mode-3`
 | 13.20 | PRx_PRIOR=0 is treated as 1 | P2 | `aou_qos_order_test.arb_mode-1.qos_tiers-3.qos_prior0-1`, `aou_qos_order_test.arb_mode-1.qos_tiers-eq01`
 | 13.21 | AXI_QOS_TO_HP at or below AXI_QOS_TO_NP (misconfiguration: the normal tier is empty) | P2 | `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_bounds-inv`
