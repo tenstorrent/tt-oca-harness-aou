@@ -271,9 +271,13 @@ Class `aou_fdi_t1_linkdown_spec_test` extends `aou_fdi_t1_bringup_test` (`uvm/te
 down (BUGS/001 item 4). NOP is ignored outside Reset (r1.1 Table 8-3), so:
 1. teardown: I_SW_DEACTIVATE_START with the AoU core deactivated; the DUT
 requests LinkReset or Disabled, the Adapter goes there and returns to
-Reset on the DUT's Active request (§8.3.3.5/8.3.3.6); then bringup;
+Reset on the DUT's Active request (§8.3.3.5/8.3.3.6); then bringup,
+whose training trigger the DUT holds until software pulses
+I_SW_ACTIVATE_START (the Adapter model does it);
 2. Adapter-initiated LinkReset, then Disabled: Link Status Down
-(Table 8-2), so O_FDI_LINK_UP drops; Reset and bringup follow;
+(Table 8-2), so O_FDI_LINK_UP drops; Reset and bringup follow (the
+DUT restarts by itself after the LinkReset, and after the Disabled, a
+software Link Disable, only on I_SW_ACTIVATE_START);
 3. I_SW_LINKERROR_INJECT: lp_linkerror, the Adapter enters LinkError and
 leaves it only on Active with lp_linkerror=0 (§8.3.3.7, FDI-R49).
 The bringup model checks the DUT side throughout.
@@ -671,11 +675,14 @@ through bringup so the DUT restarts by itself after LinkError/LinkReset.
 | Scenario | Arguments | Seeds | Target | Plan items
 | `aou_fdi_t1_link_stress_test` |  | 1-2 | `1x512-sp64` | 18.16
 | `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100` | `+le_mid_flit_pct=100` | 1-3 | `1x512-sp64` | 18.16,18.23
+| `aou_fdi_t1_link_stress_test.fdi_rx_early-40` | `+fdi_rx_early=40` | 1-3 |  | 18.16,18.19
+| `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40` | `+le_mid_flit_pct=100 +fdi_rx_early=40` | 1-3 |  | 18.16,18.19,18.23
 |===
 
 *Plan items.*
 
 * 18.16: L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested
+* 18.19: rx_active request/status handshake: raise and fall rules
 * 18.23: pl_state_sts leaves Active mid-flit
 
 [[aou-proc-aou_link_event_test]]
@@ -702,12 +709,21 @@ disabled           transactions are aborted by the reset (an M-port ID
 mismatch interrupt is tolerated); all later traffic
 must complete. Disabled is Adapter-initiated and needs
 fdi_enc=SPEC, which the test selects for it.
-Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|rand
-(rand never picks disabled)
+teardown_int       a deliberate teardown (software deactivation, then
+I_SW_DEACTIVATE_START): the DUT holds the training
+trigger until an activation request. Only
+I_INT_ACTIVATE_START gives it here, raised by local
+traffic queued while the link is down; the Adapter's
+software pulse is off, so a DUT that ignores the
+interrupt fails FDI-R51. fdi_enc=SPEC.
+Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|
+teardown_int|rand (rand never picks disabled or teardown_int)
 
 ----
 +loops +T1_TXN.
 ----
+
+*Rules named.* `FDI-R51`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -718,6 +734,7 @@ Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|rand
 | Scenario | Arguments | Seeds | Target | Plan items
 | `aou_link_event_test.event-linkerror.le_mid_flit_pct-100` | `+event=linkerror +le_mid_flit_pct=100` | 1-2 |  | 18.23
 | `aou_link_event_test.event-disabled` | `+event=disabled` | 1-2 |  | 18.18
+| `aou_link_event_test.event-teardown_int` | `+event=teardown_int` | 1-2 |  | 18.17
 | `aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128` | `+event=l1 +active_phy=1 +park_idle_phy=1` | 1 | `2xmix-tp64_128` | 18.25
 | `aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2xmix-tp64_128` | `+event=retrain +active_phy=1 +park_idle_phy=1` | 1 | `2xmix-tp64_128` | 18.25
 | `aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2x512-tp32_64` | `+event=l1 +active_phy=1 +park_idle_phy=1` | 1 | `2x512-tp32_64` | 18.25
@@ -2101,22 +2118,25 @@ answered), ENABLED or DEACTIVATE (its DeactivateReq not answered), and the
 remote die sends one opcode regardless of state. MAS §7.2.3 says which
 opcodes are invalid in each state; for those the DUT sets
 INVALID_ACTMSG_ERR, captures the opcode in INVALID_ACTMSG_INFO, raises
-INT_REQ_LINKRESET (unless masked, BUGS/014) and acknowledges an invalid
-ActivateReq but not an invalid ActivateAck (#78/#79). Software then
-recovers (LinkReset, AOU_SW_RESET, re-activation) and traffic must work.
+INT_REQ_LINKRESET (unless masked, BUGS/014) and answers neither an
+invalid ActivateReq nor an invalid ActivateAck: AoU v0.8 8.3.3 makes the
+out-of-step Req/Ack an error and 8.4 transmits nothing in that state
+Software then recovers (LinkReset, AOU_SW_RESET,
+re-activation) and traffic must work.
 Opcodes the MAS permits but the spec calls inconsistent (BUGS/013) must
 not raise LinkReset, and the link must still work afterwards.
-The Ack to an invalid ActivateReq must be on FDI before lp_linkerror rises
-(T1-L30, aou_t1_act_chk, for every ActivateReq in every test); +reps and
-the pl_trdy knobs give it Acks that can still sit in the DUT's TX stage.
+
+----
++reps and the pl_trdy knobs keep the DUT's TX stage busy when the invalid
+----
+
+ActivateReq arrives, where an Ack queued by mistake would still go out.
 Knobs: +state=disabled|activate|enabled|deactivate|all +op=act_req|act_ack|
 deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
 
 ----
 +T1_TXN.
 ----
-
-*Rules named.* `T1-L30`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 

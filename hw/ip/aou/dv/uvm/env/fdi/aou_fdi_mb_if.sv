@@ -26,6 +26,9 @@ interface aou_fdi_mb_if #(
   logic              pl_stallreq;
   logic              lp_stallack;
   logic [3:0]        pl_state_sts;
+  // pl_rx_active_req and lp_rx_active_sts both 1 (UCIe r1.1 8.2.7: the
+  // Receiver is Active). One handshake serves every PHY; the top drives it.
+  logic              rx_active;
 
   // L1: mainband stimulus and TX responder.
   clocking drv_cb @(posedge clk);
@@ -39,7 +42,7 @@ interface aou_fdi_mb_if #(
   endclocking
 
   clocking mon_cb @(posedge clk);
-    input pl_valid, pl_data, pl_flit_cancel, pl_trdy, pl_stallreq, pl_state_sts,
+    input pl_valid, pl_data, pl_flit_cancel, pl_trdy, pl_stallreq, pl_state_sts, rx_active,
           lp_data, lp_valid, lp_irdy, lp_stallack, rst_n;
   endclocking
 

@@ -19,7 +19,11 @@
 //  - LinkReset/Disabled on lp_state_req: that state, then Reset once the DUT
 //    requests Active. No bringup follows.
 // After LinkError/LinkReset/Disabled -> Reset it trains again only on a
-// NOP->Active request (cfg.train_trigger_en, FDI-R51; §8.3.3.8).
+// NOP->Active request (cfg.train_trigger_en, FDI-R51; §8.3.3.8). After a
+// deliberate teardown (the DUT's own LinkReset request, or Disabled) the DUT
+// gives that request only after an activation request; without
+// one from the test, software pulses I_SW_ACTIVATE_START after
+// cfg.sw_restart_delay cycles.
 class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   `uvm_component_utils(aou_lsm_driver)
 
@@ -38,6 +42,8 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   local bit       reacting;      // answering a DUT request (react_loop)
   local bit       le_absorbed;   // react_loop took a DUT LinkError down to Reset
   local bit       down_reset;    // Reset entered from LinkError/LinkReset/Disabled
+  local bit       down_held;     // ... and that link-down was a deliberate teardown
+  local bit       down_act;      // an activation request has come since it began
   local int unsigned trn_trig;   // NOP->Active progress since (retrain_trigger())
   local bit       clk_req_q;
   local bit       wake_ack_q;
@@ -84,8 +90,11 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     lsm_vif.drv_cb.phy_type <= cfg.active_phy == 1;
     for (int i = 0; i < 4; i++) set_sw(aou_lsm_sw_e'(i), 1'b0);
     foreach (cfg.gate[i]) cfg.gate[i].open = 1'b0;
+    foreach (cfg.gate[i]) cfg.gate[i].rx_early = 1'b0;
     link_active = 1'b0;
     down_reset = 1'b0;
+    down_held = 1'b0;
+    down_act = 1'b0;
   endtask
 
   local task main_loop();
@@ -160,6 +169,17 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
       `uvm_fatal(get_type_name(), $sformatf("%s has no %s encoding", s.name(), cfg.fdi_enc.name()))
     if (s != state) `uvm_info(get_type_name(), $sformatf("pl_state_sts %s -> %s (0x%0h)",
                                                          state.name(), s.name(), code), UVM_MEDIUM)
+    // A LinkReset the DUT asked for (its teardown from DEACTIVATE) or a
+    // Disabled (software Link Disable) is deliberate; a LinkError, or a
+    // LinkReset the Adapter starts on its own, is not.
+    if (s == LSM_LINKERROR) begin
+      down_held = 1'b0;
+    end else if (s inside {LSM_LINKRESET, LSM_DISABLED} && s != state) begin
+      bit held = s == LSM_DISABLED ||
+                 lsm_vif.drv_cb.lp_state_req === req_code(LSM_REQ_LINKRESET, cfg.fdi_enc);
+      if (held && !down_held) down_act = 1'b0;
+      down_held = held;
+    end
     state = s;
     if (s inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) down_reset = 1'b1;
     for (int p = 0; p < cfg.n_phy && p < 2; p++) begin
@@ -269,6 +289,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     int unsigned n;
     link_active = 1'b0;
     foreach (cfg.gate[i]) cfg.gate[i].open = 1'b0;
+    foreach (cfg.gate[i]) cfg.gate[i].rx_early = 1'b0;
     wait_cycles(2);
     foreach (cfg.gate[i]) begin
       while (!cfg.gate[i].quiet()) begin
@@ -281,13 +302,21 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     end
   endtask
 
+  // With cfg.rx_early the RX mainband opens once rx_active req and sts are
+  // both 1, while pl_state_sts is still Reset (UCIe r1.1 8.2.7 rule 3).
   local task active_entry();
     wait_cycles(cfg.lat());
     rx_active(1'b1);
+    if (cfg.rx_early > 0 && state == LSM_RESET) begin
+      foreach (cfg.gate[i]) cfg.gate[i].abort = 1'b0;
+      foreach (cfg.gate[i]) cfg.gate[i].rx_early = !parked(i);
+      wait_cycles(cfg.rx_early);
+    end
     wait_cycles(cfg.lat());
     set_state(LSM_ACTIVE);
     foreach (cfg.gate[i]) cfg.gate[i].abort = 1'b0;
     foreach (cfg.gate[i]) cfg.gate[i].open = !parked(i);
+    foreach (cfg.gate[i]) cfg.gate[i].rx_early = 1'b0;
     link_active = 1'b1;
   endtask
 
@@ -301,6 +330,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     set_state(LSM_RESET);
     if (down_reset) wait_train_trigger();
     down_reset = 1'b0;
+    down_held = 1'b0;
     wait_cycles(cfg.lat());
     clk_handshake(1'b1);
     wait_cycles(cfg.lat());
@@ -316,6 +346,9 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
       @(lsm_vif.drv_cb);
       if (lsm_vif.drv_cb.rst_n !== 1'b1 || state != LSM_RESET || !down_reset) trn_trig = 0;
       else trn_trig = retrain_trigger(trn_trig);
+      if (down_held && (lsm_vif.mon_cb.sw_activate_start === 1'b1 ||
+                        lsm_vif.mon_cb.int_activate_start === 1'b1))
+        down_act = 1'b1;
     end
   endtask
 
@@ -323,9 +356,29 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   // does not train again until it sees a NOP->Active transition on
   // lp_state_req (or a software or remote trigger). Without one, after
   // train_timeout cycles software starts the training so the test goes on.
+  // After a deliberate teardown the DUT holds the trigger until an activation
+  // request (UCIe r3.0 10.3.3.8 allows it; aou_bringup_model checks
+  // the hold). If none has come after sw_restart_delay cycles, software
+  // restarts the link with I_SW_ACTIVATE_START, and FDI-R51 counts from there.
   local task wait_train_trigger();
     int unsigned n;
     if (cfg.fdi_enc != AOU_FDI_ENC_SPEC || !cfg.train_trigger_en) return;
+    // sw_restart_delay=0: software never pulses; the test's own (or the DUT's
+    // INT_ACTIVATE_START) request must come within train_timeout.
+    if (down_held) begin
+      while (!down_act && trn_trig < 2) begin
+        @(lsm_vif.drv_cb);
+        ++n;
+        if (cfg.sw_restart_delay != 0 && n >= cfg.sw_restart_delay) begin
+          `uvm_info(get_type_name(), {"deliberate link-down, no activation request: software ",
+                                      "pulses I_SW_ACTIVATE_START"}, UVM_MEDIUM)
+          pulse_sw(LSM_SW_ACTIVATE, 2);
+          break;
+        end
+        if (cfg.sw_restart_delay == 0 && n >= cfg.train_timeout) break;
+      end
+      n = 0;
+    end
     aou_rule_log::check("FDI-R51", get_type_name());
     while (trn_trig < 2) begin
       @(lsm_vif.drv_cb);
@@ -415,6 +468,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     foreach (cfg.gate[i]) begin
       cfg.gate[i].abort = 1'b1;
       cfg.gate[i].open = 1'b0;
+      cfg.gate[i].rx_early = 1'b0;
     end
     // L1 drops pl_valid and pl_trdy at the next edge; the state changes with them,
     // so no beat is offered outside Active (FDI-R35).

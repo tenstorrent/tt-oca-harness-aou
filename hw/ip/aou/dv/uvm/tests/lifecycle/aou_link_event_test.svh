@@ -12,10 +12,12 @@ class aou_link_event_test extends aou_base_test;
     num_txns = 20;
   endfunction
 
-  // Disabled has only the UCIe encoding (UCIe r1.1 Table 8-2).
+  // Disabled has only the UCIe encoding (UCIe r1.1 Table 8-2); the teardown
+  // and its training trigger are checked with it too.
   function void configure();
     string ev;
-    if ($value$plusargs("event=%s", ev) && ev == "disabled") cfg.fdi_enc = AOU_FDI_ENC_SPEC;
+    if ($value$plusargs("event=%s", ev) && ev inside {"disabled", "teardown_int"})
+      cfg.fdi_enc = AOU_FDI_ENC_SPEC;
   endfunction
 
   // A hang shows within 2 ms of simulated time; every scenario here,

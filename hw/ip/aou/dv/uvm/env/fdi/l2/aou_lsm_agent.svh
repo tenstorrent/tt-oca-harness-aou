@@ -36,7 +36,14 @@ class aou_lsm_agent extends uvm_agent;
     // +train_trigger=0 lets the Adapter train again after a link-down without
     // waiting for NOP->Active (an Adapter or remote die that restarts by itself).
     void'($value$plusargs("train_trigger=%b", cfg.train_trigger_en));
+    // +sw_restart_delay=N: cycles in Reset after a deliberate teardown before
+    // software pulses I_SW_ACTIVATE_START (0: never); random in [50:1500]
+    // otherwise, so a DUT that releases its trigger on a timer rather than
+    // on the request is caught at many delays.
+    if (!$value$plusargs("sw_restart_delay=%d", cfg.sw_restart_delay))
+      cfg.sw_restart_delay = $urandom_range(1500, 50);
     void'($value$plusargs("le_mid_flit_pct=%d", cfg.le_mid_flit_pct));
+    void'($value$plusargs("fdi_rx_early=%d", cfg.rx_early));
     void'($value$plusargs("park_idle_phy=%b", cfg.park_idle_phy));
     if (cfg.n_phy < 1 || cfg.n_phy > 2)
       `uvm_fatal(get_type_name(), $sformatf("n_phy %0d not 1 or 2", cfg.n_phy))

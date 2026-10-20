@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Drives flits into the DUT RX (pl_valid/pl_data/pl_flit_cancel). A flit
-// starts only while the gate is open (L2 reports Active) and out of reset;
+// starts only while the gate is open for RX (L2 reports Active, or the
+// Receiver is Active in Reset with +fdi_rx_early) and out of reset;
 // once started it runs to completion, cancels and replays included. A
 // cancel comes in the cycle after the last beat of its 128B half
 // (FDI-R05), either with pl_valid low or with the replay's first beat. A
@@ -31,7 +32,7 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
         continue;
       end
       epoch = cfg.gate.epoch;
-      while (!(cfg.gate.open && vif.drv_cb.rst_n === 1'b1)) idle_cycle(1'b0);
+      while (!(cfg.gate.rx_open() && vif.drv_cb.rst_n === 1'b1)) idle_cycle(1'b0);
       if (epoch != cfg.gate.epoch) begin
         `uvm_info(get_type_name(), "flit fetched before a link reset dropped", UVM_MEDIUM)
         seq_item_port.item_done();

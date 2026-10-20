@@ -62,7 +62,8 @@ run_modes = ["errors"]
 args = ["+mask=1"]
 
 # The Adapter enters LinkError as soon as lp_linkerror rises (fdi_enc=SPEC and a
-# DUT with lp_linkerror): the ActivateAck that follows is lost (BUGS/037).
+# DUT with lp_linkerror). The invalid ActivateReq gets no ActivateAck either way
+# (AoU v0.8 8.3.3/8.4).
 [[tests]]
 name = "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-1"
 module = { uvm = "aou_invalid_actmsg_test" }
@@ -71,9 +72,9 @@ tags = ["errors"]
 run_modes = ["errors"]
 args = ["+state=deactivate", "+op=act_req", "+react_linkerror=1"]
 
-# T1-L30 (the Ack to an invalid ActivateReq is on FDI before lp_linkerror) with
-# pl_trdy holes and low runs, so the Ack's flit can still be inside the DUT's
-# TX output stage when the DUT decides to raise lp_linkerror (BUGS/037).
+# T1-L15 (no ActivateAck to an invalid ActivateReq) with pl_trdy holes and low
+# runs, so the DUT's TX output stage is busy when the invalid ActivateReq
+# arrives.
 [[tests]]
 name = "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8"
 module = { uvm = "aou_invalid_actmsg_test" }

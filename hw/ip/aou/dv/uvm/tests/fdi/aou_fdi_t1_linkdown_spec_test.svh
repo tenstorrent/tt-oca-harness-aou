@@ -5,9 +5,13 @@
 // down (BUGS/001 item 4). NOP is ignored outside Reset (r1.1 Table 8-3), so:
 // 1. teardown: I_SW_DEACTIVATE_START with the AoU core deactivated; the DUT
 //    requests LinkReset or Disabled, the Adapter goes there and returns to
-//    Reset on the DUT's Active request (§8.3.3.5/8.3.3.6); then bringup;
+//    Reset on the DUT's Active request (§8.3.3.5/8.3.3.6); then bringup,
+//    whose training trigger the DUT holds until software pulses
+//    I_SW_ACTIVATE_START (the Adapter model does it);
 // 2. Adapter-initiated LinkReset, then Disabled: Link Status Down
-//    (Table 8-2), so O_FDI_LINK_UP drops; Reset and bringup follow;
+//    (Table 8-2), so O_FDI_LINK_UP drops; Reset and bringup follow (the
+//    DUT restarts by itself after the LinkReset, and after the Disabled, a
+//    software Link Disable, only on I_SW_ACTIVATE_START);
 // 3. I_SW_LINKERROR_INJECT: lp_linkerror, the Adapter enters LinkError and
 //    leaves it only on Active with lp_linkerror=0 (§8.3.3.7, FDI-R49).
 // The bringup model checks the DUT side throughout.
@@ -24,7 +28,8 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     super.configure();
     env.lsm_cfg.fdi_enc = AOU_FDI_ENC_SPEC;
     env.lsm_cfg.req_timeout = 2000;
-    // The DUT restarts by itself after each link-down.
+    // The DUT restarts by itself after an unplanned link-down, and on
+    // I_SW_ACTIVATE_START after a deliberate one.
     env.lsm_cfg.clk_req_hold_bringup = 1'b1;
   endfunction
 

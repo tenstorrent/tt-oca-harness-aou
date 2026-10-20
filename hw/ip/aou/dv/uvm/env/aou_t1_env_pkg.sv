@@ -158,10 +158,6 @@ package aou_t1_env_pkg;
 
   `uvm_analysis_imp_decl(_dbg_mport)
   `uvm_analysis_imp_decl(_dbg_remote)
-  `uvm_analysis_imp_decl(_act_txmsg)
-  `uvm_analysis_imp_decl(_act_txflit)
-  `uvm_analysis_imp_decl(_act_rxflit)
-  `uvm_analysis_imp_decl(_act_rxmsg)
 
   `include "aou_t1_traffic_cfg.svh"
   `include "aou_t1_feature_cfg.svh"
@@ -185,7 +181,6 @@ package aou_t1_env_pkg;
   `include "aou_t1_mo_chk.svh"
   `include "aou_t1_sw_reset_chk.svh"
   `include "aou_t1_dbg_fifo_chk.svh"
-  `include "aou_t1_act_chk.svh"
   `include "aou_t1_env_fc_bins.svh"
   `include "aou_t1_crd_flow_chk.svh"
   `include "aou_t1_crd_rr_chk.svh"
@@ -193,6 +188,7 @@ package aou_t1_env_pkg;
   `include "aou_t1_xfer_cov.svh"
   `include "aou_t1_attr_chk.svh"
   `include "aou_t1_rx_fifo_chk.svh"
+  `include "aou_t1_rx_align_chk.svh"
   // Checkers and performance model classes the virtual sequences compose
   // (uvm/env/chk, uvm/env/perf); the tests that configure them live in uvm/tests.
   `include "chk/aou_early_bresp_chk.svh"

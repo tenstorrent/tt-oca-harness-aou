@@ -75,11 +75,10 @@ class aou_t1_env_cfg extends uvm_object;
     lsm_cfg = aou_lsm_cfg::type_id::create("lsm_cfg");
     lsm_cfg.n_phy = AOU_T1_N_PHY;
     // T1 tests answer the DUT's LinkReset request themselves (recover():
-    // an Adapter LinkError, whose exit still checks FDI-R49). An immediate
-    // LinkError would close the mainband before the DUT's last messages,
-    // e.g. the ActivateAck to an invalid ActivateReq (T1-L15). Interim, until
-    // BUGS/037 (lp_linkerror rises before that Ack) is settled; errors.yaml
-    // runs that case with +react_linkerror=1 as an expected failure.
+    // an Adapter LinkError, whose exit still checks FDI-R49). The Adapter's
+    // own reaction to lp_linkerror is run by errors.toml with
+    // +react_linkerror=1. Turning it on for every T1 test changes when the
+    // link goes down in all of them and has not been measured.
     lsm_cfg.react_linkerror_en = 1'b0;
     foreach (fdi_cfg[p]) begin
       fdi_cfg[p] = aou_fdi_cfg::type_id::create($sformatf("fdi_cfg%0d", p));

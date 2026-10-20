@@ -32,10 +32,25 @@ class aou_lsm_cfg extends uvm_object;
   // software starts the training instead.
   bit           train_trigger_en = 1'b1;
   int unsigned  train_timeout = 2000;
+  // After a deliberate teardown (the DUT's LinkReset request, or Disabled) the
+  // DUT waits for an activation request before that trigger;
+  // software gives one through I_SW_ACTIVATE_START after this many cycles in
+  // Reset if neither the test nor the DUT has; 0 never does. The agent
+  // randomises it in [50:1500] unless +sw_restart_delay=N sets it.
+  int unsigned  sw_restart_delay = 300;
   // Chance an Adapter-initiated LinkError is entered mid-flit: without the flit
   // boundary, while a flit is in flight in either direction (UCIe r1.1
   // 8.3.3.7 needs neither a stall nor a boundary). +le_mid_flit_pct.
   int unsigned  le_mid_flit_pct = 0;
+  // Cycles the Adapter forwards RX flits in Reset before Active. UCIe r1.1
+  // 8.2.7: once pl_rx_active_req and lp_rx_active_sts are both 1 the
+  // Receiver is Active "even though pl_state_sts might not have moved to
+  // Active yet" (rule 3: Reset, Retrain or Active), as when the remote die
+  // went Active first and its Rsp.Active is still on the sideband. On every
+  // Active entry from Reset, after the rx_active handshake, the RX mainband
+  // opens for rx_early cycles before pl_state_sts moves to Active; TX still
+  // waits for Active. 0 (off) keeps RX flits to Active. +fdi_rx_early=N.
+  int unsigned  rx_early = 0;
 
   // Monitor and reference model
   bit           checks_en = 1'b1;
@@ -67,8 +82,8 @@ class aou_lsm_cfg extends uvm_object;
 
   function string convert2string();
     return $sformatf({"fdi_enc=%s n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
-                      "clk_hold=%0b"},
+                      "clk_hold=%0b sw_restart_delay=%0d"},
                      fdi_enc.name(), n_phy, active_phy, lat_min, lat_max, auto_bringup,
-                     clk_req_hold_bringup);
+                     clk_req_hold_bringup, sw_restart_delay);
   endfunction
 endclass

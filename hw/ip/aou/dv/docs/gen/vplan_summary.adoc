@@ -32,7 +32,7 @@
 | `aou_t1_sw_reset_test` | `aou_t1_sw_reset_test` |  | 1-3 |  | 1.6,2.4 | 
 | `aou_t1_hard_reset_test` | `aou_t1_hard_reset_test` |  | 1-3 |  | 1.6,2.4,20.14 | 
 |===
-===== `testlists/fdi.toml` (19 scenarios)
+===== `testlists/fdi.toml` (22 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -45,8 +45,11 @@
 | `aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.fdi_trdy-holes.fdi_stall_pct-8.fdi_stall_mid_pct-50.fdi_stall_trdy_free-1` | `aou_dp_random_test` | `+dp_dir=both +l1_cancel_pct=40 +l1_cancel_mix=1 +fdi_trdy=holes +fdi_stall_pct=8 +fdi_stall_mid_pct=50 +fdi_stall_trdy_free=1` | 1-2 |  | 18.22,18.24 | 
 | `aou_fdi_t1_link_stress_test` | `aou_fdi_t1_link_stress_test` |  | 1-2 | `1x512-sp64` | 18.16 | 
 | `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100` | `aou_fdi_t1_link_stress_test` | `+le_mid_flit_pct=100` | 1-3 | `1x512-sp64` | 18.16,18.23 | 
+| `aou_fdi_t1_link_stress_test.fdi_rx_early-40` | `aou_fdi_t1_link_stress_test` | `+fdi_rx_early=40` | 1-3 |  | 18.16,18.19 | 
+| `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40` | `aou_fdi_t1_link_stress_test` | `+le_mid_flit_pct=100 +fdi_rx_early=40` | 1-3 |  | 18.16,18.19,18.23 | 
 | `aou_link_event_test.event-linkerror.le_mid_flit_pct-100` | `aou_link_event_test` | `+event=linkerror +le_mid_flit_pct=100` | 1-2 |  | 18.23 | 
 | `aou_link_event_test.event-disabled` | `aou_link_event_test` | `+event=disabled` | 1-2 |  | 18.18 | 
+| `aou_link_event_test.event-teardown_int` | `aou_link_event_test` | `+event=teardown_int` | 1-2 |  | 18.17 | 
 | `aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128` | `aou_t1_slice_test` | `+active_phy=1 +park_idle_phy=1` | 1-2 | `2xmix-tp64_128` | 18.25 | 
 | `aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128` | `aou_dp_random_test` | `+dp_dir=both +active_phy=1 +park_idle_phy=1 +fdi_trdy=holes +fdi_stall_pct=5 +fdi_stall_mid_pct=50` | 1-2 | `2xmix-tp64_128` | 18.25 | 
 | `aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128` | `aou_link_event_test` | `+event=l1 +active_phy=1 +park_idle_phy=1` | 1 | `2xmix-tp64_128` | 18.25 | 

@@ -202,7 +202,11 @@ Run-time plusargs go in `PLUSARGS` (for example
 `+train_trigger=0|1` sets how the L2 Adapter model trains again after
 LinkError, LinkReset or Disabled -> Reset. With 1, the default, it waits for a
 NOP->Active transition on `lp_state_req` (UCIe r1.1 §8.3.3.8), and with
-`FDI_ENC=SPEC` FDI-R51 fails the run if the DUT doesn't give one. With 0 it
+`FDI_ENC=SPEC` FDI-R51 fails the run if the DUT doesn't give one. After a
+deliberate teardown (the DUT's own LinkReset request, or Disabled) the DUT gives
+it only after an activation request; if the test gives none, the model's
+software pulses `I_SW_ACTIVATE_START` after `sw_restart_delay` cycles
+(`+sw_restart_delay=N`, 0 never; random in [50:1500] by default). With 0 it
 trains again by itself, like an Adapter or remote die that restarts the link
 without the trigger.
 
@@ -216,7 +220,10 @@ FDI corner knobs (run time, `testlists/fdi.toml`): `+fdi_trdy=always|random|hole
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between
 `pl_stallreq` and `lp_stallack` (UCIe r1.1 8.3.2 rule 7), `+l1_cancel_pct=N` and
 `+l1_cancel_mix=1` (second-half, both-halves and repeated flit cancels),
-`+le_mid_flit_pct=N` (Adapter LinkErrors entered mid-flit, 8.3.3.7) and, in
+`+le_mid_flit_pct=N` (Adapter LinkErrors entered mid-flit, 8.3.3.7),
+`+fdi_rx_early=N` (on every Active entry from Reset the Adapter forwards RX flits for N
+cycles after the rx_active handshake while `pl_state_sts` is still Reset, as UCIe r1.1
+8.2.7 allows when the remote die went Active first; off by default) and, in
 two-PHY builds, `+active_phy=1 +park_idle_phy=1` (the unselected PHY stays in Reset,
 so state and stalls must come from the selected one). The `l1.cg_fdi_stall`,
 `cg_fdi_cancel` and `cg_fdi_abandon` bins show the corners were reached.

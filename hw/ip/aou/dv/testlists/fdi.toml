@@ -114,6 +114,30 @@ tags = ["fdi"]
 run_modes = ["fdi"]
 args = ["+le_mid_flit_pct=100"]
 
+# RX flits before Active (18.19): once rx_active req and sts are both 1 the Receiver is
+# Active even in Reset (UCIe r1.1 8.2.7 rule 3), so a legal Adapter forwards flits there
+# when the remote die went Active first. +fdi_rx_early=40 opens the RX mainband for 40
+# cycles of every Active entry from Reset; the DUT must keep those flits (scoreboard), with
+# and without mid-flit LinkErrors before them. On every target: the SP_32B and two-PHY
+# builds pair PHY beats before the decoder.
+[[tests]]
+name = "aou_fdi_t1_link_stress_test.fdi_rx_early-40"
+module = { uvm = "aou_fdi_t1_link_stress_test" }
+seed = 1
+reseed = 3
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+fdi_rx_early=40"]
+
+[[tests]]
+name = "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40"
+module = { uvm = "aou_fdi_t1_link_stress_test" }
+seed = 1
+reseed = 3
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+le_mid_flit_pct=100", "+fdi_rx_early=40"]
+
 [[tests]]
 name = "aou_link_event_test.event-linkerror.le_mid_flit_pct-100"
 module = { uvm = "aou_link_event_test" }
@@ -134,6 +158,19 @@ reseed = 2
 tags = ["fdi"]
 run_modes = ["fdi"]
 args = ["+event=disabled"]
+
+# A deliberate teardown (software deactivation, then I_SW_DEACTIVATE_START) released
+# only by I_INT_ACTIVATE_START: local AXI traffic queued while the link is down raises
+# it, and the Adapter's software pulse is off (sw_restart_delay=0). The DUT must give
+# the training trigger on the interrupt alone (FDI-R51).
+[[tests]]
+name = "aou_link_event_test.event-teardown_int"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["fdi"]
+run_modes = ["fdi"]
+args = ["+event=teardown_int"]
 
 # Two-PHY with PHY1 active (18.25): +park_idle_phy keeps PHY0 in Reset with its
 # mainband closed, so the DUT must follow PHY1's pl_state_sts (the bringup model,
@@ -217,7 +254,7 @@ args = ["+event=retrain", "+active_phy=1", "+park_idle_phy=1"]
 
 [[groups]]
 name = "fdi"
-expected_count = 19
+expected_count = 22
 tests = [
   "aou_dp_random_test.dp_dir-both.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-60.fdi_stall_trdy_free-1",
   "aou_stress_test.st_pol-random.st_crd-slow.fdi_trdy-random.fdi_stall_pct-8.fdi_stall_mid_pct-50",
@@ -228,8 +265,11 @@ tests = [
   "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.fdi_trdy-holes.fdi_stall_pct-8.fdi_stall_mid_pct-50.fdi_stall_trdy_free-1",
   "aou_fdi_t1_link_stress_test",
   "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100",
+  "aou_fdi_t1_link_stress_test.fdi_rx_early-40",
+  "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40",
   "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
   "aou_link_event_test.event-disabled",
+  "aou_link_event_test.event-teardown_int",
   "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
   "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
   "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",

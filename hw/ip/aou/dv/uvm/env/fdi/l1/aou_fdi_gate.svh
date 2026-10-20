@@ -8,6 +8,9 @@ class aou_fdi_gate extends uvm_object;
   `uvm_object_utils(aou_fdi_gate)
 
   bit open = 1'b0;     // L2: mainband may run
+  // L2: only the RX mainband may run, before Active (pl_state_sts still Reset
+  // after the rx_active handshake, UCIe r1.1 8.2.7; +fdi_rx_early).
+  bit rx_early = 1'b0;
   bit rx_busy = 1'b0;  // PL driver is inside a flit (including its replays)
   bit tx_busy = 1'b0;  // TX responder has seen part of a DUT flit
   // L2 left Active mid-flit (LinkError, UCIe r1.1 8.3.3.7): L1 abandons the
@@ -21,6 +24,11 @@ class aou_fdi_gate extends uvm_object;
 
   function new(string name = "aou_fdi_gate");
     super.new(name);
+  endfunction
+
+  // The PL driver may start an RX flit.
+  function bit rx_open();
+    return open || rx_early;
   endfunction
 
   function bit quiet();

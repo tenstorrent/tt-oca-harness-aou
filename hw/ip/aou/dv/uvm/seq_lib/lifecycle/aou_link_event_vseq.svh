@@ -16,8 +16,15 @@
 //                      mismatch interrupt is tolerated); all later traffic
 //                      must complete. Disabled is Adapter-initiated and needs
 //                      fdi_enc=SPEC, which the test selects for it.
-// Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|rand
-// (rand never picks disabled)
+//   teardown_int       a deliberate teardown (software deactivation, then
+//                      I_SW_DEACTIVATE_START): the DUT holds the training
+//                      trigger until an activation request. Only
+//                      I_INT_ACTIVATE_START gives it here, raised by local
+//                      traffic queued while the link is down; the Adapter's
+//                      software pulse is off, so a DUT that ignores the
+//                      interrupt fails FDI-R51. fdi_enc=SPEC.
+// Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|
+// teardown_int|rand (rand never picks disabled or teardown_int)
 // +loops +T1_TXN.
 class aou_link_event_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_link_event_vseq)
@@ -44,6 +51,7 @@ class aou_link_event_vseq extends aou_link_base_vseq;
         "link_reset": link_down(LSM_EV_LINK_RESET, 1'b0);
         "inband_drop": link_down(LSM_EV_LINK_RESET, 1'b1);
         "disabled": link_down(LSM_EV_DISABLED, 1'b0);
+        "teardown_int": teardown_int();
         default: `uvm_fatal(get_type_name(), {"unknown link event ", ev})
       endcase
     end
@@ -71,6 +79,36 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     wait_cycles($urandom_range(400, 20));
     link_event(LSM_EV_L1_EXIT);
     sw_activate();
+  endtask
+
+  task teardown_int();
+    int unsigned keep = cfg.lsm_cfg.sw_restart_delay;
+    int unsigned n;
+    check_traffic(num_txns);
+    sw_deactivate(AOU_T1_BY_APB);
+    if (!link_is_up()) relink();
+    `uvm_info(get_type_name(), "teardown: pulsing I_SW_DEACTIVATE_START", UVM_LOW)
+    env.lsm.drv.pulse_sw(LSM_SW_DEACTIVATE, 2);
+    while (env.lsm.drv.state != LSM_RESET || link_is_up()) begin
+      wait_cycles(1);
+      if (++n == cfg.link_timeout) begin
+        `uvm_error(get_type_name(), "T1-L04: no FDI teardown after I_SW_DEACTIVATE_START")
+        return;
+      end
+    end
+    // Only the DUT's own interrupt may release the training trigger now.
+    cfg.lsm_cfg.sw_restart_delay = 0;
+    traffic_nb(AOU_T1_L2R, num_txns);
+    relink();
+    cfg.lsm_cfg.sw_restart_delay = keep;
+    fork
+      wait_l3(AOU_LS_ENABLED, cfg.act_timeout);
+      env.status.wait_act_state(1'b1, cfg.act_timeout);
+    join
+    if (!l3_ok || !env.status.act_ok)
+      `uvm_error(get_type_name(), "T1-L04: not ENABLED again after the interrupt-driven restart")
+    wait_traffic();
+    drain();
   endtask
 
   task link_down(aou_lsm_ev_e ev, bit inband_drop);

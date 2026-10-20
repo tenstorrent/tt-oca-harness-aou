@@ -8,14 +8,15 @@
 // remote die sends one opcode regardless of state. MAS §7.2.3 says which
 // opcodes are invalid in each state; for those the DUT sets
 // INVALID_ACTMSG_ERR, captures the opcode in INVALID_ACTMSG_INFO, raises
-// INT_REQ_LINKRESET (unless masked, BUGS/014) and acknowledges an invalid
-// ActivateReq but not an invalid ActivateAck (#78/#79). Software then
-// recovers (LinkReset, AOU_SW_RESET, re-activation) and traffic must work.
+// INT_REQ_LINKRESET (unless masked, BUGS/014) and answers neither an
+// invalid ActivateReq nor an invalid ActivateAck: AoU v0.8 8.3.3 makes the
+// out-of-step Req/Ack an error and 8.4 transmits nothing in that state
+// Software then recovers (LinkReset, AOU_SW_RESET,
+// re-activation) and traffic must work.
 // Opcodes the MAS permits but the spec calls inconsistent (BUGS/013) must
 // not raise LinkReset, and the link must still work afterwards.
-// The Ack to an invalid ActivateReq must be on FDI before lp_linkerror rises
-// (T1-L30, aou_t1_act_chk, for every ActivateReq in every test); +reps and
-// the pl_trdy knobs give it Acks that can still sit in the DUT's TX stage.
+// +reps and the pl_trdy knobs keep the DUT's TX stage busy when the invalid
+// ActivateReq arrives, where an Ack queued by mistake would still go out.
 // Knobs: +state=disabled|activate|enabled|deactivate|all +op=act_req|act_ack|
 // deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
 // +T1_TXN.
@@ -170,15 +171,16 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
       check_linkreset_status("invalid_actmsg_err", int'(op));
       if (!mask && irq_rises("INT_REQ_LINKRESET") == irq0)
         `uvm_error(get_type_name(), "T1-L14: no INT_REQ_LINKRESET for an invalid opcode")
-      // An invalid ActivateReq is still acknowledged; an invalid ActivateAck
-      // is not (MAS §7.2.3). Whether an invalid DeactivateReq is: BUGS/013.
+      // Neither an invalid ActivateReq nor an invalid ActivateAck is answered
+      // (AoU v0.8 8.3.3/8.4: error, nothing transmitted). Whether
+      // an invalid DeactivateReq is: BUGS/013.
       case (op)
         AOU_ACT_REQ:
-          if (acks != 1)
+          if (acks != 0)
             `uvm_error(get_type_name(), $sformatf(
-                       "T1-L15: %0d answers to an invalid ActivateReq, expected 1%s", acks,
+                       "T1-L15: %0d answers to an invalid ActivateReq, expected none%s", acks,
                        env.lsm.drv.n_le_react != le0 ?
-                       " (the Adapter entered LinkError on lp_linkerror first)" : ""))
+                       " (the Adapter entered LinkError on lp_linkerror)" : ""))
         AOU_DEACT_REQ:
           if (acks > 1)
             `uvm_error(get_type_name(), $sformatf(

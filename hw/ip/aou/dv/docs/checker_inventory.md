@@ -112,7 +112,7 @@ Runs with a ledger: 708.
 | FDI-R32 | MODEL | Bring-up order: clk_req handshake, then pl_inband_pres=1 | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
 | FDI-R33 | DUT | From Reset lp_state_req is NOP for at least one clock before Active (L2; checks the DUT) | aou_lsm_monitor | aou_lsm_driver | aou_invalid_actmsg_test | 1269 |  | hit |
 | FDI-R34 | MODEL | Active only after rx_active req and sts are both 1, on every entry to Active (Rsp.Active itself is sideband) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
-| FDI-R35 | MODEL | Flits go to the Protocol Layer only in Active (L1; checks the Adapter) | aou_fdi_monitor |  | aou_t1_slice_test | 1428168 |  | hit |
+| FDI-R35 | MODEL | Flits go to the Protocol Layer only in Active, or in Reset once rx_active req and sts are both 1 (L1; checks the Adapter) | aou_fdi_monitor |  | aou_t1_slice_test | 1428168 |  | hit |
 | FDI-R36 | N/A | Streaming PM is requested symmetrically over sideband | n/a |  |  | 0 |  | n/a |
 | FDI-R37 | DUT | The PL requests L1/L2 only after blocking new flits and holds the request (the DUT never requests PM; any L1/L2 request diverges from the bringup model) | via FDI-M01 |  | aou_link_event_test | 27997645 |  | hit |
 | FDI-R38 | MODEL | The Adapter enters PM only after the stallreq/ack handshake (L2 stalls the DUT TX first) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |

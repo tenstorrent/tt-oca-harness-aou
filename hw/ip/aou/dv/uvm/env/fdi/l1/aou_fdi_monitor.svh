@@ -30,6 +30,7 @@ class aou_fdi_monitor extends uvm_monitor;
   int unsigned n_rx_cancel_rep;  // RX flits with one half cancelled more than once
   int unsigned n_tx_abandoned;   // partial flits abandoned on a mid-flit LinkError
   int unsigned n_rx_abandoned;
+  int unsigned n_rx_beats_reset; // RX beats in Reset with the Receiver Active (+fdi_rx_early)
 
   local aou_flit_item tx_cur;
   local int unsigned  tx_beat;
@@ -279,9 +280,14 @@ class aou_fdi_monitor extends uvm_monitor;
     rx_half_done = 1'b0;
     abandon_h_done = 1'b0;
 
+    // UCIe r1.1 8.2.7 rule 3: with rx_active req and sts both 1 the Receiver
+    // is Active even while pl_state_sts is still Reset (+fdi_rx_early). Retrain
+    // carries no mainband flits, so the rule stays strict there.
     if (v) chk("FDI-R35");
-    if (v && sts != FDI_STS_ACTIVE)
-      err("FDI-R35", $sformatf("pl_valid while pl_state_sts=0x%0h", sts));
+    if (v && sts == FDI_STS_RESET) n_rx_beats_reset++;
+    if (v && sts != FDI_STS_ACTIVE && !(sts == FDI_STS_RESET && vif.mon_cb.rx_active === 1'b1))
+      err("FDI-R35", $sformatf("pl_valid while pl_state_sts=0x%0h (rx_active %0b)", sts,
+                               vif.mon_cb.rx_active === 1'b1));
     if (!v) begin
       if (rx_cur == null) begin
         if (rx_gap < 1000) rx_gap++;
@@ -322,9 +328,11 @@ class aou_fdi_monitor extends uvm_monitor;
                                           "(%0d while stalled; %0d flits with a second-half ",
                                           "cancel, %0d with a repeated one), %0d stalls (%0d ",
                                           "mid-flit, %0d of them with pl_trdy low); %0d TX ",
-                                          "and %0d RX flits abandoned mid-flit"}, cfg.phy,
+                                          "and %0d RX flits abandoned mid-flit; %0d RX beats ",
+                                          "in Reset"}, cfg.phy,
                                          n_tx_flits, n_rx_flits, n_rx_cancels, n_cancels_stalled,
                                          n_rx_cancel_h1, n_rx_cancel_rep, n_stalls, n_stalls_mid,
-                                         n_stalls_trdy0, n_tx_abandoned, n_rx_abandoned), UVM_LOW)
+                                         n_stalls_trdy0, n_tx_abandoned, n_rx_abandoned,
+                                         n_rx_beats_reset), UVM_LOW)
   endfunction
 endclass

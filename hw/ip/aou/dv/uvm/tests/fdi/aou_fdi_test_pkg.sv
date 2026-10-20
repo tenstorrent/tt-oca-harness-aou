@@ -12,6 +12,7 @@ package aou_fdi_test_pkg;
   import aou_fdi_pkg::*;
   import aou_lsm_pkg::*;
   import aou_axi_pkg::*;
+  import aou_t1_env_pkg::aou_t1_rx_align_chk;
 
 `ifdef TWO_PHY
   localparam int N_PHY = 2;

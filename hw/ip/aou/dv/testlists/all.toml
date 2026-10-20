@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 225
+expected_count = 228
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -109,8 +109,11 @@ tests = [
   "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.fdi_trdy-holes.fdi_stall_pct-8.fdi_stall_mid_pct-50.fdi_stall_trdy_free-1",
   "aou_fdi_t1_link_stress_test",
   "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100",
+  "aou_fdi_t1_link_stress_test.fdi_rx_early-40",
+  "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40",
   "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
   "aou_link_event_test.event-disabled",
+  "aou_link_event_test.event-teardown_int",
   "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
   "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
   "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
@@ -318,7 +321,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 411
+expected_count = 414
 tests = [
   "aou_sanity_test",
   "aou_t1_slice_test",
@@ -342,8 +345,11 @@ tests = [
   "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.fdi_trdy-holes.fdi_stall_pct-8.fdi_stall_mid_pct-50.fdi_stall_trdy_free-1",
   "aou_fdi_t1_link_stress_test",
   "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100",
+  "aou_fdi_t1_link_stress_test.fdi_rx_early-40",
+  "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40",
   "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
   "aou_link_event_test.event-disabled",
+  "aou_link_event_test.event-teardown_int",
   "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
   "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
   "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",

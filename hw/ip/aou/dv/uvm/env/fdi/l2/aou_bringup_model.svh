@@ -56,6 +56,12 @@
 // The model stays in BRG_RESET while that handshake runs, and an Active with
 // pl_inband_pres already 1 is kept as the Reset->Active request
 // (BRG_REQ_ACTIVE, §8.3.3.1 rule 1).
+// After a deliberate teardown (DEACTIVATE, or a Disabled the Adapter
+// reported: a software Link Disable) the trigger waits for an activation
+// request (I_SW_ACTIVATE_START or INT_ACTIVATE_START) seen since the
+// teardown began (UCIe r3.0 10.3.3.8 lets the
+// protocol layer hold it back). Until then BRG_RESET predicts NOP and
+// lp_wake_req=0 (FDI-M01/M02).
 //
 // Any other output that differs from the prediction for more than ref_slack
 // cycles is an error (FDI-M01..M07). Where the guide is silent the interim
@@ -79,6 +85,9 @@ class aou_bringup_model extends uvm_object;
   local bit          rst_nop_seen; // NOP on lp_state_req since then
   local bit          rst_trig_done; // ... and the trigger's Active (or presence) since
   local bit          ld_disabled;  // BRG_LINKDOWN: the Adapter last reported Disabled
+  local bit          ld_deliberate; // the link-down in progress is a deliberate teardown
+  local bit          ld_act;       // ... and an activation request has come since
+  local bit          rst_hold;     // BRG_RESET after it: trigger held for an activation request
   local int unsigned miss[7];
 
   function new(string name = "aou_bringup_model");
@@ -173,6 +182,8 @@ class aou_bringup_model extends uvm_object;
 
   function void step(aou_lsm_obs o);
     bit ok;
+    bit activate;
+    bit ld_act_n;
     logic [3:0] fsm_code;
     aou_brg_state_e nxt;
     if (!o.rst_n) begin
@@ -189,6 +200,9 @@ class aou_bringup_model extends uvm_object;
       rst_nop_seen = 1'b0;
       rst_trig_done = 1'b0;
       ld_disabled = 1'b0;
+      ld_deliberate = 1'b0;
+      ld_act = 1'b0;
+      rst_hold = 1'b0;
       return;
     end
 
@@ -198,6 +212,11 @@ class aou_bringup_model extends uvm_object;
       cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(LSM_REQ_NOP, cfg.fdi_enc) ||
           (rt_nop_seen && o.lp_state_req == req_code(LSM_REQ_ACTIVE, cfg.fdi_enc)),
           $sformatf("DUT 0x%0h, expected LSM_REQ_NOP, or LSM_REQ_ACTIVE after NOP",
+                    o.lp_state_req));
+    end else if (st == BRG_RESET && rst_down && rst_hold) begin
+      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(LSM_REQ_NOP, cfg.fdi_enc),
+          $sformatf({"DUT 0x%0h, expected LSM_REQ_NOP (deliberate link-down: the training ",
+                     "trigger waits for an activation request, UCIe r3.0 10.3.3.8)"},
                     o.lp_state_req));
     end else if (st == BRG_RESET && rst_down) begin
       if (o.lp_state_req == req_code(LSM_REQ_NOP, cfg.fdi_enc)) rst_nop_seen = 1'b1;
@@ -217,12 +236,14 @@ class aou_bringup_model extends uvm_object;
     // value; LINKDOWN needs it (pred_wake_req).
     // The training trigger after a link-down needs the wake handshake, but
     // only until its Active.
-    if ((st == BRG_DEACTIVATE && spec()) || (st == BRG_RESET && rst_down && !rst_trig_done))
+    if ((st == BRG_DEACTIVATE && spec()) ||
+        (st == BRG_RESET && rst_down && !rst_hold && !rst_trig_done))
       miss[1] = 0;
     else if (st == BRG_RESET && rst_down)
       cmp(1, "FDI-M02", "lp_wake_req", !o.wake_req,
-          $sformatf({"DUT %0b, expected 0 once the training trigger after a link-down has been ",
-                     "given (UCIe r1.1 8.3.3.8)"}, o.wake_req));
+          $sformatf({"DUT %0b, expected 0 %s (UCIe r1.1 8.3.3.8)"}, o.wake_req,
+                    rst_hold ? "while the training trigger waits for an activation request"
+                             : "once the training trigger after a link-down has been given"));
     else cmp(1, "FDI-M02", "lp_wake_req", o.wake_req == pred_wake_req(),
              $sformatf("DUT %0b%s", o.wake_req, why()));
     cmp(2, "FDI-M03", "lp_clk_ack", o.clk_ack == prev_clk_req, $sformatf("DUT %0b", o.clk_ack));
@@ -269,6 +290,19 @@ class aou_bringup_model extends uvm_object;
     if (nxt != BRG_RESET) rst_down = 1'b0;
     else if (st != BRG_RESET) rst_down = spec() && st inside {BRG_LINKERROR, BRG_UNWAKE_WAIT};
     if (nxt == BRG_RESET && st != BRG_RESET) rst_nop_seen = 1'b0;
+    // Deliberate teardowns (the guide's restart rule).
+    activate = o.sw_activate || o.int_activate;
+    ld_act_n = ld_deliberate && (ld_act || activate);
+    if (nxt != BRG_RESET) rst_hold = 1'b0;
+    else if (st != BRG_RESET)
+      rst_hold = spec() && st == BRG_UNWAKE_WAIT && ld_deliberate && !ld_act && !activate;
+    else if (activate) rst_hold = 1'b0;
+    if (nxt == BRG_LINKERROR || (st == BRG_RESET && nxt != BRG_RESET) ||
+        (nxt == BRG_LINKDOWN && !(st inside {BRG_LINKDOWN, BRG_DEACTIVATE}) &&
+         o.sts != LSM_DISABLED))
+      ld_deliberate = 1'b0;
+    else if (nxt == BRG_DEACTIVATE || (spec() && o.sts == LSM_DISABLED)) ld_deliberate = 1'b1;
+    ld_act = ld_act_n;
     if (st == BRG_RESET && rst_down &&
         ((rst_nop_seen && o.lp_state_req == req_code(LSM_REQ_ACTIVE, cfg.fdi_enc)) ||
          (o.wake_ack && o.inband_pres)))

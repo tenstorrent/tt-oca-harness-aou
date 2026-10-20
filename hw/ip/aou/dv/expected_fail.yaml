@@ -1644,24 +1644,6 @@
   seed_dependent: true
   note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
 
-- test: aou_invalid_actmsg_test
-  bug: BUGS/037
-  check: 'T1-L15: 0 answers to an invalid ActivateReq, expected 1 (the Adapter entered LinkError on lp_linkerror first)'
-  seed_dependent: true
-  note: >-
-    lp_linkerror rises about 8 cycles before the MAS-required ActivateAck reaches FDI, and an
-    Adapter that enters LinkError at once may drop it (UCIe r1.1 8.3.3.7). Only with
-    +react_linkerror=1, fdi_enc=SPEC and a DUT with lp_linkerror.
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/037
-  check: 'T1-L30: lp_linkerror rose at '
-  seed_dependent: true
-  note: >-
-    the same ordering seen on FDI, whatever the Adapter model does: lp_linkerror rises before the
-    Ack's last beat. Only a DUT with lp_linkerror (BUGS/002 fix) and without the BUGS/037 fix;
-    retire with the BUGS/037 entry above once the fix lands.
-
 # BUGS/038: after LinkError/LinkReset/Disabled -> Reset the DUT gives no NOP->Active, so a
 # compliant Adapter doesn't train again (fdi_enc=SPEC, FDI-R51). Every test that takes the link
 # down; list tests do so depending on seed and plusargs.

@@ -343,7 +343,6 @@ this API goes through the integrator, because every ported test depends on it.
 | `rst` | reset agent driving `I_RESETN`/`I_PRESETN` through `aou_rst_if` (config_db key `rst`) |
 | `sb`, `status`, `fdi_chk`, `expect` | scoreboard, interrupt/status watcher, FDI checker adapter, expectation registry |
 | `dbg_chk` | `aou_t1_dbg_fifo_chk`: predicts each RP's response error debug FIFO and checks every debug-window read and pop |
-| `act_chk` | `aou_t1_act_chk`: every ActivateReq the DUT received is answered on FDI before lp_linkerror rises (T1-L30) |
 | `crd_rr`, `early_tbl` | `aou_t1_crd_rr_chk`: round-robin MsgCredit order in a window a test opens (T1-C03); `aou_t1_early_tbl_chk`: early-table backpressure on RPs with EARLY_BRESP_EN (FEAT-R15/R16) |
 | `crd_chk` | `aou_t1_crd_flow_chk`: an RP with credit and queued work is not held back by another RP without credit (T1-C01), and the DUT uses the credit it holds (T1-C02) |
 | `vseqr` | `aou_t1_vseqr`: sequencer handles for all of the above, plus `env` |

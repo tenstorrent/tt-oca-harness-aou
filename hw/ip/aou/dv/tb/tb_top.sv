@@ -153,6 +153,13 @@ module tb_top;
       !u_dut.u_aou_core_top.u_async_apb_bridge.u_async_apb_bridge_mi.r_mi_done_clkm &&
       !u_dut.u_aou_core_top.u_async_apb_bridge.u_async_apb_bridge_mi.w_si_req_clkm;
   assign rst.rx_w_pend = 8'(u_dut.u_aou_core_top.w_aou_rx_wlast_gen_wvalid);
+  assign rst.rx_msgcrdt_valid = u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_valid;
+  assign rst.rx_msgcrdt = {u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_rp,
+                           u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_wrespcred,
+                           u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_rdatacred,
+                           u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_wdatacred,
+                           u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_rreqcred,
+                           u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_wreqcred};
   // With the BUGS/021 guard the S-port pins belong to the guard, not the core,
   // from the core reset to the end of the guard's drain.
   for (genvar r = 0; r < 8; r++) begin : g_port_iso
@@ -339,9 +346,11 @@ module tb_top;
   // ---------------------------------------------------------------------------
   logic [WD0-1:0] lp0_data;
   assign fdi_mb0.lp_data = BUS_W'(lp0_data);
+  assign fdi_mb0.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
 `ifdef TWO_PHY
   logic [WD1-1:0] lp1_data;
   assign fdi_mb1.lp_data = BUS_W'(lp1_data);
+  assign fdi_mb1.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
 `endif
 
   // Core-to-bringup triggers for the bringup reference model and the status

@@ -4,7 +4,7 @@
 // L3 -> L1: runs on the L1 sequencer for the whole test, pulling each flit L3
 // builds (tx_flit_export, blocks until L3 has one) and driving it with a
 // random cancel plan, gaps and bubbles. L1 drives only while L2 reports
-// Active. A flit L3 built before a reset (flush(), from the env's
+// Active (or, with +fdi_rx_early, an RX that is already Active in Reset). A flit L3 built before a reset (flush(), from the env's
 // reset_flush) is dropped rather than sent after the link recovers: it holds
 // stale credits and messages.
 class aou_t1_l1_pump_seq extends uvm_sequence #(aou_flit_item);
@@ -38,9 +38,9 @@ class aou_t1_l1_pump_seq extends uvm_sequence #(aou_flit_item);
       int unsigned gen;
       l3.tx_flit_export.get(lit);
       gen = flush_gen;   // L3 built the flit in this time step
-      // Hand the flit to L1 only once the link is Active, so a reset while it
-      // waits can still cancel it.
-      while (!fdi.cfg.gate.open && gen == flush_gen) @(fdi.vif.mon_cb);
+      // Hand the flit to L1 only once the link can receive (Active, or Reset
+      // with +fdi_rx_early), so a reset while it waits can still cancel it.
+      while (!fdi.cfg.gate.rx_open() && gen == flush_gen) @(fdi.vif.mon_cb);
       if (gen != flush_gen) begin
         n_dropped++;
         `uvm_info(get_type_name(), "flit built before a reset dropped", UVM_MEDIUM)
