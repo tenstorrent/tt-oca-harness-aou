@@ -665,7 +665,12 @@ assign  O_AOU_MSGCREDIT_RREQCRED    = w_aou_msgcredit_rreqcred   ;
 assign  O_AOU_MSGCREDIT_WDATACRED   = w_aou_msgcredit_wdatacred  ;
 assign  O_AOU_MSGCREDIT_RDATACRED   = w_aou_msgcredit_rdatacred  ;
 assign  O_AOU_MSGCREDIT_WRESPCRED   = w_aou_msgcredit_wrespcred  ;
-assign  O_AOU_MSGCREDIT_RP          = w_aou_msgcredit_rp         ;
+// A MsgCredit header that advertises no credit names RP0. Without this gate the RP field
+// follows the arbiter's parked grant (RP3 out of reset), which an RP_COUNT < 4 build does
+// not implement.
+assign  O_AOU_MSGCREDIT_RP          = (|{w_aou_msgcredit_wreqcred, w_aou_msgcredit_rreqcred,
+                                         w_aou_msgcredit_wdatacred, w_aou_msgcredit_rdatacred,
+                                         w_aou_msgcredit_wrespcred}) ? w_aou_msgcredit_rp : 2'b00;
 assign  O_AOU_MSGCREDIT_CRED_VALID  = ~I_STATUS_DISABLE;
 //-------------------------------------------------------------
 
