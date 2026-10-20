@@ -20,6 +20,8 @@ This section gives information about operation guide for the AOU_CORE.
 [[aou-71-sfr-setting]]
 === 7.1. SFR setting
 
+The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:table-7[Table 7] repeat at every 64 KiB of the APB address space, an unmapped offset within the 64 KiB window reads as 0 and ignores writes, and [.monospaced]#++PSLVERR++# is never asserted. See the integration guide, xref:{aou-integration-xref}#aou-ig-apb-slave-interface[Section 3.2].
+
 [[table-7]]
 
 [cols="<,<,<,<,<,<",options="header",]

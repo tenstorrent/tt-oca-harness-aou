@@ -291,7 +291,7 @@ for timing closure.
 |AXI_PEER_DIE_MAX_DATA_WD |parameter |1024 |Maximum peer data width
 (bits).
 
-|APB_ADDR_WD |parameter |32 |APB address width.
+|APB_ADDR_WD |parameter |32 |APB address width. Only [.monospaced]#++PADDR[15:0]++# is decoded (xref:aou-ig-apb-slave-interface[Section 3.2]).
 
 |APB_DATA_WD |parameter |32 |APB data width.
 
@@ -430,13 +430,26 @@ both resets have been released.
 |Signal |Direction |Width |Description
 |I_AOU_APB_SI0_PSEL |input |1 |APB select.
 |I_AOU_APB_SI0_PENABLE |input |1 |APB enable.
-|I_AOU_APB_SI0_PADDR |input |APB_ADDR_WD |APB address.
+|I_AOU_APB_SI0_PADDR |input |APB_ADDR_WD |APB address. Only bits [15:0] are decoded.
 |I_AOU_APB_SI0_PWRITE |input |1 |APB write.
 |I_AOU_APB_SI0_PWDATA |input |APB_DATA_WD |APB write data.
 |O_AOU_APB_SI0_PRDATA |output |APB_DATA_WD |APB read data.
-|O_AOU_APB_SI0_PREADY |output |1 |APB ready.
-|O_AOU_APB_SI0_PSLVERR |output |1 |APB slave error.
+|O_AOU_APB_SI0_PREADY |output |1 |APB ready. Tied high.
+|O_AOU_APB_SI0_PSLVERR |output |1 |APB slave error. Tied low.
 |=========================================================
+
+____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+*Note:* AOU_CORE_SFR decodes [.monospaced]#++PADDR[15:0]++# only; bits
+[.monospaced]#++[APB_ADDR_WD-1:16]++# are ignored, so the register map
+(offsets 0x0000 to 0x0080) repeats at every 64 KiB within the APB window.
+Size the APB window for 64 KiB and let the interconnect decode the upper
+address bits. Within the window, an offset that is not a defined register
+(including a non-word-aligned address) reads as 0x00000000 and ignores
+writes. [.monospaced]#++PREADY++# is tied high and
+[.monospaced]#++PSLVERR++# is tied low, so every access completes in one
+cycle without an error, mapped or not. The interface has no
+[.monospaced]#++PSTRB++#; writes are 32 bits wide.
+____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
 
 [[aou-ig-axi-master-rx-ar-channel]]
 === 3.3 AXI Master (RX) – AR Channel
