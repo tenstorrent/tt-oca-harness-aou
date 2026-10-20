@@ -105,7 +105,7 @@
 | 4.28 | Quality of service values 0-15 | P2 | `aou_attr_test`, `aou_attr_test.attr_excl-1`
 | 4.29 | Test WriteDataFull (no WSTRB) vs WriteData | P1 | `aou_dp_wstrb_test.dp_strb-full`, `aou_dp_wstrb_test.dp_strb-partial`
 | 4.30 | AxUSER/FLEX carriage: the DUT has no USER ports, sends FLEX as 0 and ignores it on receive | P2 | `aou_attr_test`, `aou_attr_test.attr_excl-1`
-| 4.31 | W data before AW on the S port is accepted | P2 | `aou_chan_test.chan-wfirst`
+| 4.31 | W data presented before its AW on the S port is accepted once the AW arrives | P2 | `aou_chan_test.chan-wfirst`
 |===
 ==== 2.5 Read Transaction Tests
 [cols="1,5,1,4",options="header"]
@@ -144,13 +144,13 @@
 | Item | Requirement | Priority | Scenarios
 | 6.1 | One message packed per 256-byte flit | P0 | `aou_pack_test.pk-single`, `aou_t1_slice_test`
 | 6.2 | Pack multiple WriteResp (1 granule each) in single flit | P0 | `aou_dp_packing_test.dp_pack-wresp`, `aou_pack_test.pk-wresp48`
-| 6.3 | Pack different message types (WriteReq + ReadReq + WriteResp) in same flit. Sparse packing with bubble between messages | P1 | `aou_pack_test.pk-mixed`, `aou_stress_test.st_pol-sparse.st_crd-mixed`
+| 6.3 | Pack different message types (WriteReq + ReadReq + WriteResp) in same flit. Sparse packing with bubble between messages | P1 | `aou_pack_test.pk-mixed`, `aou_pack_test.pk-mixed.1x512-sp64-nxt`, `aou_stress_test.st_pol-sparse.st_crd-mixed`
 | 6.4 | WriteData256 (8 granules) spanning flit boundary | P1 | `aou_pack_test.pk-crossflit.remote_bytes-32`
-| 6.5 | WriteData512 (15 granules) spanning flit boundary | P0 | `aou_pack_test.pk-crossflit`
+| 6.5 | WriteData512 (15 granules) spanning flit boundary | P0 | `aou_pack_test.pk-crossflit`, `aou_pack_test.pk-crossflit.1x512-sp64-nxt`
 | 6.6 | WriteData1024 (30 granules) spanning flit boundary | P0 | `aou_pack_test.pk-crossflit.remote_bytes-128`
-| 6.7 | ReadData512 (14 granules) spanning flit boundary | P0 | `aou_pack_test.pk-crossflit`
+| 6.7 | ReadData512 (14 granules) spanning flit boundary | P0 | `aou_pack_test.pk-crossflit`, `aou_pack_test.pk-crossflit.1x512-sp64-nxt`
 | 6.8 | ReadData1024 (27 granules) spanning flit boundary | P0 | `aou_pack_test.pk-crossflit.remote_bytes-128`
-| 6.9 | Reassemble message spanning multiple flits on receive | P0 | `aou_dp_packing_test.dp_pack-crossflit`, `aou_pack_test.pk-crossflit`, `aou_pack_test.pk-crossflit.remote_bytes-128`, `aou_pack_test.pk-crossflit.remote_bytes-32`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_slice_test`
+| 6.9 | Reassemble message spanning multiple flits on receive | P0 | `aou_dp_packing_test.dp_pack-crossflit`, `aou_pack_test.pk-crossflit`, `aou_pack_test.pk-crossflit.1x512-sp64-nxt`, `aou_pack_test.pk-crossflit.remote_bytes-128`, `aou_pack_test.pk-crossflit.remote_bytes-32`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_slice_test`
 | 6.10 | Verify granules 0-11 positioned at byte offset 2. All granules are verified when decoded | P0 | `aou_dp_random_test.dp_dir-r2l`
 | 6.11 | Verify granules 12-23 positioned at byte offset 66. All granules are verified when decoded | P0 | `aou_dp_random_test.dp_dir-r2l`
 | 6.12 | Verify granules 24-35 positioned at byte offset 130. All granules are verified when decoded | P0 | `aou_dp_random_test.dp_dir-r2l`
@@ -159,7 +159,7 @@
 | 6.15 | Verify `msg_start[47:0]` for multiple messages | P0 | `aou_dp_random_test.dp_dir-r2l`
 | 6.16 | Verify FDID correctly set in protocol header bytes 62-65 | P1 | dropped: No FDID field exists in this RTL; the UCIe D2D adapter owns it.
 | 6.17 | Verify `msg_credit` correctly set in bytes 128-129 | P0 | merged into 3.2
-| 6.18 | Pack exactly 48 granules (flit completely full) | P1 | `aou_pack_test.pk-full`, `aou_pack_test.pk-wresp48`
+| 6.18 | Pack exactly 48 granules (flit completely full) | P1 | `aou_pack_test.pk-full`, `aou_pack_test.pk-full.1x512-sp64-nxt`, `aou_pack_test.pk-wresp48`
 | 6.19 | Pack messages from different RPs in same flit | P1 | `aou_pack_test.pk-rp`
 | 6.20 | Verify rules for activation messages | P1 | `aou_act_after_deact_test`, `aou_act_after_deact_test.credit_manage-1.busy-1`, `aou_pack_test.pk-act`
 | 6.21 | Verify rules for misc messages | P1 | `aou_pack_test.pk-act`
@@ -183,7 +183,7 @@
 | 7.13 | Access at address 0x0. AOU has no memory map | P1 | `aou_addr_test.dp_addr-zero`
 | 7.14 | Access at maximum address (configured range - 1). AOU has no memory map | P1 | `aou_addr_test.dp_addr-top`
 | 7.15 | Sequential access across entire configured address space. AOU has no memory map | P2 | `aou_addr_test.dp_addr-sweep`
-| 7.16 | Random data with random addresses | P1 | `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.dp_profile-stall`, `aou_dp_random_test.dp_dir-r2l`, `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-ar`, `aou_stress_test.st_bp-aw`, `aou_stress_test.st_bp-b`, `aou_stress_test.st_bp-fdi`, `aou_stress_test.st_bp-r`, `aou_stress_test.st_bp-w`, `aou_stress_test.st_pol-max.st_bp-none`, `aou_stress_test.st_pol-min.st_crd-hdr`, `aou_stress_test.st_pol-random.st_crd-slow`, `aou_stress_test.st_pol-sparse.st_crd-mixed`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_deact_test`, `aou_t1_slice_test`
+| 7.16 | Random data with random addresses | P1 | `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_dp_random_test.dp_dir-both.dp_profile-stall`, `aou_dp_random_test.dp_dir-r2l`, `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-all.1x512-sp64-nxt`, `aou_stress_test.st_bp-ar`, `aou_stress_test.st_bp-aw`, `aou_stress_test.st_bp-b`, `aou_stress_test.st_bp-fdi`, `aou_stress_test.st_bp-r`, `aou_stress_test.st_bp-w`, `aou_stress_test.st_pol-max.st_bp-none`, `aou_stress_test.st_pol-min.st_crd-hdr`, `aou_stress_test.st_pol-random.st_crd-slow`, `aou_stress_test.st_pol-sparse.st_crd-mixed`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_deact_test`, `aou_t1_slice_test`
 |===
 ==== 2.8 Outstanding Transaction Tests
 [cols="1,5,1,4",options="header"]
@@ -197,8 +197,8 @@
 | 8.6 | Send maximum outstanding reads per credit limit | P1 | `aou_zero_credit_test.credit-rreq.limit-12`, `aou_zero_credit_test.credit-rreq.limit-4`
 | 8.7 | 2 outstanding writes + 2 outstanding reads | P0 | `aou_dp_outstanding_test.dp_batch-4.dp_wr_pct-50`, `aou_t1_slice_test`
 | 8.8 | 4 outstanding writes + 4 outstanding reads | P1 | `aou_dp_outstanding_test.dp_batch-4.dp_wr_pct-50`
-| 8.9 | Verify BRESP ID matches AWID | P0 | `aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-100`, `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-r2l`, `aou_t1_slice_test`
-| 8.10 | Verify RID matches ARID | P0 | `aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-0`, `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-r2l`, `aou_t1_slice_test`
+| 8.9 | Verify BRESP ID matches AWID | P0 | `aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-100`, `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_dp_random_test.dp_dir-r2l`, `aou_t1_slice_test`
+| 8.10 | Verify RID matches ARID | P0 | `aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-0`, `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_dp_random_test.dp_dir-r2l`, `aou_t1_slice_test`
 | 8.11 | Write responses return in different order (different IDs) | P1 | `aou_dp_outstanding_test.dp_batch-16.dp_ids-unique`, `aou_t1_slice_test`
 | 8.12 | Read data returns in different order (different IDs) | P1 | `aou_dp_outstanding_test.dp_batch-16.dp_ids-unique`, `aou_t1_slice_test`
 | 8.13 | Multiple transactions with same ID (must complete in order) | P1 | `aou_dp_outstanding_test.dp_batch-16.dp_ids-same`, `aou_t1_slice_test`
@@ -238,7 +238,7 @@
 | Item | Requirement | Priority | Scenarios
 | 10.1 | Sustained back-to-back writes at full rate (S1): each link delivers at least 97% of the d2d_model bytes/cycle for the CONFIG, active PHY and traffic, never above it, with the model's message mix | P1 | `aou_perf_test.perf_scn-S1.1x256-sp32`, `aou_perf_test.perf_scn-S1.1x512-sp64`, `aou_perf_test.perf_scn-S1.3x512-sp64`, `aou_perf_test.perf_scn-S1.4x512-sp64`, `aou_perf_test.perf_scn-S1.4xmix2144-sp64`, `aou_perf_test.perf_scn-S1.4xmix4211-sp128`, `aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128`, `aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128`
 | 10.2 | Sustained back-to-back reads at full rate (S1): each link delivers at least 97% of the d2d_model bytes/cycle for the CONFIG, active PHY and traffic, never above it, with the model's message mix | P1 | `aou_perf_test.perf_scn-S1.1x256-sp32`, `aou_perf_test.perf_scn-S1.1x512-sp64`, `aou_perf_test.perf_scn-S1.3x512-sp64`, `aou_perf_test.perf_scn-S1.4x512-sp64`, `aou_perf_test.perf_scn-S1.4xmix2144-sp64`, `aou_perf_test.perf_scn-S1.4xmix4211-sp128`, `aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128`, `aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128`
-| 10.3 | Simultaneous max-rate reads and writes (S1, 50/50): each link delivers at least 97% of the d2d_model bytes/cycle, never above it, with the model's message mix | P1 | `aou_dp_random_test.dp_dir-both`, `aou_perf_test.perf_scn-S1.1x256-sp32`, `aou_perf_test.perf_scn-S1.1x512-sp64`, `aou_perf_test.perf_scn-S1.3x512-sp64`, `aou_perf_test.perf_scn-S1.4x512-sp64`, `aou_perf_test.perf_scn-S1.4xmix2144-sp64`, `aou_perf_test.perf_scn-S1.4xmix4211-sp128`, `aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128`, `aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128`
+| 10.3 | Simultaneous max-rate reads and writes (S1, 50/50): each link delivers at least 97% of the d2d_model bytes/cycle, never above it, with the model's message mix | P1 | `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_perf_test.perf_scn-S1.1x256-sp32`, `aou_perf_test.perf_scn-S1.1x512-sp64`, `aou_perf_test.perf_scn-S1.3x512-sp64`, `aou_perf_test.perf_scn-S1.4x512-sp64`, `aou_perf_test.perf_scn-S1.4xmix2144-sp64`, `aou_perf_test.perf_scn-S1.4xmix4211-sp128`, `aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128`, `aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128`
 | 10.4 | Measure single write request-to-response latency | P1 | `aou_perf_test.perf_mode-lat.1x256-sp32`, `aou_perf_test.perf_mode-lat.1x512-sp64`, `aou_perf_test.perf_mode-lat.2x512-tp32_64`, `aou_perf_test.perf_mode-lat.2xmix-tp64_128`, `aou_perf_test.perf_mode-lat.3x512-sp64`, `aou_perf_test.perf_mode-lat.4x512-sp64`, `aou_perf_test.perf_mode-lat.4xmix2144-sp64`, `aou_perf_test.perf_mode-lat.4xmix4211-sp128`
 | 10.5 | Measure single read request-to-data latency | P1 | `aou_perf_test.perf_mode-lat.1x256-sp32`, `aou_perf_test.perf_mode-lat.1x512-sp64`, `aou_perf_test.perf_mode-lat.2x512-tp32_64`, `aou_perf_test.perf_mode-lat.2xmix-tp64_128`, `aou_perf_test.perf_mode-lat.3x512-sp64`, `aou_perf_test.perf_mode-lat.4x512-sp64`, `aou_perf_test.perf_mode-lat.4xmix2144-sp64`, `aou_perf_test.perf_mode-lat.4xmix4211-sp128`
 | 10.6 | Measure credit consumption to credit return delay | P2 | `aou_credit_return_test.ret-delayed.overgrant-1`, `aou_perf_test.perf_scn-S1.1x256-sp32`, `aou_perf_test.perf_scn-S1.1x512-sp64`, `aou_perf_test.perf_scn-S1.3x512-sp64`, `aou_perf_test.perf_scn-S1.4x512-sp64`, `aou_perf_test.perf_scn-S1.4xmix2144-sp64`, `aou_perf_test.perf_scn-S1.4xmix4211-sp128`, `aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128`, `aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64`, `aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128`
@@ -250,7 +250,7 @@
 | 10.12 | Burst-length sweep (S4) 1 to 256 beats through the DUT splitter, AxSIZE narrowed to stay within 4 KB: at least 97% of the d2d_model bytes/cycle per link, the split visible in the message mix | P2 | `aou_perf_test.perf_scn-S4`, `aou_perf_test.perf_scn-S4.active_phy-0`, `aou_perf_test.perf_scn-S4.active_phy-1` (blocked)
 | 10.13 | All RPs at once (S5) with 0, 50 and 100% of the transactions on the widest RP: at least 97% of the d2d_model bytes/cycle per link | P2 | `aou_perf_test.perf_scn-S5.3x512-sp64`, `aou_perf_test.perf_scn-S5.4x512-sp64`, `aou_perf_test.perf_scn-S5.4xmix4211-sp128`, `aou_perf_test.perf_scn-S5.active_phy-0`, `aou_perf_test.perf_scn-S5.active_phy-1`
 | 10.14 | Numeric performance bounds: latency and efficiency per FDI width from the PPA tables | P2 | _none_
-| 10.15 | Back-pressure on every AXI channel and on FDI trdy: throughput and correctness under stall | P2 | `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-fdi`
+| 10.15 | Back-pressure on every AXI channel and on FDI trdy: throughput and correctness under stall | P2 | `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-all.1x512-sp64-nxt`, `aou_stress_test.st_bp-fdi`
 |===
 ==== 2.11 Corner Case Tests
 [cols="1,5,1,4",options="header"]
@@ -392,7 +392,7 @@
 | 16.14 | Change `early_bresp_en` when `write_resp_done=1` | P2 | `aou_early_bresp_test.early_en-0.early_toggle-1.dp_buf_pct-50`, `aou_early_bresp_test.early_en-1.early_toggle-1.dp_buf_pct-50`, `aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50`
 | 16.15 | Different `early_bresp_en` per RP | P2 | `aou_early_bresp_test.early_en-per_rp.dp_buf_pct-50`, `aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50`
 | 16.16 | B response presented zero cycles after the AW/W handshakes complete (issue 64) | P1 | `aou_dp_b_zero_test`
-| 16.17 | O_PENDING_CNT_OVER on a write at the early-response limit | P2 | `aou_early_bresp_test.early_en-1.early_full-1.early_over-1`
+| 16.17 | Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked) | P2 | `aou_early_bresp_test.early_en-1.early_full-1.early_over-1`
 |===
 ==== 2.17 AXI Aggregator Tests
 [cols="1,5,1,4",options="header"]

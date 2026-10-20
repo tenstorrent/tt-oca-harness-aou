@@ -9,44 +9,45 @@ Don't override. Generated from: aou_core
 
 - Absolute Address: 0x0
 - Base Offset: 0x0
-- Size: 0x80
+- Size: 0x84
 
 <p>Register map for AOU_CORE_SFR (APB slave). Addresses match RTL localparams. Fields with sw=r and no reset are driven by module inputs (I_*), connected in AOU_CORE.sv; stored fields (flops) have the stated reset.</p>
 
-|Offset|         Identifier        |              Name             |
-|------|---------------------------|-------------------------------|
-| 0x00 |         ip_version        |           IP Version          |
-| 0x04 |          aou_con0         |         AOU Control 0         |
-| 0x08 |          aou_init         |            AOU Init           |
-| 0x0C |     aou_interrupt_mask    |       AOU Interrupt Mask      |
-| 0x10 |        lp_linkreset       |          LP Linkreset         |
-| 0x14 |          dest_rp          |         Destination RP        |
-| 0x18 |        prior_rp_axi       |        Priority RP AXI        |
-| 0x1C |        prior_timer        |         Priority Timer        |
-| 0x20 |      axi_split_tr_rp0     |   AXI Split Transaction RP0   |
-| 0x24 |       error_info_rp0      |         Error Info RP0        |
-| 0x28 |  write_early_response_rp0 |    Write Early Response RP0   |
-| 0x2C |    axi_error_info0_rp0    |      AXI Error Info0 RP0      |
-| 0x30 |    axi_error_info1_rp0    |      AXI Error Info1 RP0      |
-| 0x34 |axi_slv_id_mismatch_err_rp0|AXI Slave ID Mismatch Error RP0|
-| 0x38 |      axi_split_tr_rp1     |   AXI Split Transaction RP1   |
-| 0x3C |       error_info_rp1      |         Error Info RP1        |
-| 0x40 |  write_early_response_rp1 |    Write Early Response RP1   |
-| 0x44 |    axi_error_info0_rp1    |      AXI Error Info0 RP1      |
-| 0x48 |    axi_error_info1_rp1    |      AXI Error Info1 RP1      |
-| 0x4C |axi_slv_id_mismatch_err_rp1|AXI Slave ID Mismatch Error RP1|
-| 0x50 |      axi_split_tr_rp2     |   AXI Split Transaction RP2   |
-| 0x54 |       error_info_rp2      |         Error Info RP2        |
-| 0x58 |  write_early_response_rp2 |    Write Early Response RP2   |
-| 0x5C |    axi_error_info0_rp2    |      AXI Error Info0 RP2      |
-| 0x60 |    axi_error_info1_rp2    |      AXI Error Info1 RP2      |
-| 0x64 |axi_slv_id_mismatch_err_rp2|AXI Slave ID Mismatch Error RP2|
-| 0x68 |      axi_split_tr_rp3     |   AXI Split Transaction RP3   |
-| 0x6C |       error_info_rp3      |         Error Info RP3        |
-| 0x70 |  write_early_response_rp3 |    Write Early Response RP3   |
-| 0x74 |    axi_error_info0_rp3    |      AXI Error Info0 RP3      |
-| 0x78 |    axi_error_info1_rp3    |      AXI Error Info1 RP3      |
-| 0x7C |axi_slv_id_mismatch_err_rp3|AXI Slave ID Mismatch Error RP3|
+|Offset|         Identifier         |              Name              |
+|------|----------------------------|--------------------------------|
+| 0x00 |         ip_version         |           IP Version           |
+| 0x04 |          aou_con0          |          AOU Control 0         |
+| 0x08 |          aou_init          |            AOU Init            |
+| 0x0C |     aou_interrupt_mask     |       AOU Interrupt Mask       |
+| 0x10 |        lp_linkreset        |          LP Linkreset          |
+| 0x14 |           dest_rp          |         Destination RP         |
+| 0x18 |        prior_rp_axi        |         Priority RP AXI        |
+| 0x1C |         prior_timer        |         Priority Timer         |
+| 0x20 |      axi_split_tr_rp0      |    AXI Split Transaction RP0   |
+| 0x24 |       error_info_rp0       |         Error Info RP0         |
+| 0x28 |  write_early_response_rp0  |    Write Early Response RP0    |
+| 0x2C |     axi_error_info0_rp0    |       AXI Error Info0 RP0      |
+| 0x30 |     axi_error_info1_rp0    |       AXI Error Info1 RP0      |
+| 0x34 | axi_slv_id_mismatch_err_rp0| AXI Slave ID Mismatch Error RP0|
+| 0x38 |      axi_split_tr_rp1      |    AXI Split Transaction RP1   |
+| 0x3C |       error_info_rp1       |         Error Info RP1         |
+| 0x40 |  write_early_response_rp1  |    Write Early Response RP1    |
+| 0x44 |     axi_error_info0_rp1    |       AXI Error Info0 RP1      |
+| 0x48 |     axi_error_info1_rp1    |       AXI Error Info1 RP1      |
+| 0x4C | axi_slv_id_mismatch_err_rp1| AXI Slave ID Mismatch Error RP1|
+| 0x50 |      axi_split_tr_rp2      |    AXI Split Transaction RP2   |
+| 0x54 |       error_info_rp2       |         Error Info RP2         |
+| 0x58 |  write_early_response_rp2  |    Write Early Response RP2    |
+| 0x5C |     axi_error_info0_rp2    |       AXI Error Info0 RP2      |
+| 0x60 |     axi_error_info1_rp2    |       AXI Error Info1 RP2      |
+| 0x64 | axi_slv_id_mismatch_err_rp2| AXI Slave ID Mismatch Error RP2|
+| 0x68 |      axi_split_tr_rp3      |    AXI Split Transaction RP3   |
+| 0x6C |       error_info_rp3       |         Error Info RP3         |
+| 0x70 |  write_early_response_rp3  |    Write Early Response RP3    |
+| 0x74 |     axi_error_info0_rp3    |       AXI Error Info0 RP3      |
+| 0x78 |     axi_error_info1_rp3    |       AXI Error Info1 RP3      |
+| 0x7C | axi_slv_id_mismatch_err_rp3| AXI Slave ID Mismatch Error RP3|
+| 0x80 |write_early_response_wdt_ctl|Write Early Response WDT Control|
 
 ### ip_version register
 
@@ -223,17 +224,18 @@ Don't override. Generated from: aou_core
 
 <p>Interrupt mask bits for linkreset and early response errors. Write 1 to mask the corresponding interrupt source.</p>
 
-|Bits|               Identifier               |Access|Reset|Name|
-|----|----------------------------------------|------|-----|----|
-| 1:0|              reserved_1_0              |   r  | 0x0 |  — |
-|  2 |        int_si0_id_mismatch_mask        |  rw  | 0x0 |  — |
-|  3 |        int_mi0_id_mismatch_mask        |  rw  | 0x0 |  — |
-|  4 |           int_early_resp_mask          |  rw  | 0x0 |  — |
-|  5 |int_req_linkreset_msgcredit_timeout_mask|  rw  | 0x0 |  — |
-|  6 |  int_req_linkreset_invalid_actmsg_mask |  rw  | 0x0 |  — |
-|  7 |    int_req_linkreset_deact_ack_mask    |  rw  | 0x0 |  — |
-|  8 |     int_req_linkreset_act_ack_mask     |  rw  | 0x0 |  — |
-|31:9|              reserved_31_9             |   r  | 0x0 |  — |
+| Bits|               Identifier               |Access|Reset|Name|
+|-----|----------------------------------------|------|-----|----|
+| 1:0 |              reserved_1_0              |   r  | 0x0 |  — |
+|  2  |        int_si0_id_mismatch_mask        |  rw  | 0x0 |  — |
+|  3  |        int_mi0_id_mismatch_mask        |  rw  | 0x0 |  — |
+|  4  |           int_early_resp_mask          |  rw  | 0x0 |  — |
+|  5  |int_req_linkreset_msgcredit_timeout_mask|  rw  | 0x0 |  — |
+|  6  |  int_req_linkreset_invalid_actmsg_mask |  rw  | 0x0 |  — |
+|  7  |    int_req_linkreset_deact_ack_mask    |  rw  | 0x0 |  — |
+|  8  |     int_req_linkreset_act_ack_mask     |  rw  | 0x0 |  — |
+|  9  |           int_early_wdt_mask           |  rw  | 0x0 |  — |
+|31:10|             reserved_31_10             |   r  | 0x0 |  — |
 
 #### int_si0_id_mismatch_mask field
 
@@ -262,6 +264,10 @@ Don't override. Generated from: aou_core
 #### int_req_linkreset_act_ack_mask field
 
 <p>Mask bit for activation ACK timeout link reset interrupt.</p>
+
+#### int_early_wdt_mask field
+
+<p>Mask bit for the early-response write-transaction watchdog interrupt (INT_EARLY_WDT_ERR).</p>
 
 ### lp_linkreset register
 
@@ -478,7 +484,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x28
 - Size: 0x4
 
-<p>Write response done/error status and early BRESP enable for RP0.</p>
+<p>Write response done/error status, early BRESP enable and write-transaction watchdog control for RP0.</p>
 
 | Bits|       Identifier       |  Access |Reset|Name|
 |-----|------------------------|---------|-----|----|
@@ -487,7 +493,10 @@ Don't override. Generated from: aou_core
 |12:11|write_resp_err_type_info|    r    |  —  |  — |
 |  13 |     write_resp_err     |rw, woclr| 0x0 |  — |
 |  14 |     write_resp_done    |    r    |  —  |  — |
-|31:15|     reserved_31_15     |    r    | 0x0 |  — |
+|  15 |     early_always_en    |    rw   | 0x0 |  — |
+|  16 |         wdt_en         |    rw   | 0x0 |  — |
+|  17 |  wdt_trans_timeout_err |rw, woclr| 0x0 |  — |
+|31:18|     reserved_31_18     |    r    | 0x0 |  — |
 
 #### early_bresp_en field
 
@@ -508,6 +517,18 @@ Don't override. Generated from: aou_core
 #### write_resp_done field
 
 <p>Write response completion status for RP0. Read-only, driven by HW.</p>
+
+#### early_always_en field
+
+<p>Return the early write response for every non-exclusive write on RP0, regardless of AWCACHE[0] (Bufferable). Exclusive writes (AWLOCK = 1) never receive an early response.</p>
+
+#### wdt_en field
+
+<p>Enable the early-response write-transaction watchdog for RP0.</p>
+
+#### wdt_trans_timeout_err field
+
+<p>Write-transaction watchdog expired for RP0: with wdt_en set, no AW or B handshake for wdt_threshold cycles while writes were outstanding (AW accepted, B from the remote die not yet received). Set by HW, write 1 to clear. Raises INT_EARLY_WDT_ERR unless masked. The watchdog fires once per reset: after a timeout it does not re-arm until I_RESETN or AOU_SW_RESET.</p>
 
 ### axi_error_info0_rp0 register
 
@@ -633,7 +654,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x40
 - Size: 0x4
 
-<p>Write response done/error status and early BRESP enable for RP1.</p>
+<p>Write response done/error status, early BRESP enable and write-transaction watchdog control for RP1.</p>
 
 | Bits|       Identifier       |  Access |Reset|Name|
 |-----|------------------------|---------|-----|----|
@@ -642,7 +663,10 @@ Don't override. Generated from: aou_core
 |12:11|write_resp_err_type_info|    r    |  —  |  — |
 |  13 |     write_resp_err     |rw, woclr| 0x0 |  — |
 |  14 |     write_resp_done    |    r    |  —  |  — |
-|31:15|     reserved_31_15     |    r    | 0x0 |  — |
+|  15 |     early_always_en    |    rw   | 0x0 |  — |
+|  16 |         wdt_en         |    rw   | 0x0 |  — |
+|  17 |  wdt_trans_timeout_err |rw, woclr| 0x0 |  — |
+|31:18|     reserved_31_18     |    r    | 0x0 |  — |
 
 #### early_bresp_en field
 
@@ -663,6 +687,18 @@ Don't override. Generated from: aou_core
 #### write_resp_done field
 
 <p>Write response completion status for RP1. Read-only, driven by HW.</p>
+
+#### early_always_en field
+
+<p>Return the early write response for every non-exclusive write on RP1, regardless of AWCACHE[0] (Bufferable). Exclusive writes (AWLOCK = 1) never receive an early response.</p>
+
+#### wdt_en field
+
+<p>Enable the early-response write-transaction watchdog for RP1.</p>
+
+#### wdt_trans_timeout_err field
+
+<p>Write-transaction watchdog expired for RP1: with wdt_en set, no AW or B handshake for wdt_threshold cycles while writes were outstanding (AW accepted, B from the remote die not yet received). Set by HW, write 1 to clear. Raises INT_EARLY_WDT_ERR unless masked. The watchdog fires once per reset: after a timeout it does not re-arm until I_RESETN or AOU_SW_RESET.</p>
 
 ### axi_error_info0_rp1 register
 
@@ -788,7 +824,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x58
 - Size: 0x4
 
-<p>Write response done/error status and early BRESP enable for RP2.</p>
+<p>Write response done/error status, early BRESP enable and write-transaction watchdog control for RP2.</p>
 
 | Bits|       Identifier       |  Access |Reset|Name|
 |-----|------------------------|---------|-----|----|
@@ -797,7 +833,10 @@ Don't override. Generated from: aou_core
 |12:11|write_resp_err_type_info|    r    |  —  |  — |
 |  13 |     write_resp_err     |rw, woclr| 0x0 |  — |
 |  14 |     write_resp_done    |    r    |  —  |  — |
-|31:15|     reserved_31_15     |    r    | 0x0 |  — |
+|  15 |     early_always_en    |    rw   | 0x0 |  — |
+|  16 |         wdt_en         |    rw   | 0x0 |  — |
+|  17 |  wdt_trans_timeout_err |rw, woclr| 0x0 |  — |
+|31:18|     reserved_31_18     |    r    | 0x0 |  — |
 
 #### early_bresp_en field
 
@@ -818,6 +857,18 @@ Don't override. Generated from: aou_core
 #### write_resp_done field
 
 <p>Write response completion status for RP2. Read-only, driven by HW.</p>
+
+#### early_always_en field
+
+<p>Return the early write response for every non-exclusive write on RP2, regardless of AWCACHE[0] (Bufferable). Exclusive writes (AWLOCK = 1) never receive an early response.</p>
+
+#### wdt_en field
+
+<p>Enable the early-response write-transaction watchdog for RP2.</p>
+
+#### wdt_trans_timeout_err field
+
+<p>Write-transaction watchdog expired for RP2: with wdt_en set, no AW or B handshake for wdt_threshold cycles while writes were outstanding (AW accepted, B from the remote die not yet received). Set by HW, write 1 to clear. Raises INT_EARLY_WDT_ERR unless masked. The watchdog fires once per reset: after a timeout it does not re-arm until I_RESETN or AOU_SW_RESET.</p>
 
 ### axi_error_info0_rp2 register
 
@@ -943,7 +994,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x70
 - Size: 0x4
 
-<p>Write response done/error status and early BRESP enable for RP3.</p>
+<p>Write response done/error status, early BRESP enable and write-transaction watchdog control for RP3.</p>
 
 | Bits|       Identifier       |  Access |Reset|Name|
 |-----|------------------------|---------|-----|----|
@@ -952,7 +1003,10 @@ Don't override. Generated from: aou_core
 |12:11|write_resp_err_type_info|    r    |  —  |  — |
 |  13 |     write_resp_err     |rw, woclr| 0x0 |  — |
 |  14 |     write_resp_done    |    r    |  —  |  — |
-|31:15|     reserved_31_15     |    r    | 0x0 |  — |
+|  15 |     early_always_en    |    rw   | 0x0 |  — |
+|  16 |         wdt_en         |    rw   | 0x0 |  — |
+|  17 |  wdt_trans_timeout_err |rw, woclr| 0x0 |  — |
+|31:18|     reserved_31_18     |    r    | 0x0 |  — |
 
 #### early_bresp_en field
 
@@ -973,6 +1027,18 @@ Don't override. Generated from: aou_core
 #### write_resp_done field
 
 <p>Write response completion status for RP3. Read-only, driven by HW.</p>
+
+#### early_always_en field
+
+<p>Return the early write response for every non-exclusive write on RP3, regardless of AWCACHE[0] (Bufferable). Exclusive writes (AWLOCK = 1) never receive an early response.</p>
+
+#### wdt_en field
+
+<p>Enable the early-response write-transaction watchdog for RP3.</p>
+
+#### wdt_trans_timeout_err field
+
+<p>Write-transaction watchdog expired for RP3: with wdt_en set, no AW or B handshake for wdt_threshold cycles while writes were outstanding (AW accepted, B from the remote die not yet received). Set by HW, write 1 to clear. Raises INT_EARLY_WDT_ERR unless masked. The watchdog fires once per reset: after a timeout it does not re-arm until I_RESETN or AOU_SW_RESET.</p>
 
 ### axi_error_info0_rp3 register
 
@@ -1037,3 +1103,19 @@ Don't override. Generated from: aou_core
 #### axi_slv_bid_mismatch_info field
 
 <p>Captured BID when an AXI slave BID mismatch occurs. Clears when error clears.</p>
+
+### write_early_response_wdt_ctl register
+
+- Absolute Address: 0x80
+- Base Offset: 0x80
+- Size: 0x4
+
+<p>Threshold of the early-response write-transaction watchdog, shared by all RPs. Each RP's watchdog is enabled by write_early_response_rpN.wdt_en and reports through write_early_response_rpN.wdt_trans_timeout_err.</p>
+
+|Bits|  Identifier |Access| Reset |Name|
+|----|-------------|------|-------|----|
+|31:0|wdt_threshold|  rw  |0xC3500|  — |
+
+#### wdt_threshold field
+
+<p>Watchdog threshold in I_CLK cycles. The watchdog counts cycles without an AW or B handshake while writes are outstanding (AW accepted, B from the remote die not yet received) and restarts on either handshake; reaching the threshold sets wdt_trans_timeout_err once per reset. Reset 0xC3500 = 800000 cycles (800 us at 1 GHz).</p>

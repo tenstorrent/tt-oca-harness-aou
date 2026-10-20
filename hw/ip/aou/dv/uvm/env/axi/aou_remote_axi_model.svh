@@ -2,8 +2,9 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // L4a: the remote die's AXI subordinate. execute() performs one decoded request
-// on cfg.mem after cfg.timing.b_lat (writes) or r_lat (reads) cycles and returns
-// the response. Calls may overlap (fork one per request): responses come back
+// on cfg.mem (a write on arrival, a read's data after r_lat cycles) and returns
+// the response after cfg.timing.b_lat (writes) or r_lat (reads) cycles.
+// Calls may overlap (fork one per request): responses come back
 // out of order across IDs and in call order within an ID, separately for reads
 // and writes. Every response is also published on ap with local_side = 0.
 // Cycles are counted on cfg.vif's mon_cb; vif is needed only for nonzero latency
@@ -62,12 +63,17 @@ class aou_remote_axi_model extends uvm_component;
         wr_serve[id] = 0;
       end
       ticket = wr_next[id]++;
-      wait_cycles(cfg.timing.b_lat.next());
-      while (wr_serve[id] != ticket) wait_cycles(1);
+      // The write lands on memory, and the exclusive monitor is evaluated, in
+      // arrival order, as a subordinate does once it has accepted AW and W;
+      // only the B is delayed. Performing it after b_lat let two writes to the
+      // same address with different IDs land in random order, so an exclusive
+      // write could win over an ordinary write issued before it.
       if (req.data.size() != req.beats() || req.strb.size() != req.beats())
         `uvm_error(get_type_name(), $sformatf("write request needs %0d data/strb beats: %s",
                                               req.beats(), req.convert2string()))
       else rsp.bresp = cfg.mem.axi_write(rsp, cfg.exclusive_en);
+      wait_cycles(cfg.timing.b_lat.next());
+      while (wr_serve[id] != ticket) wait_cycles(1);
       wr_serve[id]++;
       n_wr++;
     end else begin

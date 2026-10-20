@@ -31,6 +31,8 @@ interface aou_status_if ();
   logic int_si0_id_mismatch;
   logic int_mi0_id_mismatch;
   logic int_early_resp_err;
+  // Early-response write-transaction watchdog (PR #89); observed, not yet checked.
+  logic int_early_wdt_err;
   logic int_activate_start;
   logic int_deactivate_start;
 
@@ -38,14 +40,14 @@ interface aou_status_if ();
     output activate_st_disabled, activate_st_enabled, req_linkreset,
            o_aou_req_linkreset,
            int_si0_id_mismatch, int_mi0_id_mismatch, int_early_resp_err,
-           int_activate_start, int_deactivate_start
+           int_early_wdt_err, int_activate_start, int_deactivate_start
   );
 
   modport mon (
     input activate_st_disabled, activate_st_enabled, req_linkreset,
           o_aou_req_linkreset,
           int_si0_id_mismatch, int_mi0_id_mismatch, int_early_resp_err,
-          int_activate_start, int_deactivate_start
+          int_early_wdt_err, int_activate_start, int_deactivate_start
   );
 
 endinterface

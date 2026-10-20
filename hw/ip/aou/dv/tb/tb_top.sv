@@ -6,7 +6,8 @@
 // T1 top (tb_top, no ports): AOU_TOP as u_dut against layered models. Build
 // configuration comes from defines (aou_sim_cfg.toml targets; Makefile CONFIG): AOU_RP_COUNT, AOU_RP<n>_DATA_W (per RP; default
 // AOU_RP_DATA_W), AOU_FDI_CONFIG, AOU_PEER_MAX_W (AXI_PEER_DIE_MAX_DATA_WD, default
-// 1024), TWO_PHY for the two-PHY FDI configurations, and
+// 1024), AOU_TX_NXT_PACKING (TX_NXT_PACKING_EN, default 0), TWO_PHY for the
+// two-PHY FDI configurations, and
 // AOU_RX_FIFO_ALT for non-default RX FIFO depths with the register slices off
 // (aou_t1_env_pkg::AOU_T1_RX_DEPTH). Every interface is registered in
 // uvm_config_db under scope "*" (docs/ARCHITECTURE.md) by the SV-UVM harness
@@ -39,6 +40,9 @@
 `ifndef AOU_PEER_MAX_W
 `define AOU_PEER_MAX_W 1024
 `endif
+`ifndef AOU_TX_NXT_PACKING
+`define AOU_TX_NXT_PACKING 0
+`endif
 
 module tb_top;
   import uvm_pkg::*;
@@ -58,6 +62,7 @@ module tb_top;
   endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
   localparam int PEER_W     = `AOU_PEER_MAX_W;
+  localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
   localparam int BUS_W      = 1024;
   localparam int AXI_W      = 1024;
   localparam int WD0 = (FDI_CFG == 0 || FDI_CFG == 3) ? 256 : (FDI_CFG == 2) ? 1024 : 512;
@@ -359,20 +364,13 @@ module tb_top;
   assign irq.int_si0_id_mismatch  = status.int_si0_id_mismatch;
   assign irq.int_mi0_id_mismatch  = status.int_mi0_id_mismatch;
   assign irq.int_early_resp_err   = status.int_early_resp_err;
+  assign irq.int_early_wdt_err    = status.int_early_wdt_err;
   assign irq.int_activate_start   = status.int_activate_start;
   assign irq.int_deactivate_start = status.int_deactivate_start;
   assign irq.act_st_disabled      = status.activate_st_disabled;
   assign irq.act_st_enabled       = status.activate_st_enabled;
   assign irq.slv_rid_agg          = u_dut.u_aou_core_top.u_aou_core.O_AXI_SLV_RID_MISMATCH_ERROR;
   assign irq.slv_bid_agg          = u_dut.u_aou_core_top.u_aou_core.O_AXI_SLV_BID_MISMATCH_ERROR;
-  for (genvar r = 0; r < 4; r++) begin : g_pend_over
-    if (r < RP_COUNT) begin : g_on
-      assign irq.pend_over[r] = u_dut.u_aou_core_top.u_aou_core.gen_aou_core_rp[r].u_aou_core_rp
-                                    .u_aou_early_bresp_s_ctrl.O_PENDING_CNT_OVER;
-    end else begin : g_off
-      assign irq.pend_over[r] = 1'b0;
-    end
-  end
 
   AOU_TOP #(
       .RP_COUNT       (RP_COUNT),
@@ -381,7 +379,8 @@ module tb_top;
       .RP1_AXI_DATA_WD(RPW1),
       .RP2_AXI_DATA_WD(RPW2),
       .RP3_AXI_DATA_WD(RPW3),
-      .AXI_PEER_DIE_MAX_DATA_WD(PEER_W)
+      .AXI_PEER_DIE_MAX_DATA_WD(PEER_W),
+      .TX_NXT_PACKING_EN(NXT_PACK)
 `ifdef AOU_RX_FIFO_ALT
       ,
       .RP0_RX_AW_FIFO_DEPTH(aou_t1_env_pkg::AOU_T1_RX_DEPTH[0][0]),
@@ -516,11 +515,10 @@ module tb_top;
       .INT_SI0_ID_MISMATCH   (status.int_si0_id_mismatch),
       .INT_MI0_ID_MISMATCH   (status.int_mi0_id_mismatch),
       .INT_EARLY_RESP_ERR    (status.int_early_resp_err),
+      .INT_EARLY_WDT_ERR     (status.int_early_wdt_err),
       .INT_ACTIVATE_START    (status.int_activate_start),
       .INT_DEACTIVATE_START  (status.int_deactivate_start),
 
-      .I_MST_BUS_CLEANY_COMPLETE(1'b1),
-      .I_SLV_BUS_CLEANY_COMPLETE(1'b1),
       .TIEL_DFT_MODESCAN        (rst.dft_modescan)
   );
 

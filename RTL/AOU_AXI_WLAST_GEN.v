@@ -123,9 +123,6 @@ assign {O_M_AWID,
         O_M_AWPROT,
         O_M_AWQOS} = w_awch_fwd_rs_mdata;
 
-wire   i_s_awvalid_tmp;
-wire   o_s_awready_tmp;
-
 generate
 if (AOU_AXI_WLAST_AWCH_RS_EN == 1) begin
 

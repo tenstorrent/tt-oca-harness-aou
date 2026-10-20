@@ -146,6 +146,13 @@ work_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-p512"
 defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "AOU_PEER_MAX_W=512"]
 
+[targets.1x512-sp64-nxt]
+description = "TX_NXT_PACKING_EN 1: registered TX packer output stage"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-nxt"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x512-sp64-nxt"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "AOU_TX_NXT_PACKING=1"]
+
 [targets.2xmix-sp64-rxf]
 description = "Non-default RX FIFO depths, RX_*_FIFO_RS_EN=0 (3.25)"
 build_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-sp64-rxf"

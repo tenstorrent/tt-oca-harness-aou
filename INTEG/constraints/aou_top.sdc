@@ -288,6 +288,7 @@ set INT_CTRL_OUTPUTS {
     INT_SI0_ID_MISMATCH
     INT_MI0_ID_MISMATCH
     INT_EARLY_RESP_ERR
+    INT_EARLY_WDT_ERR
     INT_ACTIVATE_START
     INT_DEACTIVATE_START
 }
@@ -295,15 +296,11 @@ set INT_CTRL_OUTPUTS {
 set_output_delay -clock clk_core $CORE_COMB_OUTPUT_DELAY [get_ports $INT_CTRL_OUTPUTS]
 
 # ==============================================================================
-# 13. Bus quiescence inputs (combinational)
+# 13. Bus quiescence inputs
+#
+# None: bus quiescence is tracked inside AOU_CORE (AOU_INIT.SLV_TR_COMPLETE /
+# MST_TR_COMPLETE); the former I_*_BUS_CLEANY_COMPLETE inputs were removed.
 # ==============================================================================
-
-set CTRL_INPUTS {
-    I_MST_BUS_CLEANY_COMPLETE
-    I_SLV_BUS_CLEANY_COMPLETE
-}
-
-set_input_delay -clock clk_core $CORE_COMB_INPUT_DELAY [get_ports $CTRL_INPUTS]
 
 # ==============================================================================
 # 14. FDI bringup controller -- PL/LP handshake

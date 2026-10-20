@@ -187,17 +187,18 @@ import packet_def_pkg::*;
 
     input  logic    [3:0][1:0]                              I_RP_DEST_RP,
 
-    input  logic    [3:0]                                   I_PRIOR_RP_AXI_AXI_QOS_TO_NP    ,    
-    input  logic    [3:0]                                   I_PRIOR_RP_AXI_AXI_QOS_TO_HP    ,    
-    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP3_PRIOR        ,    
-    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP2_PRIOR        ,    
-    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP1_PRIOR        ,    
-    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP0_PRIOR        ,    
-    input  logic    [1:0]                                   I_PRIOR_RP_AXI_ARB_MODE         ,    
-    input  logic    [15:0]                                  I_PRIOR_TIMER_TIMER_RESOLUTION  ,    
-    input  logic    [15:0]                                  I_PRIOR_TIMER_TIMER_THRESHOLD   ,
+    input  logic    [3:0]                                   I_PRIOR_RP_AXI_AXI_QOS_TO_NP,    
+    input  logic    [3:0]                                   I_PRIOR_RP_AXI_AXI_QOS_TO_HP,    
+    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP3_PRIOR,    
+    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP2_PRIOR,    
+    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP1_PRIOR,    
+    input  logic    [1:0]                                   I_PRIOR_RP_AXI_RP0_PRIOR,    
+    input  logic    [1:0]                                   I_PRIOR_RP_AXI_ARB_MODE,    
+    input  logic    [15:0]                                  I_PRIOR_TIMER_TIMER_RESOLUTION,    
+    input  logic    [15:0]                                  I_PRIOR_TIMER_TIMER_THRESHOLD,
     
-    input  logic                                            I_AOU_WRITEFULL_MSGTYPE_EN
+    input  logic                                            I_AOU_WRITEFULL_MSGTYPE_EN,
+    output logic    [RP_CNT-1:0]                            O_AOU_TX_B_FIFO_SVALID
 
 );
 
@@ -961,6 +962,7 @@ u_axi_master_b_fifo(
     .O_EMPTY_CNT                    (),
     .O_FULL_CNT                     ()
 );
+assign O_AOU_TX_B_FIFO_SVALID = w_granted_fifo_bvalid;
 
 assign w_writeresp_message_byteswap      = {MSG_WR_RESP, w_aou_tx_m_axi_b_rp, 2'b0, 4'b0, w_aou_writeresp_prof, w_aou_tx_m_axi_bid, w_aou_tx_m_axi_bresp, 4'b0};
 

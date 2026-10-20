@@ -318,7 +318,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 405
+expected_count = 411
 tests = [
   "aou_sanity_test",
   "aou_t1_slice_test",
@@ -672,6 +672,12 @@ tests = [
   "aou_dp_random_test.dp_dir-both.1x512-sp64-p512",
   "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512",
   "aou_dw_test.remote_bytes-32.1x512-sp64-p512",
+  "aou_sanity_test.1x512-sp64-nxt",
+  "aou_dp_random_test.dp_dir-both.1x512-sp64-nxt",
+  "aou_pack_test.pk-crossflit.1x512-sp64-nxt",
+  "aou_pack_test.pk-mixed.1x512-sp64-nxt",
+  "aou_pack_test.pk-full.1x512-sp64-nxt",
+  "aou_stress_test.st_bp-all.1x512-sp64-nxt",
   "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.remote_rp_count-2",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1",
   "aou_mrp_test.remote_rp_count-4",

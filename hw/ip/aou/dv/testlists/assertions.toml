@@ -217,8 +217,6 @@ seed = 1
 tags = ["assertions"]
 run_modes = ["assertions"]
 args = ["+rtl_asserts=1"]
-expect_fail = "BUGS/025 (expected_fail.yaml)"
-expect_fail_match = "AXI-S02: remote->local"
 
 [[tests]]
 name = "aou_aggregator_test.agg_en-1.dp_size-5.agg_need-32_128.rtl_asserts-1"

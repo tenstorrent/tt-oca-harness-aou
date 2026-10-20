@@ -1014,66 +1014,6 @@
   check: 'AXI-S04: remote->local beat 0 lane 0 (addr 50000'
   note: reads within the credit come back with the data of the overflowing reads' addresses
 
-# BUGS/025: the 1024-to-256-bit downsizer misplaces AWSIZE=6 writes that start
-# unaligned in the upper half of their 64-byte container. aou_dw_down1024_test
-# sends 1024-bit remote traffic only to the 256-bit RPs, so these checks can
-# only come from that path; reads of the corrupted bytes and the final memory
-# compare follow from the bad writes.
-- test: aou_dw_down1024_test
-  bug: BUGS/025
-  check: 'AXI-S02: remote->local'
-  note: remote AWSIZE=6 write, unaligned in the upper 32 bytes, lands one 32-byte beat late
-
-- test: aou_dw_down1024_test
-  bug: BUGS/025
-  check: 'AXI-S04: remote->local'
-  seed_dependent: true
-  note: a read-back of bytes a BUGS/025 write corrupted
-
-- test: aou_dw_down1024_test
-  bug: BUGS/025
-  check: 'AXI-S05: local memory'
-  seed_dependent: true
-  note: end-of-test memory compare of the same bytes
-
-- test: aou_dw_down1024_test
-  bug: BUGS/025
-  check: 'AXI-R10: AW INCR burst crosses 4KB: WR rp'
-  seed_dependent: true
-  note: the extra 32-byte beat crosses 4KB when the remote write ends at a 4KB boundary
-
-# The same BUGS/025 conversion in aou_pack_test +pk=crossflit +remote_bytes=128, on
-# builds with a 256-bit RP (4xmix4211-sp128 RP2/RP3, 4xmix2144-sp64 RP1, 1x256-sp32).
-# Other RPs and remote widths share the test, so the bug-specific check is the
-# corrupted write itself: a remote AWSIZE=6 write starting in the upper half of its
-# 64-byte container.
-- test: aou_pack_test
-  bug: BUGS/025
-  check_re: 'AXI-S02: remote->local .* WR rp\d remote id=\w+ addr=[0-9a-f]*[2367abef][0-9a-f] len=\d+ size=6 '
-  seed_dependent: true
-  note: remote AWSIZE=6 write, unaligned in the upper 32 bytes, lands one 32-byte beat late
-
-- test: aou_pack_test
-  bug: BUGS/025
-  check: 'AXI-S04: remote->local'
-  requires: BUGS/025
-  seed_dependent: true
-  note: a read-back of bytes a BUGS/025 write corrupted
-
-- test: aou_pack_test
-  bug: BUGS/025
-  check: 'AXI-S05: local memory'
-  requires: BUGS/025
-  seed_dependent: true
-  note: end-of-test memory compare of the same bytes
-
-- test: aou_pack_test
-  bug: BUGS/025
-  check: 'AXI-R10: AW INCR burst crosses 4KB: WR rp'
-  requires: BUGS/025
-  seed_dependent: true
-  note: the extra 32-byte beat crosses 4KB when the remote write ends at a 4KB boundary
-
 # BUGS/033 in aou_pack_test +pk=act (CREDIT_MANAGE=0): a MsgCredit in the flit of the
 # DUT's DeactivateAck.
 - test: aou_pack_test
@@ -1892,6 +1832,14 @@
     +event=linkerror seed 2 with the BUGS/029 fix: WLAST_GEN WVALID[0] stuck from 411576.5 ns,
     software reset released at 411641.5 ns)
 
+- test: aou_reset_test
+  bug: BUGS/007
+  check: 'T1-L29: RX W beat pending'
+  seed_dependent: true
+  note: >-
+    the same stale remote W beat after AOU_SW_RESET in the reset test (VCS 1x512-sp64
+    reset-sw seed 2 once the bench drives legal AxCACHE only); the rest of the run is BUGS/021
+
 - test: aou_link_event_test
   bug: BUGS/007
   check: 'T1-V02: remote (L3) not ENABLED'
@@ -1974,17 +1922,6 @@
     right on the gate (1x512 bw_rd l2r 0.9704 in the first gated run, passing); not
     seed-dependent on this deterministic bench, but borderline, so it may or may not fire
 
-# BUGS/005: AOU_CORE_RP leaves the early-response O_PENDING_CNT_OVER unconnected, and
-# AOU_EARLY_BRESP_CTRL_AWCACHE raises it only on an AW handshake at the limit, which
-# its own AWREADY gating forbids, so an AW waiting at the limit never raises it.
-# Only +early_over=1 runs check it (plan 16.17); it fires on every such run. The other
-# aou_early_bresp_test runs never reach the check, hence seed_dependent.
-- test: aou_early_bresp_test
-  bug: BUGS/005
-  check_re: 'FEAT-R21: RP\d+: an AW waited \d+ cycles at the early-response limit .* O_PENDING_CNT_OVER never rose'
-  seed_dependent: true
-  note: MAS 3.7.5 says the signal fires on a write attempted at the limit and reaches the interrupt controller
-
 # BUGS/048: with bursts the RP splits, the M port carries more than
 # M_RD_MO_CNT (32) reads outstanding (aou_t1_mo_chk counts M-port bursts). Unsplit traffic stops
 # at 32, so aou_dp_outstanding_test (plan 9.20) has no entry.
@@ -2029,20 +1966,6 @@
   check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
   seed_dependent: true
   note: a narrow RP (2xmix-sp64-rxf RP1, seed 2) splits the remote reads past M_RD_MO_CNT
-
-# Exclusive writes with early responses (aou_attr_test +attr_early=1 only).
-- test: aou_attr_test
-  bug: BUGS/055
-  check: 'DP-R07: local->remote: exclusive BRESP 0 at the requester, the subordinate answered BRESP 1'
-  seed_dependent: true
-  note: a bufferable exclusive write gets the early OKAY instead of the subordinate's EXOKAY
-
-- test: aou_attr_test
-  bug: BUGS/055
-  check: 'AXI-S05: remote memory'
-  requires: BUGS/055
-  seed_dependent: true
-  note: the exclusive data the manager was told failed is in the remote memory
 
 # BUGS/053: with AXI_PEER_DIE_MAX_DATA_WD 512 (config 1x512-sp64-p512 only) the RX
 # FIFOs put data bits in place of {RID, RRESP, RLAST} and shift back-pressured
@@ -2414,14 +2337,6 @@
   requires: BUGS/031
   seed_dependent: true
   note: another RP's B or R on this S port
-
-# BUGS/025: the extra 32-byte beat crosses 4KB (the bench's AXI-R10).
-- test: aou_pack_test
-  bug: BUGS/025
-  check_re: '\[AXI4PC\] \S+\.u_m_axi4pc\.\S+: AXI4_ERRM_AWADDR_BOUNDARY:'
-  requires: BUGS/025
-  seed_dependent: true
-  note: M-port INCR write across 4KB from the downsizer
 
 # BUGS/021, BUGS/024: after a link-event recovery the checker is back on once the port is
 # idle, and the cut bursts or the orphan-R deadlock leave later transactions open at the

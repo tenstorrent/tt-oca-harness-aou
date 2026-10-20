@@ -205,7 +205,7 @@ if(I_DATA_WD==256) begin
             src_lane = (w_cur_addr >> 0) & ((1<< (I_BYTES-0))-1);
             if(SUPPORT_AWSIZE_0) begin
             w_modified_wdata_sdata[(dst_lane*8) +: 8] = I_S_WDATA[(src_lane*8) +: 8];
-            w_modified_wstrb_sdata[(dst_lane*1) +: 1] = I_S_WSTRB[(src_lane*1) +: 1];
+            w_modified_wstrb_sdata[(dst_lane[O_BYTES-1:0]*1) +: 1] = I_S_WSTRB[(src_lane[I_BYTES-1:0]*1) +: 1];
             end
         end
         1: begin
@@ -267,7 +267,7 @@ end else if (I_DATA_WD==512) begin
             src_lane = (w_cur_addr >> 0) & ((1<< (I_BYTES-0))-1);
             if(SUPPORT_AWSIZE_0) begin
             w_modified_wdata_sdata[(dst_lane*8) +: 8] = I_S_WDATA[(src_lane*8) +: 8];
-            w_modified_wstrb_sdata[(dst_lane*1) +: 1] = I_S_WSTRB[(src_lane*1) +: 1];
+            w_modified_wstrb_sdata[(dst_lane[O_BYTES-1:0]*1) +: 1] = I_S_WSTRB[(src_lane[I_BYTES-1:0]*1) +: 1];
             end
         end
         1: begin
@@ -337,7 +337,7 @@ end else if (I_DATA_WD==1024)begin
             src_lane = (w_cur_addr >> 0) & ((1<< (I_BYTES-0))-1);
             if(SUPPORT_AWSIZE_0) begin
             w_modified_wdata_sdata[(dst_lane*8) +: 8] = I_S_WDATA[(src_lane*8) +: 8];
-            w_modified_wstrb_sdata[(dst_lane*1) +: 1] = I_S_WSTRB[(src_lane*1) +: 1];
+            w_modified_wstrb_sdata[(dst_lane[O_BYTES-1:0]*1) +: 1] = I_S_WSTRB[(src_lane[I_BYTES-1:0]*1) +: 1];
             end
         end
         1: begin

@@ -8,7 +8,8 @@
 // - excl_cg: exclusive transactions by the subordinate's answer (EXOKAY: the
 //   exclusive pair held; OKAY: it failed), per path and direction.
 // - chan_cg: channel orderings AXI4 allows: an S-port W burst presented before
-//   its AW (A3.3.1) and one the DUT took before its AW; R beats of different IDs
+//   its AW (A3.3.1; the DUT takes it only once the AW is accepted, so
+//   w_taken_before_aw is ignored); R beats of different IDs
 //   interleaved on an M port, in the ReadData the remote die sent, and on an
 //   S port (A5; ReadData carries RID and RLAST, AoU 5.5).
 class aou_t1_xfer_cov extends uvm_component;

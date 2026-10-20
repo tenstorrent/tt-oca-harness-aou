@@ -213,7 +213,9 @@ defines = ["AOU_AXI_DATA_BYTES=64", "AOU_FDI_DATA_W=512", "AOU_T1_AXI_AGENTS"]
 # 256-bit units (1 = 256, 2 = 512, 4 = 1024); sp<B> = single PHY with a B-byte
 # FDI data path (FDI_CONFIG 0 SP_32B, 1 SP_64B, 2 SP_128B); tp<B1>_<B2> = two
 # PHYs with B1- and B2-byte FDI (3 TP_32B_64B, 4 TP_64B_128B; built with
-# TWO_PHY); -p<W> = AXI_PEER_DIE_MAX_DATA_WD W bits (default 1024); -rxf =
+# TWO_PHY); -p<W> = AXI_PEER_DIE_MAX_DATA_WD W bits (default 1024); -nxt =
+# TX_NXT_PACKING_EN 1, the registered TX packer output stage (AOU_TX_NXT_PACKING);
+# -rxf =
 # non-default RX FIFO depths per RP and class with the RX FIFO register slices
 # off (AOU_RX_FIFO_ALT; the depths are AOU_T1_RX_DEPTH in
 # uvm/env/aou_t1_env_pkg.sv). Unused RPs repeat RP0's width because the DUT
@@ -277,6 +279,12 @@ description = "AXI_PEER_DIE_MAX_DATA_WD 512 (plan 14.17)"
 build_dir = "hw/ip/aou/dv/build/uvm"
 defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "AOU_PEER_MAX_W=512"]
+
+[targets.1x512-sp64-nxt]
+description = "TX_NXT_PACKING_EN 1: registered TX packer output stage"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1", "AOU_TX_NXT_PACKING=1"]
 
 [targets.2xmix-sp64-rxf]
 description = "Non-default RX FIFO depths, RX_*_FIFO_RS_EN=0 (3.25)"

@@ -31,6 +31,8 @@ _Table 8. AOU_CORE Initial Latency (Cycles)_
 
 The reason of two additional latency for AW and W CH is from WLAST signal generator, and data width converter.
 
+The TX flit packer drives the FDI data path combinationally from the granule ring by default ([.monospaced]#++TX_NXT_PACKING_EN = 0++#). With [.monospaced]#++TX_NXT_PACKING_EN = 1++# [.monospaced]#++AOU_TX_CORE++# computes each chunk from the look-ahead packing state and ring contents and registers it before the output mux.
+
 [caption=""]
 .Figure 29. Initial Latency of AOU_CORE with UCIe (Cycle)
 [[figure-29]]
@@ -139,11 +141,9 @@ The FIFO depth of the two RPs are identical.
 
 [cols=",",options="header",]
 |=============================
-|AoU Area (um^2) |64GB/s
-|1RP
-|(AXI : 512bit) |97K
-|2RP
-|(AXI : 256bit & 512bit) |197K
+|Configuration | AoU Area (um^2)
+|1RP (AXI : 512bit) |97K
+|2RP (AXI : 256bit & 512bit) |197K
 |=============================
 
 _Table 10. AOU_CORE Area (measured at an ++FDI_CFG_SP_64B++-equivalent configuration; numbers will scale up for ++FDI_CFG_*_128B++ configurations due to the 88 \-> 140 R/W FIFO depth bump.)_
@@ -161,6 +161,11 @@ ifndef::release[]
 |v0.2 |2025/09/19 |Soyoung Min, Jaeyun Lee, Hojun Lee |Kwanho Kim |256, 512, 1024 datawidth verification finished. Early response feature added.
 | |2026/04/09 |Brad Erwin | |Expand explanation of early response feature
 | |2026/04/22 |Tenstorrent | |Refresh with 128B FDI support documentation. New [.monospaced]#++FDI_CONFIG++# parameter (single integer with named constants in [.monospaced]#++RTL/packet_def_pkg.sv++#). FDI ports renamed from [.monospaced]#++_32B++#/[.monospaced]#++_64B++# to [.monospaced]#++_0++#/[.monospaced]#++_1++#; second-PHY ports and [.monospaced]#++I_PHY_TYPE++# are gated by the [.monospaced]#pass:c[+define+TWO_PHY]# build flag. New [.monospaced]#++AOU_TOP++# wrapper introduced (adds [.monospaced]#++AOU_FDI_BRINGUP_CTRL++# for turn-key FDI bringup). New [.monospaced]#++RX_*_FIFO_RS_EN++# parameters control per-channel RX-FIFO output register-slices. [.monospaced]#++RP*_RX_W_FIFO_DEPTH++# / [.monospaced]#++RP*_RX_R_FIFO_DEPTH++# defaults are now FDI-config aware (140 entries for 1024b configurations, 88 otherwise). [.monospaced]#++RP_COUNT++# default changed from 2 to 1.
+| |2026/10/19 |Tenstorrent | |Follow RTL PR #89: write-transaction watchdog ([.monospaced]#++AOU_WRITE_TRANS_WDT++#, [.monospaced]#++INT_EARLY_WDT_ERR++#, [.monospaced]#++WRITE_EARLY_RESPONSE_RPn[17:15]++#, new [.monospaced]#++WRITE_EARLY_RESPONSE_WDT_CTL++# at 0x0080, [.monospaced]#++AOU_INTERRUPT_MASK[9]++#) replaces [.monospaced]#++O_PENDING_CNT_OVER++#; [.monospaced]#++EARLY_ALWAYS_EN++#; [.monospaced]#++SLV_TR_COMPLETE++# waits for early-responded writes; [.monospaced]#++I_MST_BUS_CLEANY_COMPLETE++# / [.monospaced]#++I_SLV_BUS_CLEANY_COMPLETE++# inputs removed; write aggregation requires [.monospaced]#++AWCACHE[1] = 1++# and [.monospaced]#++AWLOCK = 0++# and its W FIFO depth is the [.monospaced]#++RPn_AGG_WCH_FIFO_DEPTH++# parameter; [.monospaced]#pass:c[+define+AOU_TX_NXT_PACKING_EN]# build option.
+| |2026/10/19 |Tenstorrent | |[.monospaced]#++TX_NXT_PACKING_EN++# parameter on [.monospaced]#++AOU_TOP++#, [.monospaced]#++AOU_CORE_TOP++#, [.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_TX_CORE++# replaces the [.monospaced]#pass:c[+define+AOU_TX_NXT_PACKING_EN]# build option.
+| |2026/10/19 |Tenstorrent | |Exclusive writes ([.monospaced]#++AWLOCK = 1++#) are excluded from the early write response (3.7.1, 7.1); previously a bufferable exclusive write, and with [.monospaced]#++EARLY_ALWAYS_EN++# every exclusive write, received an early OKAY in place of the subordinate's EXOKAY.
+| |2026/10/20 |Tenstorrent | |Write transaction watchdog: [.monospaced]#++WDT_TRANS_TIMEOUT_ERR++# is now a true W1C bit (the watchdog raises a one-cycle event instead of a sticky level); the watchdog fires once per reset and does not re-arm after a timeout (7.2.6).
+| |2026/10/20 |Tenstorrent | |Early response controller with [.monospaced]#++EARLY_BRESP_EN = 0++#: W data is accepted only once its AW has been accepted; a W burst presented ahead of its AW waits (3.7.5).
 |======================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
 
 _Table 11. Record of Changes_
@@ -174,7 +179,7 @@ endif::release[]
 [width="99%",cols="28%,50%,22%",options="header",]
 |===================================================================================
 |Document Name |Document Location and/or URL |Issuance Date
-|AXI-over-UCIe (AoU) Specification, Revision 0.7 |https://openchipletatlas.org |2025
+|AXI-over-UCIe (AoU) Specification, Revision 0.7 | https://www.openchipletatlas.org/specifications/aou/0.7.1 |2025
 |===================================================================================
 
 _Table 12. Referenced Documents_

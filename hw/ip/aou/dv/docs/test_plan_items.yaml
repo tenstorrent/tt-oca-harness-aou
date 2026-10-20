@@ -655,7 +655,7 @@
 - id: '4.31'
   section: '2.4'
   section_title: Write Transaction Tests
-  title: W data before AW on the S port is accepted
+  title: W data presented before its AW on the S port is accepted once the AW arrives
   priority: P2
   added: AXI4 A3.3.1
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
@@ -2388,10 +2388,10 @@
 - id: '16.17'
   section: '2.16'
   section_title: Write Early Response Tests
-  title: O_PENDING_CNT_OVER on a write at the early-response limit
+  title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked)'
   priority: P2
   added: MAS 3.7.5; BUGS/005
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. PR #89 replaced the signal with a write-transaction watchdog the MAS does not yet specify.'
 
 - id: '17.1'
   section: '2.17'

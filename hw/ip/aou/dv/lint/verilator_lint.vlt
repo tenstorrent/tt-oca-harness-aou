@@ -7,6 +7,10 @@
 // harness tree) are excluded: they have their own owners.
 lint_off -file "*/RTL/*"
 lint_off -rule WIDTHCONCAT -file "*/RTL/*"
+// Except for nets with no driver at all: a DUT output or an internal net
+// nothing assigns is a wiring bug the bench would otherwise read as a
+// constant (PR #89 left INT_EARLY_WDT_ERR unassigned in AOU_CORE_TOP).
+lint_on -rule UNDRIVEN -file "*/RTL/*"
 lint_off -file "*/uvm-core/*"
 lint_off -file "*/hw/common/dv/vip/*"
 lint_off -rule TIMESCALEMOD

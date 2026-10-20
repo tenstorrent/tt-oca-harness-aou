@@ -32,7 +32,10 @@ module AOU_SLV_AXI_INFO #(
     parameter  RD_MO_CNT                = 64,
     parameter  WR_MO_CNT                = 64,
     localparam RD_MO_CNT_WD             = $clog2(RD_MO_CNT+1),
-    localparam WR_MO_CNT_WD             = $clog2(WR_MO_CNT+1)
+    localparam WR_MO_CNT_WD             = $clog2(WR_MO_CNT+1),
+
+    localparam RD_MO_IDX_WD             = $clog2(RD_MO_CNT),
+    localparam WR_MO_IDX_WD             = $clog2(WR_MO_CNT)
 
 )
 (
@@ -85,18 +88,14 @@ st_ar_table [RD_MO_CNT-1:0] r_pending_rid_table;
 st_ar_table [WR_MO_CNT-1:0] r_pending_wid_table;
 
 // AR table logic
-logic [RD_MO_CNT_WD-1:0]   r_rid_table_rd_ptr;
-logic [RD_MO_CNT_WD-1:0]   r_rid_table_wr_ptr;
-
-logic [RD_MO_CNT_WD-1:0]   w_nxt_rid_table_wr_ptr;
+logic [RD_MO_IDX_WD-1:0]   r_rid_table_rd_ptr;
+logic [RD_MO_IDX_WD-1:0]   r_rid_table_wr_ptr;
 
 logic [RD_MO_CNT-1:0]      w_rid_table_match_flag; //find valid & ID match idx
 
 // AW table logic
-logic [WR_MO_CNT_WD-1:0]   r_wid_table_rd_ptr;
-logic [WR_MO_CNT_WD-1:0]   r_wid_table_wr_ptr;
-
-logic [WR_MO_CNT_WD-1:0]   w_nxt_wid_table_wr_ptr;
+logic [WR_MO_IDX_WD-1:0]   r_wid_table_rd_ptr;
+logic [WR_MO_IDX_WD-1:0]   r_wid_table_wr_ptr;
 
 logic [WR_MO_CNT-1:0]      w_wid_table_match_flag; //find valid & ID match idx
 

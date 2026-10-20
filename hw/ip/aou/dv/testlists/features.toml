@@ -387,8 +387,10 @@ tags = ["features"]
 run_modes = ["features"]
 args = ["+early_en=per_rp", "+dp_buf_pct=50"]
 
-# 16.17: the manager keeps an AW waiting at the early-response limit; MAS 3.7.5 says
-# O_PENDING_CNT_OVER fires and reaches the interrupt controller (FEAT-R21; BUGS/005).
+# 16.17: the manager keeps an AW waiting at the early-response limit. MAS 3.7.5 says
+# O_PENDING_CNT_OVER fires and reaches the interrupt controller; the signal was
+# unconnected (BUGS/005) and PR #89 removed it for the write-transaction watchdog
+# INT_EARLY_WDT_ERR, so FEAT-R21 is not checked and the run reports the watchdog pin.
 [[tests]]
 name = "aou_early_bresp_test.early_en-1.early_full-1.early_over-1"
 module = { uvm = "aou_early_bresp_test" }

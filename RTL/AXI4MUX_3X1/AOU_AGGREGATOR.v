@@ -33,7 +33,8 @@ module AOU_AGGREGATOR #(
     parameter STRB_WD = DATA_WD / 8,
     parameter LEN_WD  = 8,
     parameter DATA_BYTE = DATA_WD / 8,
-    parameter RD_MO_CNT = 128
+    parameter RD_MO_CNT = 128,
+    parameter AOU_AGG_WCH_FIFO_DEPTH = 16 //It should be configured to a value greater than the maximum burst length of the local bus.
 ) 
 (
     input                           I_CLK,
@@ -46,7 +47,7 @@ module AOU_AGGREGATOR #(
     input [2: 0]                    I_S_AWSIZE,
     input [1:0]                     I_S_AWBURST,
     input                           I_S_AWLOCK,
-    input [3:0]                     I_S_AWCACHE,
+    input [3:0]                     I_S_AWCACHE,//[1]: Modifiable, [0]: Bufferable
     input [2:0]                     I_S_AWPROT,
     input [3:0]                     I_S_AWQOS,
     input                           I_S_AWVALID,
@@ -132,6 +133,8 @@ localparam AXSIZE = $clog2(DATA_WD/8);
 localparam ADDR_OFF_WD = $clog2(DATA_WD/8);
 
 reg  [LEN_WD-1:0]                   w_agg_awlen;
+reg  [LEN_WD:0]                     w_agg_awlen_ext;
+
 reg                                 r_s_wbusy_tt;
 reg  [2: 0]                         r_s_awsize;
 wire [2: 0]                         w_s_awsize_mux;
@@ -141,6 +144,8 @@ reg  [ADDR_OFF_WD-1:0]              w_agg_cur_awaddr;
 reg  [ADDR_OFF_WD-1:0]              r_s_awaddr;
 
 reg  [LEN_WD-1:0]                   w_agg_arlen;
+reg  [LEN_WD:0]                     w_agg_arlen_ext;
+
 wire [$clog2(STRB_WD)-1:0]          w_rob_araddr;
 
 wire                                w_rob_ar_slot_avail_flag; 
@@ -253,11 +258,11 @@ generate
 if(DATA_WD==256) begin
     always @(*) begin
         case (I_S_AWSIZE)
-            'd4:     w_agg_awlen = (I_S_AWADDR[4:4] + I_S_AWLEN) >> 1;
-            'd3:     w_agg_awlen = (I_S_AWADDR[4:3] + I_S_AWLEN) >> 2;
-            'd2:     w_agg_awlen = (I_S_AWADDR[4:2] + I_S_AWLEN) >> 3;
-            'd1:     w_agg_awlen = (I_S_AWADDR[4:1] + I_S_AWLEN) >> 4;
-            default: w_agg_awlen = (I_S_AWADDR[4:0] + I_S_AWLEN) >> 5;
+            'd4:     w_agg_awlen_ext = (I_S_AWADDR[4:4] + {1'b0, I_S_AWLEN}) >> 1;
+            'd3:     w_agg_awlen_ext = (I_S_AWADDR[4:3] + {1'b0, I_S_AWLEN}) >> 2;
+            'd2:     w_agg_awlen_ext = (I_S_AWADDR[4:2] + {1'b0, I_S_AWLEN}) >> 3;
+            'd1:     w_agg_awlen_ext = (I_S_AWADDR[4:1] + {1'b0, I_S_AWLEN}) >> 4;
+            default: w_agg_awlen_ext = (I_S_AWADDR[4:0] + {1'b0, I_S_AWLEN}) >> 5;
         endcase
 
         case (w_s_awsize_mux)
@@ -281,12 +286,12 @@ if(DATA_WD==256) begin
 end else if(DATA_WD==512) begin
     always @(*) begin
         case (I_S_AWSIZE)
-            'd5:     w_agg_awlen = (I_S_AWADDR[5:5] + I_S_AWLEN) >> 1;
-            'd4:     w_agg_awlen = (I_S_AWADDR[5:4] + I_S_AWLEN) >> 2;
-            'd3:     w_agg_awlen = (I_S_AWADDR[5:3] + I_S_AWLEN) >> 3;
-            'd2:     w_agg_awlen = (I_S_AWADDR[5:2] + I_S_AWLEN) >> 4;
-            'd1:     w_agg_awlen = (I_S_AWADDR[5:1] + I_S_AWLEN) >> 5;
-            default: w_agg_awlen = (I_S_AWADDR[5:0] + I_S_AWLEN) >> 6;
+            'd5:     w_agg_awlen_ext = (I_S_AWADDR[5:5] + {1'b0, I_S_AWLEN}) >> 1;
+            'd4:     w_agg_awlen_ext = (I_S_AWADDR[5:4] + {1'b0, I_S_AWLEN}) >> 2;
+            'd3:     w_agg_awlen_ext = (I_S_AWADDR[5:3] + {1'b0, I_S_AWLEN}) >> 3;
+            'd2:     w_agg_awlen_ext = (I_S_AWADDR[5:2] + {1'b0, I_S_AWLEN}) >> 4;
+            'd1:     w_agg_awlen_ext = (I_S_AWADDR[5:1] + {1'b0, I_S_AWLEN}) >> 5;
+            default: w_agg_awlen_ext = (I_S_AWADDR[5:0] + {1'b0, I_S_AWLEN}) >> 6;
         endcase
 
         case (w_s_awsize_mux)
@@ -310,13 +315,13 @@ end else if(DATA_WD==512) begin
 end else begin
     always @(*) begin
         case (I_S_AWSIZE)
-            'd6:     w_agg_awlen = (I_S_AWADDR[6:6] + I_S_AWLEN) >> 1;
-            'd5:     w_agg_awlen = (I_S_AWADDR[6:5] + I_S_AWLEN) >> 2;
-            'd4:     w_agg_awlen = (I_S_AWADDR[6:4] + I_S_AWLEN) >> 3;
-            'd3:     w_agg_awlen = (I_S_AWADDR[6:3] + I_S_AWLEN) >> 4;
-            'd2:     w_agg_awlen = (I_S_AWADDR[6:2] + I_S_AWLEN) >> 5;
-            'd1:     w_agg_awlen = (I_S_AWADDR[6:1] + I_S_AWLEN) >> 6;
-            default: w_agg_awlen = (I_S_AWADDR[6:0] + I_S_AWLEN) >> 7;
+            'd6:     w_agg_awlen_ext = (I_S_AWADDR[6:6] + {1'b0, I_S_AWLEN}) >> 1;
+            'd5:     w_agg_awlen_ext = (I_S_AWADDR[6:5] + {1'b0, I_S_AWLEN}) >> 2;
+            'd4:     w_agg_awlen_ext = (I_S_AWADDR[6:4] + {1'b0, I_S_AWLEN}) >> 3;
+            'd3:     w_agg_awlen_ext = (I_S_AWADDR[6:3] + {1'b0, I_S_AWLEN}) >> 4;
+            'd2:     w_agg_awlen_ext = (I_S_AWADDR[6:2] + {1'b0, I_S_AWLEN}) >> 5;
+            'd1:     w_agg_awlen_ext = (I_S_AWADDR[6:1] + {1'b0, I_S_AWLEN}) >> 6;
+            default: w_agg_awlen_ext = (I_S_AWADDR[6:0] + {1'b0, I_S_AWLEN}) >> 7;
         endcase
 
         case (w_s_awsize_mux)
@@ -343,7 +348,7 @@ end else begin
 end
 
 endgenerate
-
+assign w_agg_awlen = w_agg_awlen_ext[LEN_WD-1:0];
 //----------------------------------------------------
 //for AWSIZE to BYTES
 always @ (*) begin
@@ -371,11 +376,11 @@ endgenerate
 //signal for aggregator operation
 generate
 if(DATA_WD == 256) begin
-    assign w_en_aggregator_w = (I_S_AWSIZE < 3'b101) & (|I_S_AWLEN);
+    assign w_en_aggregator_w = ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b101) & (|I_S_AWLEN);
 end else if (DATA_WD == 512) begin
-    assign w_en_aggregator_w = (I_S_AWSIZE < 3'b110) & (|I_S_AWLEN);
+    assign w_en_aggregator_w = ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b110) & (|I_S_AWLEN);
 end else if (DATA_WD == 1024) begin
-    assign w_en_aggregator_w = (I_S_AWSIZE < 3'b111) & (|I_S_AWLEN);
+    assign w_en_aggregator_w = ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b111) & (|I_S_AWLEN);
 end else begin
     assign w_en_aggregator_w = 0;
 end
@@ -454,12 +459,12 @@ generate
 if(DATA_WD==256) begin
     always @(*) begin
         case (I_S_ARSIZE)
-            'd5:     w_agg_arlen = I_S_ARLEN;
-            'd4:     w_agg_arlen = (I_S_ARADDR[4:4] + I_S_ARLEN) >> 1;
-            'd3:     w_agg_arlen = (I_S_ARADDR[4:3] + I_S_ARLEN) >> 2;
-            'd2:     w_agg_arlen = (I_S_ARADDR[4:2] + I_S_ARLEN) >> 3;
-            'd1:     w_agg_arlen = (I_S_ARADDR[4:1] + I_S_ARLEN) >> 4;
-            default: w_agg_arlen = (I_S_ARADDR[4:0] + I_S_ARLEN) >> 5;
+            'd5:     w_agg_arlen_ext = {1'b0, I_S_ARLEN};
+            'd4:     w_agg_arlen_ext = (I_S_ARADDR[4:4] + {1'b0, I_S_ARLEN}) >> 1;
+            'd3:     w_agg_arlen_ext = (I_S_ARADDR[4:3] + {1'b0, I_S_ARLEN}) >> 2;
+            'd2:     w_agg_arlen_ext = (I_S_ARADDR[4:2] + {1'b0, I_S_ARLEN}) >> 3;
+            'd1:     w_agg_arlen_ext = (I_S_ARADDR[4:1] + {1'b0, I_S_ARLEN}) >> 4;
+            default: w_agg_arlen_ext = (I_S_ARADDR[4:0] + {1'b0, I_S_ARLEN}) >> 5;
         endcase
 
     end
@@ -467,33 +472,34 @@ if(DATA_WD==256) begin
 end else if(DATA_WD==512) begin
     always @(*) begin
         case (I_S_ARSIZE)
-            'd6:     w_agg_arlen = I_S_ARLEN;
-            'd5:     w_agg_arlen = (I_S_ARADDR[5:5] + I_S_ARLEN) >> 1;
-            'd4:     w_agg_arlen = (I_S_ARADDR[5:4] + I_S_ARLEN) >> 2;
-            'd3:     w_agg_arlen = (I_S_ARADDR[5:3] + I_S_ARLEN) >> 3;
-            'd2:     w_agg_arlen = (I_S_ARADDR[5:2] + I_S_ARLEN) >> 4;
-            'd1:     w_agg_arlen = (I_S_ARADDR[5:1] + I_S_ARLEN) >> 5;
-            default: w_agg_arlen = (I_S_ARADDR[5:0] + I_S_ARLEN) >> 6;
+            'd6:     w_agg_arlen_ext = {1'b0, I_S_ARLEN};
+            'd5:     w_agg_arlen_ext = (I_S_ARADDR[5:5] + {1'b0, I_S_ARLEN}) >> 1;
+            'd4:     w_agg_arlen_ext = (I_S_ARADDR[5:4] + {1'b0, I_S_ARLEN}) >> 2;
+            'd3:     w_agg_arlen_ext = (I_S_ARADDR[5:3] + {1'b0, I_S_ARLEN}) >> 3;
+            'd2:     w_agg_arlen_ext = (I_S_ARADDR[5:2] + {1'b0, I_S_ARLEN}) >> 4;
+            'd1:     w_agg_arlen_ext = (I_S_ARADDR[5:1] + {1'b0, I_S_ARLEN}) >> 5;
+            default: w_agg_arlen_ext = (I_S_ARADDR[5:0] + {1'b0, I_S_ARLEN}) >> 6;
         endcase
 
     end
 end else begin
     always @(*) begin
         case (I_S_ARSIZE)
-            'd7:     w_agg_arlen = I_S_ARLEN;
-            'd6:     w_agg_arlen = (I_S_ARADDR[6:6] + I_S_ARLEN) >> 1;
-            'd5:     w_agg_arlen = (I_S_ARADDR[6:5] + I_S_ARLEN) >> 2;
-            'd4:     w_agg_arlen = (I_S_ARADDR[6:4] + I_S_ARLEN) >> 3;
-            'd3:     w_agg_arlen = (I_S_ARADDR[6:3] + I_S_ARLEN) >> 4;
-            'd2:     w_agg_arlen = (I_S_ARADDR[6:2] + I_S_ARLEN) >> 5;
-            'd1:     w_agg_arlen = (I_S_ARADDR[6:1] + I_S_ARLEN) >> 6;
-            default: w_agg_arlen = (I_S_ARADDR[6:0] + I_S_ARLEN) >> 7;
+            'd7:     w_agg_arlen_ext = {1'b0, I_S_ARLEN};
+            'd6:     w_agg_arlen_ext = (I_S_ARADDR[6:6] + {1'b0, I_S_ARLEN}) >> 1;
+            'd5:     w_agg_arlen_ext = (I_S_ARADDR[6:5] + {1'b0, I_S_ARLEN}) >> 2;
+            'd4:     w_agg_arlen_ext = (I_S_ARADDR[6:4] + {1'b0, I_S_ARLEN}) >> 3;
+            'd3:     w_agg_arlen_ext = (I_S_ARADDR[6:3] + {1'b0, I_S_ARLEN}) >> 4;
+            'd2:     w_agg_arlen_ext = (I_S_ARADDR[6:2] + {1'b0, I_S_ARLEN}) >> 5;
+            'd1:     w_agg_arlen_ext = (I_S_ARADDR[6:1] + {1'b0, I_S_ARLEN}) >> 6;
+            default: w_agg_arlen_ext = (I_S_ARADDR[6:0] + {1'b0, I_S_ARLEN}) >> 7;
         endcase
 
     end
 end
 
 endgenerate
+assign w_agg_arlen = w_agg_arlen_ext[LEN_WD-1:0];
 
 reg [2:0] w_agg_arsize;
 
@@ -671,7 +677,6 @@ AOU_FWD_RS #(
 
 //----------------------------------------------------
 localparam AOU_AGG_WCH_PAYLOAD_WD = DATA_WD + STRB_WD + 1; 
-localparam AOU_AGG_WCH_FIFO_DEPTH = 16;
 localparam WCH_FIFO_FULL_CNT_WD   = $clog2(AOU_AGG_WCH_FIFO_DEPTH + 1); 
 
 wire [AOU_AGG_WCH_PAYLOAD_WD - 1:0] w_aou_agg_wch_fifo_sdata;

@@ -11,11 +11,12 @@
 //   FEAT-R15: no S-port AW is accepted while wr_mo_cnt entries are held.
 //   FEAT-R16: an AW held while the table was full is accepted within
 //             free_bound cycles of the WriteResp that frees an entry.
-//   FEAT-R21 (over_chk, test intent: +early_over, plan 16.17): an AW waiting
-//             at the full table raises O_PENDING_CNT_OVER (MAS 3.7.5: "fires
-//             if a write handshake is attempted while the counter is already
-//             at the limit"), read white-box since no interrupt or pin carries
-//             it (BUGS/005); it never rises below the limit.
+//   FEAT-R21 (plan 16.17) is not checked: the O_PENDING_CNT_OVER it observed
+//             (MAS 3.7.5) was unconnected (BUGS/005) and PR #89 removed it,
+//             adding a write-transaction watchdog (INT_EARLY_WDT_ERR) instead.
+//             With over_chk (+early_over) the watchdog pin is only counted
+//             while an AW waits at the limit, for the report, until the MAS
+//             specifies the watchdog and a check can be written against it.
 // Whether a run filled the table and saw a stall end is coverage
 // (env.cg_early_tbl), not a check.
 class aou_t1_early_tbl_chk extends uvm_component;
@@ -44,8 +45,7 @@ class aou_t1_early_tbl_chk extends uvm_component;
   protected int unsigned n_full[AOU_RP_MAX];
   protected int unsigned n_resumed[AOU_RP_MAX];
   protected virtual aou_irq_if irq_vif;
-  protected int unsigned n_over[AOU_RP_MAX];      // O_PENDING_CNT_OVER cycles at the limit
-  protected int unsigned n_over_bad[AOU_RP_MAX];  // ... and below it
+  protected int unsigned n_wdt[AOU_RP_MAX];       // INT_EARLY_WDT_ERR cycles, AW at the limit
   protected int unsigned n_attempt[AOU_RP_MAX];   // cycles an AW waited at the limit
 
   function new(string name, uvm_component parent);
@@ -117,10 +117,6 @@ class aou_t1_early_tbl_chk extends uvm_component;
       end
       occ = (wlast[r] > freed[r]) ? wlast[r] - freed[r] : 0;
       if (occ > occ_max[r]) occ_max[r] = occ;
-      if (over_chk && irq_vif.mon_cb.pend_over[r] === 1'b1) begin
-        if (occ >= wr_mo_cnt) n_over[r]++;
-        else n_over_bad[r]++;
-      end
       if (freed[r] != last_freed) begin
         last_freed = freed[r];
         freed_since = 1'b1;
@@ -148,6 +144,7 @@ class aou_t1_early_tbl_chk extends uvm_component;
         stalled = 1'b0;
       end else if (occ >= wr_mo_cnt) begin
         n_attempt[r]++;
+        if (over_chk && irq_vif.mon_cb.int_early_wdt_err === 1'b1) n_wdt[r]++;
         if (!stalled) begin
           n_full[r]++;
           sample(0);
@@ -167,32 +164,12 @@ class aou_t1_early_tbl_chk extends uvm_component;
     end
   endtask
 
-  function void check_phase(uvm_phase phase);
-    if (!over_chk) return;
-    foreach (vif[r]) begin
-      aou_rule_log::check("FEAT-R21", get_type_name());
-      if (n_attempt[r] != 0 && n_over[r] == 0) begin
-        aou_rule_log::fire("FEAT-R21", get_type_name());
-        `uvm_error(get_type_name(), $sformatf(
-            {"FEAT-R21: RP%0d: an AW waited %0d cycles at the early-response limit (%0d ",
-             "stalls) and O_PENDING_CNT_OVER never rose (no interrupt carries it)"},
-            r, n_attempt[r], n_full[r]))
-      end
-      if (n_over_bad[r] != 0) begin
-        aou_rule_log::fire("FEAT-R21", get_type_name());
-        `uvm_error(get_type_name(), $sformatf(
-            "FEAT-R21: RP%0d: O_PENDING_CNT_OVER high %0d cycles below the limit", r,
-            n_over_bad[r]))
-      end
-    end
-  endfunction
-
   function void report_phase(uvm_phase phase);
     foreach (vif[r])
       if (n_full[r] != 0 || occ_max[r] != 0)
         `uvm_info(get_type_name(), $sformatf(
             {"RP%0d early table: %0d writes, at most %0d held, %0d full stalls, %0d resumed, ",
-             "O_PENDING_CNT_OVER %0d cycles"}, r,
-            wlast[r], occ_max[r], n_full[r], n_resumed[r], n_over[r] + n_over_bad[r]), UVM_LOW)
+             "%0d AW cycles waited at the limit (INT_EARLY_WDT_ERR high for %0d of them)"}, r,
+            wlast[r], occ_max[r], n_full[r], n_resumed[r], n_attempt[r], n_wdt[r]), UVM_LOW)
   endfunction
 endclass

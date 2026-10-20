@@ -299,9 +299,23 @@ for timing closure.
 
 |S_WR_MO_CNT |parameter |32 |Slave write outstanding count.
 
+|TX_NXT_PACKING_EN |parameter |0 |TX flit packer output stage in
+[.monospaced]#++AOU_TX_CORE++#. 0: each FDI chunk is driven combinationally from the
+granule ring and the current packing state. 1: the chunk is computed from the
+look-ahead (next) packing state and ring contents and registered before the
+FDI output mux, so the FDI TX data leaves a register.
+
 |M_RD_MO_CNT |parameter |32 |Master read outstanding count.
 
 |M_WR_MO_CNT |parameter |32 |Master write outstanding count.
+
+|RP0_AGG_WCH_FIFO_DEPTH ... RP3_AGG_WCH_FIFO_DEPTH |localparam in
+[.monospaced]#++AOU_CORE_TOP++# (parameter of [.monospaced]#++AOU_CORE++#) |16 |Depth of the per-RP
+W-channel FIFO that decouples AW from W inside the AXI Aggregator. It must be
+greater than the longest write burst the local bus issues to the AXI manager
+port (the aggregator issues an AW only once the FIFO can hold the whole
+recalculated burst). Fixed at 16 in [.monospaced]#++AOU_CORE_TOP++#; change the localparams
+there to integrate a longer-burst local bus.
 |=======================================================================
 
 [[aou-ig-fdi_config-values]]
@@ -721,6 +735,8 @@ multiplexing: 0 = PHY0, 1 = PHY1. See xref:aou-ig-phy-type-mux[Section 6.6.4].
 |INT_SI0_ID_MISMATCH |output |1 |Slave interface ID mismatch.
 |INT_MI0_ID_MISMATCH |output |1 |Master interface ID mismatch.
 |INT_EARLY_RESP_ERR |output |1 |Early response error.
+|INT_EARLY_WDT_ERR |output |1 |Early-response write-transaction watchdog
+expired on an RP (see xref:aou-ig-interrupts[Section 5]).
 |INT_ACTIVATE_START |output |1 |Activate start.
 |INT_DEACTIVATE_START |output |1 |Deactivate start.
 |=============================================================
@@ -742,10 +758,6 @@ ________________________________________________________________________________
 |I_INT_FSM_IN_ACTIVE |input |1 |Initialization done / FSM in active
 state indicator.
 
-|I_MST_BUS_CLEANY_COMPLETE |input |1 |Master bus cleany complete.
-
-|I_SLV_BUS_CLEANY_COMPLETE |input |1 |Slave bus cleany complete.
-
 |O_AOU_ACTIVATE_ST_DISABLED |output |1 |Activation state disabled.
 
 |O_AOU_ACTIVATE_ST_ENABLED |output |1 |Activation state enabled.
@@ -758,14 +770,12 @@ link up is complete. When starting the test, [.monospaced]#++I_INT_FSM_IN_ACTIVE
 should be 0, and when you want to activate AOU_CORE,
 [.monospaced]#++I_INT_FSM_IN_ACTIVE++# should be 1. When testing with IP standalone,
 you must force [.monospaced]#++I_INT_FSM_IN_ACTIVE++#.
-* [.monospaced]#++I_MST_BUS_CLEANY_COMPLETE++# is asserted when all responses to the
-remote diepass:[']s requests have been completed. The signal originates from
-the BUS_CLEANY. If the BUS_CLEANY feature is not used, the corresponding
-port must be tied to 1.
-* [.monospaced]#++I_SLV_BUS_CLEANY_COMPLETE++# is asserted when all responses from the
-remote die have been received for the requests sent by the local die.
-The signal originates from the BUS_CLEANY. If the BUS_CLEANY feature is
-not used, the corresponding port must be tied to 1.
+* Bus quiescence (whether every request sent to or received from the
+remote die has been answered) is tracked inside AOU_CORE and reported in
+[.monospaced]#++AOU_INIT.SLV_TR_COMPLETE++# / [.monospaced]#++AOU_INIT.MST_TR_COMPLETE++#; no external
+BUS_CLEANY inputs exist. [.monospaced]#++SLV_TR_COMPLETE++# also waits for the actual B
+responses of writes that received an early B response
+([.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE++#).
 * After AOU_CORE deactivation, the activation status transitions to
 DISABLED, allowing the UCIe link to go down. Once deactivation
 completes, [.monospaced]#++O_AOU_ACTIVATE_ST_DISABLED++# is asserted to notify the
@@ -1013,6 +1023,20 @@ Error. SW can check the ID and error type of the transaction in which
 the error occurred by reading AOU_CORE.WRITE_EARLY_RESPONSE SFR. The
 interrupt can be cleared by writing pass:[']1pass:['] to the
 AOU_CORE.WRITE_EARLY_RESPONSE.WRITE_RESP_ERR SFR.
+* *INT_EARLY_WDT_ERR* An interrupt that occurs when the write-transaction
+watchdog of an RP expires: with AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_EN
+set, no AW or B handshake occurred for
+AOU_CORE.WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD I_CLK cycles (reset
+0xC3500) while the RP had writes outstanding, typically because the
+remote die stopped answering writes that already received an early
+OKAY. SW can find the RP by reading
+AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_TRANS_TIMEOUT_ERR; the interrupt is
+cleared by writing pass:[']1pass:['] to that bit and masked with
+AOU_CORE.AOU_INTERRUPT_MASK.INT_EARLY_WDT_MASK (bit 9). The watchdog of an
+RP fires once per reset: after a timeout it does not re-arm until I_RESETN or
+AOU_CON0.AOU_SW_RESET. See
+[.monospaced]#++DOC/MAS/software-operation.adoc++# section 7.2.6 for the recovery
+sequence.
 * *INT_REQ_LINKRESET* An interrupt that occurs when AOU_CORE receives a
 protocol violation. Refer to the _AOU_CORE Micro-Architecture
 Specification_ ([.monospaced]#++DOC/MAS/interrupts-errors.adoc++#) for debugging details.
@@ -1202,7 +1226,7 @@ is asserted because the local die is required to return a response to
 the remote die. When AOU_CON0.CREDIT_MANAGE is set to 1, this interrupt
 can also be asserted if a new request after the remote die has sent a
 DeactivateReq. There is a response to be received
-(I_SLV_BUS_CLEANY_COMPLETE == 0) When AOU_CON0.CREDIT_MANAGE is set to
+(AOU_INIT.SLV_TR_COMPLETE == 0) When AOU_CON0.CREDIT_MANAGE is set to
 0, this interrupt can be asserted if the local die issues new AXI
 requests after the remote die has sent a DeactivateReq. An ActivateReq
 message is received from the remote die while the activation handshake
@@ -1696,7 +1720,10 @@ Constraint files are located in [.monospaced]#++INTEG/constraints/++#.
 
 The SDC file defines timing constraints for synthesis and STA. All delay
 budget variables are declared at the top of the file and can be
-overridden by the integrating project.
+overridden by the integrating project. The port groups follow the
+current port list: [.monospaced]#++INT_EARLY_WDT_ERR++# is in the combinational
+interrupt-output group, and the former [.monospaced]#++I_*_BUS_CLEANY_COMPLETE++#
+inputs are gone.
 
 [[aou-ig-clock-definitions]]
 ==== 8.5.1 Clock Definitions
@@ -1743,7 +1770,8 @@ mux.
 * *AXI Master inputs* (R/B data, READY feedback): Combinational -- feeds
 control logic and FIFO write.
 * *FDI TX outputs* (DATA, VALID, IRDY): Combinational. STALLACK outputs
-are registered.
+are registered. With [.monospaced]#++TX_NXT_PACKING_EN = 1++# the DATA output is driven from
+a register in [.monospaced]#++AOU_TX_CORE++# through the FDI output mux only.
 * *FDI RX inputs*: Combinational -- data/valid pass through an input
 mux. [.monospaced]#++FLIT_CANCEL++# drives both sequential and combinational logic.
 * *Interrupt/control signals*: Combinational.

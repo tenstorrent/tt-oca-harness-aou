@@ -264,11 +264,11 @@ logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_wda
 logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_rreqcred;
 logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_wreqcred;
 
-logic   [3:0] [8:0]             w_cnt_rp_aw_credit;
-logic   [3:0] [8:0]             w_cnt_rp_ar_credit;
-logic   [3:0] [8:0]             w_cnt_rp_w_credit; 
-logic   [3:0] [8:0]             w_cnt_rp_r_credit; 
-logic   [3:0] [4:0]             w_cnt_rp_b_credit;
+logic   [3:0] [9:0]             w_cnt_rp_aw_credit;
+logic   [3:0] [9:0]             w_cnt_rp_ar_credit;
+logic   [3:0] [9:0]             w_cnt_rp_w_credit; 
+logic   [3:0] [9:0]             w_cnt_rp_r_credit; 
+logic   [3:0] [5:0]             w_cnt_rp_b_credit;
  
 logic   [RP_COUNT-1:0] [8:0]    w_cnt_rp_aw_credit_discount;
 logic   [RP_COUNT-1:0] [8:0]    w_cnt_rp_ar_credit_discount;

@@ -261,8 +261,8 @@ expect_fail = "BUGS/031 (expected_fail.yaml)"
 expect_fail_match = "AXI-R07: B ID|matches no outstanding write"
 
 # The per-RP remote widths put every RP of the 4xmix pair through each of its
-# converters. 1024-bit remote data reaches a 256-bit RP only aligned while
-# BUGS/025 is open, and in aou_dw_down1024_test, which XFAILs on it.
+# converters. 1024-bit remote data reaches a 256-bit RP aligned here and
+# unaligned in aou_dw_down1024_test (tenstorrent/tt-oca-harness-aou#90, fixed by RTL PR #89).
 [[tests]]
 name = "aou_dw_test.remote_bytes-32.4xmix4211-sp128"
 module = { uvm = "aou_dw_test" }
@@ -313,7 +313,6 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=128", "+dp_align=aligned"]
 
-# Known failures: BUGS/025 (expected_fail.yaml)
 [[tests]]
 name = "aou_dw_down1024_test.4xmix4211-sp128"
 module = { uvm = "aou_dw_down1024_test" }
@@ -322,8 +321,6 @@ seed = 1
 reseed = 3
 tags = ["matrix"]
 run_modes = ["matrix"]
-expect_fail = "BUGS/025 (expected_fail.yaml)"
-expect_fail_match = "AXI-S02: remote->local"
 
 [[tests]]
 name = "aou_dw_test.remote_bytes-32.4xmix2144-sp64"
@@ -375,7 +372,6 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=128", "+dp_align=aligned"]
 
-# Known failures: BUGS/025 (expected_fail.yaml)
 [[tests]]
 name = "aou_dw_down1024_test.4xmix2144-sp64"
 module = { uvm = "aou_dw_down1024_test" }
@@ -384,8 +380,6 @@ seed = 1
 reseed = 3
 tags = ["matrix"]
 run_modes = ["matrix"]
-expect_fail = "BUGS/025 (expected_fail.yaml)"
-expect_fail_match = "AXI-S02: remote->local"
 
 [[tests]]
 name = "aou_dw_test.remote_bytes-32.1x256-sp32"
@@ -407,7 +401,6 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=64"]
 
-# Known failures: BUGS/025 (expected_fail.yaml)
 [[tests]]
 name = "aou_dw_down1024_test.1x256-sp32"
 module = { uvm = "aou_dw_down1024_test" }
@@ -416,8 +409,6 @@ seed = 1
 reseed = 2
 tags = ["matrix"]
 run_modes = ["matrix"]
-expect_fail = "BUGS/025 (expected_fail.yaml)"
-expect_fail_match = "AXI-S02: remote->local"
 
 [[tests]]
 name = "aou_dw_test.remote_bytes-32.2xmix-tp64_128"
@@ -795,6 +786,69 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_bytes=32"]
 
+# TX_NXT_PACKING_EN 1 (target -nxt): the TX packer's registered output stage,
+# the other value of the AOU_TX_CORE parameter (default 0 everywhere else).
+# The link gate, mixed-direction traffic, the flit packing scenarios and
+# back-pressure on every channel, since the stage sits between the granule
+# ring and the FDI output.
+[[tests]]
+name = "aou_sanity_test.1x512-sp64-nxt"
+module = { uvm = "aou_sanity_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.1x512-sp64-nxt"
+module = { uvm = "aou_dp_random_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both"]
+
+[[tests]]
+name = "aou_pack_test.pk-crossflit.1x512-sp64-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=crossflit"]
+
+[[tests]]
+name = "aou_pack_test.pk-mixed.1x512-sp64-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=mixed"]
+
+[[tests]]
+name = "aou_pack_test.pk-full.1x512-sp64-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=full"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-all.1x512-sp64-nxt"
+module = { uvm = "aou_stress_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+st_bp=all"]
+
 # 12.20: local and remote RP_COUNT differ; traffic on the RPs both dies have
 # (T1-M01: the others carry no AXI message; AOU-R14/AOU-R24 on the smaller count).
 [[tests]]
@@ -839,7 +893,7 @@ args = ["+remote_rp_count=3"]
 
 [[groups]]
 name = "matrix"
-expected_count = 82
+expected_count = 88
 tests = [
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-1.4x512-sp64",
@@ -919,6 +973,12 @@ tests = [
   "aou_dp_random_test.dp_dir-both.1x512-sp64-p512",
   "aou_dp_size_test.dp_size-0_1_2_3_4_5_6.1x512-sp64-p512",
   "aou_dw_test.remote_bytes-32.1x512-sp64-p512",
+  "aou_sanity_test.1x512-sp64-nxt",
+  "aou_dp_random_test.dp_dir-both.1x512-sp64-nxt",
+  "aou_pack_test.pk-crossflit.1x512-sp64-nxt",
+  "aou_pack_test.pk-mixed.1x512-sp64-nxt",
+  "aou_pack_test.pk-full.1x512-sp64-nxt",
+  "aou_stress_test.st_bp-all.1x512-sp64-nxt",
   "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.remote_rp_count-2",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1",
   "aou_mrp_test.remote_rp_count-4",

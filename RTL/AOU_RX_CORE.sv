@@ -653,11 +653,11 @@ import packet_def_pkg::*;
     assign w_read_req_cnt       = {i_read_req_cnt[0], r_read_req_cnt};
 
     assign w_write_data_idx     = {i_write_data_idx, r_write_data_idx[0], r_write_data_idx[1], r_write_data_idx[2]};
-    assign w_write_data_valid   = {(i_write_data_valid & {MAX_DATA_COUNT_CHUNK{w_rx_chunk_data_valid}}), r_write_data_valid[0], r_write_data_valid[1], r_write_data_valid[2]};
+    assign w_write_data_valid   = {(i_write_data_valid & {(MAX_DATA_COUNT_CHUNK*DEC_MULTI){w_rx_chunk_data_valid}}), r_write_data_valid[0], r_write_data_valid[1], r_write_data_valid[2]};
     assign w_write_data_cnt     = {i_write_data_cnt, r_write_data_cnt[0], r_write_data_cnt[1], r_write_data_cnt[2]};
 
     assign w_read_data_idx      = {i_read_data_idx, r_read_data_idx[0], r_read_data_idx[1], r_read_data_idx[2]};
-    assign w_read_data_valid    = {(i_read_data_valid & {MAX_DATA_COUNT_CHUNK{w_rx_chunk_data_valid}}), r_read_data_valid[0], r_read_data_valid[1], r_read_data_valid[2]};
+    assign w_read_data_valid    = {(i_read_data_valid & {(MAX_DATA_COUNT_CHUNK*DEC_MULTI){w_rx_chunk_data_valid}}), r_read_data_valid[0], r_read_data_valid[1], r_read_data_valid[2]};
     assign w_read_data_cnt      = {i_read_data_cnt, r_read_data_cnt[0], r_read_data_cnt[1], r_read_data_cnt[2]};
 
 //Find start index for each message (misc, aw, ar, w, b, r)

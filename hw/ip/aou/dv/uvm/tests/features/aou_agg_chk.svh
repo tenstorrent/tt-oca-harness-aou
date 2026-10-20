@@ -5,10 +5,14 @@
 // FEAT-R03 (enabled): a narrow multi-beat burst never reaches the M port; it is
 // promoted to the full bus width. FEAT-R04 (disabled): every original burst
 // reaches the M port with its own address, size and length. The enable is per
-// RP (agg_en[rp]), and each RP is judged by its own. need_from/need_to
-// (bytes, 0: off) require at least one narrow multi-beat original of that beat
-// size on an RP of that width, so a run that claims a promotion (plan 17.3:
-// 256-bit bursts onto a 1024-bit RP) shows it happened.
+// RP (agg_en[rp]), and each RP is judged by its own. A write is only eligible
+// when it is modifiable and not exclusive (AWCACHE[1]=1, AWLOCK=0; MAS 3.8.2,
+// RTL PR #89); other writes pass through unchanged even with the aggregator
+// on, and are judged like FEAT-R04. Reads are always eligible (3.8.3).
+// need_from/need_to (bytes, 0: off) require at least one eligible narrow
+// multi-beat original of that beat size on an RP of that width, so a run that
+// claims a promotion (plan 17.3: 256-bit bursts onto a 1024-bit RP) shows it
+// happened.
 class aou_agg_chk extends uvm_component;
   `uvm_component_utils(aou_agg_chk)
 
@@ -42,6 +46,12 @@ class aou_agg_chk extends uvm_component;
     return t.beat_bytes() < bus_bytes(t) && t.len != 0;
   endfunction
 
+  // The aggregator may merge this burst: on for its RP, and for a write only
+  // when it is modifiable and not exclusive (MAS 3.8.2).
+  function bit eligible(aou_axi_txn t);
+    return agg_en[t.rp] && (t.dir == AOU_AXI_RD || (t.cache[1] && !t.lock));
+  endfunction
+
   static function string width_key(int unsigned from, int unsigned to);
     return $sformatf("%0d->%0d", from, to);
   endfunction
@@ -51,7 +61,9 @@ class aou_agg_chk extends uvm_component;
   endfunction
 
   function void take_orig(aou_axi_txn t);
-    if (narrow_burst(t)) begin
+    // Exercised: a narrow original the aggregator could act on (its RP off, or
+    // on and the burst eligible); with it on, a non-eligible write proves nothing.
+    if (narrow_burst(t) && (!agg_en[t.rp] || eligible(t))) begin
       string wk = width_key(t.beat_bytes(), bus_bytes(t));
       n_narrow_orig++;
       if (n_by_width.exists(wk)) n_by_width[wk]++;
@@ -59,13 +71,13 @@ class aou_agg_chk extends uvm_component;
     end
     // A beat wider than the RP goes through the width converter, which
     // reshapes the burst whatever the aggregator does.
-    if (!agg_en[t.rp] && t.beat_bytes() <= bus_bytes(t)) want.push_back(key(t));
+    if (!eligible(t) && t.beat_bytes() <= bus_bytes(t)) want.push_back(key(t));
   endfunction
 
   function void take_m(aou_axi_txn t);
     string k = key(t);
     n_m++;
-    if (agg_en[t.rp] && narrow_burst(t))
+    if (eligible(t) && narrow_burst(t))
       `uvm_error(get_type_name(), $sformatf(
           "FEAT-R03: RP%0d aggregator on but a %0d-byte, %0d-beat burst reached the M port: %s",
           t.rp, t.beat_bytes(), t.beats(), t.convert2string()))
@@ -95,7 +107,8 @@ class aou_agg_chk extends uvm_component;
       if (m_seen.exists(want[i]) && m_seen[want[i]] > 0) m_seen[want[i]]--;
       else
         `uvm_error(get_type_name(), $sformatf(
-            "FEAT-R04: aggregator off but burst {dir:addr:size:len}=%s not unchanged at the M port",
+            {"FEAT-R04: aggregator off (or write not eligible) but burst ",
+             "{dir:addr:size:len}=%s not unchanged at the M port"},
             want[i]))
     end
   endfunction

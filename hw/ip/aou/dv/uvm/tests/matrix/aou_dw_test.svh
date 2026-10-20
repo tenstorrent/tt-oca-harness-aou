@@ -49,8 +49,9 @@ class aou_dw_test extends aou_dp_base_test;
 endclass
 
 // The 1024-to-256-bit downsizer (plan 14.5) on its own: the remote die is
-// 1024 bits wide on the 256-bit RPs and 512 bits on the others, so the known
-// failures of BUGS/025 (expected_fail.yaml) stay confined to this test.
+// 1024 bits wide on the 256-bit RPs and 512 bits on the others, so the
+// unaligned AWSIZE=6 conversion (tenstorrent/tt-oca-harness-aou#90, fixed by RTL PR #89) is exercised
+// here and nowhere else.
 class aou_dw_down1024_test extends aou_dw_test;
   `uvm_component_utils(aou_dw_down1024_test)
 

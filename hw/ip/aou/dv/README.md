@@ -128,7 +128,7 @@ into one book with Asciidoctor.
 
 `CONFIG` selects the build parameters of the T1 bench (`TB=t1`) and the register
 bench (`TB=reg`): RP count, AXI data width per RP, `FDI_CONFIG` and, in `-p<W>`
-configurations, `AXI_PEER_DIE_MAX_DATA_WD`. Build and
+and `-nxt` configurations, `AXI_PEER_DIE_MAX_DATA_WD` and `TX_NXT_PACKING_EN`. Build and
 output directories are named after it (`build/vcs-t1-1x512-sp64`,
 `out/vcs-t1-1x512-sp64`). `make configs` prints this table.
 
@@ -143,6 +143,7 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `2xmix-tp64_128` | 2 | 512, 1024 | FDI_CFG_TP_64B_128B | 2 | Two-PHY FDI, two RPs, mixed widths |
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
 | `1x512-sp64-p512` | 1 | 512 | FDI_CFG_SP_64B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 512 (plan 14.17) |
+| `1x512-sp64-nxt` | 1 | 512 | FDI_CFG_SP_64B | 1 | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
 
 Reading a name:
@@ -156,6 +157,9 @@ Reading a name:
   (`FDI_CFG_TP_<B1>B_<B2>B`, built with `TWO_PHY`).
 - `-p<W>`: `AXI_PEER_DIE_MAX_DATA_WD` of W bits (1024, the RTL default,
   without it). A `+remote_bytes` above W/8 is limited to W/8.
+- `-nxt`: `TX_NXT_PACKING_EN` 1 (`AOU_TX_NXT_PACKING=1`): the TX flit packer
+  computes each chunk from its look-ahead state and registers it before the FDI
+  output; the default (0) drives the chunk combinationally from the granule ring.
 - `-rxf`: non-default RX FIFO depths (`AOU_T1_RX_DEPTH` in `uvm/env/aou_t1_env_pkg.sv`) and
   `RX_*_FIFO_RS_EN=0`, passed to `AOU_TOP` under the `AOU_RX_FIFO_ALT` define.
 
@@ -355,7 +359,8 @@ fake `make run`.
 ## Lint and coding rules
 
 `make lint` runs Verible and Verilator `-Wall` on the testbench (RTL and
-uvm-core are excluded), after `scripts/check_rules.py`, which fails when a rule
+uvm-core are excluded; the T1 top is linted with the DUT's parameter defaults
+and again with `AOU_TX_NXT_PACKING=1`, the `-nxt` build), after `scripts/check_rules.py`, which fails when a rule
 ID the testbench emits has no row in `uvm/env/checkers/rules.csv` or a row's ID is never
 emitted (rows checked `via`, by construction, not checked or N/A excepted; any
 other exception goes in its `EXEMPT` list with the reason). New code follows [CODING_GUIDELINES.md](CODING_GUIDELINES.md)

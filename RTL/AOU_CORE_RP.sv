@@ -37,6 +37,7 @@ import packet_def_pkg::*;
 
     parameter   M_RD_MO_CNT                 = 32,
     parameter   M_WR_MO_CNT                 = 32,
+    parameter   AOU_AGG_WCH_FIFO_DEPTH      = 16,
 
     localparam  AXI_ADDR_WD                 = 64,
     localparam  AXI_ID_WD                   = 10,
@@ -224,6 +225,11 @@ import packet_def_pkg::*;
     output  [1:0]                           O_EARLY_BRESP_ERR_TYPE,
     output  [AXI_ID_WD-1:0]                 O_EARLY_BRESP_ERR_ID,
     input                                   I_EARLY_BRESP_EN,
+    input                                   I_EARLY_BRESP_ALWAYS_EN,
+
+    input                                   I_EARLY_BRESP_WDT_EN, 
+    input   [31:0]                          I_EARLY_BRESP_WDT_THRESHOLD,
+    output                                  O_EARLY_BRESP_TRANS_TIMEOUT_ERR,
                                   
     input   [31:0]                          I_DEBUG_ERROR_INFO_UPPER_ADDR,
     input   [31:0]                          I_DEBUG_ERROR_INFO_LOWER_ADDR,
@@ -723,71 +729,75 @@ import packet_def_pkg::*;
     );
 
     AOU_EARLY_BRESP_CTRL_AWCACHE #(
-        .AXI_DATA_WD                ( AXI_DATA_WD                   ), 
-        .AXI_ADDR_WD                ( AXI_ADDR_WD                   ), 
-        .AXI_ID_WD                  ( AXI_ID_WD                     ), 
-        .AXI_LEN_WD                 ( AXI_LEN_WD                    ), 
+        .AXI_DATA_WD                ( AXI_DATA_WD                       ), 
+        .AXI_ADDR_WD                ( AXI_ADDR_WD                       ), 
+        .AXI_ID_WD                  ( AXI_ID_WD                         ), 
+        .AXI_LEN_WD                 ( AXI_LEN_WD                        ), 
                                     
-        .AW_W_FIFO_CNT_DEPTH        ( 3                             ),
-        .WR_MO_CNT                  ( S_WR_MO_CNT                   )
+        .AW_W_FIFO_CNT_DEPTH        ( 3                                 ),
+        .WR_MO_CNT                  ( S_WR_MO_CNT                       )
     ) u_aou_early_bresp_s_ctrl
     (
-        .I_CLK                      ( I_CLK                         ),
-        .I_RESETN                   ( I_RESETN                      ),                    
+        .I_CLK                      ( I_CLK                             ),
+        .I_RESETN                   ( I_RESETN                          ),                    
     
-        .I_AXI_S_AWID               ( I_AOU_TX_AXI_S_AWID           ),
-        .I_AXI_S_AWADDR             ( I_AOU_TX_AXI_S_AWADDR         ),
-        .I_AXI_S_AWLEN              ( I_AOU_TX_AXI_S_AWLEN          ),
-        .I_AXI_S_AWSIZE             ( I_AOU_TX_AXI_S_AWSIZE         ),
-        .I_AXI_S_AWBURST            ( I_AOU_TX_AXI_S_AWBURST        ),      
-        .I_AXI_S_AWLOCK             ( I_AOU_TX_AXI_S_AWLOCK         ),
-        .I_AXI_S_AWCACHE            ( I_AOU_TX_AXI_S_AWCACHE        ),
-        .I_AXI_S_AWPROT             ( I_AOU_TX_AXI_S_AWPROT         ),
-        .I_AXI_S_AWQOS              ( I_AOU_TX_AXI_S_AWQOS          ),
-        .I_AXI_S_AWVALID            ( I_AOU_TX_AXI_S_AWVALID        ),
-        .O_AXI_S_AWREADY            ( O_AOU_TX_AXI_S_AWREADY        ),
+        .I_AXI_S_AWID               ( I_AOU_TX_AXI_S_AWID               ),
+        .I_AXI_S_AWADDR             ( I_AOU_TX_AXI_S_AWADDR             ),
+        .I_AXI_S_AWLEN              ( I_AOU_TX_AXI_S_AWLEN              ),
+        .I_AXI_S_AWSIZE             ( I_AOU_TX_AXI_S_AWSIZE             ),
+        .I_AXI_S_AWBURST            ( I_AOU_TX_AXI_S_AWBURST            ),      
+        .I_AXI_S_AWLOCK             ( I_AOU_TX_AXI_S_AWLOCK             ),
+        .I_AXI_S_AWCACHE            ( I_AOU_TX_AXI_S_AWCACHE            ),
+        .I_AXI_S_AWPROT             ( I_AOU_TX_AXI_S_AWPROT             ),
+        .I_AXI_S_AWQOS              ( I_AOU_TX_AXI_S_AWQOS              ),
+        .I_AXI_S_AWVALID            ( I_AOU_TX_AXI_S_AWVALID            ),
+        .O_AXI_S_AWREADY            ( O_AOU_TX_AXI_S_AWREADY            ),
                                                     
-        .I_AXI_S_WDATA              ( I_AOU_TX_AXI_S_WDATA          ),
-        .I_AXI_S_WSTRB              ( I_AOU_TX_AXI_S_WSTRB          ),
-        .I_AXI_S_WLAST              ( I_AOU_TX_AXI_S_WLAST          ),
-        .I_AXI_S_WVALID             ( I_AOU_TX_AXI_S_WVALID         ),
-        .O_AXI_S_WREADY             ( O_AOU_TX_AXI_S_WREADY         ),
+        .I_AXI_S_WDATA              ( I_AOU_TX_AXI_S_WDATA              ),
+        .I_AXI_S_WSTRB              ( I_AOU_TX_AXI_S_WSTRB              ),
+        .I_AXI_S_WLAST              ( I_AOU_TX_AXI_S_WLAST              ),
+        .I_AXI_S_WVALID             ( I_AOU_TX_AXI_S_WVALID             ),
+        .O_AXI_S_WREADY             ( O_AOU_TX_AXI_S_WREADY             ),
                                
-        .O_AXI_S_BID                ( O_AOU_RX_AXI_S_BID            ),
-        .O_AXI_S_BRESP              ( O_AOU_RX_AXI_S_BRESP          ),
-        .O_AXI_S_BVALID             ( O_AOU_RX_AXI_S_BVALID         ),
-        .I_AXI_S_BREADY             ( I_AOU_RX_AXI_S_BREADY         ),                       
+        .O_AXI_S_BID                ( O_AOU_RX_AXI_S_BID                ),
+        .O_AXI_S_BRESP              ( O_AOU_RX_AXI_S_BRESP              ),
+        .O_AXI_S_BVALID             ( O_AOU_RX_AXI_S_BVALID             ),
+        .I_AXI_S_BREADY             ( I_AOU_RX_AXI_S_BREADY             ),                       
                                
-        .O_AXI_M_AWID               ( O_EARLY_BRESP_CTRL_AWID       ),
-        .O_AXI_M_AWADDR             ( O_EARLY_BRESP_CTRL_AWADDR     ),
-        .O_AXI_M_AWLEN              ( O_EARLY_BRESP_CTRL_AWLEN      ),
-        .O_AXI_M_AWSIZE             ( O_EARLY_BRESP_CTRL_AWSIZE     ),
-        .O_AXI_M_AWBURST            ( O_EARLY_BRESP_CTRL_AWBURST    ),
-        .O_AXI_M_AWLOCK             ( O_EARLY_BRESP_CTRL_AWLOCK     ),
-        .O_AXI_M_AWCACHE            ( O_EARLY_BRESP_CTRL_AWCACHE    ),
-        .O_AXI_M_AWPROT             ( O_EARLY_BRESP_CTRL_AWPROT     ),
-        .O_AXI_M_AWQOS              ( O_EARLY_BRESP_CTRL_AWQOS      ),
-        .O_AXI_M_AWVALID            ( w_early_bresp_ctrl_awvalid    ),
-        .I_AXI_M_AWREADY            ( w_early_bresp_ctrl_awready    ),
+        .O_AXI_M_AWID               ( O_EARLY_BRESP_CTRL_AWID           ),
+        .O_AXI_M_AWADDR             ( O_EARLY_BRESP_CTRL_AWADDR         ),
+        .O_AXI_M_AWLEN              ( O_EARLY_BRESP_CTRL_AWLEN          ),
+        .O_AXI_M_AWSIZE             ( O_EARLY_BRESP_CTRL_AWSIZE         ),
+        .O_AXI_M_AWBURST            ( O_EARLY_BRESP_CTRL_AWBURST        ),
+        .O_AXI_M_AWLOCK             ( O_EARLY_BRESP_CTRL_AWLOCK         ),
+        .O_AXI_M_AWCACHE            ( O_EARLY_BRESP_CTRL_AWCACHE        ),
+        .O_AXI_M_AWPROT             ( O_EARLY_BRESP_CTRL_AWPROT         ),
+        .O_AXI_M_AWQOS              ( O_EARLY_BRESP_CTRL_AWQOS          ),
+        .O_AXI_M_AWVALID            ( w_early_bresp_ctrl_awvalid        ),
+        .I_AXI_M_AWREADY            ( w_early_bresp_ctrl_awready        ),
                                             
-        .O_AXI_M_WDATA              ( O_EARLY_BRESP_CTRL_WDATA      ),
-        .O_AXI_M_WSTRB              ( O_EARLY_BRESP_CTRL_WSTRB      ),
-        .O_AXI_M_WLAST              ( O_EARLY_BRESP_CTRL_WLAST      ),
-        .O_AXI_M_WVALID             ( w_early_bresp_ctrl_wvalid     ),
-        .I_AXI_M_WREADY             ( w_early_bresp_ctrl_wready     ),
+        .O_AXI_M_WDATA              ( O_EARLY_BRESP_CTRL_WDATA          ),
+        .O_AXI_M_WSTRB              ( O_EARLY_BRESP_CTRL_WSTRB          ),
+        .O_AXI_M_WLAST              ( O_EARLY_BRESP_CTRL_WLAST          ),
+        .O_AXI_M_WVALID             ( w_early_bresp_ctrl_wvalid         ),
+        .I_AXI_M_WREADY             ( w_early_bresp_ctrl_wready         ),
                                
-        .I_AXI_M_BID                ( w_early_bresp_ctrl_bid        ),
-        .I_AXI_M_BRESP              ( w_early_bresp_ctrl_bresp      ),
-        .I_AXI_M_BVALID             ( w_early_bresp_ctrl_bvalid     ),
-        .O_AXI_M_BREADY             ( w_early_bresp_ctrl_bready     ),
+        .I_AXI_M_BID                ( w_early_bresp_ctrl_bid            ),
+        .I_AXI_M_BRESP              ( w_early_bresp_ctrl_bresp          ),
+        .I_AXI_M_BVALID             ( w_early_bresp_ctrl_bvalid         ),
+        .O_AXI_M_BREADY             ( w_early_bresp_ctrl_bready         ),
 
-        .I_EARLY_BRESP_EN           ( I_EARLY_BRESP_EN              ),
-        .O_BRESP_DONE               ( O_EARLY_BRESP_DONE            ),
+        .I_EARLY_BRESP_EN           ( I_EARLY_BRESP_EN                  ),
+        .I_EARLY_BRESP_ALWAYS_EN    ( I_EARLY_BRESP_ALWAYS_EN           ),
+        .O_BRESP_DONE               ( O_EARLY_BRESP_DONE                ),
                                
-        .O_BRESP_ERR                ( O_EARLY_BRESP_ERR_SET         ),
-        .O_BRESP_ERR_ID             ( O_EARLY_BRESP_ERR_ID          ),
-        .O_BRESP_ERR_TYPE           ( O_EARLY_BRESP_ERR_TYPE        ),
-        .O_PENDING_CNT_OVER         (                               )                               
+        .O_BRESP_ERR                ( O_EARLY_BRESP_ERR_SET             ),
+        .O_BRESP_ERR_ID             ( O_EARLY_BRESP_ERR_ID              ),
+        .O_BRESP_ERR_TYPE           ( O_EARLY_BRESP_ERR_TYPE            ),
+        
+        .I_SFR_WDT_EN               ( I_EARLY_BRESP_WDT_EN              ), 
+        .I_SFR_WDT_THRESHOLD        ( I_EARLY_BRESP_WDT_THRESHOLD       ),
+        .O_AXI_WR_TRANS_TIMEOUT_ERR ( O_EARLY_BRESP_TRANS_TIMEOUT_ERR   )                             
     );
 
 //----------------------------------------------------------------------------
@@ -797,7 +807,8 @@ import packet_def_pkg::*;
         .ID_WD                          ( AXI_ID_WD                         ),
         .LEN_WD                         ( AXI_LEN_WD                        ),
         .RD_MO_CNT                      ( M_RD_MO_CNT                       ),
-        .WR_MO_CNT                      ( M_WR_MO_CNT                       )
+        .WR_MO_CNT                      ( M_WR_MO_CNT                       ),
+        .AOU_AGG_WCH_FIFO_DEPTH         ( AOU_AGG_WCH_FIFO_DEPTH            )
     ) u_aou_axi4mux_3x1_top
     (
         .I_CLK                          ( I_CLK                             ),
@@ -1080,7 +1091,7 @@ end
         end
     end 
 
-    assign O_SLV_TR_COMPLETE = (~(|r_slv_wr_pending_cnt) & ~(|r_slv_rd_pending_cnt));
+    assign O_SLV_TR_COMPLETE = O_EARLY_BRESP_DONE & (~(|r_slv_wr_pending_cnt) & ~(|r_slv_rd_pending_cnt));
     assign O_MST_TR_COMPLETE = (~(|r_mst_wr_pending_cnt) & ~(|r_mst_rd_pending_cnt));
     
 

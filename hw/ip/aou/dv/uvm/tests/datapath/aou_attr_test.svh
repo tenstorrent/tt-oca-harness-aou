@@ -15,9 +15,9 @@
 // and xfer_cov.excl_cg counts EXOKAY and failed exclusives each way.
 // +attr_early=1 enables early write responses on every RP, makes the
 // exclusive accesses bufferable (AWCACHE[0]=1) and the traffic after them
-// writes only (half bufferable, no sweep): an exclusive write still needs its
-// real EXOKAY, since only the subordinate can grant it (interim expectation:
-// no document says whether early responses cover exclusive writes).
+// writes only (half bufferable, no sweep): an exclusive write still gets its
+// real EXOKAY, since only the subordinate can grant it (MAS 3.7.1: AWLOCK=1
+// is never answered early, whatever AWCACHE[0] and EARLY_ALWAYS_EN say).
 class aou_attr_test extends aou_dp_base_test;
   `uvm_component_utils(aou_attr_test)
 

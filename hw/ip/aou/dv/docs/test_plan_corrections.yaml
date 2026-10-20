@@ -285,7 +285,7 @@
 - id: '4.31'
   added: 'AXI4 A3.3.1'
   priority: P2
-  title: 'W data before AW on the S port is accepted'
+  title: 'W data presented before its AW on the S port is accepted once the AW arrives'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.15'
   added: 'AoU 6.4.1; BUGS/012'
@@ -390,8 +390,8 @@
 - id: '16.17'
   added: 'MAS 3.7.5; BUGS/005'
   priority: P2
-  title: 'O_PENDING_CNT_OVER on a write at the early-response limit'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked)'
+  note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. PR #89 replaced the signal with a write-transaction watchdog the MAS does not yet specify.'
 - id: '18.13'
   added: 'UCIe r1.1 8.3.3.4; BUGS/015'
   priority: P2

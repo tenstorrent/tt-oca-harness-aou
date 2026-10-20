@@ -280,7 +280,8 @@ tags = ["datapath"]
 run_modes = ["datapath"]
 args = ["+attr_excl=1"]
 
-# Exclusive writes that are bufferable with early responses enabled.
+# Exclusive writes that are bufferable with early responses enabled: they get the
+# subordinate's EXOKAY/OKAY, not an early OKAY (MAS 3.7.1).
 [[tests]]
 name = "aou_attr_test.attr_excl-1.attr_early-1"
 module = { uvm = "aou_attr_test" }

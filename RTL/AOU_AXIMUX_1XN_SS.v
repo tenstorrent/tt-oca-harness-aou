@@ -28,7 +28,7 @@
 module AOU_AXIMUX_1XN_SS #(
     parameter   AOU_AXIMUX_1XN_ARCH_RS_EN = 1,
     parameter   AOU_AXIMUX_1XN_RCH_RS_EN  = 1,
-    parameter   AOU_AXIMUX_1XN_AWCH_RS_EN = 1,
+    parameter   AOU_AXIMUX_1XN_AWCH_RS_EN = 0,//In AoU, it connects with Aggegator, so it should be 0.
     parameter   AOU_AXIMUX_1XN_WCH_RS_EN  = 1,
     parameter   AOU_AXIMUX_1XN_M_AWCH_RS_EN = 1,
     parameter   AOU_AXIMUX_1XN_M_WCH_RS_EN = 1,

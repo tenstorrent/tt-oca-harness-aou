@@ -533,8 +533,8 @@ yet carries the `blocked` tag and its reason in the sidecar; `run_list.py` and
 
 **Decision.** `CONFIG` selects the T1 (and register bench) build parameters: RP
 count, data width per RP, `FDI_CONFIG` and, where it is not the default 1024,
-`AXI_PEER_DIE_MAX_DATA_WD` (and, in `-rxf`, the RX FIFO parameters). Ten
-configurations exist:
+`AXI_PEER_DIE_MAX_DATA_WD`, `TX_NXT_PACKING_EN` (and, in `-rxf`, the RX FIFO
+parameters). Eleven configurations exist:
 
 | CONFIG | RPs | RP widths | FDI_CONFIG | Purpose |
 |---|---|---|---|---|
@@ -547,6 +547,7 @@ configurations exist:
 | 2xmix-tp64_128 | 2 | 512, 1024 | 4 (TP_64B_128B) | Two-PHY FDI, two RPs, mixed widths |
 | 2x512-tp32_64 | 2 | 512 each | 3 (TP_32B_64B) | Two-PHY FDI with a 256-bit PHY0, two RPs at one width |
 | 1x512-sp64-p512 | 1 | 512 | 1 (SP_64B) | `AXI_PEER_DIE_MAX_DATA_WD` 512 (plan 14.17) |
+| 1x512-sp64-nxt | 1 | 512 | 1 (SP_64B) | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
 | 2xmix-sp64-rxf | 2 | 1024, 256 | 1 (SP_64B) | Non-default RX FIFO depths, RX FIFO register slices off |
 
 Names describe the configuration and refer to nothing else:
@@ -560,6 +561,9 @@ Names describe the configuration and refer to nothing else:
 - `-p<W>`: `AXI_PEER_DIE_MAX_DATA_WD` of W bits (`CONFIG_PEER_W`); without it
   the RTL default, 1024. The remote die is then never wider than W bits
   (`aou_t1_env_cfg::finalize()` limits `+remote_bytes`).
+- `-nxt`: `TX_NXT_PACKING_EN` 1 (`AOU_TX_NXT_PACKING=1`): the other value of the
+  AOU_TX_CORE output-stage parameter, a registered flit chunk computed from the
+  packer's look-ahead state. Every other build takes the RTL default, 0.
 - `-rxf`: the integrator's RX FIFO parameters changed: a different depth per RP and
   class (multiples the MAS 3.9 credit formulas divide by) and every `RX_*_FIFO_RS_EN`
   0. The other builds keep the RTL defaults, so the advertised credit is checked

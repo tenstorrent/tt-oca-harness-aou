@@ -22,6 +22,7 @@ endif::[]
 |INT_SI0_ID_MISMATCH |W1C |Asserted when AXI subordinate port received with an AXI ID response that does not match any transaction
 |INT_MI0_ID_MISMATCH |W1C |Asserted when AXI manager port received with an AXI ID response that does not match any transaction
 |INT_EARLY_RESP_ERR |W1C |Asserted when B response error occurs on early responded B response
+|INT_EARLY_WDT_ERR |W1C |Asserted when the write-transaction watchdog of an RP expires: with WDT_EN set, no AW or B handshake occurred for WDT_THRESHOLD cycles while writes were outstanding
 |INT_REQ_LINKRESET |W1C |Asserted when AOU_CORE encounters AOU SPEC protocol violation. Request link to go LinkReset.
 |=================================================================================================================================
 
@@ -52,6 +53,12 @@ Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.ERR
 An interrupt that occurs when, due to the xref:aou-37-write-early-response-controller[Write Early Response] feature, a B response has already been sent through the AXI Subordinate Interface, and a subsequent actual B response arrives with an error. For details, see xref:aou-373-transaction-flow----error-case[Section 3.7.3].
 
 Software can check the ID and error type of the transaction in which the error occurred by reading [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE.WRITE_RESP_ERR++#.
+
+* *INT_EARLY_WDT_ERR*
+
+An interrupt that occurs when the write-transaction watchdog of the xref:aou-37-write-early-response-controller[Write Early Response Controller] expires on an RP. The watchdog is enabled per RP by [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_EN++#; it counts I_CLK cycles in which neither an AW nor a B handshake occurs while the RP has writes outstanding (AW accepted, actual B from the remote die not yet received), restarts on either handshake, and expires when the count reaches [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD++# (shared by all RPs). An expiry typically means the remote die stopped answering writes for which an early OKAY may already have been returned. For details, see xref:aou-375-write-outstanding-queue-backpressure[Section 3.7.5].
+
+Software can find the RP by reading [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_TRANS_TIMEOUT_ERR++#. The status bit is sticky; the interrupt can be cleared by writing pass:[']1pass:['] to it, and masked for all RPs with [.monospaced]#++AOU_CORE.AOU_INTERRUPT_MASK.INT_EARLY_WDT_MASK++# (the mask gates the pin, not the status bit).
 
 * *INT_REQ_LINKRESET*
 

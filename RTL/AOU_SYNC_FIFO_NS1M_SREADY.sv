@@ -32,6 +32,7 @@ module AOU_SYNC_FIFO_NS1M_SREADY
     parameter   ICH_CNT  = 4   ,          // input channel count
 
     localparam  ICH_CNT_WD = $clog2(ICH_CNT+1),
+    localparam  ICH_IDX_WD = (ICH_CNT <= 1 ) ? 1 : $clog2(ICH_CNT),
     localparam  AW         = $clog2(FIFO_DEPTH),
     localparam  CNT_WD     = $clog2(FIFO_DEPTH+1)
 )
@@ -74,8 +75,8 @@ always_comb begin
 
     for (idx_write_req = 0; idx_write_req < ICH_CNT; idx_write_req = idx_write_req + 1) begin
         if (I_SVALID[idx_write_req] == 1'b1) begin
-            w_nxt_fifo_data[w_write_req_cnt] = I_SDATA[idx_write_req]; 
-            w_nxt_wr_ptr[w_write_req_cnt] = (r_wr_ptr + w_write_req_cnt >= FIFO_DEPTH) ? (r_wr_ptr + w_write_req_cnt - FIFO_DEPTH) : (r_wr_ptr + w_write_req_cnt);
+            w_nxt_fifo_data[w_write_req_cnt[ICH_IDX_WD-1:0]] = I_SDATA[idx_write_req]; 
+            w_nxt_wr_ptr[w_write_req_cnt[ICH_IDX_WD-1:0]] = (r_wr_ptr + w_write_req_cnt >= FIFO_DEPTH) ? (r_wr_ptr + w_write_req_cnt - FIFO_DEPTH) : (r_wr_ptr + w_write_req_cnt);
             w_write_req_cnt = w_write_req_cnt + 1;
         end
     end

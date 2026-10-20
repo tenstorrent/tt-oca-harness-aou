@@ -241,9 +241,10 @@ module AOU_DATA_W_FIFO_NS1M_TPSRAM
                     w_data_ptr[sram_cnt]    <= nxt_w_data_ptr[sram_cnt];
                     w_ex_data_ptr[sram_cnt] <= nxt_w_ex_data_ptr[sram_cnt];
                 end
-                if(|cen_b)
-                    wr_sram_idx <= ((wr_sram_idx + write_req_cnt) >= REQ_CNT) ? (wr_sram_idx + write_req_cnt - REQ_CNT) : (wr_sram_idx + write_req_cnt);
             end
+
+            if(|cen_b)
+                wr_sram_idx <= ((wr_sram_idx + write_req_cnt) >= REQ_CNT) ? (wr_sram_idx + write_req_cnt - REQ_CNT) : (wr_sram_idx + write_req_cnt);
             
             if(~cen_a_tmp) begin
                 for(int sram_cnt = 0; sram_cnt < REQ_CNT; sram_cnt = sram_cnt + 1) begin

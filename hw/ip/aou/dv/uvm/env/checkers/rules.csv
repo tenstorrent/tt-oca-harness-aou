@@ -154,10 +154,10 @@ AOU-R44,by construction (aou_lsm_driver),,MODEL,Streaming + Format 6 negotiated 
 AOU-R45,aou_fdi_chk_adapter,,DUT,RP counts/DEST_RP maps agree on both ends (checker VIOL_RP_MAP),AoU 6.2; MAS 3.10
 FEAT-R01,aou_split_chk,,DUT,No M-port burst is longer than MAX_AxBURSTLEN+1 beats (illegal values stored as 0xF),MAS 3.6.2/3.6.4
 FEAT-R02,aou_split_chk,,DUT,Each inbound burst becomes ceil(beats/(MAX_AxBURSTLEN+1)) M-port bursts; within the limit it passes unsplit,MAS 3.6.2
-FEAT-R03,aou_agg_chk,,DUT,Aggregator enabled: no narrow multi-beat burst reaches the M port (size promoted to the bus width),MAS 3.8.2/3.8.3
-FEAT-R04,aou_agg_chk,,DUT,Aggregator disabled: every inbound burst reaches the M port with its own address/size/length,MAS 3.8.1
-FEAT-R05,aou_early_bresp_chk,,DUT,EARLY_BRESP_EN=1 and AWCACHE[0]=1: OKAY B at the S port before the remote die completes the write,MAS 3.7.1
-FEAT-R06,aou_early_bresp_chk,,DUT,Early response off or non-bufferable: B at the S port only after the remote die completed the write,MAS 3.7.1
+FEAT-R03,aou_agg_chk,,DUT,Aggregator enabled: no eligible narrow multi-beat burst reaches the M port (size promoted to the bus width); a write is eligible only when modifiable and not exclusive (AWCACHE[1]=1 and AWLOCK=0; RTL PR #89),MAS 3.8.2/3.8.3
+FEAT-R04,aou_agg_chk,,DUT,Aggregator disabled (or a non-modifiable or exclusive write with it enabled): every such inbound burst reaches the M port with its own address/size/length,MAS 3.8.1/3.8.2
+FEAT-R05,aou_early_bresp_chk,,DUT,EARLY_BRESP_EN=1 and AWCACHE[0]=1 and AWLOCK=0: OKAY B at the S port before the remote die completes the write,MAS 3.7.1
+FEAT-R06,aou_early_bresp_chk,,DUT,Early response off or non-bufferable or exclusive: B at the S port only after the remote die completed the write,MAS 3.7.1
 FEAT-R07,aou_early_bresp_vseq,,DUT,Remote error after an early B: INT_EARLY_RESP_ERR plus WRITE_RESP_ERR_ID_INFO/TYPE_INFO capture; W1C clears all three,MAS 3.7.3; SW op WRITE_EARLY_RESPONSE
 FEAT-R08,aou_lp_mode_vseq,,DUT,Idle FDI flits: continuous with TX_LP_MODE=0; none with TX_LP_MODE=1/threshold 0; periodic heartbeat otherwise,SW op Low Power mode; RDL AOU_CON0
 FEAT-R09,aou_dest_rp_chk,,DUT,AXI messages the DUT sends carry DEST_RP of the local RP,MAS 3.10.2
@@ -209,7 +209,7 @@ FEAT-R13,aou_qos_order_chk,,DUT,QoS scenario: both tiers were waiting at the arb
 FEAT-R14,aou_qos_order_chk,,DUT,Round-robin (ARB_MODE 0 or equal priority): no RP granted twice in a row while another has a request waiting,MAS 3.2.1 Figure 5
 FEAT-R15,aou_t1_early_tbl_chk,,DUT,"EARLY_BRESP_EN=1: no S-port AW is accepted while WR_MO_CNT (32) writes hold early-table entries (WLAST accepted, remote WriteResp not yet sent)",MAS 3.7.5; plan 16.11
 FEAT-R16,aou_t1_early_tbl_chk,aou_early_bresp_vseq,DUT,An AW held by the full early table is accepted within 1000 cycles (+early_free_bound) of the remote WriteResp that frees an entry; WRITE_RESP_DONE reads 1 once every write completed,MAS 3.7.5/3.7.6; plan 16.12
-FEAT-R21,aou_t1_early_tbl_chk,,DUT,An AW presented while the early table is full raises O_PENDING_CNT_OVER (white-box; no interrupt carries it) and it never rises below the limit,MAS 3.7.5; BUGS/005; plan 16.17
+FEAT-R21,not checked,,DUT,An AW presented while the early table is full raises O_PENDING_CNT_OVER: the signal was unconnected (BUGS/005) and PR #89 removed it for a write-transaction watchdog (INT_EARLY_WDT_ERR) that the MAS does not yet specify; aou_t1_early_tbl_chk reports the watchdog pin while an AW waits at the limit,MAS 3.7.5; BUGS/005; plan 16.17
 FEAT-R22,aou_t1_mo_chk,,DUT,At most M_RD_MO_CNT reads and M_WR_MO_CNT writes (32) outstanding per RP on the M port: the pending-ID tables back-pressure when full,MAS software-operation 7.2.2; integration guide M_*_MO_CNT; plan 9.20
 T1-E02,aou_t1_dbg_fifo_chk,,DUT,"The response error debug FIFO returns, in push order, one {ID; ADDR aligned to the request size; RESP} entry per remote request answered with an M-port B/R error (either order for errors pushed together); holds four and drops later errors (BUGS/028 interim layout, BUGS/041)",MAS software-operation 7.2.4
 T1-E03,aou_t1_dbg_fifo_chk,,DUT,A debug FIFO read and pop at the configured address complete with OKAY,MAS software-operation 7.2.4

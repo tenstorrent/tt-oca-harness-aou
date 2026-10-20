@@ -539,12 +539,18 @@ check-config:
 	python3 -I $(UVM_ROOT)/scripts/check_testlists.py
 	python3 -I $(UVM_ROOT)/scripts/check_bug_refs.py
 
+# The T1 top is linted twice: with the DUT's parameter defaults and with
+# AOU_TX_NXT_PACKING=1 (TX_NXT_PACKING_EN, the -nxt target), so both generate
+# arms of the TX packer's output stage are elaborated.
 lint: check-config
 	verible-verilog-lint --rules_config=$(UVM_ROOT)/.rules.verible_lint \
 	  --waiver_files=$(UVM_ROOT)/.verible_waivers $(TB_SOURCES)
 	$(foreach tb,reg axi_selftest l3_unit t1,verilator --lint-only -Wall --timing \
 	  --top-module $(shell $(call LINT_CFG,$(tb)) top) $(addprefix +define+,$(call LINT_DEFINES,$(tb))) \
 	  $(UVM_ROOT)/lint/verilator_lint.vlt $(call LINT_FLIST,$(tb)) &&) true
+	verilator --lint-only -Wall --timing \
+	  --top-module $(shell $(call LINT_CFG,t1) top) $(addprefix +define+,$(call LINT_DEFINES,t1) AOU_TX_NXT_PACKING=1) \
+	  $(UVM_ROOT)/lint/verilator_lint.vlt $(call LINT_FLIST,t1)
 
 test: build
 	@$(MAKE) --no-print-directory run

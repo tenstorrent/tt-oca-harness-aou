@@ -142,7 +142,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field int_req_linkreset_invalid_actmsg_mask;
         rand uvm_reg_field int_req_linkreset_deact_ack_mask;
         rand uvm_reg_field int_req_linkreset_act_ack_mask;
-        rand uvm_reg_field reserved_31_9;
+        rand uvm_reg_field int_early_wdt_mask;
+        rand uvm_reg_field reserved_31_10;
 
         function new(string name = "aou_core__aou_interrupt_mask");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -165,8 +166,10 @@ package aou_core_csr_uvm_pkg;
             this.int_req_linkreset_deact_ack_mask.configure(this, 1, 7, "RW", 1, 'h0, 1, 1, 0);
             this.int_req_linkreset_act_ack_mask = new("int_req_linkreset_act_ack_mask");
             this.int_req_linkreset_act_ack_mask.configure(this, 1, 8, "RW", 1, 'h0, 1, 1, 0);
-            this.reserved_31_9 = new("reserved_31_9");
-            this.reserved_31_9.configure(this, 23, 9, "RO", 1, 'h0, 1, 1, 0);
+            this.int_early_wdt_mask = new("int_early_wdt_mask");
+            this.int_early_wdt_mask.configure(this, 1, 9, "RW", 1, 'h0, 1, 1, 0);
+            this.reserved_31_10 = new("reserved_31_10");
+            this.reserved_31_10.configure(this, 22, 10, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__aou_interrupt_mask
 
@@ -360,7 +363,10 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field write_resp_err_type_info;
         rand uvm_reg_field write_resp_err;
         rand uvm_reg_field write_resp_done;
-        rand uvm_reg_field reserved_31_15;
+        rand uvm_reg_field early_always_en;
+        rand uvm_reg_field wdt_en;
+        rand uvm_reg_field wdt_trans_timeout_err;
+        rand uvm_reg_field reserved_31_18;
 
         function new(string name = "aou_core__write_early_response_rp0");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -377,8 +383,14 @@ package aou_core_csr_uvm_pkg;
             this.write_resp_err.configure(this, 1, 13, "W1C", 1, 'h0, 1, 1, 0);
             this.write_resp_done = new("write_resp_done");
             this.write_resp_done.configure(this, 1, 14, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_15 = new("reserved_31_15");
-            this.reserved_31_15.configure(this, 17, 15, "RO", 1, 'h0, 1, 1, 0);
+            this.early_always_en = new("early_always_en");
+            this.early_always_en.configure(this, 1, 15, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_en = new("wdt_en");
+            this.wdt_en.configure(this, 1, 16, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_trans_timeout_err = new("wdt_trans_timeout_err");
+            this.wdt_trans_timeout_err.configure(this, 1, 17, "W1C", 1, 'h0, 1, 1, 0);
+            this.reserved_31_18 = new("reserved_31_18");
+            this.reserved_31_18.configure(this, 14, 18, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__write_early_response_rp0
 
@@ -489,7 +501,10 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field write_resp_err_type_info;
         rand uvm_reg_field write_resp_err;
         rand uvm_reg_field write_resp_done;
-        rand uvm_reg_field reserved_31_15;
+        rand uvm_reg_field early_always_en;
+        rand uvm_reg_field wdt_en;
+        rand uvm_reg_field wdt_trans_timeout_err;
+        rand uvm_reg_field reserved_31_18;
 
         function new(string name = "aou_core__write_early_response_rp1");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -506,8 +521,14 @@ package aou_core_csr_uvm_pkg;
             this.write_resp_err.configure(this, 1, 13, "W1C", 1, 'h0, 1, 1, 0);
             this.write_resp_done = new("write_resp_done");
             this.write_resp_done.configure(this, 1, 14, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_15 = new("reserved_31_15");
-            this.reserved_31_15.configure(this, 17, 15, "RO", 1, 'h0, 1, 1, 0);
+            this.early_always_en = new("early_always_en");
+            this.early_always_en.configure(this, 1, 15, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_en = new("wdt_en");
+            this.wdt_en.configure(this, 1, 16, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_trans_timeout_err = new("wdt_trans_timeout_err");
+            this.wdt_trans_timeout_err.configure(this, 1, 17, "W1C", 1, 'h0, 1, 1, 0);
+            this.reserved_31_18 = new("reserved_31_18");
+            this.reserved_31_18.configure(this, 14, 18, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__write_early_response_rp1
 
@@ -618,7 +639,10 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field write_resp_err_type_info;
         rand uvm_reg_field write_resp_err;
         rand uvm_reg_field write_resp_done;
-        rand uvm_reg_field reserved_31_15;
+        rand uvm_reg_field early_always_en;
+        rand uvm_reg_field wdt_en;
+        rand uvm_reg_field wdt_trans_timeout_err;
+        rand uvm_reg_field reserved_31_18;
 
         function new(string name = "aou_core__write_early_response_rp2");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -635,8 +659,14 @@ package aou_core_csr_uvm_pkg;
             this.write_resp_err.configure(this, 1, 13, "W1C", 1, 'h0, 1, 1, 0);
             this.write_resp_done = new("write_resp_done");
             this.write_resp_done.configure(this, 1, 14, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_15 = new("reserved_31_15");
-            this.reserved_31_15.configure(this, 17, 15, "RO", 1, 'h0, 1, 1, 0);
+            this.early_always_en = new("early_always_en");
+            this.early_always_en.configure(this, 1, 15, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_en = new("wdt_en");
+            this.wdt_en.configure(this, 1, 16, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_trans_timeout_err = new("wdt_trans_timeout_err");
+            this.wdt_trans_timeout_err.configure(this, 1, 17, "W1C", 1, 'h0, 1, 1, 0);
+            this.reserved_31_18 = new("reserved_31_18");
+            this.reserved_31_18.configure(this, 14, 18, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__write_early_response_rp2
 
@@ -747,7 +777,10 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field write_resp_err_type_info;
         rand uvm_reg_field write_resp_err;
         rand uvm_reg_field write_resp_done;
-        rand uvm_reg_field reserved_31_15;
+        rand uvm_reg_field early_always_en;
+        rand uvm_reg_field wdt_en;
+        rand uvm_reg_field wdt_trans_timeout_err;
+        rand uvm_reg_field reserved_31_18;
 
         function new(string name = "aou_core__write_early_response_rp3");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -764,8 +797,14 @@ package aou_core_csr_uvm_pkg;
             this.write_resp_err.configure(this, 1, 13, "W1C", 1, 'h0, 1, 1, 0);
             this.write_resp_done = new("write_resp_done");
             this.write_resp_done.configure(this, 1, 14, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_15 = new("reserved_31_15");
-            this.reserved_31_15.configure(this, 17, 15, "RO", 1, 'h0, 1, 1, 0);
+            this.early_always_en = new("early_always_en");
+            this.early_always_en.configure(this, 1, 15, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_en = new("wdt_en");
+            this.wdt_en.configure(this, 1, 16, "RW", 1, 'h0, 1, 1, 0);
+            this.wdt_trans_timeout_err = new("wdt_trans_timeout_err");
+            this.wdt_trans_timeout_err.configure(this, 1, 17, "W1C", 1, 'h0, 1, 1, 0);
+            this.reserved_31_18 = new("reserved_31_18");
+            this.reserved_31_18.configure(this, 14, 18, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__write_early_response_rp3
 
@@ -823,6 +862,20 @@ package aou_core_csr_uvm_pkg;
         endfunction : build
     endclass : aou_core__axi_slv_id_mismatch_err_rp3
 
+    // reg - aou_core::write_early_response_wdt_ctl
+    class aou_core__write_early_response_wdt_ctl extends uvm_reg;
+        rand uvm_reg_field wdt_threshold;
+
+        function new(string name = "aou_core__write_early_response_wdt_ctl");
+            super.new(name, 32, UVM_NO_COVERAGE);
+        endfunction : new
+
+        virtual function void build();
+            this.wdt_threshold = new("wdt_threshold");
+            this.wdt_threshold.configure(this, 32, 0, "RW", 1, 'hc3500, 1, 1, 0);
+        endfunction : build
+    endclass : aou_core__write_early_response_wdt_ctl
+
     // addrmap - aou_core
     class aou_core extends uvm_reg_block;
         rand aou_core__ip_version ip_version;
@@ -857,6 +910,7 @@ package aou_core_csr_uvm_pkg;
         rand aou_core__axi_error_info0_rp3 axi_error_info0_rp3;
         rand aou_core__axi_error_info1_rp3 axi_error_info1_rp3;
         rand aou_core__axi_slv_id_mismatch_err_rp3 axi_slv_id_mismatch_err_rp3;
+        rand aou_core__write_early_response_wdt_ctl write_early_response_wdt_ctl;
 
         function new(string name = "aou_core");
             super.new(name);
@@ -1024,6 +1078,11 @@ package aou_core_csr_uvm_pkg;
 
             this.axi_slv_id_mismatch_err_rp3.build();
             this.default_map.add_reg(this.axi_slv_id_mismatch_err_rp3, 'h7c);
+            this.write_early_response_wdt_ctl = new("write_early_response_wdt_ctl");
+            this.write_early_response_wdt_ctl.configure(this);
+
+            this.write_early_response_wdt_ctl.build();
+            this.default_map.add_reg(this.write_early_response_wdt_ctl, 'h80);
         endfunction : build
     endclass : aou_core
 

@@ -4,7 +4,9 @@
 // AXI channel orderings the DUT must take: the scoreboard checks the data and
 // the drain that nothing hangs; xfer_cov.chan_cg shows the ordering happened.
 // +chan=wfirst (plan 4.31): local writes only, each W burst presented before
-//   its AW (AW held back 4-20 cycles, W at once; AXI4 A3.3.1).
+//   its AW (AW held back 4-20 cycles, W at once; AXI4 A3.3.1). The DUT holds
+//   WREADY until the AW arrives (MAS 3.7.5), so the check is that nothing
+//   hangs and the data lands; xfer_cov.chan_cg w_before_aw shows the ordering.
 // +chan=ilv (plan 8.14): reads on distinct IDs both ways, the local
 //   subordinates interleave R beats of different IDs at the M ports and the
 //   remote die interleaves the ReadData it returns (L3 rdata_ilv), so the DUT

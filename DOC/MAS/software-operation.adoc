@@ -57,7 +57,8 @@ This section gives information about operation guide for the AOU_CORE.
 | | |DEACTIVATE_START |[1] |RW |0x0
 | | |ACTIVATE_START |[0] |RW |0x0
 |AOU_INTERRUPT_MASK |0x000C | | | |
-| | |Rsvd |[31:9] |RO |0x0
+| | |Rsvd |[31:10] |RO |0x0
+| | |INT_EARLY_WDT_MASK |[9] |RW |0x0
 | | |INT_REQ_LINKRESET_ACT_ACK_MASK |[8] |RW |0x0
 | | |INT_REQ_LINKRESET_DEACT_ACK_MASK |[7] |RW |0x0
 | | |INT_REQ_LINKRESET_INVALID_ACTMSG_MASK |[6] |RW |0x0
@@ -113,7 +114,10 @@ This section gives information about operation guide for the AOU_CORE.
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
 |WRITE_EARLY_RESPONSE_RP0 |0x0028 | | | |0x0
-| | |Rsvd |[31:15] |RO |0x0
+| | |Rsvd |[31:18] |RO |0x0
+| | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
+| | |WDT_EN |[16] |RW |0x0
+| | |EARLY_ALWAYS_EN |[15] |RW |0x0
 | | |WRITE_RESP_DONE |[14] |RO |0x0
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
@@ -140,7 +144,10 @@ This section gives information about operation guide for the AOU_CORE.
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
 |WRITE_EARLY_RESPONSE_RP1 |0x0040 | | | |0x0
-| | |Rsvd |[31:15] |RO |0x0
+| | |Rsvd |[31:18] |RO |0x0
+| | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
+| | |WDT_EN |[16] |RW |0x0
+| | |EARLY_ALWAYS_EN |[15] |RW |0x0
 | | |WRITE_RESP_DONE |[14] |RO |0x0
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
@@ -167,7 +174,10 @@ This section gives information about operation guide for the AOU_CORE.
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
 |WRITE_EARLY_RESPONSE_RP2 |0x0058 | | | |0x0
-| | |Rsvd |[31:15] |RO |0x0
+| | |Rsvd |[31:18] |RO |0x0
+| | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
+| | |WDT_EN |[16] |RW |0x0
+| | |EARLY_ALWAYS_EN |[15] |RW |0x0
 | | |WRITE_RESP_DONE |[14] |RO |0x0
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
@@ -194,7 +204,10 @@ This section gives information about operation guide for the AOU_CORE.
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
 |WRITE_EARLY_RESPONSE_RP3 |0x0070 | | | |0x0
-| | |Rsvd |[31:15] |RO |0x0
+| | |Rsvd |[31:18] |RO |0x0
+| | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
+| | |WDT_EN |[16] |RW |0x0
+| | |EARLY_ALWAYS_EN |[15] |RW |0x0
 | | |WRITE_RESP_DONE |[14] |RO |0x0
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
@@ -210,6 +223,8 @@ This section gives information about operation guide for the AOU_CORE.
 | | |AXI_SLV_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |AXI_SLV_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |AXI_SLV_RID_MISMATCH_ERR |[0] |W1C |0x0
+|WRITE_EARLY_RESPONSE_WDT_CTL |0x0080 | | | |0x000C3500
+| | |WDT_THRESHOLD |[31:0] |RW |0x000C3500
 |==========================================================================
 
 _Table 7. Register Map_
@@ -249,6 +264,7 @@ The DISABLED signal is asserted to indicate that deactivation has been completed
 *MST_TR_COMPLETE/SLV_TR_COMPLETE*
 
 * This signal indicates that there are no pending transactions in both local die and remote die.
+* SLV_TR_COMPLETE additionally requires WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE = 1 on every RP: a write that received an early B response counts as pending until its actual B response has arrived from the remote die.
 
 *ACK_TIME_OUT_VALUE/MSG_CREDIT_TIME_OUT_VALUE*
 
@@ -258,8 +274,11 @@ The DISABLED signal is asserted to indicate that deactivation has been completed
 
 *WRITE_EARLY_RESPONSE*
 
-* For the EARLY_RESPONSE_EN SFR setting to enable or disable early response, there must be no pending write requests.
-* EARLY_RESPONSE_EN: If this field is set(1), It performs the early response function.
+* For the EARLY_RESPONSE_EN or EARLY_ALWAYS_EN SFR setting to enable or disable early response, there must be no pending write requests (WRITE_RESP_DONE = 1).
+* EARLY_RESPONSE_EN: If this field is set(1), It performs the early response function for bufferable writes (AWCACHE[0] = 1). Exclusive writes (AWLOCK = 1) never receive an early response.
+* EARLY_ALWAYS_EN: If this field is set(1) together with EARLY_RESPONSE_EN, every non-exclusive write receives the early response regardless of AWCACHE[0].
+* WDT_EN / WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD: enable and threshold of the write-transaction watchdog; see xref:aou-726-write-transaction-watchdog[Section 7.2.6].
+* WDT_TRANS_TIMEOUT_ERR: set when the watchdog of this RP expires; source of the INT_EARLY_WDT_ERR interrupt. Writing 1 clears it.
 * WRITE_RESP_DONE: It indicates that there are no pending write requests and all write responses have been received from the remote die.
 * WRITE_RESP_ERR: It indicated that although the early response feature was enabled and an early response has already been delivered to the local die, an error occurred later in the write response received from the remote die. The BRESP value of the error is stored in WRITE_RESP_ERR_TYPE_INFO, and the BID of the transaction that caused the error is stored in WRITE_RESP_ERR_ID_INFO SFR. When an error occurs, an interrupt is generated. Afterward, writing 1 to the WRITE_RESP_ERR SFR clears ERR_TYPE_INFO, ERR_ID_INFO, and RESP_ERR.
 
@@ -286,6 +305,7 @@ AOU_CORE provides several error-detection and debug features, each with a dedica
 [cols="<,<,<",options="header",]
 |===================================================
 |Mask Bit |Feature |Interrupt Signal
+|[9] |Early-response write-transaction watchdog |INT_EARLY_WDT_ERR
 |[8] |Activate-ack timeout |INT_REQ_LINKRESET
 |[7] |Deactivate-ack timeout |INT_REQ_LINKRESET
 |[6] |Invalid ACTMSG |INT_REQ_LINKRESET
@@ -374,6 +394,22 @@ When the early write-response feature is enabled ([.monospaced]#++EARLY_BRESP_EN
 
 For a detailed description of the early response error flow, see xref:{aou-architecture-xref}#aou-373-transaction-flow----error-case[section 3.7.3 (Transaction Flow \-- Error Case)] and xref:{aou-architecture-xref}#aou-379-sfr-fields[section 3.7.9 (SFR Fields)].
 
+[[aou-726-write-transaction-watchdog]]
+==== 7.2.6. Write Transaction Watchdog
+
+Once an early OKAY has been returned, the local AXI manager has no way to notice that the remote die never completed the write. The write-transaction watchdog in each RP's early response controller detects this: with [.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WDT_EN = 1++# it counts I_CLK cycles in which the RP has writes outstanding (AW accepted, actual B not yet received) and neither an AW nor a B handshake occurs. Either handshake restarts the count. When it reaches [.monospaced]#++WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD++# (0x0080, shared by all RPs, reset 0xC3500 = 800000 cycles), [.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WDT_TRANS_TIMEOUT_ERR++# is set and [.monospaced]#++INT_EARLY_WDT_ERR++# is asserted unless [.monospaced]#++AOU_INTERRUPT_MASK.INT_EARLY_WDT_MASK++# is set.
+
+Enable sequence:
+
+1.  Write the threshold to [.monospaced]#++WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD++#. Choose a value well above the longest expected write round trip, including remote-die back-pressure.
+2.  Set [.monospaced]#++WDT_EN++# in each RP's [.monospaced]#++WRITE_EARLY_RESPONSE_RPn++#, normally together with [.monospaced]#++EARLY_BRESP_EN++#. The watchdog counts whether or not early response is enabled, so it can also be used as a plain write-completion timeout.
+
+On [.monospaced]#++INT_EARLY_WDT_ERR++#:
+
+1.  Read [.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WDT_TRANS_TIMEOUT_ERR++# of every RP to find the RP whose writes stalled; [.monospaced]#++WRITE_RESP_DONE = 0++# on that RP confirms that writes are still outstanding.
+2.  Write 1 to [.monospaced]#++WDT_TRANS_TIMEOUT_ERR++# to clear the status and the interrupt. The watchdog of that RP fires once: after a timeout its timer is held cleared and it does not re-arm until the next reset ([.monospaced]#++I_RESETN++# or [.monospaced]#++AOU_CON0.AOU_SW_RESET++#), so clearing the bit does not by itself restore hang detection. Toggling [.monospaced]#++WDT_EN++# does not re-arm it either.
+3.  Recover the link as for a protocol error: the outstanding writes will not complete, so [.monospaced]#++SLV_TR_COMPLETE++# stays 0 and deactivation cannot finish. Apply [.monospaced]#++AOU_CON0.AOU_SW_RESET++# or request LinkReset as described in xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6].
+
 [[aou-73-activation-deactivation-flow]]
 === 7.3. Activation & Deactivation Flow
 
@@ -457,10 +493,10 @@ image::image25.png[Figure 26. CREDIT_MANAGE 1 Deactivate sequence flow]
 [[figure-27]]
 image::image26.png[Figure 27. CREDIT_MANAGE 0 Deactivate sequence flow]
 
-This system provides a bus cleany mechanism:
+This system provides a bus cleany mechanism, tracked inside AOU_CORE and reported in AOU_INIT:
 
-* Subordinate bus cleanly indicates whether the local die has received all responses to the requests it sent to the remote die.
-* Manager bus cleanly indicates whether the remote die has received all responses to the requests it sent to the local die.
+* SLV_TR_COMPLETE (subordinate bus cleanly) indicates whether the local die has received all responses to the requests it sent to the remote die. Writes that received an early B response count until their actual B response arrives (WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE = 1 on every RP), so deactivation waits for them.
+* MST_TR_COMPLETE (manager bus cleanly) indicates whether the remote die has received all responses to the requests it sent to the local die.
 
 After the local die sends a DeactivateReq, if the remote die issues a new request and expects a response, the system must re-enter the activation sequence before any response can be provided.
 
@@ -479,7 +515,7 @@ To meet satisfy the condition in the local diepass:[']s sequence 10.1, no backpr
 1.  There is a message to send
 ** When AOU_CON0.CREDIT_MANAGE = 0, if a new request arrives from the remote die after the local die has sent a DeactivateReq, this interrupt is asserted because the local die must return a response.
 ** When AOU_CON0.CREDIT_MANAGE = 1, this interrupt can also be asserted if a new request arrives after the remote die has sent a DeactivateReq.
-2.  There is a response to be received (I_SLV_BUS_CLEANY_COMPLETE == 0)
+2.  There is a response to be received: the local die has sent requests to the remote die whose responses have not yet arrived (AOU_INIT.SLV_TR_COMPLETE == 0)
 ** When AOU_CON0.CREDIT_MANAGE = 0, this interrupt can be asserted if the local die issues new AXI requests after the remote die has sent a DeactivateReq.
 3.  An ActivateReq message is received from the remote die, and the activation handshake has not yet completed (the FSM is DISABLED or ACTIVATE). An ActivateReq received while ENABLED is [.monospaced]#++INVALID_ACTMSG++# and requests LinkReset (xref:aou-723-linkreset-error-reporting[Section 7.2.3]), not this interrupt.
 

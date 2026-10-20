@@ -16,7 +16,8 @@
 // actual B responses arrive; the env's aou_t1_early_tbl_chk checks the AW
 // stall and its release (FEAT-R15/R16), the vseq WRITE_RESP_DONE once drained.
 // +early_over=1 with +early_full=1 (16.17): the env's early-table checker also
-// checks O_PENDING_CNT_OVER at the limit (FEAT-R21, white-box; BUGS/005).
+// reports INT_EARLY_WDT_ERR while an AW waits at the limit (FEAT-R21 is not
+// checked: O_PENDING_CNT_OVER, BUGS/005, was removed by PR #89 for the watchdog).
 // +early_toggle=1 (16.14): two traffic phases; between them, with every write
 // done and WRITE_RESP_DONE = 1 on every RP (MAS 3.7.8), each RP's
 // EARLY_BRESP_EN is inverted, and the second phase must follow the new setting.

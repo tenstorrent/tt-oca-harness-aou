@@ -2,11 +2,12 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // MAS 3.7 early write response, for local writes (DUT S port -> remote model).
-// FEAT-R05: with EARLY_BRESP_EN=1 a bufferable write (AWCACHE[0]=1) gets its B
-// at the S port before the remote die has completed it, unless an older write
-// with the same ID was still waiting for its B when it was issued (MAS 3.7.7:
-// the early B then waits for that write). FEAT-R06: any other write gets its
-// B only after the remote die completed it. B time is its BVALID rise on the S
+// FEAT-R05: with EARLY_BRESP_EN=1 a bufferable write (AWCACHE[0]=1) that is
+// not exclusive gets its B at the S port before the remote die has completed
+// it, unless an older write with the same ID was still waiting for its B when
+// it was issued (MAS 3.7.7: the early B then waits for that write). FEAT-R06:
+// any other write, exclusive ones included (MAS 3.7.1), gets its B only after
+// the remote die completed it. B time is its BVALID rise on the S
 // port, not the handshake the manager may delay with BREADY. A B that followed
 // another B back to back (BVALID held across the handshake) may have waited
 // behind it, so FEAT-R05 is not judged for it. Writes pair with
@@ -112,7 +113,7 @@ class aou_early_bresp_chk extends uvm_component;
   endfunction
 
   function bit expect_early(aou_axi_txn s);
-    return en_at(s.rp, s.t_addr) && s.cache[0];
+    return en_at(s.rp, s.t_addr) && s.cache[0] && !s.lock;
   endfunction
 
   function void judge(aou_axi_txn s, aou_axi_txn r);

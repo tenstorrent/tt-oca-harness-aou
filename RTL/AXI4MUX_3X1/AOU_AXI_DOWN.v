@@ -211,7 +211,9 @@ generate
     if($clog2(I_DATA_WD/8)==0) begin
         assign O_M_AWADDR = I_S_AWADDR;
     end else begin
-        assign O_M_AWADDR = (I_S_AWSIZE == $clog2(I_DATA_WD/8)) ? {I_S_AWADDR[ADDR_WD-1:$clog2(I_DATA_WD/8)], {$clog2(I_DATA_WD/8){1'b0}}} : I_S_AWADDR;
+        //assign O_M_AWADDR = (I_S_AWSIZE == $clog2(I_DATA_WD/8)) ? {I_S_AWADDR[ADDR_WD-1:$clog2(I_DATA_WD/8)], {$clog2(I_DATA_WD/8){1'b0}}} : I_S_AWADDR;
+        //bug fix for 1024-256 Downsizing
+        assign O_M_AWADDR = (I_S_AWSIZE > $clog2(O_DATA_WD/8)) ? ((I_S_AWADDR >> I_S_AWSIZE) << I_S_AWSIZE) : I_S_AWADDR; 
     end
 endgenerate
 
