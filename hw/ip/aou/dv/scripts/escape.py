@@ -106,8 +106,11 @@ def main():
         entries.append(e)
     for e in entries:
         if e.get("axi4pc"):
-            _, out = make(args, "build-name", *build_args(e["tb"], e["config"], ""))
-            if not out.strip().endswith("-axi4pc"):
+            rc, out = make(args, "build-name", *build_args(e["tb"], e["config"], ""))
+            if rc != 0 or not out.split():
+                print(out[-3000:])
+                return 1
+            if "axi4pc" not in out.split()[-1].split("-"):
                 e["result"] = "NOT-RUN"
                 print(f"skip   {e['escape']}: needs Arm Axi4PC (.deps/BP063)", flush=True)
     sim_entries = [e for e in entries if not e.get("build") and "result" not in e]

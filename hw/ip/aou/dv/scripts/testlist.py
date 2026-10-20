@@ -43,8 +43,13 @@ class TestlistError(Exception):
     pass
 
 
-def bench_of(path):
-    return BENCH_OF.get(os.path.splitext(os.path.basename(path))[0], "t1")
+def bench_of(path, default="t1"):
+    """The bench a list runs on: by name, T1 for the other lists shipped in testlists/,
+    and default for a list from elsewhere, which has no bench of its own."""
+    name = os.path.splitext(os.path.basename(path))[0]
+    if name in BENCH_OF:
+        return BENCH_OF[name]
+    return "t1" if os.path.dirname(os.path.abspath(path)) == TESTLIST_DIR else default
 
 
 def load(path, _stack=None):
@@ -144,7 +149,8 @@ def load_plan_ids(path=PLAN_IDS):
 def entries(path, plan_ids=None):
     """Flat entries of one list (includes expanded), in file order:
     name, test (UVM class), seeds, plusargs, target, tags, run_modes, expect_fail,
-    expect_fail_match, plan_ids, blocked, tb, list (the file that defines it)."""
+    expect_fail_match, plan_ids, blocked, tb, tb_fixed (False for a custom list, which runs
+    on whichever bench is selected), list (the file that defines it)."""
     tests, _ = load(path)
     side = plan_ids if plan_ids is not None else load_plan_ids()
     out = []
@@ -162,6 +168,7 @@ def entries(path, plan_ids=None):
             "plan_ids": side["plan_ids"].get(name, ""),
             "blocked": side["blocked"].get(name, "") or ("blocked" in t.get("tags", []) and "blocked") or "",
             "tb": bench_of(t["_source"]),
+            "tb_fixed": bench_of(t["_source"], None) is not None,
             "list": os.path.splitext(os.path.basename(t["_source"]))[0],
         })
     return out

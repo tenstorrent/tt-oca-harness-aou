@@ -485,7 +485,7 @@ def main():
                 lst = lists_of.setdefault(e["list"], len(lists_of))
                 if e["blocked"]:
                     print(f"skip   {e['name']}: blocked: {e['blocked']}")
-                elif e["tb"] != args.tb:
+                elif e["tb_fixed"] and e["tb"] != args.tb:
                     print(f"skip   {e['name']}: tb {e['tb']} (running {args.tb})")
                 elif args.tb in ("t1", "reg") and e["target"] and e["target"] != args.target:
                     print(f"skip   {e['name']}: target {e['target']} (running {args.target})")
