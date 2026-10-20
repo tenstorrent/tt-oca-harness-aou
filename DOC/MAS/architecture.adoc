@@ -559,6 +559,7 @@ Upon receipt of an ActivateReq from the remote die during the initial activation
 
 * The Tx Credit is increased immediately upon receipt of a credit message from the Rx Core, within the updated value taking effect in the following cycle. Credit is decremented when the Tx Core packs a message and places it into the ring buffer. The consumption point is defined at the time of insertion into the per-RP Tx FIFO.
 * The AOU_RX_CRD_CTRL exchanges credit messages (PLP protocol header MsgCredit field, dedicated Misc message) with the Tx core through valid/ready signaling. Tx core asserts CRDTGRANT_READY when the Tx core can pack a Misc Credit Message or asserts MSGCREDIT_CRED_READY when a protocol header is required to be transmitted. A credit is considered advertised at the point when the credit message handshake (valid and ready both asserted) occurs. At that instant, the advertised credits are treated as already reserved for the RX FIFO. Accordingly, a credit is not considered returned when a message leaves the RX Core, but only when data is actually dequeued from the RX FIFO, releasing the previously reserved credit.
+* Every transmitted protocol header carries a MsgCredit field. When AOU_RX_CRD_CTRL has no credit to advertise, all credit subfields are zero and the RP subfield (MsgCredit[15:14]) is 0, so the header never names an RP the local die does not implement. The RP subfield is only meaningful when at least one credit subfield is non-zero.
 
 [[aou-310-rp-remapping]]
 === 3.10. RP Remapping
