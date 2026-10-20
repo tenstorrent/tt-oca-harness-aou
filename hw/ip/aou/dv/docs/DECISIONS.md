@@ -534,7 +534,7 @@ yet carries the `blocked` tag and its reason in the sidecar; `run_list.py` and
 **Decision.** `CONFIG` selects the T1 (and register bench) build parameters: RP
 count, data width per RP, `FDI_CONFIG` and, where it is not the default 1024,
 `AXI_PEER_DIE_MAX_DATA_WD`, `TX_NXT_PACKING_EN` (and, in `-rxf`, the RX FIFO
-parameters). Eleven configurations exist:
+parameters). Thirteen configurations exist:
 
 | CONFIG | RPs | RP widths | FDI_CONFIG | Purpose |
 |---|---|---|---|---|
@@ -548,6 +548,8 @@ parameters). Eleven configurations exist:
 | 2x512-tp32_64 | 2 | 512 each | 3 (TP_32B_64B) | Two-PHY FDI with a 256-bit PHY0, two RPs at one width |
 | 1x512-sp64-p512 | 1 | 512 | 1 (SP_64B) | `AXI_PEER_DIE_MAX_DATA_WD` 512 (plan 14.17) |
 | 1x512-sp64-nxt | 1 | 512 | 1 (SP_64B) | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
+| 4xmix4211-sp128-p512 | 4 | 1024, 512, 256, 256 | 2 (SP_128B) | `AXI_PEER_DIE_MAX_DATA_WD` 512 below a 1024-bit RP (plan 14.17) |
+| 4xmix4211-sp128-p256 | 4 | 1024, 512, 256, 256 | 2 (SP_128B) | `AXI_PEER_DIE_MAX_DATA_WD` 256 below 1024- and 512-bit RPs (plan 14.17) |
 | 2xmix-sp64-rxf | 2 | 1024, 256 | 1 (SP_64B) | Non-default RX FIFO depths, RX FIFO register slices off |
 
 Names describe the configuration and refer to nothing else:
@@ -588,11 +590,16 @@ the DUT's parameterization lives, and a single build covers only one point of
 each. A full cross product would multiply build and regression cost for little
 gain. The integration guide puts no constraint on RP widths per `FDI_CONFIG`, so
 `2x512-tp32_64` keeps 512-bit RPs and differs from `2xmix-tp64_128` in the FDI
-pair alone. `AXI_PEER_DIE_MAX_DATA_WD` gets one build, at 512, with the RP no
-wider than the peer: 256 does not elaborate (the RX core sizes its 512-bit
-message path with `AXI_PEER_DIE_MAX_DATA_WD - 512`), and a peer narrower than
-the local RP would have to return ReadData wider than itself (AoU 5.7:
-ReadData follows ARSIZE).
+pair alone. Every pairing of a local RP width and a remote RP width (256, 512,
+1024) is legal, and the remote's width is not known when the DUT is built, so
+the remote width is a run-time knob (`+remote_bytes`, per RP) and the mixed
+builds cover all nine pairings. `AXI_PEER_DIE_MAX_DATA_WD` is the integrator's
+promise that the remote die sends no WriteData wider than it; the default 1024
+allows every pairing. It gets three restricted builds (the bench limits the
+remote die to the parameter): `1x512-sp64-p512`; `4xmix4211-sp128-p512`, where
+a 1024-bit RP is wider than the parameter and its own reads still get
+ReadData1024 (AoU 5.7: ReadData follows ARSIZE); and `4xmix4211-sp128-p256`,
+the largest ratio (a 1024-bit ReadData path over a 256-bit WriteData path).
 
 **Rejected.** *One configuration* (misses the converters and the other FDI
 widths). *A full cross product* (cost). *Names after a purpose or another bench*

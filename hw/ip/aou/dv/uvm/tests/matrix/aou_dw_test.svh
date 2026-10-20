@@ -20,6 +20,9 @@ class aou_dw_test extends aou_dp_base_test;
 
   function void set_knobs();
     k.dir = AOU_T1_BOTH_DIRS;
+    // Every size up to each requester's bus, in turn, so each side sends both
+    // full-width and narrower requests (the list is cut at the bus width).
+    k.sizes = '{0, 1, 2, 3, 4, 5, 6, 7};
     k.lens = '{0, 1, 3, 7, 15};
     k.strb = aou_dp_knobs::DP_STRB_MIXED;
     k.loopback = 1'b1;
@@ -37,6 +40,7 @@ class aou_dw_test extends aou_dp_base_test;
     end
     chk.req_r2l = (k.dir != AOU_T1_L2R);
     chk.req_l2r = (k.dir != AOU_T1_R2L);
+    chk.upsize = (cfg.remote_wreq == AOU_RWREQ_UPSIZE);
   endfunction
 
   function void connect_phase(uvm_phase phase);
@@ -46,12 +50,21 @@ class aou_dw_test extends aou_dp_base_test;
     env.l3.ap_rx_msg.connect(chk.dut_fifo.analysis_export);
     env.l3.ap_tx_msg.connect(chk.tb_fifo.analysis_export);
   endfunction
+
+  // The remote model's own width conversions (aou_t1_l4a_adapter).
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf(
+              "remote model conversions [write, read][downsized, exact]: %p; split %0d",
+              env.l4a.n_conv, env.l4a.n_split), UVM_LOW)
+  endfunction
 endclass
 
-// The 1024-to-256-bit downsizer (plan 14.5) on its own: the remote die is
-// 1024 bits wide on the 256-bit RPs and 512 bits on the others, so the
-// unaligned AWSIZE=6 conversion (tenstorrent/tt-oca-harness-aou#90, fixed by RTL PR #89) is exercised
-// here and nowhere else.
+// A 1024-bit remote die on the 256-bit RPs (plan 14.5), 512 bits on the
+// others, every start unaligned. By default its WriteReq keeps AWSIZE and its
+// WriteData is packed at it (the minimal legal choice), so the 1024- and
+// 512-bit downsizers each take their own sizes; +remote_wreq=dut_like sends
+// every write as WriteData1024, through the 1024-bit downsizer.
 class aou_dw_down1024_test extends aou_dw_test;
   `uvm_component_utils(aou_dw_down1024_test)
 

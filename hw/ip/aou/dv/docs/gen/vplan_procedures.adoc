@@ -479,6 +479,8 @@ directions at once (+dp_dir=both; D41). +dp_profile picks a profile
 | `aou_dp_random_test.dp_dir-both.dp_profile-stall` | `+dp_dir=both +dp_profile=stall` | 1-3 |  | 7.16
 | `aou_dp_random_test.dp_dir-both.1x512-sp64-p512` | `+dp_dir=both` | 1-3 | `1x512-sp64-p512` | 14.17
 | `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt` | `+dp_dir=both` | 1-3 | `1x512-sp64-nxt` | 10.3,7.16,8.9,8.10
+| `aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512` | `+dp_dir=both` | 1-2 | `4xmix4211-sp128-p512` | 14.17
+| `aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256` | `+dp_dir=both` | 1-2 | `4xmix4211-sp128-p256` | 14.17
 | `aou_dp_random_test.dp_dir-both.dp_profile-stall.rtl_asserts-1` | `+dp_dir=both +dp_profile=stall +rtl_asserts=1` | 1-2 | `1x512-sp64-assert` | 11.18
 | `aou_dp_random_test.dp_dir-both.rtl_asserts-1` | `+dp_dir=both +rtl_asserts=1` | 1 | `1x256-sp32-assert` | 11.18
 |===
@@ -1167,6 +1169,14 @@ bursts the DUT splits on its M port (aou_split_chk).
 | `aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-7_15_31.dp_batch-1` | `+split_aw=per_rp +split_ar=per_rp +dp_len=7,15,31 +dp_batch=1` | 1-3 | `4x512-sp64` | 15.16
 | `aou_split_test.split_aw-15.split_ar-15.dp_len-7_15_31_63` | `+split_aw=15 +split_ar=15 +dp_len=7,15,31,63` | 1-3 | `1x256-sp32` | 15.17
 | `aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-15_31_63` | `+split_aw=sweep +split_ar=sweep +dp_len=15,31,63` | 1-3 | `1x256-sp32` | 15.17
+| `aou_split_test.remote_bytes-128.split-255.4xmix4211-sp128` | `+remote_bytes=128 +split_aw=255 +split_ar=255` | 1-2 | `4xmix4211-sp128` | 15.17
+| `aou_split_test.remote_bytes-128.split-3.4xmix4211-sp128` | `+remote_bytes=128 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17
+| `aou_split_test.remote_bytes-64.split-15.4xmix4211-sp128` | `+remote_bytes=64 +split_aw=15 +split_ar=15` | 1-2 | `4xmix4211-sp128` | 15.17
+| `aou_split_test.remote_bytes-32.split-3.4xmix4211-sp128` | `+remote_bytes=32 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17
+| `aou_split_test.remote_bytes-128.split-255.4xmix2144-sp64` | `+remote_bytes=128 +split_aw=255 +split_ar=255` | 1-2 | `4xmix2144-sp64` | 15.17
+| `aou_split_test.remote_bytes-128.split-15.4xmix2144-sp64` | `+remote_bytes=128 +split_aw=15 +split_ar=15` | 1-2 | `4xmix2144-sp64` | 15.17
+| `aou_split_test.remote_bytes-64.split-3.4xmix4211-sp128` | `+remote_bytes=64 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17
+| `aou_split_test.remote_bytes-64.split-255.4xmix4211-sp128` | `+remote_bytes=64 +split_aw=255 +split_ar=255` | 1-2 | `4xmix4211-sp128` | 15.17
 | `aou_split_test.split_aw-sweep.split_ar-sweep.dp_len-0_15_63_255.rtl_asserts-1` | `+split_aw=sweep +split_ar=sweep +dp_len=0,15,63,255 +rtl_asserts=1` | 1-2 | `1x512-sp64-assert` | 11.18
 |===
 
@@ -3026,6 +3036,17 @@ DLENGTH and that every targeted conversion happened.
 | `aou_dw_test.remote_bytes-64.2x512-tp32_64` | `+remote_bytes=64` | 1-2 | `2x512-tp32_64` | 14.8,14.10,14.11,14.14,14.15,14.16,18.4
 | `aou_dw_test.remote_bytes-128.2x512-tp32_64` | `+remote_bytes=128` | 1-2 | `2x512-tp32_64` | 14.6,14.12,14.10,14.11,14.14,14.15,14.16
 | `aou_dw_test.remote_bytes-32.1x512-sp64-p512` | `+remote_bytes=32` | 1-2 | `1x512-sp64-p512` | 14.17
+| `aou_dw_test.remote_bytes-128.remote_max_burst-4.4xmix4211-sp128` | `+remote_bytes=128 +dp_align=aligned +remote_max_burst=4` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
+| `aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512` | `+remote_bytes=32` | 1-2 | `4xmix4211-sp128-p512` | 14.17
+| `aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512` | `+remote_bytes=64` | 1-2 | `4xmix4211-sp128-p512` | 14.17
+| `aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix4211-sp128` | `+remote_bytes=128 +remote_wreq=upsize` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
+| `aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-upsize` | `+remote_bytes=32,128,64,32 +remote_wreq=upsize` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
+| `aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix2144-sp64` | `+remote_bytes=128 +remote_wreq=upsize` | 1-2 | `4xmix2144-sp64` | 14.10,14.11
+| `aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256` | `+remote_bytes=32` | 1-2 | `4xmix4211-sp128-p256` | 14.17
+| `aou_dw_test.remote_bytes-128.remote_max_burst_rand-1` | `+remote_bytes=128 +remote_max_burst_rand=1` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
+| `aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128` | `+remote_bytes=128 +remote_wreq=dut_like` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
+| `aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-dut_like` | `+remote_bytes=32,128,64,32 +remote_wreq=dut_like` | 1-2 | `4xmix4211-sp128` | 14.10,14.11
+| `aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix2144-sp64` | `+remote_bytes=128 +remote_wreq=dut_like` | 1-2 | `4xmix2144-sp64` | 14.10,14.11
 | `aou_dw_test.remote_bytes-32.rtl_asserts-1.1x512-sp64-assert` | `+remote_bytes=32 +rtl_asserts=1` | 1 | `1x512-sp64-assert` | 11.18
 | `aou_dw_test.remote_bytes-128_128_64_64.rtl_asserts-1` | `+remote_bytes=128,128,64,64 +rtl_asserts=1` | 1-2 | `4xmix4211-sp128-assert` | 11.18
 | `aou_dw_test.remote_bytes-32.rtl_asserts-1.2xmix-tp64_128-assert` | `+remote_bytes=32 +rtl_asserts=1` | 1 | `2xmix-tp64_128-assert` | 11.18
@@ -3062,10 +3083,11 @@ DLENGTH and that every targeted conversion happened.
 ===== 61. `aou_dw_down1024_test`
 Class `aou_dw_down1024_test` extends `aou_dw_test` (`uvm/tests/matrix/aou_dw_test.svh`).
 
-*Purpose.* The 1024-to-256-bit downsizer (plan 14.5) on its own: the remote die is
-1024 bits wide on the 256-bit RPs and 512 bits on the others, so the
-unaligned AWSIZE=6 conversion (tenstorrent/tt-oca-harness-aou#90, fixed by RTL PR #89) is exercised
-here and nowhere else.
+*Purpose.* A 1024-bit remote die on the 256-bit RPs (plan 14.5), 512 bits on the
+others, every start unaligned. By default its WriteReq keeps AWSIZE and its
+WriteData is packed at it (the minimal legal choice), so the 1024- and
+512-bit downsizers each take their own sizes; +remote_wreq=dut_like sends
+every write as WriteData1024, through the 1024-bit downsizer.
 
 *Procedure.* The class's own `run_phase` (see the file).
 
@@ -3079,6 +3101,7 @@ here and nowhere else.
 | `aou_dw_down1024_test.4xmix4211-sp128` |  | 1-3 | `4xmix4211-sp128` | 14.5,14.12,14.10,14.11,14.14,14.15,14.16
 | `aou_dw_down1024_test.4xmix2144-sp64` |  | 1-3 | `4xmix2144-sp64` | 14.5,14.12,14.10,14.11,14.14,14.15,14.16
 | `aou_dw_down1024_test.1x256-sp32` |  | 1-2 | `1x256-sp32` | 14.5,14.12,14.10,14.11,14.14,14.15,14.16
+| `aou_dw_down1024_test.remote_wreq-dut_like.4xmix2144-sp64` | `+remote_wreq=dut_like` | 1-2 | `4xmix2144-sp64` | 14.5
 | `aou_dw_down1024_test.rtl_asserts-1` | `+rtl_asserts=1` | 1 | `4xmix4211-sp128-assert` | 11.18
 |===
 

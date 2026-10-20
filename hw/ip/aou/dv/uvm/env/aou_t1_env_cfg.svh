@@ -12,6 +12,9 @@ class aou_t1_env_cfg extends uvm_object;
   int unsigned   rp_bytes[];               // DUT AXI data bytes per RP
   int unsigned   remote_bytes = 64;        // remote die's AXI data width (WriteData DLENGTH)
   int unsigned   rp_remote_bytes[];        // per RP; 0 = remote_bytes
+  aou_t1_rwreq_e remote_wreq = AOU_RWREQ_AWSIZE;  // remote WriteReq sizing (remote_mgr_driver)
+  int unsigned   remote_max_burst = 256;   // remote splitter's longest burst (2^n beats)
+  bit            remote_max_burst_rand = 1'b0;  // re-pick it while the remote is idle
   aou_spec_rev_e spec_rev = AOU_SPEC_V07;
   aou_fdi_enc_e  fdi_enc = AOU_FDI_ENC_RTL;
 

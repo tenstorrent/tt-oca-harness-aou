@@ -14,6 +14,8 @@
 | `attr_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_path`, `cp_dir`, `cp_qos`, `cp_prot`, `cp_cache` | `x_qos`, `x_prot`, `x_cache`
 | `excl_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_path`, `cp_dir`, `cp_resp` | `x_excl`
 | `chan_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_event` | -
+| `width_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_path`, `cp_dir`, `cp_dut`, `cp_rem`, `cp_size`, `cp_req` | `x_pair`, `x_pair_dir`, `x_pair_req`, `x_pair_size`
+| `split_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_max`, `cp_split` | `x_max_split`
 | `txn_cg` | `aou_axi_monitor` | `uvm/env/axi/aou_axi_monitor.svh` | `cp_dir`, `cp_size`, `cp_len`, `cp_align` | `x_txn`
 | `zero_cg` | `aou_axi_monitor` | `uvm/env/axi/aou_axi_monitor.svh` | `cp_dir`, `cp_zero` | `x_zero`
 | `cg_fdi_xfer` | `aou_fdi_cov` | `uvm/env/fdi/l1/aou_fdi_cov.svh` | `cp_dir`, `cp_width`, `cp_stall`, `cp_gap` | `x_dir_stall`, `x_dir_gap`

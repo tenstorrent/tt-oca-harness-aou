@@ -225,12 +225,12 @@ T1-E12,aou_int_vseq,,DUT,Simultaneous interrupt sources are all captured and cle
 T1-E13,n/a,,N/A,Retired (spec v0.8): reads beyond the advertised credit are a sender violation with no defined receiver reaction; aou_credit_violation_test removed,AoU v0.8 6.1
 T1-E14,aou_before_enable_vseq,,DUT,A request before activation waits and raises INT_ACTIVATE_START,AoU 8.4; MAS software-operation 7.3.5
 DP-R02,aou_dw_chk,,DUT,An S-port read beat whose ReadData is narrower than the RP carries that ReadData replicated across the bus,MAS 3.3 (R 4M1S FIFO); plan 14.16
-DP-R03,aou_dw_chk,,DUT,WriteData the DUT sends carries the DLENGTH of its RP's AXI data width,MAS 3.5.2
-DP-R04,aou_dw_chk,,DUT,A width-conversion run produced every conversion it targets (remote width writes and reads; single- and multi-beat M-port writes; narrow S-port reads),test self-check; plan 14.x
+DP-R04,aou_dw_chk,,DUT,A width-conversion run produced every conversion it targets (remote writes; remote-width reads; single- and multi-beat M-port writes; narrow S-port reads),test self-check; plan 14.x
 DP-R05,aou_t1_attr_chk,,DUT,"Each WriteReq/ReadReq the DUT sends carries the AxLOCK, AxCACHE, AxPROT and AxQOS of the S-port AW/AR it came from",AoU 5.3; Basic Profile Table 31; plan 4.25-4.28/5.23-5.26
 DP-R06,aou_t1_attr_chk,,DUT,"Each M-port AW/AR carries the AxLOCK, AxCACHE, AxPROT and AxQOS of the WriteReq/ReadReq it came from",AoU 5.3; Basic Profile Table 31; plan 4.25-4.28/5.23-5.26
 DP-R07,aou_t1_attr_chk,,DUT,"An exclusive transaction's BRESP/RRESP at the requester is the far subordinate's (EXOKAY or OKAY), when the DUT neither split nor merged it",AXI4 A7.2; AoU 5.5/5.6; plan 4.25/5.23
 DP-R08,aou_t1_attr_chk,,DUT,FLEX is 0 in every AXI message the DUT sends (it has no AXI USER ports),AoU 5.2 (FLEX = USER[15:0] in the Basic Profile); plan 4.30
+DP-R09,aou_t1_attr_chk,,DUT,The size of each WriteReq the DUT sends is at least the AWSIZE of the S-port write it came from,AoU 5.3; project ruling (a writer may raise the size above AWSIZE)
 T1-M01,aou_mrp_chk,,DUT,Per RP the DUT sends one request per S-port transaction and one WriteResp/last ReadData per remote transaction; idle RPs carry no AXI message,MAS 3.10; AoU RP field; plan 12.1-12.8/12.19
 T1-M02,aou_mrp_chk,,DUT,With every RP backlogged no RP starves: when the first RP has sent all its requests the others have sent at least 25% of theirs,MAS 3.2.1 (round-robin arbitration); plan 12.6/12.8
 T1-M03,aou_mrp_chk,,DUT,A slowed RP does not hold back the others: they complete while it still has transactions outstanding,MAS 3.4 (per-RP FIFOs and credits); plan 12.x
@@ -269,3 +269,5 @@ T1-RM04,aou_t1_remote_mgr_driver,,DUT,ReadData LAST is set on the last beat of a
 T1-RM05,aou_t1_remote_mgr_driver,,DUT,No remote write or read is outstanding at the end of the test,ARCHITECTURE.md scoreboard rule
 T1-RM06,aou_t1_remote_mgr,,DUT,A WriteResp/ReadData the DUT sends carries an RP below the remote managers' plane count,AoU 6.4.1; MAS 3.10
 T1-L4A01,aou_t1_l4a_adapter,,DUT,Every WriteData beat of one write burst carries the same DLENGTH,MAS 3.5.2
+T1-L4A02,aou_t1_l4a_adapter,,DUT,"WriteData DLENGTH is at least max(the size of its WriteReq, 256 bits)","AoU 5.4 (DLENGTH); project ruling: DLENGTH is self-describing, any width at or above the WriteReq's size is legal"
+T1-L4A04,aou_t1_l4a_adapter,,MODEL,The remote model's maximum burst length changes only while it has no request in hand,project ruling: a maximum burst change is legal only while the remote is idle

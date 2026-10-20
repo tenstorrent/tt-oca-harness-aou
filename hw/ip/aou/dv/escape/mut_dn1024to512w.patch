@@ -1,0 +1,19 @@
+SPDX-License-Identifier: Apache-2.0
+Mutation mut_dn1024to512w (not a main fix): flips WDATA bit 600 into the 1024-to-512-bit
+write downsizer only, so a remote die of 1024 bits writing to a 512-bit RP at AWSIZE 7
+must corrupt memory (AXI-S02), while every other width pairing passes.
+Applied to a build-time copy of RTL/ by make build ESCAPE=mut_dn1024to512w.
+
+diff --git a/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_512.v b/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_512.v
+index 49a2422..4731b7b 100644
+--- a/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_512.v
++++ b/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_512.v
+@@ -450,7 +450,7 @@ AOU_AXI_DOWN #(
+     .I_S_AWVALID   ( I_S_AWVALID_2   ),
+     .O_S_AWREADY   ( O_S_AWREADY_2   ),
+ 
+-    .I_S_WDATA     ( I_S_WDATA_2     ),
++    .I_S_WDATA     ( I_S_WDATA_2 ^ (1024'd1 << 600) ),
+     .I_S_WSTRB     ( I_S_WSTRB_2     ),  
+     .I_S_WLAST     ( I_S_WLAST_2     ),
+     .I_S_WVALID    ( I_S_WVALID_2    ),

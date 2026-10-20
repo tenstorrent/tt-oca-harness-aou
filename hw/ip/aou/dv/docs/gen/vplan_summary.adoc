@@ -342,7 +342,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | BUGS/052 (expected_fail.yaml)
 |===
-===== `testlists/matrix.toml` (86 scenarios)
+===== `testlists/matrix.toml` (108 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -432,6 +432,28 @@
 | `aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1` | `aou_mrp_test` | `+mrp_scn=solo +mrp_rps=0 +remote_rp_count=1` | 1-2 | `3x512-sp64` | 12.20 | 
 | `aou_mrp_test.remote_rp_count-4` | `aou_mrp_test` | `+remote_rp_count=4` | 1-2 | `1x512-sp64` | 12.20 | 
 | `aou_mrp_test.remote_rp_count-3` | `aou_mrp_test` | `+remote_rp_count=3` | 1-2 | `2x512-tp32_64` | 12.20 | 
+| `aou_split_test.remote_bytes-128.split-255.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=128 +split_aw=255 +split_ar=255` | 1-2 | `4xmix4211-sp128` | 15.17 | 
+| `aou_split_test.remote_bytes-128.split-3.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=128 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17 | 
+| `aou_split_test.remote_bytes-64.split-15.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=64 +split_aw=15 +split_ar=15` | 1-2 | `4xmix4211-sp128` | 15.17 | 
+| `aou_split_test.remote_bytes-32.split-3.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=32 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17 | 
+| `aou_split_test.remote_bytes-128.split-255.4xmix2144-sp64` | `aou_split_test` | `+remote_bytes=128 +split_aw=255 +split_ar=255` | 1-2 | `4xmix2144-sp64` | 15.17 | 
+| `aou_split_test.remote_bytes-128.split-15.4xmix2144-sp64` | `aou_split_test` | `+remote_bytes=128 +split_aw=15 +split_ar=15` | 1-2 | `4xmix2144-sp64` | 15.17 | 
+| `aou_dw_test.remote_bytes-128.remote_max_burst-4.4xmix4211-sp128` | `aou_dw_test` | `+remote_bytes=128 +dp_align=aligned +remote_max_burst=4` | 1-2 | `4xmix4211-sp128` | 14.10,14.11 | 
+| `aou_dw_test.remote_bytes-32.4xmix4211-sp128-p512` | `aou_dw_test` | `+remote_bytes=32` | 1-2 | `4xmix4211-sp128-p512` | 14.17 | 
+| `aou_dw_test.remote_bytes-64.4xmix4211-sp128-p512` | `aou_dw_test` | `+remote_bytes=64` | 1-2 | `4xmix4211-sp128-p512` | 14.17 | 
+| `aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p512` | `aou_dp_random_test` | `+dp_dir=both` | 1-2 | `4xmix4211-sp128-p512` | 14.17 | 
+| `aou_split_test.remote_bytes-64.split-3.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=64 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17 | 
+| `aou_split_test.remote_bytes-64.split-255.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=64 +split_aw=255 +split_ar=255` | 1-2 | `4xmix4211-sp128` | 15.17 | 
+| `aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix4211-sp128` | `aou_dw_test` | `+remote_bytes=128 +remote_wreq=upsize` | 1-2 | `4xmix4211-sp128` | 14.10,14.11 | 
+| `aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-upsize` | `aou_dw_test` | `+remote_bytes=32,128,64,32 +remote_wreq=upsize` | 1-2 | `4xmix4211-sp128` | 14.10,14.11 | 
+| `aou_dw_test.remote_bytes-128.remote_wreq-upsize.4xmix2144-sp64` | `aou_dw_test` | `+remote_bytes=128 +remote_wreq=upsize` | 1-2 | `4xmix2144-sp64` | 14.10,14.11 | 
+| `aou_dw_test.remote_bytes-32.4xmix4211-sp128-p256` | `aou_dw_test` | `+remote_bytes=32` | 1-2 | `4xmix4211-sp128-p256` | 14.17 | 
+| `aou_dp_random_test.dp_dir-both.4xmix4211-sp128-p256` | `aou_dp_random_test` | `+dp_dir=both` | 1-2 | `4xmix4211-sp128-p256` | 14.17 | 
+| `aou_dw_test.remote_bytes-128.remote_max_burst_rand-1` | `aou_dw_test` | `+remote_bytes=128 +remote_max_burst_rand=1` | 1-2 | `4xmix4211-sp128` | 14.10,14.11 | 
+| `aou_dw_down1024_test.remote_wreq-dut_like.4xmix2144-sp64` | `aou_dw_down1024_test` | `+remote_wreq=dut_like` | 1-2 | `4xmix2144-sp64` | 14.5 | 
+| `aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128` | `aou_dw_test` | `+remote_bytes=128 +remote_wreq=dut_like` | 1-2 | `4xmix4211-sp128` | 14.10,14.11 | 
+| `aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-dut_like` | `aou_dw_test` | `+remote_bytes=32,128,64,32 +remote_wreq=dut_like` | 1-2 | `4xmix4211-sp128` | 14.10,14.11 | 
+| `aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix2144-sp64` | `aou_dw_test` | `+remote_bytes=128 +remote_wreq=dut_like` | 1-2 | `4xmix2144-sp64` | 14.10,14.11 | 
 |===
 ===== `testlists/perf.toml` (23 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]

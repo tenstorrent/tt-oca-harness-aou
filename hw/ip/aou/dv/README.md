@@ -144,6 +144,8 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
 | `1x512-sp64-p512` | 1 | 512 | FDI_CFG_SP_64B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 512 (plan 14.17) |
 | `1x512-sp64-nxt` | 1 | 512 | FDI_CFG_SP_64B | 1 | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
+| `4xmix4211-sp128-p512` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 512 below a 1024-bit RP (plan 14.17) |
+| `4xmix4211-sp128-p256` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | `AXI_PEER_DIE_MAX_DATA_WD` 256 below 1024- and 512-bit RPs (plan 14.17) |
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
 
 Reading a name:

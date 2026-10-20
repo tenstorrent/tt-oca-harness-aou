@@ -12,6 +12,16 @@
 //   w_taken_before_aw is ignored); R beats of different IDs
 //   interleaved on an M port, in the ReadData the remote die sent, and on an
 //   S port (A5; ReadData carries RID and RLAST, AoU 5.5).
+// - width_cg: every completed request by path, direction, the DUT RP's width,
+//   the remote die's native width on that RP and the requester's AxSIZE (full
+//   bus width or narrower), so the report shows which of the nine width
+//   pairings ran, each way (plan 2.14). Fed by the S-port managers (l2r) and
+//   the remote managers (r2l). The widths are the configured ones. On l2r
+//   the DUT's part does not depend on the remote width: those cells cover the
+//   remote model's converter (the DUT's part is DUT width x ARSIZE). On r2l
+//   they cover the DUT's upsizers and downsizers, per direction.
+// - split_cg: the remote model's splitter, by its maximum burst length and
+//   whether the request was split (sampled by aou_t1_l4a_adapter).
 class aou_t1_xfer_cov extends uvm_component;
   `uvm_component_utils(aou_t1_xfer_cov)
 
@@ -19,6 +29,9 @@ class aou_t1_xfer_cov extends uvm_component;
                     EV_S_ILV = 4} ev_e;
 
   uvm_tlm_analysis_fifo #(aou_msg) tb_fifo;   // remote die -> DUT
+  uvm_tlm_analysis_fifo #(aou_axi_txn) req_fifo;  // completed requests, both paths
+  int unsigned dut_bytes[4] = '{default: 64};     // DUT RP widths
+  int unsigned rem_bytes[4] = '{default: 64};     // remote die's native width per RP
   aou_axi_vif_t s_vif[];
   aou_axi_vif_t m_vif[];
 
@@ -29,6 +42,12 @@ class aou_t1_xfer_cov extends uvm_component;
   protected bit [3:0] cv_cache;
   protected bit [1:0] cv_resp;
   protected int       cv_ev;
+  protected int       cv_dut;
+  protected int       cv_rem;
+  protected int       cv_size;
+  protected int       cv_req;
+  protected int       cv_max;
+  protected int       cv_split;
 
   protected bit [9:0] msg_id[4];
   protected bit       msg_open[4];
@@ -73,16 +92,56 @@ class aou_t1_xfer_cov extends uvm_component;
     }
   endgroup
 
+  covergroup width_cg;
+    cp_path: coverpoint cv_path {
+      `AOU_XFER_FC_PATH(AOU_FC_CG)
+    }
+    cp_dir: coverpoint cv_dir {
+      `AOU_XFER_FC_DIR(AOU_FC_CG)
+    }
+    cp_dut: coverpoint cv_dut {
+      `AOU_XFER_FC_WIDTH(AOU_FC_CG)
+    }
+    cp_rem: coverpoint cv_rem {
+      `AOU_XFER_FC_WIDTH(AOU_FC_CG)
+    }
+    cp_size: coverpoint cv_size {
+      `AOU_XFER_FC_SIZE(AOU_FC_CG)
+    }
+    cp_req: coverpoint cv_req {
+      `AOU_XFER_FC_REQ(AOU_FC_CG)
+    }
+    x_pair: cross cp_dut, cp_rem;
+    x_pair_dir: cross cp_path, cp_dir, cp_dut, cp_rem;
+    x_pair_req: cross cp_path, cp_dut, cp_rem, cp_req;
+    x_pair_size: cross cp_path, cp_dir, cp_dut, cp_rem, cp_size;
+  endgroup
+
+  covergroup split_cg;
+    cp_max: coverpoint cv_max {
+      `AOU_XFER_FC_MAX_BURST(AOU_FC_CG)
+    }
+    cp_split: coverpoint cv_split {
+      `AOU_XFER_FC_SPLIT(AOU_FC_CG)
+    }
+    x_max_split: cross cp_max, cp_split;
+  endgroup
+
   protected aou_fc_group fc_attr;
   protected aou_fc_group fc_excl;
   protected aou_fc_group fc_chan;
+  protected aou_fc_group fc_width;
+  protected aou_fc_group fc_split;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     tb_fifo = new("tb_fifo", this);
+    req_fifo = new("req_fifo", this);
     attr_cg = new();
     excl_cg = new();
     chan_cg = new();
+    width_cg = new();
+    split_cg = new();
     fc_declare();
   endfunction
 
@@ -112,6 +171,27 @@ class aou_t1_xfer_cov extends uvm_component;
     if (fresh) begin
       p = fc_chan.cp("cp_event"); `AOU_XFER_FC_EVENT(AOU_FC_REG)
     end
+    fc_width = db.group("xfer.width_cg", fresh);
+    if (fresh) begin
+      p = fc_width.cp("cp_path"); `AOU_XFER_FC_PATH(AOU_FC_REG)
+      p = fc_width.cp("cp_dir"); `AOU_XFER_FC_DIR(AOU_FC_REG)
+      p = fc_width.cp("cp_dut"); `AOU_XFER_FC_WIDTH(AOU_FC_REG)
+      p = fc_width.cp("cp_rem"); `AOU_XFER_FC_WIDTH(AOU_FC_REG)
+      p = fc_width.cp("cp_size"); `AOU_XFER_FC_SIZE(AOU_FC_REG)
+      p = fc_width.cp("cp_req"); `AOU_XFER_FC_REQ(AOU_FC_REG)
+      void'(fc_width.add_cross("x_pair", "cp_dut cp_rem"));
+      void'(fc_width.add_cross("x_pair_dir", "cp_path cp_dir cp_dut cp_rem"));
+      void'(fc_width.add_cross("x_pair_req", "cp_path cp_dut cp_rem cp_req"));
+      p = fc_width.add_cross("x_pair_size", "cp_path cp_dir cp_dut cp_rem cp_size");
+      `AOU_XFER_FC_X_SIZE(AOU_FC_REG)
+    end
+    fc_split = db.group("xfer.split_cg", fresh);
+    if (fresh) begin
+      p = fc_split.cp("cp_max"); `AOU_XFER_FC_MAX_BURST(AOU_FC_REG)
+      p = fc_split.cp("cp_split"); `AOU_XFER_FC_SPLIT(AOU_FC_REG)
+      p = fc_split.add_cross("x_max_split", "cp_max cp_split");
+      `AOU_XFER_FC_X_SPLIT(AOU_FC_REG)
+    end
   endfunction
 
   // p: 0 local->remote, 1 remote->local; f: the request as the far side got it.
@@ -137,6 +217,30 @@ class aou_t1_xfer_cov extends uvm_component;
     cv_ev = int'(e);
     chan_cg.sample();
     fc_chan.sample(cv_ev);
+  endfunction
+
+  // One request through the remote model's splitter.
+  function void sample_split(int unsigned max_burst, bit split);
+    cv_max = int'(max_burst);
+    cv_split = split ? 1 : 0;
+    split_cg.sample();
+    fc_split.sample(cv_max, cv_split);
+  endfunction
+
+  // A completed request: local_side marks an S-port request (l2r), otherwise
+  // a remote manager's (r2l). Aborted requests prove nothing.
+  function void take_req(aou_axi_txn t);
+    int unsigned own;
+    if (t.aborted || t.rp > 3) return;
+    cv_path = t.local_side ? 0 : 1;
+    cv_dir = (t.dir == AOU_AXI_WR) ? 0 : 1;
+    cv_dut = int'(dut_bytes[t.rp]);
+    cv_rem = int'(rem_bytes[t.rp]);
+    cv_size = int'(t.size);
+    own = t.local_side ? dut_bytes[t.rp] : rem_bytes[t.rp];
+    cv_req = (t.beat_bytes() < own) ? 1 : 0;
+    width_cg.sample();
+    fc_width.sample(cv_path, cv_dir, cv_dut, cv_rem, cv_size, cv_req);
   endfunction
 
   function void take_tb(aou_msg m);
@@ -220,6 +324,13 @@ class aou_t1_xfer_cov extends uvm_component;
       automatic int rr = r;
       fork watch_m(rr); join_none
     end
+    fork
+      forever begin
+        aou_axi_txn t;
+        req_fifo.get(t);
+        take_req(t);
+      end
+    join_none
     forever begin
       tb_fifo.get(m);
       take_tb(m);

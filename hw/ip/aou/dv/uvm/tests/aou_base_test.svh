@@ -18,6 +18,10 @@
 // +trdy=always|random|bursty|holes, +trdy_pct=N, +hole_pct=N, +burst_max=N the
 // Adapter's pl_trdy policy on every PHY (aou_fdi_cfg), over what the test sets;
 // the L1 stall and cancel knobs of aou_t1_env_cfg::l1_plusargs().
+// +remote_max_burst=2^n the remote die's splitter splits bursts past n beats
+// (default 256); +remote_max_burst_rand=1 re-picks it whenever the remote is idle;
+// +remote_wreq=awsize|upsize|dut_like how the remote die sizes its WriteReqs
+// (aou_t1_remote_mgr_driver; default awsize);
 // +remote_rp_count=N the remote die's RP count (default: the DUT's);
 // +sw_hold_on_deact=0 software keeps issuing requests after DEACTIVATE_START
 // (MAS 7.3.5 broken on purpose); +l3_deact_ack_hold=N the remote die holds its
@@ -84,6 +88,22 @@ class aou_base_test extends ocah_test;
               "DUT rules: AoU v0.7.1 Misc placement", UVM_LOW)
     void'($value$plusargs("l3_deact_ack_hold=%d", cfg.l3_cfg.deact_ack_hold));
     if ($value$plusargs("remote_bytes=%s", rb)) cfg.set_remote_bytes(rb);
+    void'($value$plusargs("remote_max_burst_rand=%d", cfg.remote_max_burst_rand));
+    if ($value$plusargs("remote_wreq=%s", rb)) begin
+      case (rb)
+        "awsize":   cfg.remote_wreq = AOU_RWREQ_AWSIZE;
+        "upsize":   cfg.remote_wreq = AOU_RWREQ_UPSIZE;
+        "dut_like": cfg.remote_wreq = AOU_RWREQ_DUT_LIKE;
+        default:
+          `uvm_fatal(get_type_name(), {"+remote_wreq: awsize, upsize or dut_like, not ", rb})
+      endcase
+      // expected_fail.yaml scopes entries to a mode with when_re on this line.
+      `uvm_info(get_type_name(), {"remote_wreq=", rb}, UVM_LOW)
+    end
+    if ($value$plusargs("remote_max_burst=%d", cfg.remote_max_burst) &&
+        !(cfg.remote_max_burst inside {1, 2, 4, 8, 16, 32, 64, 128, 256}))
+      `uvm_fatal(get_type_name(), $sformatf("+remote_max_burst=%0d is not 2^n up to 256",
+                                            cfg.remote_max_burst))
     cfg.l1_plusargs();
     if (AOU_T1_N_PHY > 1) begin
       cfg.lsm_cfg.active_phy = $urandom_range(AOU_T1_N_PHY - 1);

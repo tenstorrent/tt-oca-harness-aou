@@ -1,0 +1,19 @@
+SPDX-License-Identifier: Apache-2.0
+Mutation mut_dn512to256r (not a main fix): flips RDATA bit 200 out of the 512-to-256-bit
+read downsizer only, so a remote die of 512 bits or more reading a 256-bit RP at ARSIZE 6
+must get wrong data (AXI-S04), while every other width pairing passes.
+Applied to a build-time copy of RTL/ by make build ESCAPE=mut_dn512to256r.
+
+diff --git a/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_256.v b/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_256.v
+index 1423cf9..6796011 100644
+--- a/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_256.v
++++ b/RTL/AXI4MUX_3X1/AOU_AXI4MUX_3X1_256.v
+@@ -607,7 +607,7 @@ assign  O_S_RID_0       = I_M_RID[ID_WD+1:2];
+ assign  dn_s_rid_1      = I_M_RID[ID_WD+1:2];
+ assign  dn_s_rid_2      = I_M_RID[ID_WD+1:2];
+ assign  O_S_RDATA_0     = I_M_RDATA;
+-assign  dn_s_rdata_1    = I_M_RDATA;
++assign  dn_s_rdata_1    = I_M_RDATA ^ (256'd1 << 200);
+ assign  dn_s_rdata_2    = I_M_RDATA;
+ assign  O_S_RRESP_0     = I_M_RRESP;
+ assign  dn_s_rresp_1    = I_M_RRESP;

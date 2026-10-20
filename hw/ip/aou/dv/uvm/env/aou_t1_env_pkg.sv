@@ -68,6 +68,9 @@ package aou_t1_env_pkg;
   localparam int AOU_T1_RP3_BYTES = AOU_T1_RP_BYTES;
 `endif
 
+  // How the remote die sizes its WriteReqs (aou_t1_remote_mgr_driver).
+  typedef enum int {AOU_RWREQ_AWSIZE, AOU_RWREQ_UPSIZE, AOU_RWREQ_DUT_LIKE} aou_t1_rwreq_e;
+
   // AXI_PEER_DIE_MAX_DATA_WD in bytes (Makefile CONFIG: AOU_PEER_MAX_W, default 1024)
 `ifdef AOU_PEER_MAX_W
   localparam int AOU_T1_PEER_MAX_BYTES = `AOU_PEER_MAX_W / 8;

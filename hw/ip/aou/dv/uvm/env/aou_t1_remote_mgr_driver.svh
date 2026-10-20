@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// The remote die's AXI manager on one plane: takes aou_axi_txn from an
-// aou_axi_sequencer (so the L4b sequences run unchanged), sends WriteReq +
+// The remote die's AXI manager on one plane, its bus cfg.data_bytes wide:
+// takes aou_axi_txn from an aou_axi_sequencer (so the L4b sequences run
+// unchanged), sends WriteReq +
 // WriteData/WriteDataFull or ReadReq through L3, and completes each
 // transaction from the DUT's WriteResp/ReadData (rsp_write(), fed by
 // aou_t1_remote_mgr). item_done() returns once the messages are queued; the
@@ -14,6 +15,17 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   aou_l3_agent l3;
   bit [1:0]    wire_rp = 2'd0; // RP field of our requests: the DUT's plane
   int unsigned full_pct = 30;  // WriteDataFull when every lane is strobed
+  // How our writes go on the link. A writer may raise the WriteReq size above
+  // AWSIZE, and WriteData may use any DLENGTH of at least max(the WriteReq
+  // size, 256 bits): DLENGTH is self-describing. All three modes are legal.
+  // AOU_RWREQ_AWSIZE (default): the WriteReq keeps AWSIZE and WriteData is
+  //   packed at it, the minimal legal choice.
+  // AOU_RWREQ_UPSIZE: a narrow write that is modifiable (AxCACHE[1]) and not
+  //   exclusive goes as a WriteReq of our bus size, its length recomputed and
+  //   its strobes sparse. A non-modifiable one keeps its size (AXI4 A4.4).
+  // AOU_RWREQ_DUT_LIKE: the WriteReq keeps AWSIZE and WriteData is at our bus
+  //   width, as this DUT sends; legal, and it exercises a receiver's downsizers.
+  aou_t1_rwreq_e wreq_mode = AOU_RWREQ_AWSIZE;
   uvm_analysis_port #(aou_axi_txn) ap;
 
   int unsigned n_wr;
@@ -97,15 +109,68 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
 
   protected function void send_write(aou_axi_txn t);
     aou_msg_wreq wq = aou_msg_wreq::type_id::create("wreq");
-    bit [127:0] all = {128{1'b1}} >> (128 - cfg.data_bytes);
+    int unsigned mb = (t.beat_bytes() < 32) ? 32 : t.beat_bytes();
+    bit [127:0] all;
+    if (wreq_mode == AOU_RWREQ_DUT_LIKE) mb = cfg.data_bytes;
+    if (wreq_mode == AOU_RWREQ_UPSIZE && !t.lock && t.cache[1] &&
+        t.beat_bytes() < cfg.data_bytes) begin
+      send_write_upsized(t);
+      return;
+    end
+    all = {128{1'b1}} >> (128 - mb);
     fill_req(wq, t);
     l3.send(wq);
     for (int unsigned i = 0; i < t.beats(); i++) begin
       aou_msg_wdata wd = aou_msg_wdata::type_id::create("wdata");
       wd.rp = wire_rp;
-      wd.dlength = dl_of(cfg.data_bytes);
-      wd.data = t.data[i];
-      wd.strb = t.strb[i] & all;
+      wd.dlength = dl_of(mb);
+      if (mb == cfg.data_bytes) begin
+        wd.data = t.data[i];
+        wd.strb = t.strb[i] & all;
+      end else begin
+        // Move the active lanes from our bus to the narrower message's lanes.
+        wd.data = '0;
+        wd.strb = '0;
+        for (int unsigned l = t.lane_lo(i); l <= t.lane_hi(i); l++) begin
+          int unsigned m = int'((t.beat_base(i) + 64'(l)) % 64'(mb));
+          wd.data[8*m +: 8] = t.data[i][8*l +: 8];
+          wd.strb[m] = t.strb[i][l];
+        end
+      end
+      if (wd.strb == all && $urandom_range(99) < full_pct) wd.set_full(1'b1);
+      l3.send(wd);
+    end
+  endfunction
+
+  // t as a WriteReq of our bus size: the same bytes, in beats of the bus from
+  // t's (possibly unaligned) start to its end, strobes on t's bytes only.
+  protected function void send_write_upsized(aou_axi_txn t);
+    aou_msg_wreq wq = aou_msg_wreq::type_id::create("wreq");
+    bit [7:0] b[bit [63:0]];
+    int unsigned bb = cfg.data_bytes;
+    bit [63:0] base = t.addr & ~(64'(bb) - 64'd1);
+    bit [63:0] stop = (t.addr & ~(64'(t.beat_bytes()) - 64'd1)) +
+                      64'(t.beat_bytes()) * (64'(t.len) + 64'd1);
+    int unsigned nbeats = int'((stop - base + 64'(bb) - 64'd1) / 64'(bb));
+    bit [127:0] all = {128{1'b1}} >> (128 - bb);
+    t.to_bytes(b);
+    fill_req(wq, t);
+    wq.size = 3'($clog2(bb));
+    wq.len = 8'(nbeats - 1);
+    l3.send(wq);
+    for (int unsigned i = 0; i < nbeats; i++) begin
+      aou_msg_wdata wd = aou_msg_wdata::type_id::create("wdata");
+      wd.rp = wire_rp;
+      wd.dlength = dl_of(bb);
+      wd.data = '0;
+      wd.strb = '0;
+      for (int unsigned l = 0; l < bb; l++) begin
+        bit [63:0] a = base + 64'(i * bb + l);
+        if (b.exists(a)) begin
+          wd.data[8*l +: 8] = b[a];
+          wd.strb[l] = 1'b1;
+        end
+      end
       if (wd.strb == all && $urandom_range(99) < full_pct) wd.set_full(1'b1);
       l3.send(wd);
     end

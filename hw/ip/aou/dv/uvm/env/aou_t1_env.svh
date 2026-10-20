@@ -85,6 +85,7 @@ class aou_t1_env extends uvm_env;
     remote.cfg = cfg.remote_cfg;
     l4a = aou_t1_l4a_adapter::type_id::create("l4a");
     l4a.remote = remote;
+    l4a.cfg = cfg;
     cfg.l3_cfg.l4a = l4a;
     l3 = aou_l3_agent::type_id::create("l3", this);
     l3.cfg = cfg.l3_cfg;
@@ -121,6 +122,7 @@ class aou_t1_env extends uvm_env;
     if (cfg.attr_chk_en) begin
       attr_chk = aou_t1_attr_chk::type_id::create("attr_chk", this);
       attr_chk.cov = xfer_cov;
+      attr_chk.l3_cfg = cfg.l3_cfg;
     end
     if (cfg.rx_fifo_chk_en) begin
       rx_fifo_chk = aou_t1_rx_fifo_chk::type_id::create("rx_fifo_chk", this);
@@ -141,7 +143,10 @@ class aou_t1_env extends uvm_env;
     end
     bridge.ap.connect(l3.rx_flit_imp);
     l3.ap_rx_msg.connect(rmgr.rx_imp);
-    foreach (rmgr.drv[r]) rmgr.drv[r].clk_vif = s_mgr[0].cfg.vif;
+    foreach (rmgr.drv[r]) begin
+      rmgr.drv[r].clk_vif = s_mgr[0].cfg.vif;
+      rmgr.drv[r].wreq_mode = cfg.remote_wreq;
+    end
     apb = regs.apb;
 
     if (cfg.sb_en) begin
@@ -199,6 +204,13 @@ class aou_t1_env extends uvm_env;
     foreach (s_mgr[r]) xfer_cov.s_vif[r] = s_mgr[r].cfg.vif;
     foreach (m_sub[r]) xfer_cov.m_vif[r] = m_sub[r].cfg.vif;
     l3.ap_tx_msg.connect(xfer_cov.tb_fifo.analysis_export);
+    for (int unsigned r = 0; r < cfg.n_rp && r < 4; r++) begin
+      xfer_cov.dut_bytes[r] = cfg.rp_bytes[r];
+      xfer_cov.rem_bytes[r] = cfg.remote_bytes_of(r);
+    end
+    foreach (s_mgr[r]) s_mgr[r].ap.connect(xfer_cov.req_fifo.analysis_export);
+    rmgr.ap.connect(xfer_cov.req_fifo.analysis_export);
+    l4a.cov = xfer_cov;
     if (attr_chk != null) begin
       foreach (s_mgr[r]) s_mgr[r].ap.connect(attr_chk.loc_fifo.analysis_export);
       foreach (m_sub[r]) m_sub[r].ap.connect(attr_chk.sub_fifo.analysis_export);

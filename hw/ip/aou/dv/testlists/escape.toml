@@ -134,3 +134,21 @@ target = "1x512-sp64"
 args = ["+credit=rreq", "+deact=1", "+credit_manage=1", "+sw_hold_on_deact=0", "+l3_deact_ack_hold=500"]
 seed = 1
 signature = "AOU-R30: AOU_FDI_CHECKER VIOL_MSG_ORDER LP|AOU-R34: \\[l3\\] DUT [RW]REQ at flit#\\d+ G\\d+ after its DeactivateReq"
+# Width-conversion mutations (G7 width-matrix judge): each corrupts one
+# downsizer of the M-port path, so only its own DUT x remote width pairing may
+# fail. Both run on 4xmix4211-sp128: RP1 is 512 bits, RP2/RP3 256 bits.
+[[escapes]]
+test = "aou_dw_test"
+escape = "mut_dn1024to512w"
+target = "4xmix4211-sp128"
+args = ["+remote_bytes=128", "+dp_align=aligned"]
+seed = 1
+signature = "AXI-S02: remote->local .* WR rp1 "
+
+[[escapes]]
+test = "aou_dw_test"
+escape = "mut_dn512to256r"
+target = "4xmix4211-sp128"
+args = ["+remote_bytes=64"]
+seed = 1
+signature = "AXI-S04: remote->local .* rp[23] "

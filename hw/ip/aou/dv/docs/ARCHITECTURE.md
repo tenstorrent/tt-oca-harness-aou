@@ -69,6 +69,8 @@ all configurations and the naming legend are in README "Build configurations"
 | 2x512-tp32_64 | 2 | 512 | TP_32B_64B (TWO_PHY) | two-PHY FDI with a 256-bit PHY0, 2 RPs at one width |
 | 1x512-sp64-p512 | 1 | 512 | SP_64B | AXI_PEER_DIE_MAX_DATA_WD 512 (remote die at most 512 bits) |
 | 1x512-sp64-nxt | 1 | 512 | SP_64B | TX_NXT_PACKING_EN 1 (registered TX packer output stage) |
+| 4xmix4211-sp128-p512 | 4 | 1024, 512, 256, 256 | SP_128B | AXI_PEER_DIE_MAX_DATA_WD 512 with a 1024-bit RP (remote die at most 512 bits; the DUT's own reads still get ReadData1024) |
+| 4xmix4211-sp128-p256 | 4 | 1024, 512, 256, 256 | SP_128B | AXI_PEER_DIE_MAX_DATA_WD 256 below the 1024- and 512-bit RPs (remote die at most 256 bits) |
 | 2xmix-sp64-rxf | 2 | 1024, 256 | SP_64B | non-default RX FIFO depths, RX FIFO register slices off |
 
 The configurations are a pairwise set rather than a cross product: every pair
@@ -76,7 +78,17 @@ of RP count (1, 2, 3, 4), local width (256, 512, 1024, mixed) and FDI width
 (256, 512, 1024, both two-PHY pairs) that matters appears in some build, and
 every RP is built at every local width. The remote die's width is a
 run-time choice (`+remote_bytes=N` or `N0,N1,..` per RP), so one build covers
-every upsize, downsize and bypass pairing. Unused RPs repeat RP0's width,
+every upsize, downsize and bypass pairing. The remote model converts like a
+real die of that width (`aou_t1_l4a_adapter`). A writer may raise the WriteReq
+size above AWSIZE, and WriteData may use any DLENGTH of at least max(the
+WriteReq size, 256 bits), so DLENGTH is self-describing. By default the model
+packs at AWSIZE, the minimal legal choice; `+remote_wreq=upsize` sends WriteReqs
+of its bus size, and `dut_like` keeps AWSIZE with WriteData at its bus width,
+as this DUT does. It maps a
+received request that fits its bus onto one AXI transaction, downsizes a wider
+one, splits bursts past `+remote_max_burst` (default 256 beats) like the DUT's
+splitter (MAS 3.6), and packs ReadData at the requester's ARSIZE (AoU 5.7).
+Unused RPs repeat RP0's width,
 because the DUT sizes the AXI data ports to the widest of all four parameters;
 a narrower RP uses the low bits of its slot. In two-PHY builds the remote die
 uses one PHY (`+active_phy=P`, random per seed by default) and AOU_FDI_CHECKER is
