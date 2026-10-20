@@ -8,6 +8,9 @@ endif::[]
 ifndef::aou-integration-xref[]
 :aou-integration-xref: ../integration_guide/integrator.adoc
 endif::[]
+ifndef::aou-overview-xref[]
+:aou-overview-xref: overview.adoc
+endif::[]
 
 [[aou-3-architecture]]
 == 3. Architecture
@@ -199,6 +202,8 @@ ________________________________________________________________________________
 ==== 3.6.2. Burst Splitting
 
 The splitter uses internal address-generator submodules ([.monospaced]#++aou_axi_split_addrgen_ar++# for reads, [.monospaced]#++aou_axi_split_addrgen_aw++# for writes) to decompose a single long burst into multiple sub-bursts, each no longer than [.monospaced]#++MAX_AxBURSTLEN + 1++# beats. Addresses for each sub-burst are computed from the original base address, burst type, and size.
+
+The address generators recompute address bits [11:0] of each sub-burst; bits [ADDR_WD-1:12] are carried unchanged from the original request. This relies on the request not crossing a 4 KB boundary, which AXI4 guarantees (IHI 0022, A3.4.1). The splitter does not detect a request that crosses one; see xref:{aou-overview-xref}#aou-22-assumptions[Section 2.2].
 
 The [.monospaced]#++MAX_AxBURSTLEN++# value must be of the form 2^n - 1. Legal values are:
 

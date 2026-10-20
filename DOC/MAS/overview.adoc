@@ -8,6 +8,12 @@ endif::[]
 ifndef::aou-integration-xref[]
 :aou-integration-xref: ../integration_guide/integrator.adoc
 endif::[]
+ifndef::aou-architecture-xref[]
+:aou-architecture-xref: architecture.adoc
+endif::[]
+ifndef::aou-errors-xref[]
+:aou-errors-xref: interrupts-errors.adoc
+endif::[]
 
 Apache License Release +
 AOU_CORE Microarchitecture specification +
@@ -63,3 +69,14 @@ image::image1.png[Figure 1. Block Diagram of AOU_CORE and function description]
 * According to the AoU specification, except for the AXI data width, the parameters AXI_ADDR_WD, AXI_ID_WD, and AXI_LEN_WD are fixed. Porting to match the width of the connected ports must be handled externally to AOU_CORE_TOP.
 * Returning read data that exceeds the AXI data width of the remote die is treated as a violation.
 * For a Read Request received from the remote die, if ARSIZE is 5 or less, it returns a Read Data message with DLEN = 2pass:[']b00; if ARSIZE is 6, it returns a Read Data message with DLEN = 2pass:[']b01; if ARSIZE is 7, it returns a Read Data message with DLEN = 2pass:[']b10; Accordingly, if the local die receives a read data message from the remote die whose size is smaller than its own AXI data width, it duplicates the data to match its own AXI data width.
+
+[[aou-22-assumptions]]
+=== 2.2. Assumptions
+
+AOU_CORE forwards the requests it receives from the remote die to its AXI Manager interface after data-width conversion and burst splitting. It assumes that every WriteReq and ReadReq describes a transaction that is legal on an AXI4 interface (AMBA AXI, IHI 0022), in particular:
+
+* the burst does not cross a 4 KB address boundary (A3.4.1);
+* the burst transfers at most Max_Transaction_Bytes (4096) bytes, as defined by the AoU Basic Profile;
+* AxSIZE does not exceed the data width of the remote die.
+
+AOU_CORE does not check these properties and does not split or reject a request that violates them. In particular, the xref:{aou-architecture-xref}#aou-36-axi-transaction-splitter[AXI Transaction Splitter] generates sub-burst addresses within the 4 KB page of the original request only, so a request that crosses a 4 KB boundary is issued with addresses that wrap within that page, and no error is reported. Ensuring that only compliant requests are sent is the responsibility of the AXI requesters and the AoU bridge of the remote die. See also xref:{aou-errors-xref}#aou-51-non-compliant-requests[Section 5.1].

@@ -441,6 +441,16 @@ both resets have been released.
 [[aou-ig-axi-master-rx-ar-channel]]
 === 3.3 AXI Master (RX) – AR Channel
 
+____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+*Note:* The AR and AW requests on the AXI Master (RX) ports are the remote
+die's ReadReq and WriteReq messages, forwarded after data-width conversion
+and burst splitting. AOU_CORE_TOP does not validate them against the AXI4
+rules (no burst crossing a 4 KB boundary, no burst exceeding
+Max_Transaction_Bytes). The system integrator must ensure that the remote
+die issues only AXI4-compliant requests; see the MAS,
+xref:../MAS/overview.adoc#aou-22-assumptions[Section 2.2].
+____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
+
 [cols="<,<,<,<",options="header",]
 |=======================================================================
 |Signal |Direction |Width |Description

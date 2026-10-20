@@ -8,6 +8,9 @@ endif::[]
 ifndef::aou-software-xref[]
 :aou-software-xref: software-operation.adoc
 endif::[]
+ifndef::aou-overview-xref[]
+:aou-overview-xref: overview.adoc
+endif::[]
 
 [[aou-4-interrupt]]
 == 4. Interrupt
@@ -68,3 +71,8 @@ An interrupt that occurs when AOU_CORE receives an AoU protocol violation. Refer
 == 5. Error
 
 *TBD*
+
+[[aou-51-non-compliant-requests]]
+=== 5.1. Non-compliant requests from the remote die
+
+A WriteReq or ReadReq from the remote die that violates the AXI4 rules listed in xref:{aou-overview-xref}#aou-22-assumptions[Section 2.2] (a burst crossing a 4 KB boundary, or exceeding Max_Transaction_Bytes) is not detected. The request is forwarded to the AXI Manager interface as described there; no interrupt is raised and no LinkReset is requested.
