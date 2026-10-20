@@ -219,7 +219,7 @@
 | 9.8 | Incomplete flit received (timeout) | P2 | dropped: The RTL has no RX incomplete-flit time-out, and on FDI the Adapter completes or cancels every flit (UCIe r1.1 8.2.4).
 | 9.9 | Response with BID not matching any pending write | P1 | `aou_id_mismatch_test.side-mgr.kind-b`, `aou_id_mismatch_test.side-mgr.kind-b.detect_only-1`
 | 9.10 | Response with RID not matching any pending read | P1 | `aou_id_mismatch_test.side-mgr.kind-r`, `aou_id_mismatch_test.side-mgr.kind-r.detect_only-1`
-| 9.11 | BRESP with BID not matching pending (subordinate side), on every RP; per-RP status and the BID mismatch interrupt | P1 | `aou_id_mismatch_test.side-sub.kind-b`, `aou_id_mismatch_test.side-sub.kind-b.4x512-sp64`, `aou_id_mismatch_test.side-sub.kind-b.slv_en-0`, `aou_slv_id_mismatch_test.1x512-sp64`, `aou_slv_id_mismatch_test.4x512-sp64`
+| 9.11 | BRESP with BID not matching pending (subordinate side), on every RP; per-RP status and the BID mismatch interrupt | P1 | `aou_id_mismatch_test.side-sub.kind-b`, `aou_id_mismatch_test.side-sub.kind-b.4x512-sp64`, `aou_slv_id_mismatch_test.1x512-sp64`, `aou_slv_id_mismatch_test.4x512-sp64`
 | 9.12 | RRESP with RID not matching pending (subordinate side), on every RP; per-RP status and the RID mismatch interrupt | P1 | `aou_id_mismatch_test.side-sub.kind-r`, `aou_slv_id_mismatch_test.1x512-sp64`, `aou_slv_id_mismatch_test.4x512-sp64`
 | 9.13 | Verify error info captured in per-RP debug FIFO | P2 | `aou_axi_err_resp_test`, `aou_axi_err_resp_test.4x512-sp64`, `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5`, `aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0`, `aou_axi_err_resp_test.part-fifo.dbg_len-31`, `aou_axi_err_resp_test.part-fifo.dbg_len-max`
 | 9.14 | Test remote die reading error info via configured AXI address | P2 | `aou_axi_err_resp_test`, `aou_axi_err_resp_test.4x512-sp64`, `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5`, `aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0`, `aou_axi_err_resp_test.part-fifo.dbg_len-31`, `aou_axi_err_resp_test.part-fifo.dbg_len-max`
@@ -230,7 +230,7 @@
 | 9.19 | Debug FIFO read through an RP narrower than the remote die (two-beat read) | P2 | `aou_axi_err_resp_test.part-fifo.1x256-sp32`, `aou_axi_err_resp_test.part-fifo.4xmix4211-sp128`
 | 9.20 | M-port ID and split tables full: back-pressure, no error | P2 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64`, `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.4x512-sp64`, `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.1x512-sp64`, `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.4x512-sp64`
 | 9.21 | ReadData wider than the remote AXI width (a violation per the MAS; reaction unspecified) | P2 | `aou_rdata_wide_test.1x256-sp32`, `aou_rdata_wide_test.1x512-sp64`, `aou_rdata_wide_test.4xmix4211-sp128`
-| 9.22 | Subordinate ID-check enable bit (AXI_SLV_ID_MISMATCH_ERR_RPn[22]) off and on | P2 | `aou_id_mismatch_test.side-sub.kind-b.slv_en-0`
+| 9.22 | Subordinate ID-check enable bit (AXI_SLV_ID_MISMATCH_ERR_RPn[22]) off and on | P2 | _none_
 |===
 ==== 2.10 Performance Tests
 [cols="1,5,1,4",options="header"]

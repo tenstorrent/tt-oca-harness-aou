@@ -660,11 +660,13 @@ module tb_top;
 `define AOU_AXI4PC_PORT(P) \
     aou_axi4pc_gate u_``P``_gate ( \
       .clk(clk), .bus_rst_n(rst_n), .port_rst_n(axi_port_rst_n), .off_set(axi4pc_ctl.off_set), \
+      .resync(axi4pc_ctl.P``_resync[r]), \
       .awvalid(P``_awvalid[r]), .awready(P``_awready[r]), .wvalid(P``_wvalid[r]), \
       .wready(P``_wready[r]), .wlast(P``_wlast[r]), .bvalid(P``_bvalid[r]), \
       .bready(P``_bready[r]), .arvalid(P``_arvalid[r]), .arready(P``_arready[r]), \
       .rvalid(P``_rvalid[r]), .rready(P``_rready[r]), .rlast(P``_rlast[r]), \
-      .chk_rst_n(P``_chk_rst_n), .off(axi4pc_ctl.P``_off[r]) \
+      .chk_rst_n(P``_chk_rst_n), .off(axi4pc_ctl.P``_off[r]), \
+      .sync_wait(axi4pc_ctl.P``_sync_wait[r]) \
     ); \
     Axi4PC #( \
       .DATA_WIDTH(rp_w(r)), .WID_WIDTH(10), .RID_WIDTH(10), .ADDR_WIDTH(64), \
@@ -698,6 +700,8 @@ module tb_top;
   for (genvar r = RP_COUNT; r < 8; r++) begin : g_axi4pc_none
     assign axi4pc_ctl.s_off[r] = 1'b0;
     assign axi4pc_ctl.m_off[r] = 1'b0;
+    assign axi4pc_ctl.s_sync_wait[r] = 1'b0;
+    assign axi4pc_ctl.m_sync_wait[r] = 1'b0;
   end
   assign axi4pc_ctl.present = 1'b1;
 `undef AOU_AXI4PC_PORT
@@ -705,6 +709,8 @@ module tb_top;
   assign axi4pc_ctl.present = 1'b0;
   assign axi4pc_ctl.s_off = '0;
   assign axi4pc_ctl.m_off = '0;
+  assign axi4pc_ctl.s_sync_wait = '0;
+  assign axi4pc_ctl.m_sync_wait = '0;
 `endif
 
 endmodule : tb_top

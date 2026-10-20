@@ -406,7 +406,11 @@ link is lost while AoU isn't DISABLED, the transactions in flight can't complete
 port's next reset (then as above), or to the end of the test; each hold and release
 is logged. The same component expects the rules a deliberately unmatched response
 from the local subordinate trips (`inject_orphan`, the ID-mismatch tests) on that
-port while it is presented (`uvm/env/axi4pc/aou_axi4pc_pkg.sv`).
+port while it is presented (`uvm/env/axi4pc/aou_axi4pc_pkg.sv`). Once the DUT takes
+such an orphan, Axi4PC's own transaction tracking is wrong (an unmatched B or RLAST
+corrupts its CAMs until reset), so that checker is reset once, in the port's next quiet
+cycle and only for that cycle; it is never held while the port is active, and a reset still
+waiting at the end of the test is an error.
 
 ## Coverage
 

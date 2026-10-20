@@ -235,7 +235,6 @@ plan_ids:
   aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1: '19.8'
   aou_id_mismatch_test.side-sub.kind-b: '9.11,20.13'
   aou_id_mismatch_test.side-sub.kind-b.4x512-sp64: '9.11'
-  aou_id_mismatch_test.side-sub.kind-b.slv_en-0: '9.11,9.22'
   aou_id_mismatch_test.side-sub.kind-r: '9.12'
   aou_id_mismatch_test.side-sub.kind-b.mask-1: '19.7'
   aou_int_test.mode-w1c: '19.1,19.2,19.11'

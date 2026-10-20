@@ -22,6 +22,9 @@
 // time-out alone the interrupt stays pending, and since it can only rise
 // again once cleared, software still clears it when the state arrives later
 // by another path (the test's own activation, say), as 7.3.5 asks.
+// On INT_MI0_ID_MISMATCH software clears every RP's SPLIT_RID/BID_MISMATCH_ERR
+// with write 1 (MAS 7.2.2), which also ends the DUT's TX credit block on an ID
+// mismatch (937a8a8). service_id_mismatch = 0 leaves it to the test.
 class aou_t1_sw_isr extends uvm_component;
   `uvm_component_utils(aou_t1_sw_isr)
 
@@ -33,6 +36,9 @@ class aou_t1_sw_isr extends uvm_component;
   bit               hold_on_deact = 1'b1;
   bit               drain_before_deact = 1'b0;
   bit               held = 1'b0;
+  bit               service_id_mismatch = 1'b1;
+  int unsigned      n_rp = 1;
+  int unsigned      n_id_mismatch;
   int unsigned      state_timeout = 20000;
   int unsigned      n_act;
   int unsigned      n_deact;
@@ -184,8 +190,30 @@ class aou_t1_sw_isr extends uvm_component;
     done();
   endtask
 
+  // Clears the manager-side ID-mismatch errors of every RP until the
+  // interrupt stays low (bounded: a response the DUT keeps presenting re-sets
+  // the error after every clear).
+  protected task service_id_mismatch_irq();
+    int unsigned n = 0;
+    while (service_id_mismatch && status.vif.mon_cb.int_mi0_id_mismatch === 1'b1 && n++ < 16) begin
+      n_id_mismatch++;
+      `uvm_info(get_type_name(), "INT_MI0_ID_MISMATCH: clearing SPLIT_RID/BID_MISMATCH_ERR",
+                UVM_LOW)
+      for (int unsigned r = 0; r < n_rp; r++) begin
+        uvm_reg rg = rm.get_reg_by_name($sformatf("error_info_rp%0d", r));
+        write_field(rg.get_field_by_name("split_rid_mismatch_err"), 1);
+        write_field(rg.get_field_by_name("split_bid_mismatch_err"), 1);
+      end
+      repeat (4) @(status.vif.mon_cb);
+    end
+  endtask
+
   task run_phase(uvm_phase phase);
     fork
+      forever begin
+        status.mi0_id_mismatch_ev.wait_trigger();
+        service_id_mismatch_irq();
+      end
       forever begin
         status.act_start_ev.wait_trigger();
         if (enable) service(1'b1);

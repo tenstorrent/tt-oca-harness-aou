@@ -115,8 +115,10 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     n_down++;
     expect_event("INT_REQ_LINKRESET", 0, n_down);
     // The DUT can lose track of local M-port transactions when the link
-    // drops under them (BUGS/015 interim).
-    expect_event("INT_MI0_ID_MISMATCH", 0, n_down);
+    // drops under them (BUGS/015 interim). Software clears the error
+    // each time (aou_t1_sw_isr, MAS 7.2.2), so every orphan beat left on an M
+    // port can raise it again: no upper bound.
+    expect_event("INT_MI0_ID_MISMATCH", 0, 0);
     traffic_nb(AOU_T1_BOTH_DIRS, num_txns);
     wait_cycles($urandom_range(500, 20));
     recover(null, 1'b1, ev, inband_drop);

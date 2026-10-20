@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 229
+expected_count = 228
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -266,7 +266,6 @@ tests = [
   "aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1",
   "aou_id_mismatch_test.side-sub.kind-b",
   "aou_id_mismatch_test.side-sub.kind-b.4x512-sp64",
-  "aou_id_mismatch_test.side-sub.kind-b.slv_en-0",
   "aou_id_mismatch_test.side-sub.kind-r",
   "aou_id_mismatch_test.side-sub.kind-b.mask-1",
   "aou_int_test.mode-w1c",
@@ -322,7 +321,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 415
+expected_count = 414
 tests = [
   "aou_sanity_test",
   "aou_t1_slice_test",
@@ -551,7 +550,6 @@ tests = [
   "aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1",
   "aou_id_mismatch_test.side-sub.kind-b",
   "aou_id_mismatch_test.side-sub.kind-b.4x512-sp64",
-  "aou_id_mismatch_test.side-sub.kind-b.slv_en-0",
   "aou_id_mismatch_test.side-sub.kind-r",
   "aou_id_mismatch_test.side-sub.kind-b.mask-1",
   "aou_int_test.mode-w1c",

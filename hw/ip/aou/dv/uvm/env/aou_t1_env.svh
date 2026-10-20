@@ -103,6 +103,7 @@ class aou_t1_env extends uvm_env;
     sw_isr.enable = cfg.sw_isr_en;
     sw_isr.hold_on_deact = cfg.sw_hold_on_deact;
     sw_isr.drain_before_deact = cfg.sw_drain_before_deact;
+    sw_isr.n_rp = cfg.n_rp;
     orphan = aou_t1_orphan_chk::type_id::create("orphan", this);
     axi4pc = aou_t1_axi4pc_ctl::type_id::create("axi4pc", this);
     mo_chk = aou_t1_mo_chk::type_id::create("mo_chk", this);

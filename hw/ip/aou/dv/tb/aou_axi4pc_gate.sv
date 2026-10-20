@@ -12,23 +12,39 @@
 //   that never ends (lost with the link) keeps the checker in reset.
 // - off_set (a link event, aou_t1_axi4pc_ctl) holds the checker in reset until the
 //   port's next reset, then as above. Without a port reset it stays held.
+// - resync (aou_t1_axi4pc_ctl, a one-cycle request) is kept pending (sync_wait) until a
+//   quiet cycle, and the checker's reset is pulsed in the high half of that cycle
+//   only: its CAMs clear (asynchronous reset), but no clock edge samples ARESETn low,
+//   so no handshake is missed and the *VALID_RESET rules (VALID low at the first edge
+//   after reset) don't apply; the checker is never held while the port is active.
+//   A request still pending at the end of the test is reported by aou_t1_axi4pc_ctl;
+//   until then the checker runs on with the stale entry, so it errs towards false
+//   failures, never silence. A response handshake with nothing
+//   outstanding (an injected orphan the DUT accepted) leaves Axi4PC's tracking wrong
+//   until its next reset: an unmatched B sets BRespCam on the free entry, so the next
+//   write stored there never matches its B; an RLAST beat pops the empty read CAM
+//   (RIndex 0, AUX_RCAM_UNDERFLOW on every cycle). The counters below never count a
+//   response with nothing outstanding, so the same handshake doesn't keep busy set.
 module aou_axi4pc_gate (
   input  logic clk,
   input  logic bus_rst_n,
   input  logic port_rst_n,
   input  logic off_set,
+  input  logic resync,
   input  logic awvalid, awready,
   input  logic wvalid, wready, wlast,
   input  logic bvalid, bready,
   input  logic arvalid, arready,
   input  logic rvalid, rready, rlast,
   output logic chk_rst_n,
-  output logic off
+  output logic off,
+  output logic sync_wait
 );
   int unsigned n_aw, n_wl, n_b, n_ar, n_rl;
   logic        w_mid;
   logic        off_q;
   logic        held_q;
+  logic        sync_q;
 
   wire aw_hs = awvalid === 1'b1 && awready === 1'b1;
   wire w_hs  = wvalid === 1'b1 && wready === 1'b1;
@@ -55,9 +71,9 @@ module aou_axi4pc_gate (
         if (wlast === 1'b1) n_wl <= n_wl + 1;
         w_mid <= wlast !== 1'b1;
       end
-      if (b_hs) n_b <= n_b + 1;
+      if (b_hs && n_b < n_wr) n_b <= n_b + 1;
       if (ar_hs) n_ar <= n_ar + 1;
-      if (r_hs && rlast === 1'b1) n_rl <= n_rl + 1;
+      if (r_hs && rlast === 1'b1 && n_rl < n_ar) n_rl <= n_rl + 1;
     end
   end
 
@@ -69,6 +85,13 @@ module aou_axi4pc_gate (
     else if (off_set) off_q <= 1'b1;
   end
 
+  // Pending until the end of a cycle that was quiet (the reset below covered it).
+  always_ff @(posedge clk or negedge bus_rst_n) begin
+    if (!bus_rst_n) sync_q <= 1'b0;
+    else if (resync === 1'b1) sync_q <= 1'b1;
+    else if (quiet) sync_q <= 1'b0;
+  end
+
   always_ff @(posedge clk or negedge bus_rst_n) begin
     if (!bus_rst_n) held_q <= 1'b0;
     else held_q <= off_q || !port_rst_n || (held_q && !quiet);
@@ -76,6 +99,9 @@ module aou_axi4pc_gate (
 
   // quiet is combinational so the first edge Axi4PC samples out of reset is one
   // with every VALID low.
-  assign chk_rst_n = port_rst_n && !off_q && !(held_q && !quiet);
+  // The resync pulse: within a quiet cycle, while clk is high (between edges).
+  assign chk_rst_n = port_rst_n && !off_q && !(held_q && !quiet) &&
+                     !(sync_q && quiet && clk === 1'b1);
   assign off = off_q || held_q;
+  assign sync_wait = sync_q;
 endmodule

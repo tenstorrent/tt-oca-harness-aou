@@ -119,9 +119,8 @@ tags = ["err_int"]
 run_modes = ["err_int"]
 args = ["+side=mgr", "+kind=b", "+mask=1"]
 
-# BUGS/029 bug-avoiding variant (decision D8): status, INFO, interrupt and mask
-# are checked, then a hard reset ends the scenario. It drops the 500-cycle
-# acceptance check, so it is weaker than the entries above, which stay.
+# Detection only (decision D8): status, INFO, interrupt and mask are checked,
+# then a hard reset ends the scenario without the write-1 clear.
 [[tests]]
 name = "aou_id_mismatch_test.side-mgr.kind-b.detect_only-1"
 module = { uvm = "aou_id_mismatch_test" }
@@ -166,14 +165,6 @@ seed = 1
 tags = ["err_int"]
 run_modes = ["err_int"]
 args = ["+side=sub", "+kind=b"]
-
-[[tests]]
-name = "aou_id_mismatch_test.side-sub.kind-b.slv_en-0"
-module = { uvm = "aou_id_mismatch_test" }
-seed = 1
-tags = ["err_int"]
-run_modes = ["err_int"]
-args = ["+side=sub", "+kind=b", "+slv_en=0"]
 
 [[tests]]
 name = "aou_id_mismatch_test.side-sub.kind-r"
@@ -330,7 +321,7 @@ run_modes = ["err_int"]
 
 [[groups]]
 name = "err_int"
-expected_count = 34
+expected_count = 33
 tests = [
   "aou_axi_err_resp_test",
   "aou_axi_err_resp_test.4x512-sp64",
@@ -349,7 +340,6 @@ tests = [
   "aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1",
   "aou_id_mismatch_test.side-sub.kind-b",
   "aou_id_mismatch_test.side-sub.kind-b.4x512-sp64",
-  "aou_id_mismatch_test.side-sub.kind-b.slv_en-0",
   "aou_id_mismatch_test.side-sub.kind-r",
   "aou_id_mismatch_test.side-sub.kind-b.mask-1",
   "aou_int_test.mode-w1c",

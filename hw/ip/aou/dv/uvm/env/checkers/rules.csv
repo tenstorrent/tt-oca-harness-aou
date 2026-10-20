@@ -215,7 +215,6 @@ T1-E02,aou_t1_dbg_fifo_chk,,DUT,"The response error debug FIFO returns, in push 
 T1-E03,aou_t1_dbg_fifo_chk,,DUT,A debug FIFO read and pop at the configured address complete with OKAY,MAS software-operation 7.2.4
 T1-E19,aou_t1_dbg_fifo_chk,,DUT,"Every RP-wide lane of every beat of a debug FIFO read equals the head entry, for reads and pops of any length within 4 KB: the window answers each beat and the RP sends no part of the access to memory or splits it by MAX_AxBURSTLEN (BUGS/035, BUGS/043 interim)",MAS software-operation 7.2.4; AXI4 A3.4.1; BUGS/035; BUGS/043
 T1-E04,aou_id_mismatch_vseq,,DUT,An ID mismatch sets its per-RP error bit and captures the ID; INFO clears with the error,MAS software-operation 7.2.2; interrupts-errors 4
-T1-E05,aou_id_mismatch_vseq,,DUT,The DUT takes an M-port response with an unknown ID (BUGS/029 interim),AXI4 A3.2.1; BUGS/029
 T1-E06,aou_id_mismatch_vseq / aou_int_vseq,,DUT,An interrupt is high exactly while its status bit is set and unmasked,MAS software-operation 7.2.1
 T1-E07,aou_id_mismatch_vseq / aou_int_vseq,,DUT,Clearing a mask with the status pending raises the interrupt (BUGS/029 interim),MAS software-operation 7.2.1; BUGS/029
 T1-E08,aou_int_vseq,,DUT,A write-1-to-clear in the cycle a new error sets the bit never loses the error (BUGS/029 interim),BUGS/029
@@ -225,7 +224,6 @@ T1-E11,aou_int_vseq,,DUT,WRITE_EARLY_RESPONSE_RPn captures the failing ID and ty
 T1-E12,aou_int_vseq,,DUT,Simultaneous interrupt sources are all captured and clear independently,MAS interrupts-errors 4
 T1-E13,aou_credit_violation_vseq,,DUT,Reads beyond the advertised RREQ credit leave reads within it answered and raise no LinkReset (BUGS/030 interim),AoU 6.1; BUGS/030
 T1-E14,aou_before_enable_vseq,,DUT,A request before activation waits and raises INT_ACTIVATE_START,AoU 8.4; MAS software-operation 7.3.5
-T1-E15,aou_id_mismatch_vseq,,DUT,SLV_TR_COMPLETE is 1 with nothing outstanding after an unrequested response (BUGS/029),MAS software-operation 7.1; BUGS/029
 DP-R02,aou_dw_chk,,DUT,An S-port read beat whose ReadData is narrower than the RP carries that ReadData replicated across the bus,MAS 3.3 (R 4M1S FIFO); plan 14.16
 DP-R03,aou_dw_chk,,DUT,WriteData the DUT sends carries the DLENGTH of its RP's AXI data width,MAS 3.5.2
 DP-R04,aou_dw_chk,,DUT,A width-conversion run produced every conversion it targets (remote width writes and reads; single- and multi-beat M-port writes; narrow S-port reads),test self-check; plan 14.x

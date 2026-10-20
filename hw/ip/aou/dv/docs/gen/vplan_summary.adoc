@@ -259,7 +259,7 @@
 | `aou_slv_id_mismatch_test.4x512-sp64` | `aou_slv_id_mismatch_test` |  | 1-2 | `4x512-sp64` | 9.11,9.12 | 
 | `aou_slv_id_mismatch_test.1x512-sp64` | `aou_slv_id_mismatch_test` |  | 1 | `1x512-sp64` | 9.11,9.12 | 
 |===
-===== `testlists/err_int.toml` (34 scenarios)
+===== `testlists/err_int.toml` (33 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -280,7 +280,6 @@
 | `aou_id_mismatch_test.side-mgr.kind-b.mask-1.detect_only-1` | `aou_id_mismatch_test` | `+side=mgr +kind=b +mask=1 +detect_only=1` | 1-2 |  | 19.8 | 
 | `aou_id_mismatch_test.side-sub.kind-b` | `aou_id_mismatch_test` | `+side=sub +kind=b` | 1-2 |  | 9.11,20.13 | 
 | `aou_id_mismatch_test.side-sub.kind-b.4x512-sp64` | `aou_id_mismatch_test` | `+side=sub +kind=b` | 1 | `4x512-sp64` | 9.11 | 
-| `aou_id_mismatch_test.side-sub.kind-b.slv_en-0` | `aou_id_mismatch_test` | `+side=sub +kind=b +slv_en=0` | 1 |  | 9.11,9.22 | 
 | `aou_id_mismatch_test.side-sub.kind-r` | `aou_id_mismatch_test` | `+side=sub +kind=r` | 1 |  | 9.12 | 
 | `aou_id_mismatch_test.side-sub.kind-b.mask-1` | `aou_id_mismatch_test` | `+side=sub +kind=b +mask=1` | 1-2 |  | 19.7 | 
 | `aou_int_test.mode-w1c` | `aou_int_test` | `+mode=w1c` | 1-2 |  | 19.1,19.2,19.11 | 

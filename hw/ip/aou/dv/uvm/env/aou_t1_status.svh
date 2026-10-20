@@ -22,12 +22,14 @@ class aou_t1_status extends uvm_component;
   bit                act_ok;      // result of wait_act_state()
   uvm_event          act_start_ev;    // INT_ACTIVATE_START rose
   uvm_event          deact_start_ev;  // INT_DEACTIVATE_START rose
+  uvm_event          mi0_id_mismatch_ev;  // INT_MI0_ID_MISMATCH rose
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     state_ev = new("state_ev");
     act_start_ev = new("act_start_ev");
     deact_start_ev = new("deact_start_ev");
+    mi0_id_mismatch_ev = new("mi0_id_mismatch_ev");
   endfunction
 
   static function string int_name(int unsigned i);
@@ -80,6 +82,7 @@ class aou_t1_status extends uvm_component;
           rises[int_name(i)]++;
           if (i == 4) act_start_ev.trigger();
           if (i == 5) deact_start_ev.trigger();
+          if (i == 2) mi0_id_mismatch_ev.trigger();
           if (is_error(i) && checks_en)
             `uvm_error(get_type_name(), $sformatf("%s: interrupt asserted", int_name(i)))
           else

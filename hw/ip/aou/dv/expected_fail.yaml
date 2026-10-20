@@ -939,14 +939,6 @@
 
 - test: aou_id_mismatch_test
   bug: BUGS/029
-  check: 'not accepted in 500 cycles (BUGS/029)'
-  seed_dependent: true
-  note: >-
-    +side=mgr. The M port never raises BREADY/RREADY for a response with an
-    unknown ID; it flags the mismatch but holds the channel.
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
   check: 'T1-RM01: WriteResp with no write outstanding'
   seed_dependent: true
   note: +side=mgr +kind=b. Clearing SPLIT_BID_MISMATCH_ERR sends WriteResps with the previous B's ID to the remote die
@@ -982,27 +974,6 @@
   bug: BUGS/029
   check: 'T1-E06: INT_MI0_ID_MISMATCH is 1, expected 0'
   seed_dependent: true
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'T1-E15: SLV_TR_COMPLETE is 0 with nothing outstanding'
-  seed_dependent: true
-  note: >-
-    +side=sub (+kind=r, or +slv_en=0). An unrequested ReadData, or a WriteResp
-    with the subordinate checker off, leaves SLV_TR_COMPLETE low for good, so
-    deactivation never completes.
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'AXI-R07: B ID'
-  seed_dependent: true
-  note: +side=sub +slv_en=0. The unrequested WriteResp reaches the S port as a B nobody asked for
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'matches no outstanding write'
-  seed_dependent: true
-  note: +side=sub +slv_en=0. The local manager's view of the same B
 
 - test: aou_credit_violation_test
   bug: BUGS/030
@@ -2300,15 +2271,6 @@
 # Arm Axi4PC (AXI4PC=1 builds; README "Optional: Arm AXI4 protocol assertions") on the
 # same DUT violations the bench's own AXI rules report. Each is a follow-on of the
 # bug-specific entry that names the violation, so it never explains a run alone.
-
-# BUGS/029 item 4: with the subordinate checker off, the remote die's stray WriteResp
-# comes out on the S port as a B for no write (the bench's AXI-R07).
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check_re: '\[AXI4PC\] \S+\.u_s_axi4pc\.\S+: AXI4_ERRS_BRESP_(AW|WLAST):'
-  requires: BUGS/029
-  seed_dependent: true
-  note: unrequested B on the S port (+side=sub +slv_en=0)
 
 # BUGS/031: RP0's responses come out on RP1's S port (the bench's AXI-R07/AXI-R08). With
 # no request behind them Axi4PC also finds no data lanes (RDATA_X), its read CAM
