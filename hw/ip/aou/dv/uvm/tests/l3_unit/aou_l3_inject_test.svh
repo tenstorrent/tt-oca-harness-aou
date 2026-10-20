@@ -13,6 +13,13 @@
 //   fdid       wrong FDId                 AOU-R9  (A, B self-check, checker)
 //   act_place  Activation not at G0       AOU-R6  (A, B self-check, checker)
 //   overgrant  credit beyond any buffer   saturation in A, AOU-R21 (checker)
+//   req_after_dreq  WriteReq after B's own DeactivateReq
+//                                         AOU-R30 (checker), AOU-R34 (A)
+//   rsp_after_dack  ReadData credit after B's own DeactivateAck
+//                                         AOU-R29 (checker), AOU-R26 (A)
+// The last two keep the v0.8 8.4 rules honest: ReadData/WriteResp may follow
+// one's own DeactivateReq and request credits one's own DeactivateAck, so
+// the checker's windows depend on the class.
 class aou_l3_inject_test extends aou_l3_unit_env_test;
   `uvm_component_utils(aou_l3_inject_test)
 
@@ -45,6 +52,16 @@ class aou_l3_inject_test extends aou_l3_unit_env_test;
       "overgrant": begin
         rule = "AOU-R21";
         rx_check = 1'b0;
+      end
+      "req_after_dreq": begin
+        rule = "AOU-R30";
+        rx_check = 1'b0;
+        also.push_back("AOU-R34");
+      end
+      "rsp_after_dack": begin
+        rule = "AOU-R29";
+        rx_check = 1'b0;
+        also.push_back("AOU-R26");
       end
       default: `uvm_fatal(get_type_name(), {"unknown +L3_INJECT=", inject})
     endcase
@@ -109,6 +126,24 @@ class aou_l3_inject_test extends aou_l3_unit_env_test;
         idle(40);
         b.cfg.pol.start_granule = -1;
       end
+      "req_after_dreq": begin
+        aou_msg_wreq w = aou_msg_wreq::type_id::create("w");
+        w.ignore_state = 1'b1;
+        b.model.lnk.queue_op(AOU_DEACT_REQ);
+        b.model.kick();
+        wait (b.model.lnk.dreq_sent);
+        b.send(w);
+      end
+      "rsp_after_dack": begin
+        a.model.lnk.request_deactivate();
+        a.model.maybe_release_deact();
+        a.model.kick();
+        wait (b.model.lnk.dack_sent);
+        // RP0 RDATA=1 in an otherwise empty flit ({RP, WRESP, RDATA, ...}).
+        b.model.pk.inj_msg_credit = 'h0200;
+        b.model.pk.inj_empty = 1'b1;
+        b.model.kick();
+      end
       default: begin
         aou_l3_overgrant_seq s = aou_l3_overgrant_seq::type_id::create("s");
         s.cls = AOU_CC_RDATA;
@@ -122,6 +157,9 @@ class aou_l3_inject_test extends aou_l3_unit_env_test;
     super.check_phase(phase);
     expect_true(chk.count(rule, "aou_fdi_chk_adapter") > 0,
                 $sformatf("AOU_FDI_CHECKER reports %s for %s", rule, inject));
+    foreach (also[i])
+      expect_true(chk.count(also[i]) > 0, $sformatf("receiving model reports %s for %s",
+                                                     also[i], inject));
     if (rx_check)
       expect_true(chk.count(rule, "aou_unpacker") + chk.count(rule, "aou_l3_model") > 0,
                   $sformatf("receiving model reports %s for %s", rule, inject));

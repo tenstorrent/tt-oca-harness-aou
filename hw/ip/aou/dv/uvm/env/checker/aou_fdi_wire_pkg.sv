@@ -17,17 +17,18 @@
 // *****************************************************************************
 //
 //  Module     : aou_fdi_wire_pkg
-//  Version    : 1.01
-//  Date       : 26-09-07
+//  Version    : 1.02
+//  Date       : 26-10-20
 //
 // *****************************************************************************
 //
 //  The AoU v0.7 wire format as AOU_FDI_CHECKER reads it: flit geometry, the
 //  protocol header, the message encodings and lengths, and the two Misc
-//  message layouts. Every value cites the specification section it comes
-//  from and is shared with nothing in the design: the checker judges the wire
-//  against the specification, so it must not learn the wire from the RTL it
-//  judges.
+//  message layouts. Every value cites the v0.7 section or table it comes from
+//  (the revision the design implements; v0.8 renumbers 5.7-5.9 to 5.8-5.10,
+//  6.3 to 6.4 and Tables 17-26 to 16-25) and is shared with nothing in the
+//  design: the checker judges the wire against the specification, so it must
+//  not learn the wire from the RTL it judges.
 //
 //  Message layouts follow 5.7's convention -- bytes count up, bits count down,
 //  fields MSB-first -- through wire_bit(), so a field is stated as the stream
@@ -156,7 +157,8 @@ localparam logic [DLENGTH_WD-1:0] DLENGTH_RESERVED = 2'b11;
 
 // -----------------------------------------------------------------------------
 // Message lengths in granules (Tables 2-13, 19, 26). Every message is a fixed
-// number of granules under the Base Profile, which ignores PROFEXTLEN (5.8).
+// number of granules under the Base Profile, which ignores PROFEXTLEN (5.8;
+// v0.8 removes PROFEXTLEN).
 // -----------------------------------------------------------------------------
 localparam int AW_G         = 3;
 localparam int AR_G         = 3;

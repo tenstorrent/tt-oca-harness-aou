@@ -3597,10 +3597,17 @@ msgstart   MsgStart inside a message  AOU-R4  (A, B self-check, checker)
 fdid       wrong FDId                 AOU-R9  (A, B self-check, checker)
 act_place  Activation not at G0       AOU-R6  (A, B self-check, checker)
 overgrant  credit beyond any buffer   saturation in A, AOU-R21 (checker)
+req_after_dreq  WriteReq after B's own DeactivateReq
+AOU-R30 (checker), AOU-R34 (A)
+rsp_after_dack  ReadData credit after B's own DeactivateAck
+AOU-R29 (checker), AOU-R26 (A)
+The last two keep the v0.8 8.4 rules honest: ReadData/WriteResp may follow
+one's own DeactivateReq and request credits one's own DeactivateAck, so
+the checker's windows depend on the class.
 
 *Procedure.* The class's own `run_phase` (see the file).
 
-*Rules named.* `AOU-R11`, `AOU-R16`, `AOU-R21`, `AOU-R3`, `AOU-R4`, `AOU-R40`, `AOU-R6`, `AOU-R9`
+*Rules named.* `AOU-R11`, `AOU-R16`, `AOU-R21`, `AOU-R26`, `AOU-R29`, `AOU-R3`, `AOU-R30`, `AOU-R34`, `AOU-R4`, `AOU-R40`, `AOU-R6`, `AOU-R9`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 

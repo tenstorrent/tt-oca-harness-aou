@@ -17,12 +17,15 @@
 // *****************************************************************************
 //
 //  Module     : AOU_FDI_CHECKER
-//  Version    : 1.12
-//  Date       : 26-09-07
+//  Version    : 1.13
+//  Date       : 26-10-20
 //
 // *****************************************************************************
 //
-//  Synthesizable AoU v0.7 protocol checker for one single-PHY FDI link.
+//  Synthesizable AoU protocol checker for one single-PHY FDI link: the v0.7
+//  wire format the design implements, judged by the v0.8 activation and credit
+//  ordering rules. Section numbers are v0.8's unless marked v0.7; the wire
+//  format's citations (aou_fdi_wire_pkg) are v0.7's.
 //  Design rationale and the interface reference are in DESIGN.md.
 //
 // *****************************************************************************
@@ -56,7 +59,7 @@ import aou_fdi_checker_pkg::*;
     parameter int FDID              = 0,
 
     // Outstanding credits one shadow counter can hold. Not a protocol quantity:
-    // the receiver advertises exactly the slots it has (6.3.3), so this is the
+    // the receiver advertises exactly the slots it has (6.4.3), so this is the
     // checker's tracking capacity, and exceeding it is reported.
     parameter int CRD_CAPACITY      = 2048,
 
@@ -555,7 +558,7 @@ always_comb begin
 end
 
 // -----------------------------------------------------------------------------
-// Message lengths, from aou_fdi_wire_pkg (Tables 2-13, 19, 26).
+// Message lengths, from aou_fdi_wire_pkg (v0.7 Tables 2-13, 19, 26).
 // See DESIGN.md "Message lengths".
 // -----------------------------------------------------------------------------
 localparam int MSG_G_WD = $clog2(MAX_MSG_G + 1);
@@ -699,7 +702,7 @@ always_comb begin
 end
 
 // -----------------------------------------------------------------------------
-// Resource-plane range (v0.7 5.2.2, 6.2, 6.3.1, 6.3.2).
+// Resource-plane range (5.2.2, 6.2, 6.4.1, 6.4.2).
 //
 // A credited message names its destination plane in the receiver's numbering;
 // an advertisement names the advertising die's own plane. Wire plane q is one
@@ -748,7 +751,7 @@ end
 // -----------------------------------------------------------------------------
 // Activation handshake model.
 //
-// Deliberately independent of AOU_ACTIVATION_CTRL; written from v0.7 8.2-8.4.
+// Deliberately independent of AOU_ACTIVATION_CTRL; written from 8.2-8.4.
 // A die is named by the stream it drives, so a die index is a direction index.
 // -----------------------------------------------------------------------------
 localparam int DIE_LP = DIR_LP;
@@ -769,6 +772,10 @@ logic [DIR_CNT-1:0]                     r_act_req;
 logic [DIR_CNT-1:0]                     r_act_ack;
 logic [DIR_CNT-1:0]                     r_deact_req;
 logic [DIR_CNT-1:0]                     r_deact_ack;
+// An ActivateAck in a committed first half (UCIe 3.0 10.2): the receiving die
+// may act on it before the second half arrives. Opens the consume window the
+// same way a consumed ActivateAck flit does, nothing else.
+logic [DIR_CNT-1:0]                     r_act_ack_half;
 
 // ONE STATE FOR THE LINK, NOT ONE PER DIE. 8.2's conditions -- ENABLED once an
 // ActivateAck has been sent and received, DISABLED once a DeactivateAck has
@@ -924,27 +931,35 @@ end
 // I_ERR_CLEAR does not alter protocol-model state.
 always_ff @(posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
-        r_act_req   <= '0;
-        r_act_ack   <= '0;
-        r_deact_req <= '0;
-        r_deact_ack <= '0;
+        r_act_req      <= '0;
+        r_act_ack      <= '0;
+        r_deact_req    <= '0;
+        r_deact_ack    <= '0;
+        r_act_ack_half <= '0;
     end else if (I_LINK_RESET || w_teardown_done) begin
-        r_act_req   <= '0;
-        r_act_ack   <= '0;
-        r_deact_req <= '0;
-        r_deact_ack <= '0;
+        r_act_req      <= '0;
+        r_act_ack      <= '0;
+        r_deact_req    <= '0;
+        r_deact_ack    <= '0;
+        r_act_ack_half <= '0;
     end else if (w_act_model_en) begin
         r_act_req   <= w_act_req_nxt;
         r_act_ack   <= w_act_ack_nxt;
         r_deact_req <= w_deact_req_nxt;
         r_deact_ack <= w_deact_ack_nxt;
+        for (int unsigned d = 0; d < DIR_CNT; d++) begin
+            if (w_half0_commit[d] & ~w_flit_nop[d] & w_act_believed[d][0] &
+                (w_chk_actop[d][0] == ACTOP_ACTIVATE_ACK)) begin
+                r_act_ack_half[d] <= 1'b1;
+            end
+        end
     end
 end
 
 // -----------------------------------------------------------------------------
 // Credit accounting.
 //
-// Deliberately independent of AOU_*_CRD_CTRL; written from v0.7 6.1-6.3 and
+// Deliberately independent of AOU_*_CRD_CTRL; written from 6.1-6.4 and
 // 8.4. Plane fields name destinations on credited messages and sources on
 // advertisements. See DESIGN.md "Credit accounting".
 // -----------------------------------------------------------------------------
@@ -970,22 +985,37 @@ localparam int CRD_SUM_WD       = $clog2(CRD_CAPACITY + CRD_FLIT_ADS_MAX + 1);
 // credited messages die d has sent to it.
 logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0][CRD_WD-1:0]  r_crd;
 
-// The windows 8.4 and 9.2 open and close for die d. Advertising is legal from
-// the flit that carries its own ActivateAck ("after ActivateAck is sent, it is
-// permitted ... to send credits") until the one that carries its own
-// DeactivateAck ("must not be sent after"). Sending credited messages is legal
-// once it has sent an ActivateReq and received the ActivateAck answering it
-// (9.2) -- the lenient of the two readings, since 8.4's ENABLED additionally
-// waits for the die's own acknowledge -- and stops at its own DeactivateReq.
-// Each closing message is the first in its flit (4.4), so the rest of that
-// flit is after it and both windows close with the flit rather than after it.
+// The windows v0.8 8.4 and 9.2 open and close for die d. Advertising is legal
+// from the flit that carries its own ActivateAck ("after ActivateAck is sent,
+// it is permitted ... to send credits"). Response credits stop with the flit
+// that carries its own DeactivateAck (v0.7's rule; v0.8 is silent on them).
+// Request credits -- WriteReq, ReadReq and, as an interim reading, WriteData --
+// are permitted after the die's own DeactivateAck (v0.8 8.4) until the link
+// reaches DISABLED, where no credit may be sent (8.4 DISABLED). Sending
+// credited messages is legal once it has sent an ActivateReq and received the
+// ActivateAck answering it (9.2) -- the lenient of the two readings, since
+// 8.4's ENABLED additionally waits for the die's own acknowledge; an
+// ActivateAck in a committed first half counts as received. Requests stop at
+// its own DeactivateReq; pending ReadData and WriteResp must still be sent
+// after it (v0.8 8.4) and stay legal until DISABLED. Each closing message is
+// the first in its flit (4.4), so the rest of that flit is after it and the
+// windows close with the flit rather than after it.
 logic [DIR_CNT-1:0]                                 w_adv_en;
+logic [DIR_CNT-1:0]                                 w_adv_req_en;
 logic [DIR_CNT-1:0]                                 w_consume_en;
+logic [DIR_CNT-1:0]                                 w_consume_rsp_en;
+logic [DIR_CNT-1:0][CRD_CLS_CNT-1:0]                w_consume_cls_en;
 
 always_comb begin
     for (int unsigned d = 0; d < DIR_CNT; d++) begin
-        w_adv_en[d]     = (r_act_ack[d] | w_flit_act_ack[d]) & ~w_deact_ack_nxt[d];
-        w_consume_en[d] = r_act_req[d] & r_act_ack[1-d] & ~w_deact_req_nxt[d];
+        w_adv_req_en[d]     = r_act_ack[d] | w_flit_act_ack[d];
+        w_adv_en[d]         = w_adv_req_en[d] & ~w_deact_ack_nxt[d];
+        w_consume_rsp_en[d] = r_act_req[d] & (r_act_ack[1-d] | r_act_ack_half[1-d]);
+        w_consume_en[d]     = w_consume_rsp_en[d] & ~w_deact_req_nxt[d];
+        for (int unsigned c = 0; c < CRD_CLS_CNT; c++) begin
+            w_consume_cls_en[d][c] = ((c == CRD_R) || (c == CRD_B)) ? w_consume_rsp_en[d]
+                                                                     : w_consume_en[d];
+        end
     end
 end
 
@@ -1045,8 +1075,14 @@ logic [DIR_CNT-1:0][GRANT_POS_CNT-1:0]
 logic [DIR_CNT-1:0][RP_WIRE_CNT-1:0][CRD_CLS_CNT-1:0][CRD_ENC_WD-1:0] w_grant_span_enc;
 logic [DIR_CNT-1:0][RP_WIRE_CNT-1:0][CRD_CLS_CNT-1:0][CRD_ENC_WD-1:0] w_hdr_enc;
 logic [DIR_CNT-1:0]                                         w_hdr_adv;
+// Advertisements carrying response (ReadData, WriteResp) credits, whose window
+// closes earlier than the request classes' (see w_adv_req_en). A grant at G47
+// has its body in the next flit, so its classes are unknown when it is judged
+// and it is held to the response window.
+logic [DIR_CNT-1:0]                                         w_hdr_adv_rsp;
+logic [DIR_CNT-1:0][GRANULE_CNT-1:0]                        w_grant_adv_rsp;
 logic [DIR_CNT-1:0][RP_WD-1:0]                              w_hdr_rp;
-// Advertisements naming a plane the advertising die does not have (6.3.2), a
+// Advertisements naming a plane the advertising die does not have (6.4.2), a
 // grant's attributed to its first granule and a spanning grant's to G0.
 logic [DIR_CNT-1:0][GRANULE_CNT-1:0]                        w_grant_rp_bad;
 logic [DIR_CNT-1:0]                                         w_hdr_rp_bad;
@@ -1131,6 +1167,16 @@ always_comb begin
 
         // A header advertising nothing names no plane.
         w_hdr_adv[d]    = |w_chk_msg_credit[d][MC_WREQ_LSB +: MC_RP_LSB];
+        w_hdr_adv_rsp[d] = (|w_chk_msg_credit[d][MC_RDATA_LSB +: CRD_ENC_WD]) |
+                           (|w_chk_msg_credit[d][MC_WRESP_LSB +: CRD_ENC_B_WD]);
+        w_grant_adv_rsp[d] = '1;
+        for (int unsigned g = 0; g < GRANT_POS_CNT; g++) begin
+            w_grant_adv_rsp[d][g] = 1'b0;
+            for (int unsigned q = 0; q < RP_WIRE_CNT; q++) begin
+                w_grant_adv_rsp[d][g] |= (|w_grant_enc[d][g][q][CRD_R]) |
+                                         (|w_grant_enc[d][g][q][CRD_B]);
+            end
+        end
         w_hdr_rp_bad[d] = w_hdr_adv[d] & ~w_adv_rp_ok[d][w_hdr_rp[d]];
 
         w_grant_rp_bad[d] = '0;
@@ -1194,11 +1240,12 @@ logic [DIR_CNT-1:0]                                                   r_early_cl
 always_comb begin
     for (int unsigned d = 0; d < DIR_CNT; d++) begin
         w_early_go[d]     = w_half0_commit[d] & ~w_flit_nop[d];
+        // Funds every advertisement until DISABLED, including the response
+        // credits reported after the advertiser's own DeactivateAck (v0.8 is
+        // silent on them): the peer may spend them, and leaving them unfunded
+        // turned one report into a stream of underflows.
         w_early_adv_en[d] =
-            (r_act_ack[d] | (w_act_believed[d][0] &
-                             (w_chk_actop[d][0] == ACTOP_ACTIVATE_ACK))) &
-            ~(r_deact_ack[d] | (w_act_believed[d][0] &
-                                (w_chk_actop[d][0] == ACTOP_DEACTIVATE_ACK)));
+            r_act_ack[d] | (w_act_believed[d][0] & (w_chk_actop[d][0] == ACTOP_ACTIVATE_ACK));
 
         for (int unsigned q = 0; q < RP_WIRE_CNT; q++) begin
             for (int unsigned c = 0; c < CRD_CLS_CNT; c++) begin
@@ -1260,7 +1307,7 @@ logic [DIR_CNT-1:0][GRANULE_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0]     w_crd_se
 logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0][GRANULE_CNT-1:0][MSG_G_WD-1:0] w_spent_term;
 logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0][SPENT_WD-1:0]        w_spent;
 // Spending on stream d is judged this cycle at all.
-logic [DIR_CNT-1:0]                                                     w_spend_go;
+logic [DIR_CNT-1:0][CRD_CLS_CNT-1:0]                                    w_spend_go;
 
 logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0][CRD_SUM_WD-1:0]      w_crd_avail;
 logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0]                      w_crd_uf;
@@ -1293,7 +1340,9 @@ endfunction
 
 always_comb begin
     for (int unsigned d = 0; d < DIR_CNT; d++) begin
-        w_spend_go[d] = w_chk_go[d] & w_consume_en[d];
+        for (int unsigned c = 0; c < CRD_CLS_CNT; c++) begin
+            w_spend_go[d][c] = w_chk_go[d] & w_consume_cls_en[d][c];
+        end
 
         for (int unsigned g = 0; g < GRANULE_CNT; g++) begin
             for (int unsigned p = 0; p < RP_COUNT; p++) begin
@@ -1308,7 +1357,7 @@ always_comb begin
         for (int unsigned p = 0; p < RP_COUNT; p++) begin
             for (int unsigned c = 0; c < CRD_CLS_CNT; c++) begin
                 for (int unsigned g = 0; g < GRANULE_CNT; g++) begin
-                    w_spent_term[d][p][c][g] = (w_spend_go[d] & w_crd_sel[d][g][p][c])
+                    w_spent_term[d][p][c][g] = (w_spend_go[d][c] & w_crd_sel[d][g][p][c])
                                              ? w_msg_len[d][g] : '0;
                 end
                 w_spent[d][p][c] = sum_spent(w_spent_term[d][p][c]);
@@ -1316,7 +1365,7 @@ always_comb begin
                 // Advertisements crossing the other way in this same cycle are
                 // counted before this cycle's spending.
                 w_crd_avail[d][p][c] = CRD_SUM_WD'(r_crd[d][p][c]) +
-                    ((w_chk_go[1-d] & w_adv_en[1-d]) ? w_late_for[1-d][p][c] : '0) +
+                    ((w_chk_go[1-d] & w_adv_req_en[1-d]) ? w_late_for[1-d][p][c] : '0) +
                     w_early_for[1-d][p][c];
 
                 w_crd_uf[d][p][c]   = w_crd_avail[d][p][c] < CRD_SUM_WD'(w_spent[d][p][c]);
@@ -1332,7 +1381,8 @@ always_comb begin
         for (int unsigned g = 0; g < GRANULE_CNT; g++) begin
             // Asks nothing about the plane: this is about when a credited
             // message was sent, not which buffer it lands in.
-            w_msg_order[d][g] = w_chk_go[d] & w_crd_msg[d][g] & ~w_consume_en[d];
+            w_msg_order[d][g] = w_chk_go[d] & w_crd_msg[d][g] &
+                                ~w_consume_cls_en[d][w_crd_cls[d][g]];
 
             // An underflowing counter marks every credited granule of its
             // class in the flit; the capture names the lowest. The credit
@@ -1341,7 +1391,7 @@ always_comb begin
             w_crd_underflow[d][g] = 1'b0;
             for (int unsigned p = 0; p < RP_COUNT; p++) begin
                 for (int unsigned c = 0; c < CRD_CLS_CNT; c++) begin
-                    w_crd_underflow[d][g] |= w_crd_en & w_spend_go[d] &
+                    w_crd_underflow[d][g] |= w_crd_en & w_spend_go[d][c] &
                                              w_crd_uf[d][p][c] & w_crd_sel[d][g][p][c];
                 end
             end
@@ -1458,9 +1508,14 @@ always_comb begin
 
             // A grant is attributed to its own granule; the protocol header has
             // none, so a header finding names granule 0.
+            // Request credits only need w_adv_req_en; response credits need
+            // w_adv_en, which closes earlier.
             w_granule_viol[d][g][VIOL_ADV_ORDER] =
-                w_chk_class_en[VIOL_ADV_ORDER] & ~w_adv_en[d] &
-                (w_starts_crdtgrant[d][g] | ((g == 0) & w_hdr_adv[d]));
+                w_chk_class_en[VIOL_ADV_ORDER] &
+                ((w_starts_crdtgrant[d][g] &
+                  (~w_adv_req_en[d] | (w_grant_adv_rsp[d][g] & ~w_adv_en[d]))) |
+                 ((g == 0) & w_hdr_adv[d] &
+                  (~w_adv_req_en[d] | (w_hdr_adv_rsp[d] & ~w_adv_en[d]))));
 
             w_granule_viol[d][g][VIOL_RP_RANGE] =
                 w_chk_class_en[VIOL_RP_RANGE] &
@@ -1468,7 +1523,7 @@ always_comb begin
                  ((g == 0) & w_hdr_rp_bad[d]));
 
             // A flit for another bridge (4.3.1): its credits are assigned to
-            // that bridge (6.3), so nothing this instance accounts for applies
+            // that bridge (6.4), so nothing this instance accounts for applies
             // to it. Reported on the header, so against granule 0; the flit is
             // otherwise judged as if it were ours, because a bench with one
             // bridge that sees this has a misconfiguration to fix first.

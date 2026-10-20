@@ -114,3 +114,13 @@ seed = 1
 signature = "\\[AXI4PC\\] \\S+\\.u_m_axi4pc\\.\\S+: AXI4_ERRM_AWBURST:"
 axi4pc = true
 note = "Arm Axi4PC fires on the M port; skipped (NOT-RUN) without BP063 in .deps/"
+
+# v0.8 8.4 permits request credits after one's own DeactivateAck; credits in
+# DISABLED are still forbidden, and the class-aware VIOL_ADV_ORDER and the L3
+# model's AOU-R26 must still catch them.
+[[escapes]]
+test = "aou_link_act_deact_test"
+escape = "mut_aou_r29_crd_in_disabled"
+target = "1x512-sp64"
+seed = 1
+signature = "AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP|AOU-R26: \\[l3\\] DUT \\w+ \\w+ RP\\d+=\\d+ in DISABLED"

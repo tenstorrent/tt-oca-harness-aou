@@ -1,0 +1,20 @@
+SPDX-License-Identifier: Apache-2.0
+Mutation mut_aou_r29_crd_in_disabled (not a main fix): request (and, with
+CREDIT_MANAGE=0, response) credits stay enabled in DISABLED, so credit freed as
+the RX FIFO drains after a deactivation goes out in DISABLED. AOU_FDI_CHECKER's
+VIOL_ADV_ORDER (AOU-R29) and the L3 model's AOU-R26 must still fire (v0.8 8.4
+DISABLED), now that request credits after one's own DeactivateAck are permitted.
+Applied to a build-time copy of RTL/ by make build ESCAPE=mut_aou_r29_crd_in_disabled.
+
+--- a/RTL/AOU_ACTIVATION_CTRL.sv
++++ b/RTL/AOU_ACTIVATION_CTRL.sv
+@@ -431,7 +431,8 @@
+                                   | (r_cur_st == DEACTIVATE) ; 
+ //Reqest and WriteData message
+ assign O_REQ_CRD_ADVERTISE_EN       = ((r_cur_st == ACTIVATE) & (r_rx_activate_ack | (((O_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & O_ACTMSG_VALID & I_ACTMSG_READY))))
+-                                    | (((r_cur_st == DEACTIVATE) | (r_cur_st == ENABLED)) & ~(r_rx_deactivate_req));
++                                    | (((r_cur_st == DEACTIVATE) | (r_cur_st == ENABLED)) & ~(r_rx_deactivate_req))
++                                    | (r_cur_st == DISABLED);
+ 
+ assign O_TX_REQ_CREDITED_MESSAGE_EN = ((r_cur_st == ACTIVATE) & (r_tx_activate_req & r_rx_activate_ack & r_rx_activate_req & (((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID)|r_tx_activate_ack)))
+                                   | ((r_cur_st == ENABLED) & (~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY))))

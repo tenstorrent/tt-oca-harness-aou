@@ -34,8 +34,11 @@ violate; [`../README.md`](../README.md) carries the user-facing summary.
 
 ## Overview
 
-A synthesizable AXI-over-UCIe (AoU v0.7) protocol checker for one single-PHY
-UCIe FDI link. It observes either or both directions -- the LP stream the die
+A synthesizable AXI-over-UCIe protocol checker for one single-PHY UCIe FDI
+link: the AoU v0.7 wire format the design implements, judged by the v0.8
+activation and credit-ordering rules (v0.8 decides where the two differ).
+Section numbers here are v0.8's unless marked v0.7; the wire-format package
+cites v0.7's. It observes either or both directions -- the LP stream the die
 under observation drives, the PL stream its peer drives -- reconstructs 256-byte
 flits and reports protocol violations on hardware status ports: a sticky
 per-class vector, a frozen first-violation capture record, a per-direction flit
@@ -60,7 +63,7 @@ Rules covered: the structural encodings (MSGTYPE, MISCOP, ACTIVATIONOP, DLENGTH,
 reserved-must-be-zero fields); message-start framing and the Activation
 placement rule (4.4); the activation handshake (8.4); message and advertisement
 ordering (8.4); credit accounting across four planes (6); the FDId (4.3.1),
-plane-range (6.2-6.3) and plane-map (3, 6.2) configuration rules; and the
+plane-range (6.2, 6.4) and plane-map (3, 6.2) configuration rules; and the
 optional activation-status cross-check, the one finding about the design's
 opinion rather than the traffic.
 
@@ -103,7 +106,7 @@ section: flit geometry and granule positions (4.2, Figure 4); the protocol
 header (4.3, Figure 5); first-byte fields and the MSGTYPE, MISCOP, DLENGTH and
 ACTIVATIONOP encodings (Tables 1, 15, 27, 5.4); message lengths (Tables 2-13,
 19, 26); the credit encoding (Table 18); and the two Misc layouts (Figures 19,
-20). The Misc layouts are derived, not stated: 5.7's convention -- bytes count
+20). The Misc layouts are derived, not stated: v0.7 5.7's (v0.8 5.8) convention -- bytes count
 up, bits count down, fields MSB-first -- is `wire_bit(s)`, so ACTIVATIONOP is
 "stream bits 7-10" and the grant's twenty credit fields are "three bits each in
 class-then-plane order from stream bit 7, two for WriteResp". The fields that
@@ -180,7 +183,8 @@ traffic it judges could not tell misconfiguration from compliance. One map
 serves both dies because the protocol requires the two to be programmed as
 inverses of each other; the active entries must be distinct ([The plane map is
 one-to-one](#the-plane-map-is-one-to-one)). There is no credit-management-type
-input: v0.7 8.4 gates request and response credits identically.
+input: the v0.8 8.4 windows depend on the message or credit class, not on a
+mode ([Credit accounting](#credit-accounting)).
 
 ### Cross-check inputs
 
@@ -227,15 +231,15 @@ for a number nobody read.
 | 1 | `VIOL_MISCOP` | Reserved or undefined MISCOP (Table 15). |
 | 2 | `VIOL_ACTIVATIONOP` | Reserved or undefined ACTIVATIONOP (Table 27). |
 | 3 | `VIOL_DLENGTH` | Reserved DLENGTH encoding (5.4). |
-| 4 | `VIOL_RSVD_NONZERO` | Reserved field non-zero (Tables 2, 3, 10-13, 19, 26). |
+| 4 | `VIOL_RSVD_NONZERO` | Reserved field non-zero (Tables 2, 3, 10-13, 18; v0.7 Table 26). |
 | 5 | `VIOL_MSGSTART` | MsgStart inconsistent with message lengths (4.4). |
 | 6 | `VIOL_ACT_SEQ` | Illegal activation sequencing (8.4). |
-| 7 | `VIOL_MSG_ORDER` | Credited message outside its window (9.2, 8.4). |
+| 7 | `VIOL_MSG_ORDER` | Credited message outside its window: before the sender's ActivateAck is received (9.2), a request after its own DeactivateReq, any after DISABLED (8.4). |
 | 8 | `VIOL_CRD_UNDERFLOW` | Shadow credit would go negative (6). |
 | 9 | `VIOL_MISC_PLACEMENT` | Activation message not at granule 0, including a second Activation message in the same flit (4.4). |
-| 10 | `VIOL_ADV_ORDER` | Credits advertised before the advertiser's ActivateAck or after its DeactivateAck (8.4). |
-| 11 | `VIOL_RP_RANGE` | Plane field naming a plane the link lacks (5.2.2, 6.2, 6.3). |
-| 12 | `VIOL_FDID` | Flit whose FDId is not the bridge this instance watches (4.3.1, 6.3). |
+| 10 | `VIOL_ADV_ORDER` | Credits advertised before the advertiser's ActivateAck, response credits after its DeactivateAck, or any in DISABLED (8.4). |
+| 11 | `VIOL_RP_RANGE` | Plane field naming a plane the link lacks (5.2.2, 6.2, 6.4). |
+| 12 | `VIOL_FDID` | Flit whose FDId is not the bridge this instance watches (4.3.1, 6.4). |
 | 13 | `VIOL_CRD_OVERFLOW` | Advertisement took a shadow counter past `CRD_CAPACITY`. |
 | 14 | `VIOL_RP_MAP` | `I_CFG_RP_DEST_RP` maps two planes onto one (3, 6.2); reported with every flit until fixed. |
 
@@ -503,7 +507,7 @@ an illegal MSGTYPE breaks one rule rather than four. Legal values are
 
 **Reserved fields.** The activation message's RsvdZero (stream bits 12-39,
 Figure 19) and PROPERTYREQ on any opcode but ActivateReq ("must be 0b0 for
-other messages", Table 26); the credit grant's 17-bit RsvdZero tail, which lies
+other messages", v0.7 Table 26); the credit grant's 17-bit RsvdZero tail, which lies
 in its second granule -- the granule the report names, since the first would
 show none of the offending bits; and the RsvdZero in the first granule of the
 credited messages that have one -- stream bit 6 on WriteReq and ReadReq, bits
@@ -511,7 +515,9 @@ credited messages that have one -- stream bit 6 on WriteReq and ReadReq, bits
 qualified on MSGTYPE because the same positions are AWLOCK, DLENGTH or RLAST on
 another message. The padding at the tail of the data messages lies in a later
 granule and is not checked. PROF and PROFEXTLEN are never read as reserved: the
-Base Profile ignores them (5.8), and a profile is entitled to fill them.
+v0.7 Base Profile ignores them (v0.7 5.8), and a profile is entitled to fill
+them; v0.8 removes PROFEXTLEN and passes the 16-bit FLEX as AXI USER under the
+Basic Profile (11.1).
 
 ### Activation message placement
 
@@ -530,8 +536,8 @@ meaning is not.
 ### Resource-plane range
 
 A credited message names its destination plane in the receiver's numbering
-(5.2.2); an advertisement names the advertiser's own plane (6.3.1), and a grant's
-fields for an unsupported plane "must be set to zero" (6.3.2). Wire plane q is
+(5.2.2); an advertisement names the advertiser's own plane (6.4.1), and a grant's
+fields for an unsupported plane "must be set to zero" (6.4.2). Wire plane q is
 the observed die's when `q < RP_COUNT` and the peer's when some local plane maps
 onto it, so a stream's messages may name the receiver's set and its
 advertisements the sender's. Anything else is `VIOL_RP_RANGE`, attributed to the
@@ -553,7 +559,7 @@ would produce -- rather than an elaboration guard.
 ### Flit destination
 
 FDId (4.3.1) says which of up to four bridges a flit is for, and its credits
-"must be assigned to the initiator indicated by the FDId field" (6.3). This
+"must be assigned to the initiator indicated by the FDId field" (6.4). This
 instance watches one pair, `FDID`; a flit for another is `VIOL_FDID` on granule
 0 and is otherwise judged as if it were ours, because a single-bridge bench has
 a misconfiguration to fix before any other report on that flit means anything.
@@ -562,8 +568,8 @@ A multi-bridge bench needs one instance per FDId.
 ## Message lengths
 
 The counts are `aou_fdi_wire_pkg`'s, one per Table 2-13, 19 and 26; every
-message has the fixed length of its type under the Base Profile (5.8), which
-ignores PROFEXTLEN. `MAX_MSG_G` (30) sizes the overrun carry and must not exceed
+message has the fixed length of its type under the Base Profile (v0.7 5.8),
+which ignores PROFEXTLEN; v0.8 has no PROFEXTLEN. `MAX_MSG_G` (30) sizes the overrun carry and must not exceed
 the flit.
 
 ## Message-start consistency
@@ -651,38 +657,64 @@ a stream of consequences from a state transition the wire did not establish.
 Overview). A credit is one granule of receive buffer for one class (6.1);
 advertisements travel as the header MsgCredit field (one plane, five classes)
 and CrdtGrant messages (four planes, five classes), both in one flit adding
-(6.3); every AXI message consumes its granule count at its start, including one
+(6.4); every AXI message consumes its granule count at its start, including one
 that runs into the next flit; Misc is not credited.
 
 Boundary messages on the same stream affect the remainder of their own flit:
 an Activation message is first (4.4), so later messages in that flit are after
 it. The advertising window therefore opens and closes with the die's own
-acknowledge flits, and the consume window closes with its own DeactivateReq
-flit. Its opening boundary is a received ActivateAck on the opposite stream, so
-credited traffic is enabled after that flit has been consumed.
+acknowledge flits, and the request part of the consume window closes with its
+own DeactivateReq flit. Its opening boundary is a received ActivateAck on the
+opposite stream, so credited traffic is enabled once that ActivateAck is
+received: when its flit is consumed, or earlier when it lies in a committed
+first half (see "First halves fund early").
+
+The windows are v0.8 8.4's, which made them depend on the class (v0.7 gated
+every class alike):
 
 - **Advertising**: from the die's own ActivateAck ("after ActivateAck is sent,
   it is permitted ... to send credits" -- the header can share the flit, and a
-  CrdtGrant may follow the Activation MiscU at granule 0) until its own
-  DeactivateAck ("must not be sent after" -- so credits in the DeactivateAck's
-  own flit are already after it); before that "must not send any credits".
-  Outside the window: `VIOL_ADV_ORDER`, and the advertisement funds nothing.
+  CrdtGrant may follow the Activation message at granule 0 under v0.7) until the
+  link reaches DISABLED, where 8.4 forbids every credit. Response credits
+  (ReadData, WriteResp) stop earlier, at the die's own DeactivateAck: credits in
+  the DeactivateAck's own flit are already after it. v0.8 is silent on them, and
+  the checker keeps v0.7's rule as the interim. Request credits (WriteReq,
+  ReadReq and, as an interim reading, WriteData) are permitted after it (v0.8
+  8.4 allows, without requiring, request credits after one's own DeactivateAck),
+  so they may share the flit of an Ack that completes the teardown; whether
+  "Request" covers WriteData is an open spec question. Header and grant are
+  judged by whether they carry any response credit; a grant at granule 47 has
+  its body in the next flit and is held to the response window. Outside the
+  window: `VIOL_ADV_ORDER`. Before the advertiser's ActivateAck and in DISABLED
+  the advertisement funds nothing. After its own DeactivateAck every credit
+  still funds the counters until DISABLED, the response credits that are
+  reported included: the peer may spend them (v0.8 is silent), and leaving them
+  unfunded turned one report into a stream of underflows once responses became
+  legal after the DeactivateReq.
 - **Sending credited messages**: from the die having sent an ActivateReq and
-  received the ActivateAck answering it, until its own DeactivateReq. The
-  opening is 9.2's condition ("once the protocol layer has sent an ActivateReq
-  and received an ActivateAck, it can proceed to send data messages"), which is
-  the lenient of the two the specification offers: 8.4's ENABLED additionally
-  waits for the die's own acknowledge. A die that has been acknowledged but is
-  slow to acknowledge in turn is compliant by 9.2, and a checker holding it to
-  8.4 would report it; the two sections should agree and have been raised as
-  feedback. Outside the window: `VIOL_MSG_ORDER`, with no underflow report, so
-  one root cause yields one report.
+  received the ActivateAck answering it. Requests (WriteReq, ReadReq, WriteData)
+  stop at its own DeactivateReq (8.4). Pending ReadData and WriteResp must still
+  be sent after it, including answers to requests received after it (8.4), so
+  they stay legal until DISABLED. The opening is 9.2's condition ("once the
+  protocol layer has sent an ActivateReq and received an ActivateAck, it can
+  proceed to send data messages"), which is the lenient of the two the
+  specification offers: 8.4's ENABLED additionally waits for the die's own
+  acknowledge. A die that has been acknowledged but is slow to acknowledge in
+  turn is compliant by 9.2, and a checker holding it to 8.4 would report it; the
+  two sections should agree and have been raised as feedback. Outside the
+  window: `VIOL_MSG_ORDER`, with no underflow report, so one root cause yields
+  one report.
 
 **First halves fund early.** A latency-optimized flit's first half that is not
 cancelled is consumed by the protocol layer before the second half arrives
 (UCIe 3.0 10.2, Figures 10-16 and 10-17), so a die may spend a credit grant
-carried in it as soon as that half commits, and an adapter that pauses `pl_valid`
-between the halves makes the gap visible. At the first half's commit the
+carried in it as soon as that half commits, and an ActivateAck at granule 0 of
+it is received then too: it opens the receiving die's consume window at the
+commit (`r_act_ack_half`), not when the flit completes. Without that, a die that
+acted on the first half -- an adapter pause between the halves, its next flit
+ending in the same cycle as the Ack's -- was reported for a credited message
+before the ActivateAck (seen on a 32-byte FDI build). An adapter that pauses
+`pl_valid` between the halves makes the gap visible. At the first half's commit the
 buffer's first half is current and the framing of G0-G23 depends only on earlier
 granules and the carry, so grants lying wholly in G0-G23, and one continuing
 from the previous flit's G47, are summed then and fund the peer's counter at
@@ -694,10 +726,9 @@ advertising flit's consume. Without this the checker funded credit one half late
 and reported an underflow against a die that spent a first-half grant before the
 second half arrived.
 
-The peer keeps advertising until its own DeactivateAck and the counters keep
-being spent until the sender's own DeactivateReq, so the two windows are all
-teardown needs: v0.7 has no gating asymmetry between message classes and
-nothing to suspend.
+The peer keeps advertising response credits until its own DeactivateAck and
+the response counters keep being spent until DISABLED, so the windows are all
+teardown needs and nothing is suspended.
 
 **Planes.** A counter is per die, per local plane, per class. The plane field
 means two things: a credited message carries the **destination** plane, already
@@ -719,8 +750,8 @@ direction of the source/destination mistake. Advertisements are accumulated in
 wire-plane numbering and mapped to local planes once.
 
 **Capacity.** AoU has no sender-side ceiling: a receiver advertises exactly its
-slots (6.3.3), and a sender that saturates its own counter, as
-`AOU_TX_CRD_CTRL` does, makes an implementation choice the wire cannot see. So
+slots (6.4.3), and a sender's counter saturates on an over-grant (6.4, since
+v0.7.1), which the wire cannot see. So
 the per-plane, per-class ceilings the checker once carried described nothing it
 could judge and were replaced by one `CRD_CAPACITY`: how much outstanding credit
 a shadow counter can track, `$clog2(CRD_CAPACITY + 1)` bits. An advertisement
@@ -897,8 +928,16 @@ not tried again.
   nothing the checker could judge and assumed both dies were built alike;
   replaced by one capacity and an overflow finding.
 - **A teardown suspension window** and a credit-management-type input. 8.4
-  defines the windows exactly and gates both message classes alike; nothing to
-  suspend.
+  defines the windows exactly; nothing to suspend. (v0.8 8.4 since made them
+  class-dependent, which the windows follow without a mode input.)
+- **One teardown window for every class**, v0.7 8.4's: no credited message
+  after the sender's own DeactivateReq and no credit after its own
+  DeactivateAck. v0.8 8.4 requires pending ReadData and WriteResp after the
+  DeactivateReq and permits request credits after the DeactivateAck, so both
+  windows now depend on the class (2026-10-20).
+- **The consume window opening only when the ActivateAck's flit completes.**
+  A committed first half is received (UCIe 3.0 10.2), as the early funding
+  already assumed; see [Credit accounting](#credit-accounting).
 - **Serial credit walks**, forty-seven adds and forty-eight compare-subtracts per
   counter, to name the granule at which credit ran out. Replaced by trees and
   per-flit attribution; three-quarters of the module's logic.

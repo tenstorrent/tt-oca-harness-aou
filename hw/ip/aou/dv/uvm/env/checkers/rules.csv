@@ -135,8 +135,8 @@ AOU-R25,by construction (aou_l3_model),,MODEL,Misc messages are never credit-che
 AOU-R26,aou_l3_model,,DUT,No credits or credited messages in DISABLED; no credits after one's DeactivateAck (see BUGS/009),AoU 8.2/8.4
 AOU-R27,via AOU-R40,by construction (aou_link_ctrl),DUT,ActivateReq sent or received moves DISABLED to ACTIVATE (a DUT that did not move answers out of sequence),AoU 8.4
 AOU-R28,aou_l3_model,,DUT,A received ActivateReq is answered with ActivateAck (end-of-test check),AoU 8.4
-AOU-R29,aou_l3_model,aou_fdi_chk_adapter,DUT,Credits are sent only after one's own ActivateAck,AoU 8.4
-AOU-R30,aou_l3_model,aou_fdi_chk_adapter,DUT,Credited messages only once ActivateReq sent and ActivateAck received,AoU 8.4/9.2
+AOU-R29,aou_l3_model,aou_fdi_chk_adapter,DUT,"Credits are sent only after one's own ActivateAck; AOU_FDI_CHECKER also reports response credits after one's own DeactivateAck and any credit in DISABLED (request credits after it are permitted, v0.8 8.4)",AoU v0.8 8.4
+AOU-R30,aou_l3_model,aou_fdi_chk_adapter,DUT,"Credited messages only once ActivateReq sent and ActivateAck received (a committed first half counts); requests stop at one's own DeactivateReq, pending ReadData/WriteResp may follow it until DISABLED",AoU v0.8 8.4/9.2
 AOU-R31,aou_l3_model,,DUT,In ENABLED credits are sent: quiescent at end of test every advertised credit is back within cred_return_cycles,AoU 8.4; MAS software-operation 7.1 (LP threshold 0)
 AOU-R32,via AOU-R40,by construction (aou_link_ctrl),DUT,DeactivateReq sent or received moves ENABLED to DEACTIVATE (a DUT that did not move answers out of sequence),AoU 8.4
 AOU-R33,aou_l3_model,,DUT,DeactivateReq only after the sender's requests are complete,AoU 8.3.2/8.4
@@ -144,7 +144,7 @@ AOU-R34,aou_l3_model,,DUT,No request messages after one's DeactivateReq,AoU 8.4
 AOU-R35,via T1-T01,by construction (L3 packer),DUT,Pending data and WriteResp are still sent in DEACTIVATE (a DUT that stops leaves remote requests undrained),AoU 8.4
 AOU-R36,aou_l3_model,,DUT,A DeactivateReq is answered with DeactivateAck (end-of-test check),AoU 8.4
 AOU-R37,via AOU-R40,by construction (aou_link_ctrl),DUT,DISABLED needs both DeactivateAcks sent and received (a DUT disabled early answers out of sequence),AoU 8.4
-AOU-R38,n/a,,N/A,"v0.8 clarification: request credits are sent after DeactivateReq; v0.7, v0.8 and the MAS disagree (BUGS/009)",AoU v0.8 8.4
+AOU-R38,n/a,,N/A,v0.8 8.4: request credits may follow one's own DeactivateAck (now permitted by AOU-R26/AOU-R29); whether WriteData counts as a request class and whether response credits may follow it are owner/spec questions (BUGS/009),AoU v0.8 8.4
 AOU-R39,n/a,,N/A,"Quiesce option 1 supported and both ends use the same mode (configuration, not visible on the wire)",AoU 8.3.2
 AOU-R40,aou_l3_model,aou_fdi_chk_adapter,DUT,An out-of-sequence Req/Ack is a violation; v0.8 moves to ERROR,AoU 8.3.3
 AOU-R41,aou_link_ctrl,,N/A,v0.8 only: ERROR transmits nothing and ignores what it receives (the v0.7 DUT has no ERROR state),AoU v0.8 8.3.3
