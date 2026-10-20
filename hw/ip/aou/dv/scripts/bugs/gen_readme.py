@@ -43,18 +43,24 @@ KINDS = {
     "testbench": "Testbench",
 }
 SEVERITIES = {"high": "High", "medium": "Medium", "low": "Low"}
-STATES = ("open", "merged", "closed")
+# open: the problem stands. resolved: a merged PR or commit fixed it (DUT, documentation or
+# spec), but follow-ups (testbench, test plan, ...) keep the draft and its issue open.
+# merged: folded into another draft. closed: done (closed_reason says how).
+STATES = ("open", "resolved", "merged", "closed")
 CLOSED_REASONS = ("completed", "not-planned")
 NEEDS = ("owner-decision", "spec-clarification", "docs")
 VERDICTS = ("accepted", "proposal", "rejected", "none")
 PRIVATE_KEYS = ("tracker",)
 LIST_KEYS = ("area", "needs", "blocked_by", "related")
 REQUIRED = ("kind", "severity", "state", "status", "fix_verdict") + LIST_KEYS
-OPTIONAL = ("merged_into", "closed_reason", "fix_branch", "fix_pushed",
+OPTIONAL = ("merged_into", "closed_reason", "resolved_by", "fix_branch", "fix_pushed",
             "issue_github") + PRIVATE_KEYS
 ID_LISTS = ("blocked_by", "related")
+# What resolved a draft: a PR (#89, or owner/repo#89) or a commit SHA (7-40 hex digits).
+RESOLVED_BY_RE = re.compile(r"(?:[\w.-]+/[\w.-]+)?#\d+|[0-9a-f]{7,40}")
 
-CSV_COLUMNS = ["id", "title", "kind", "severity", "state", "status", "merged_into", "includes",
+CSV_COLUMNS = ["id", "title", "kind", "severity", "state", "status", "resolved_by", "merged_into",
+               "includes",
                "area", "needs", "blocked_by", "related", "fix_branch", "fix_pushed",
                "fix_verdict", "issue_github"]
 FIELDS = [
@@ -63,6 +69,7 @@ FIELDS = [
     ("kind", "Kind"),
     ("severity", "Severity"),
     ("status", "Status"),
+    ("resolved", "Resolved by"),
     ("related", "Related"),
     ("branch", "Fix branch"),
     ("issue", "Issue"),
@@ -197,6 +204,18 @@ def validate(drafts, areas=None, allow_private=False):
                 errs.append(f"{d.file}: a merged draft has no fix_branch (its fix is on {mi}'s)")
         elif mi:
             errs.append(f"{d.file}: merged_into is only for state merged")
+        rb = m.get("resolved_by")
+        if state == "resolved":
+            refs = rb if isinstance(rb, list) else [rb] if rb not in (None, "") else []
+            if not refs:
+                errs.append(f"{d.file}: state resolved needs resolved_by "
+                            "(a PR such as \"#89\", a commit SHA, or a list of them)")
+            for r in refs:
+                if not isinstance(r, str) or not RESOLVED_BY_RE.fullmatch(r):
+                    errs.append(f"{d.file}: resolved_by value {r!r} is not a quoted PR "
+                                "(\"#89\", \"owner/repo#89\") or commit SHA")
+        elif rb not in (None, "", []):
+            errs.append(f"{d.file}: resolved_by is only for state resolved")
         cr = m.get("closed_reason")
         if state == "closed":
             if cr not in CLOSED_REASONS:
@@ -252,6 +271,12 @@ def branch_cell(by_id, d):
     return f"`{d.get('fix_branch')}`" + ("" if d.get("fix_pushed") else " (not pushed)")
 
 
+def resolved_refs(d):
+    """resolved_by as a list of strings (it may be one string or a list)."""
+    rb = d.get("resolved_by")
+    return [] if rb in (None, "") else [str(x) for x in (rb if isinstance(rb, list) else [rb])]
+
+
 def issue_cell(d):
     refs = [str(d.get("issue_github"))] if d.get("issue_github") else []
     refs += [str(t) for t in d.get("tracker", [])]
@@ -270,6 +295,7 @@ def item(by_id, d):
         "kind": KINDS[d.get("kind")],
         "severity": SEVERITIES[d.get("severity")],
         "status": d.get("status"),
+        "resolved": ", ".join(resolved_refs(d)),
         "related": "; ".join(related),
         "branch": branch_cell(by_id, d),
         "issue": issue_cell(d),
@@ -278,18 +304,22 @@ def item(by_id, d):
 
 def summary(drafts):
     open_by = collections.defaultdict(list)
-    merged, closed = [], []
+    resolved, merged, closed = [], [], []
     for d in drafts:
         state = d.get("state")
-        if state == "merged":
+        if state == "resolved":
+            resolved.append(d.id)
+        elif state == "merged":
             merged.append(d.id)
         elif state == "closed":
             closed.append(d.id)
         else:
             open_by[d.get("kind")].append(d.id)
     parts = [f"{KINDS[k]} {len(open_by[k])} ({', '.join(open_by[k])})" for k in KINDS if open_by[k]]
-    text = (f"Open drafts by kind: {'; '.join(parts)}. "
-            f"Merged: {len(merged)} ({', '.join(merged)}).")
+    text = f"Open drafts by kind: {'; '.join(parts)}. "
+    if resolved:
+        text += f"Resolved, follow-ups open: {len(resolved)} ({', '.join(resolved)}). "
+    text += f"Merged: {len(merged)} ({', '.join(merged)})."
     if closed:
         text += f" Closed: {len(closed)} ({', '.join(closed)})."
     return text
@@ -332,7 +362,8 @@ def render_csv(drafts):
     w = csv.writer(buf, lineterminator="\n")
     w.writerow(CSV_COLUMNS)
     for d in drafts:
-        row = {"id": d.id, "title": d.title, "includes": d.includes}
+        row = {"id": d.id, "title": d.title, "includes": d.includes,
+               "resolved_by": resolved_refs(d)}
         w.writerow([cell(row[c] if c in row else d.meta.get(c)) for c in CSV_COLUMNS])
     return buf.getvalue()
 

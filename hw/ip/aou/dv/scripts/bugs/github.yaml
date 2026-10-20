@@ -27,6 +27,7 @@ label_colors:
   severity: "fbca04"
   area: "0e8a16"
   needs: "5319e7"
+  status: "0075ca"
 
 kinds:
   dut-bug: The RTL is wrong against the spec or its own documentation
@@ -44,6 +45,10 @@ needs:
   owner-decision: Open questions for the RTL owners
   spec-clarification: The AoU or UCIe spec is ambiguous or conflicts with the MAS
   docs: A change to the MAS, RDL or integration guide is requested
+
+# Issue status labels beyond open/closed (from the draft's state).
+statuses:
+  resolved: Fixed by a merged PR or commit; still open for testbench, test-plan or other follow-ups
 
 # Area vocabulary: 1-3 per draft. files lists the RTL (and doc) files each area covers.
 areas:

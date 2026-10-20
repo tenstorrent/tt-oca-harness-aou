@@ -18,7 +18,13 @@ doesn't exist yet (each body carries a hidden `<!-- bugs-id: NNN -->` marker, so
 the issues it made instead of duplicating them); pass 2 rewrites the bodies with the real issue
 numbers, adds the blocked-by dependencies, closes merged drafts as duplicates of the draft they
 were merged into and closed drafts with their reason; then writes issue_github back into each
-draft's front matter.
+draft's front matter. A resolved draft (fixed by a PR or commit, follow-ups still open) stays an
+open issue with the `status:resolved` label and a body line naming what resolved it and what is
+still outstanding; the label goes again once the draft is open or closed.
+
+Nothing internal is published: every `## Internal notes` section is dropped from the body, and a
+fix branch is named only once fix_pushed is true and fix_branch is the branch or PR URL (or a PR
+reference); plan.md lists the branches left out.
 
 Settings (labels, issue types, severity as labels or an issue field, area vocabulary) are in
 github.yaml. Draft references become `#{NNN}` placeholders until pass 2 knows the numbers, and
@@ -39,6 +45,9 @@ MAX_BODY = 65536
 MARKER = "<!-- bugs-id: {} -->"
 PATH_ROOTS = ("RTL", "DOC", "csr", "INTEG", "hw")
 CLOSE_REASON = {"completed": "completed", "not-planned": "not_planned"}
+RESOLVED_LABEL = "status:resolved"
+FIX_LINK_RE = re.compile(r"https://github\.com/[\w.-]+/[\w.-]+/(?:tree/\S+|pull/\d+)")
+PR_REF_RE = re.compile(r"(?:[\w.-]+/[\w.-]+)?#\d+")
 
 FENCE_RE = re.compile(r"^(```|~~~)")
 MD_LINK_RE = re.compile(r"\[([^\]]+)\]\((\d{3})-[\w.-]*?\.md(?:#[\w-]*)?\)")
@@ -180,14 +189,39 @@ def strip_h1(d):
     return "\n".join(lines).strip("\n")
 
 
+def strip_internal(text):
+    """Drop every `## Internal notes` section (internal links and tracker keys live there by
+    design): from that heading to the next level-2 heading outside a fenced block, or the end."""
+    out, skip, fenced = [], False, False
+    for line in text.split("\n"):
+        if FENCE_RE.match(line.lstrip()):
+            fenced = not fenced
+        elif not fenced and line.startswith("## "):
+            skip = line.strip().lower() == "## internal notes"
+        if not skip:
+            out.append(line)
+    return "\n".join(out).strip("\n")
+
+
+def public_fix(d):
+    """The fix to name in a public issue: only a pushed branch or PR given as a link (a URL, or
+    a PR reference such as #12 or owner/repo#12); never a local branch name."""
+    fb = str(d.get("fix_branch") or "")
+    if d.get("fix_pushed") and (FIX_LINK_RE.fullmatch(fb) or PR_REF_RE.fullmatch(fb)):
+        return fb
+    return None
+
+
 def meta_line(d, ids):
-    """Facts that have no label, type or field: the fix branch and what the draft waits on."""
+    """Facts that have no label, type or field: the fix, what resolved it, what it waits on."""
     parts = []
-    if d.get("fix_branch"):
-        extra = d.get("fix_verdict")
-        if not d.get("fix_pushed"):
-            extra += ", not pushed"
-        parts.append(f"**Fix branch:** `{d.get('fix_branch')}` ({extra})")
+    fix = public_fix(d)
+    if fix:
+        parts.append(f"**Fix:** {fix} ({d.get('fix_verdict')})")
+    if d.get("state") == "resolved":
+        refs = ", ".join(gen_readme.resolved_refs(d))
+        parts.append(f"**Resolved by:** {refs}; open until the follow-ups are done: "
+                     f"{d.get('status')}")
     if d.get("blocked_by"):
         parts.append("**Blocked by:** " + ", ".join(
             "#{%s}" % b if b in ids else f"BUGS/{b}" for b in d.get("blocked_by")))
@@ -200,12 +234,14 @@ def labels_for(d, cfg):
         labels.append(f"severity:{d.get('severity')}")
     labels += [f"area:{a}" for a in d.get("area", [])]
     labels += [f"needs:{n}" for n in d.get("needs", [])]
+    if d.get("state") == "resolved":
+        labels.append(RESOLVED_LABEL)
     return labels
 
 
 def issue_for(d, cfg, repo, ids, source_dir):
     t = Transform(repo, ids)
-    body = t.body(strip_h1(d))
+    body = t.body(strip_internal(strip_h1(d)))
     head = meta_line(d, ids)
     rel = os.path.relpath(d.path, source_dir) if source_dir else f"BUGS/{d.file}"
     footer = f"Imported from `{rel}` at {repo.sha}.\n{MARKER.format(d.id)}"
@@ -222,7 +258,7 @@ def issue_for(d, cfg, repo, ids, source_dir):
         "labels": labels_for(d, cfg),
         "type": (cfg.get("issue_types") or {}).get(d.get("kind")),
         "fields": fields,
-        "state": "open" if state == "open" else "closed",
+        "state": "open" if state in ("open", "resolved") else "closed",
         "state_reason": reason,
         "duplicate_of": d.get("merged_into") if state == "merged" else None,
         "blocked_by": list(d.get("blocked_by", [])),
@@ -234,7 +270,8 @@ def issue_for(d, cfg, repo, ids, source_dir):
 def label_defs(cfg):
     colors = cfg.get("label_colors") or {}
     defs = []
-    for prefix, key in (("kind", "kinds"), ("severity", "severities"), ("needs", "needs")):
+    for prefix, key in (("kind", "kinds"), ("severity", "severities"), ("needs", "needs"),
+                        ("status", "statuses")):
         if prefix == "severity" and (cfg.get("severity") or {}).get("mode", "labels") != "labels":
             continue
         for name, desc in (cfg.get(key) or {}).items():
@@ -271,6 +308,8 @@ def plan_md(drafts, issues, labels, stats, repo):
     closed = [(d.id, by[d.id]["state_reason"]) for d in drafts
               if by[d.id]["state"] == "closed" and not by[d.id]["duplicate_of"]]
     fields = [(d.id, by[d.id]["fields"]) for d in drafts if by[d.id]["fields"]]
+    resolved = [d.id for d in drafts if RESOLVED_LABEL in by[d.id]["labels"]]
+    withheld = [d.id for d in drafts if d.get("fix_branch") and not public_fix(d)]
     lines += ["", "## 3. Pass 2: link and close", "",
               "- Rewrite every body: `#{NNN}` becomes the real issue number.",
               f"- Set issue fields on {len(fields)} issues." if fields else
@@ -281,6 +320,10 @@ def plan_md(drafts, issues, labels, stats, repo):
               + (", ".join(f"{a} of {b}" for a, b in dups) or "none") + ".",
               f"- Close with a reason ({len(closed)}): "
               + (", ".join(f"{a} ({r})" for a, r in closed) or "none") + ".",
+              f"- Keep open as resolved, `{RESOLVED_LABEL}` set ({len(resolved)}): "
+              + (", ".join(resolved) or "none") + "; every other issue loses that label.",
+              f"- Fix branches left out of the bodies (not pushed, or not a link) "
+              f"({len(withheld)}): " + (", ".join(withheld) or "none") + ".",
               "", "## 4. Write back", "",
               "Set `issue_github:` in each draft's front matter to the issue URL, then run "
               "`gen_readme.py` so the README Issue column shows it.", "",
@@ -376,6 +419,15 @@ def add_blocked_by(slug, number, blocker_id):
        payload={"issue_id": blocker_id})
 
 
+def sync_resolved_label(slug, number, resolved, have):
+    """Add or drop the status:resolved label to match the draft, leaving other labels alone."""
+    if resolved and RESOLVED_LABEL not in have:
+        gh("-X", "POST", f"repos/{slug}/issues/{number}/labels",
+           payload={"labels": [RESOLVED_LABEL]})
+    elif not resolved and RESOLVED_LABEL in have:
+        gh("-X", "DELETE", f"repos/{slug}/issues/{number}/labels/{RESOLVED_LABEL}")
+
+
 def close_issue(slug, number, reason, duplicate_of=None):
     if duplicate_of:
         gh("-X", "POST", f"repos/{slug}/issues/{number}/comments",
@@ -411,6 +463,8 @@ def apply(drafts, cfg, repo, source_dir):
         set_fields(repo.slug, num, i["fields"])
         for b in i["blocked_by"]:
             add_blocked_by(repo.slug, num, made[b]["id"])
+        sync_resolved_label(repo.slug, num, RESOLVED_LABEL in i["labels"],
+                            {l["name"] for l in made[d.id].get("labels") or []})
         if i["state"] == "closed" and made[d.id].get("state") != "closed":
             close_issue(repo.slug, num, i["state_reason"],
                         numbers.get(i["duplicate_of"]) if i["duplicate_of"] else None)

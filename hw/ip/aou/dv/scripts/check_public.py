@@ -25,7 +25,9 @@ BUILTIN = [
     (r"\b[\w.-]+\.local(\b|:)", "private hostname"),
     (r"/home/[A-Za-z0-9_.-]+/", "home directory"),
     (r"\buser_dev/", "personal work area"),
-    (r"\b(10|192\.168|172\.(1[6-9]|2\d|3[01]))\.\d+\.\d+(\.\d+)?\b", "private IP address"),
+    # Four octets, and not a spec section number (UCIe "§10.3.3.8", "section 10.2.3.1", "r3.0 10.3.3.8").
+    (r"(?<![§\d.])(?<!section )(?<!\d\.\d )\b(10\.\d{1,3}|192\.168|172\.(1[6-9]|2\d|3[01]))\.\d{1,3}\.\d{1,3}\b(?!\.\d)",
+     "private IP address"),
 ]
 SKIP_FILES = re.compile(r"\.(pdf|png|jpg|gz|tgz|zip|fsdb|fst|vcd)$")
 OK_MARKER = "public-ok"

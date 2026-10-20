@@ -12,20 +12,22 @@ AWVALID) and the splitter's AWVALID (which waits for WREADY) form a loop that
 never raises either.
 Applied to a build-time copy of RTL/ by make build ESCAPE=split_awvalid_drop.
 
+diff --git a/RTL/AOU_AXIMUX_1XN_SS.v b/RTL/AOU_AXIMUX_1XN_SS.v
 --- a/RTL/AOU_AXIMUX_1XN_SS.v
 +++ b/RTL/AOU_AXIMUX_1XN_SS.v
-@@ -30,7 +30,7 @@
+@@ -30,7 +30,7 @@ module AOU_AXIMUX_1XN_SS #(
      parameter   AOU_AXIMUX_1XN_RCH_RS_EN  = 1,
-     parameter   AOU_AXIMUX_1XN_AWCH_RS_EN = 1,
+     parameter   AOU_AXIMUX_1XN_AWCH_RS_EN = 0,//In AoU, it connects with Aggegator, so it should be 0.
      parameter   AOU_AXIMUX_1XN_WCH_RS_EN  = 1,
 -    parameter   AOU_AXIMUX_1XN_M_AWCH_RS_EN = 1,
 +    parameter   AOU_AXIMUX_1XN_M_AWCH_RS_EN = 0,
      parameter   AOU_AXIMUX_1XN_M_WCH_RS_EN = 1,
  
      parameter   SN            = 4,
+diff --git a/RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v b/RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v
 --- a/RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v
 +++ b/RTL/AXI4MUX_3X1/AOU_AXI_SPLIT_TR.v
-@@ -37,7 +37,7 @@
+@@ -37,7 +37,7 @@ module AOU_AXI_SPLIT_TR #(
      parameter   WR_MO_CNT = 64,
      parameter   AOU_AXI_SPLIT_TR_SLV_ARCH_RS_EN = 1,
      parameter   AOU_AXI_SPLIT_TR_SLV_RCH_RS_EN = 1,

@@ -209,6 +209,20 @@ class ValidateTest(Fixture):
         self.add("001", closed_reason="completed")
         self.assertError("closed_reason is only for state closed")
 
+    def test_resolved_needs_resolved_by(self):
+        self.add("001", state="resolved")
+        self.assertError("state resolved needs resolved_by")
+        self.add("001", state="resolved", resolved_by='"PR 89"')
+        self.assertError("resolved_by value 'PR 89' is not a quoted PR")
+        self.add("001", state="resolved", resolved_by='["#89", "1a2b3c4d"]')
+        self.assertEqual(self.errors(), [])
+        self.add("001", state="resolved", resolved_by='"o/r#89"')
+        self.assertEqual(self.errors(), [])
+
+    def test_resolved_by_only_for_resolved(self):
+        self.add("001", resolved_by='"#89"')
+        self.assertError("resolved_by is only for state resolved")
+
     def test_branch_without_verdict(self):
         self.add("001", fix_verdict="none")
         self.assertError("fix_branch is set but fix_verdict is none")
@@ -268,6 +282,56 @@ class RenderTest(Fixture):
         self.assertEqual(cells["003"]["kind"], "Spec/doc conflict")
         self.assertEqual(cells["003"]["severity"], "Low")
         self.assertEqual(cells["004"]["issue"], "https://example.invalid/issues/4")
+
+    def test_resolved_cells_and_summary(self):
+        self.add("001", "Fixed", state="resolved", resolved_by='["#89", "1a2b3c4"]',
+                 status='"fixed; bench entries to retire"')
+        self.add("002")
+        drafts, _ = gen_readme.load(self.dir)
+        by_id = {d.id: d for d in drafts}
+        self.assertEqual(gen_readme.item(by_id, by_id["001"])["resolved"], "#89, 1a2b3c4")
+        self.assertEqual(gen_readme.item(by_id, by_id["002"])["resolved"], "")
+        self.assertEqual(gen_readme.summary(drafts),
+                         "Open drafts by kind: DUT bug 1 (002). "
+                         "Resolved, follow-ups open: 1 (001). Merged: 0 ().")
+        self.assertIn(",resolved,fixed; bench entries to retire,#89 1a2b3c4,",
+                      gen_readme.render_csv(drafts).splitlines()[1])
+
+    def test_resolved_issue(self):
+        self.add("001", "Fixed", state="resolved", resolved_by='"#89"',
+                 status='"fixed; bench entries to retire"')
+        drafts, _ = gen_readme.load(self.dir)
+        repo = gh_import.Repo("o/r", "abc123", [])
+        issue, _ = gh_import.issue_for(drafts[0], {}, repo, {"001"}, None)
+        self.assertEqual(issue["state"], "open")
+        self.assertIsNone(issue["state_reason"])
+        self.assertIn("status:resolved", issue["labels"])
+        self.assertTrue(issue["body"].startswith(
+            "**Resolved by:** #89; open until the follow-ups are done: fixed; bench entries "
+            "to retire"))
+
+    def issue(self, **over):
+        self.add("001", **over)
+        drafts, _ = gen_readme.load(self.dir)
+        return gh_import.issue_for(drafts[0], {}, gh_import.Repo("o/r", "abc", []), {"001"},
+                                   None)[0]["body"]
+
+    def test_fix_branch_published_only_as_pushed_link(self):
+        url = "https://github.com/me/r/tree/bugfix/12-x"
+        self.assertNotIn("bugfix/BUGS-001-x", self.issue(fix_pushed="false"))
+        self.assertNotIn("bugfix/BUGS-001-x", self.issue(fix_pushed="true"))
+        self.assertTrue(self.issue(fix_branch=url).startswith(f"**Fix:** {url} (accepted)"))
+        self.assertNotIn(url, self.issue(fix_branch=url, fix_pushed="false"))
+        self.assertTrue(self.issue(fix_branch='"#12"').startswith("**Fix:** #12 (accepted)"))
+
+    def test_internal_notes_dropped(self):
+        text = ("# 001: T\n\n## Summary\n\nKeep.\n\n## Internal notes\n\nJira KEY-1, "
+                "/proj/x\n```\n## not a heading\n```\nmore\n\n## Reproduce\n\nKeep too.\n")
+        out = gh_import.strip_internal(text)
+        self.assertNotIn("KEY-1", out)
+        self.assertNotIn("not a heading", out)
+        self.assertIn("Keep.", out)
+        self.assertIn("## Reproduce\n\nKeep too.", out)
 
     def test_write_then_check(self):
         self.make_set()

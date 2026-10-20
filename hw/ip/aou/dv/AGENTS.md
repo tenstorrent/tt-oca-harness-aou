@@ -188,6 +188,12 @@ so nothing may be added that works only through it.
   `main`) links the issue. An `expected_fail.yaml` entry that stops matching is
   reported as XPASS: check the issue, and remove the entry when the fix is on
   `main`.
+- **Resolved, not yet closed.** When a merged PR or commit fixes the problem
+  (in the DUT, a document or the spec) but testbench, test-plan or other
+  follow-ups remain, set the draft to `state: resolved` with `resolved_by` (the
+  PR such as `"#89"`, or the commit SHA). Its issue stays open with the
+  `status:resolved` label and names what resolved it; close it, like any open
+  issue, once the follow-ups are done.
 
 ## Boundaries
 
