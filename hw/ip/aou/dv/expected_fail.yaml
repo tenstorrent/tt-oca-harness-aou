@@ -861,6 +861,25 @@
     CREDIT_MANAGE=1: DeactivateAck at 2486.5 ns, then credit in LP flit 466 at 2495.5 ns
     (waves vcs-t1-4x512-sp64 aou_zero_credit_test.rid.allw2.seed.1, +credit=rreq)
 
+- test: aou_remote_react_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: a deactivation after the drain lands while the DUT still owes RDATA/WRESP
+    credit and it returns it after its DeactivateAck, as the MAS documents (4x512-sp64 VCS seed
+    2: DeactivateReq at 64054.5 ns, credit in LP flits 13338-13342 before DISABLED at 64087.5 ns)
+
+- test: aou_axi_err_resp_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the end-of-test deactivation lands while the DUT still owes RDATA/WRESP
+    credit and it returns it after its DeactivateAck, as the MAS documents (4x512-sp64 VCS seed
+    1, +T1_VSEQ=aou_dbg_off_vseq +dbg_on=5: DeactivateReq at 3041.5 ns, credit in LP flits 441
+    and 442 before DISABLED at 3069.5 ns)
+
 - test: aou_link_event_test
   bug: BUGS/024
   check: 'T1-L26: orphan B beat'
