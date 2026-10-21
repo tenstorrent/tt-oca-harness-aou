@@ -197,7 +197,6 @@ import packet_def_pkg::*;
     input  logic    [15:0]                                  I_PRIOR_TIMER_TIMER_RESOLUTION,    
     input  logic    [15:0]                                  I_PRIOR_TIMER_TIMER_THRESHOLD,
     
-    input  logic                                            I_AOU_WRITEFULL_MSGTYPE_EN,
     output logic    [RP_CNT-1:0]                            O_AOU_TX_B_FIFO_SVALID
 
 );
@@ -696,7 +695,7 @@ assign w_writedata_wo_strb_message = {<<8{w_writedata_wo_strb_message_byteswap}}
 
 logic [40*W1024b_G-1:0] w_writedata_wf_message_en;
 
-assign w_writedata_wf_message_en = (I_AOU_WRITEFULL_MSGTYPE_EN && w_aou_tx_fifo_m_axi_wstrb_full) ? {{(40*(W1024b_G-WF1024b_G)){1'b0}} , w_writedata_wo_strb_message} : w_writedata_message; 
+assign w_writedata_wf_message_en = w_aou_tx_fifo_m_axi_wstrb_full ? {{(40*(W1024b_G-WF1024b_G)){1'b0}} , w_writedata_wo_strb_message} : w_writedata_message; 
 
 
 AOU_SYNC_FIFO_REG
@@ -1142,7 +1141,7 @@ always_comb begin
         O_AOU_TX_WREQVALID     [i] = w_aou_tx_m_axi_awvalid[i] && w_aou_tx_m_axi_awready[i] && w_aou_tx_aw_credit_valid [i];
         O_AOU_TX_RREQVALID     [i] = w_aou_tx_m_axi_arvalid[i] && w_aou_tx_m_axi_arready[i] && w_aou_tx_ar_credit_valid [i];
         O_AOU_TX_WDATAVALID    [i] = w_aou_tx_m_axi_wvalid [i] && w_aou_tx_m_axi_wready [i] && w_aou_tx_w_credit_valid  [i];
-        O_AOU_TX_WFDATA        [i] = I_AOU_WRITEFULL_MSGTYPE_EN && w_aou_tx_m_axi_wstrb_full[i];
+        O_AOU_TX_WFDATA        [i] = w_aou_tx_m_axi_wstrb_full[i];
         O_AOU_TX_RDATAVALID    [i] = w_aou_tx_s_axi_rvalid [i] && w_aou_tx_s_axi_rready [i] && w_aou_tx_r_credit_valid  [i];
         O_AOU_TX_RDATA_DLENGTH [i] = w_aou_tx_s_axi_rdlen[i];
         O_AOU_TX_WRESPVALID    [i] = w_aou_tx_s_axi_bvalid [i] && w_aou_tx_s_axi_bready [i] && w_aou_tx_b_credit_valid  [i];
