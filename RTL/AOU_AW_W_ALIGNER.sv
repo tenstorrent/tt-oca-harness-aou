@@ -85,9 +85,17 @@ module AOU_AW_W_ALIGNER #(
 // Each RP's W burst follows its own AW, and W beats of different RPs may interleave
 // (every WriteData message carries its RP). One RP waiting for WDATA credit therefore
 // holds only its own next AW, never the shared AW path (AoU v0.7 RP independence).
+//
+// An AW is taken only together with the first W beat of its burst: both leave in the
+// same cycle, so the WriteReq and WriteData message FIFOs behind this module gain one
+// entry each. Every AW ahead of a WriteReq then has a beat ahead of that write's first
+// WriteData, and the TX core, which pops the two FIFOs with one ready, never sends a
+// WriteData before its own WriteReq.
 logic [AXI_SLV_NUM-1:0]                         r_wbusy         ;
 logic [AXI_SLV_NUM-1:0]                         w_aw_sel_oh     ;
 logic                                           w_aw_busy       ;
+logic                                           w_aw_w1_vld     ;
+logic                                           w_aw_can        ;
 logic                                           w_aw_hs         ;
 logic [AXI_SLV_NUM-1:0]                         w_w_new         ;
 logic [AXI_SLV_NUM-1:0]                         w_w_open        ;
@@ -100,8 +108,6 @@ logic [AXI_SLV_NUM-1:0]                         w_w_grant       ;
 logic [AXI_SLV_NUM-1:0]                         w_w_last_hs     ;
 logic [RP_SEL_WD-1: 0]                          w_w_sel         ;
 
-wire                                            w_no_awvalid    ;
-
 genvar p;
 //==============================================================
 //                          AW
@@ -112,11 +118,14 @@ always_comb begin
 end
 
 assign w_aw_busy       = |(r_wbusy & w_aw_sel_oh);
-assign w_no_awvalid    = ~I_S_AWVALID;
+// The first beat of the offered AW's burst; I_S_WVALID already carries its RP's WDATA credit.
+assign w_aw_w1_vld     = |(I_S_WVALID & w_aw_sel_oh);
+assign w_aw_can        = ~w_aw_busy & I_S_AWVALID & w_aw_w1_vld;
 
-assign O_S_AWREADY     = ~w_aw_busy & (I_M_AWREADY | w_no_awvalid);
-assign O_M_AWVALID     = ~w_aw_busy & I_S_AWVALID;
-assign w_aw_hs         = I_S_AWVALID & O_S_AWREADY;
+// AW and first beat are pushed in the same cycle, so each needs the other's ready.
+assign O_M_AWVALID     = w_aw_can & I_M_WREADY;
+assign O_S_AWREADY     = w_aw_can & I_M_AWREADY & I_M_WREADY;
+assign w_aw_hs         = O_S_AWREADY;
 
 assign O_AW_RP_READY   = ~r_wbusy;
 
@@ -137,12 +146,13 @@ assign O_M_AWQOS       = I_S_AWQOS   ;
 //==============================================================
 //                          W
 //==============================================================
-// The first beat may go in the same cycle as its AW, as before. Bursts go out in
-// AW order (oldest first), as before; a younger RP's beat goes only while every
-// older open burst has no beat it can send (no WVALID or no WDATA credit).
+// A new burst's first beat goes with its AW (above) and takes the W path that cycle.
+// Otherwise open bursts go out in AW order (oldest first), as before; a younger RP's
+// beat goes only while every older open burst has no beat it can send (no WVALID or
+// no WDATA credit).
 assign w_w_new         = w_aw_sel_oh & {AXI_SLV_NUM{w_aw_hs}};
 assign w_w_open        = r_wbusy | w_w_new;
-assign w_w_req         = w_w_open & I_S_WVALID;
+assign w_w_req         = r_wbusy & I_S_WVALID;
 
 always_comb begin
     for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
@@ -155,13 +165,19 @@ end
 always_comb begin
     w_w_grant = '0;
     w_w_sel   = '0;
-    for (int unsigned i = 0; i < AXI_SLV_NUM; i++) begin
-        if (w_w_req[i]) begin
-            w_w_grant[i] = 1'b1;
-            for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
-                if (w_w_req[q] & w_w_older[q][i]) w_w_grant[i] = 1'b0;
+    if (|w_w_new) begin
+        w_w_grant = w_w_new;
+    end else begin
+        for (int unsigned i = 0; i < AXI_SLV_NUM; i++) begin
+            if (w_w_req[i]) begin
+                w_w_grant[i] = 1'b1;
+                for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
+                    if (w_w_req[q] & w_w_older[q][i]) w_w_grant[i] = 1'b0;
+                end
             end
         end
+    end
+    for (int unsigned i = 0; i < AXI_SLV_NUM; i++) begin
         if (w_w_grant[i]) w_w_sel = i[RP_SEL_WD-1:0];
     end
 end

@@ -400,13 +400,16 @@ logic      [RP_CNT-1:0]           w_aou_tx_ar_req;
 logic      [RP_CNT-1:0]           w_aou_tx_b_req;
 logic      [RP_CNT-1:0]           w_aou_tx_r_req;
 
-// An AW is accepted only once its RP's previous W burst is finished (AOU_AW_W_ALIGNER).
-// Until then the RP keeps requesting, and holds the grant as before, only while it has
-// WDATA credit to finish that burst; without credit it steps aside.
-assign w_aou_tx_aw_send_en = w_aou_tx_aw_credit_valid & w_aou_tx_aw_rp_ready;
+// A write is committed only when its WriteReq and its first WriteData can both be sent:
+// WREQ credit, WDATA credit, the first W beat present, and the RP's previous W burst
+// finished (AOU_AW_W_ALIGNER, which then takes the AW and that beat in the same cycle).
+// An RP short of any of these does not compete for the AW grant. With no open burst
+// on the RP, the head of its W FIFO is the first beat of the AW at the head of its AW
+// FIFO (AXI keeps W in AW order).
+assign w_aou_tx_aw_send_en = w_aou_tx_aw_credit_valid & w_aou_tx_aw_rp_ready &
+                             w_aou_tx_m_axi_wvalid & w_aou_tx_w_credit_valid;
 assign w_aou_tx_aw_valid   = w_aou_tx_m_axi_awvalid & w_aou_tx_aw_send_en;
-assign w_aou_tx_aw_req     = w_aou_tx_m_axi_awvalid & w_aou_tx_aw_credit_valid &
-                             (w_aou_tx_aw_rp_ready | w_aou_tx_w_credit_valid);
+assign w_aou_tx_aw_req     = w_aou_tx_aw_valid;
 assign w_aou_tx_ar_req     = w_aou_tx_m_axi_arvalid & w_aou_tx_ar_credit_valid;
 assign w_aou_tx_b_req      = w_aou_tx_s_axi_bvalid  & w_aou_tx_b_credit_valid;
 assign w_aou_tx_r_req      = w_aou_tx_s_axi_rvalid  & w_aou_tx_r_credit_valid;
