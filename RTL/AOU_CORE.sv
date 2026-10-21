@@ -1314,8 +1314,6 @@ import packet_def_pkg::*;
         .O_AOU_TX_RDATA_DLENGTH         ( w_aou_tx_rdata_dlength        ),
         .O_AOU_TX_WRESPVALID            ( w_aou_tx_wrespvalid           ),
 
-        .I_AOU_WRITEFULL_MSGTYPE_EN     ( 1'b1                          ),
-
         .I_AOU_TX_LP_MODE_THRESHOLD     ( w_tx_lp_mode_threshold        ),
         .I_AOU_TX_LP_MODE               ( w_tx_lp_mode                  ),
 
