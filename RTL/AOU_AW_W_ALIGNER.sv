@@ -91,6 +91,14 @@ module AOU_AW_W_ALIGNER #(
 // entry each. Every AW ahead of a WriteReq then has a beat ahead of that write's first
 // WriteData, and the TX core, which pops the two FIFOs with one ready, never sends a
 // WriteData before its own WriteReq.
+//
+// Open bursts with a sendable beat keep the W path, oldest first; a new AW, whose first
+// beat must travel with it, is taken only in a cycle where none of them can send. A
+// burst already committed to the link therefore drains before a later write starts,
+// and a stream of short writes on one RP cannot hold another RP's burst open. The wait
+// is bounded by the open bursts' remaining beats, and an open burst that has no beat
+// or no WDATA credit holds nothing. Which RP's write is committed next is the AW
+// arbiter's choice (QoS or round robin), not this module's.
 logic [AXI_SLV_NUM-1:0]                         r_wbusy         ;
 logic [AXI_SLV_NUM-1:0]                         w_aw_sel_oh     ;
 logic                                           w_aw_busy       ;
@@ -120,7 +128,9 @@ end
 assign w_aw_busy       = |(r_wbusy & w_aw_sel_oh);
 // The first beat of the offered AW's burst; I_S_WVALID already carries its RP's WDATA credit.
 assign w_aw_w1_vld     = |(I_S_WVALID & w_aw_sel_oh);
-assign w_aw_can        = ~w_aw_busy & I_S_AWVALID & w_aw_w1_vld;
+// Open bursts that can send a beat this cycle; they go ahead of any new AW.
+assign w_w_req         = r_wbusy & I_S_WVALID;
+assign w_aw_can        = ~w_aw_busy & I_S_AWVALID & w_aw_w1_vld & ~|w_w_req;
 
 // AW and first beat are pushed in the same cycle, so each needs the other's ready.
 assign O_M_AWVALID     = w_aw_can & I_M_WREADY;
@@ -146,13 +156,12 @@ assign O_M_AWQOS       = I_S_AWQOS   ;
 //==============================================================
 //                          W
 //==============================================================
-// A new burst's first beat goes with its AW (above) and takes the W path that cycle.
-// Otherwise open bursts go out in AW order (oldest first), as before; a younger RP's
-// beat goes only while every older open burst has no beat it can send (no WVALID or
-// no WDATA credit).
+// Open bursts go out in AW order (oldest first), as before; a younger RP's beat goes
+// only while every older open burst has no beat it can send (no WVALID or no WDATA
+// credit). A new burst's first beat goes with its AW (above), which is taken only in a
+// cycle where no open burst can send, so it has the W path to itself then.
 assign w_w_new         = w_aw_sel_oh & {AXI_SLV_NUM{w_aw_hs}};
 assign w_w_open        = r_wbusy | w_w_new;
-assign w_w_req         = r_wbusy & I_S_WVALID;
 
 always_comb begin
     for (int unsigned q = 0; q < AXI_SLV_NUM; q++) begin
