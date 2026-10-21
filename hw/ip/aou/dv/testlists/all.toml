@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 236
+expected_count = 242
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -324,12 +324,18 @@ tests = [
   "aou_reset_test.reset-apb.when-traffic.pclk_ps-600",
   "aou_reset_test.reset-apb.when-traffic.pclk_ps-1013",
   "aou_dft_scan_test",
+  "aou_wdt_test",
+  "aou_wdt_test.wdt_case-near_miss.wdt_thr-64",
+  "aou_wdt_test.wdt_thr-0.wdt_reset-sw",
+  "aou_wdt_test.wdt_case-masked",
+  "aou_wdt_test.wdt_case-multi_rp.4x512-sp64",
+  "aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128",
 ]
 
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 450
+expected_count = 456
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -781,4 +787,10 @@ tests = [
   "aou_t1_slice_test.rtl_asserts-1.1x256-sp32-assert",
   "aou_dp_random_test.dp_dir-both.rtl_asserts-1",
   "aou_dw_test.remote_bytes-64.rtl_asserts-1",
+  "aou_wdt_test",
+  "aou_wdt_test.wdt_case-near_miss.wdt_thr-64",
+  "aou_wdt_test.wdt_thr-0.wdt_reset-sw",
+  "aou_wdt_test.wdt_case-masked",
+  "aou_wdt_test.wdt_case-multi_rp.4x512-sp64",
+  "aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128",
 ]

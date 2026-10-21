@@ -11,12 +11,11 @@
 //   FEAT-R15: no S-port AW is accepted while wr_mo_cnt entries are held.
 //   FEAT-R16: an AW held while the table was full is accepted within
 //             free_bound cycles of the WriteResp that frees an entry.
-//   FEAT-R21 (plan 16.17) is not checked: the O_PENDING_CNT_OVER it observed
-//             (MAS 3.7.5) was unconnected and PR #89 removed it,
-//             adding a write-transaction watchdog (INT_EARLY_WDT_ERR) instead.
-//             With over_chk (+early_over) the watchdog pin is only counted
-//             while an AW waits at the limit, for the report, until the MAS
-//             specifies the watchdog and a check can be written against it.
+//   FEAT-R21 (plan 16.17) is not checked: PR #89 removed the
+//             O_PENDING_CNT_OVER it observed (MAS 3.7.5) for a write-transaction
+//             watchdog (INT_EARLY_WDT_ERR), which aou_t1_wdt_chk checks. With
+//             over_chk (+early_over) the watchdog pin is counted while an AW
+//             waits at the limit, for the report.
 // Whether a run filled the table and saw a stall end is coverage
 // (env.cg_early_tbl), not a check.
 class aou_t1_early_tbl_chk extends uvm_component;

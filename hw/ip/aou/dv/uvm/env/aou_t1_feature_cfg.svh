@@ -13,6 +13,9 @@ class aou_t1_feature_cfg extends uvm_object;
   int aggregator[4] = '{-1, -1, -1, -1};   // RPn_AXI_AGGREGATOR_EN
   int early_resp[4] = '{-1, -1, -1, -1};   // EARLY_BRESP_EN
   int dest_rp[4]    = '{-1, -1, -1, -1};   // DEST_RP.RPn_DEST
+  int wdt_en[4]     = '{-1, -1, -1, -1};   // WRITE_EARLY_RESPONSE_RPn.WDT_EN
+  // Write-transaction watchdog threshold (WRITE_EARLY_RESPONSE_WDT_CTL, all RPs)
+  int wdt_threshold = -1;
   // QoS arbitration
   int arb_mode = -1;
   int rp_prior[4] = '{-1, -1, -1, -1};
@@ -32,6 +35,7 @@ class aou_t1_feature_cfg extends uvm_object;
   int mask_deact_ack = -1;
   int mask_act_ack = -1;
   int mask_fdi_link_down = -1;
+  int mask_early_wdt = -1;
   // Time-outs
   int msgcredit_timeout = -1;
   int ack_timeout = -1;
@@ -54,7 +58,7 @@ class aou_t1_feature_cfg extends uvm_object;
   function bit any_mask();
     return mask_si0_id_mismatch >= 0 || mask_mi0_id_mismatch >= 0 || mask_early_resp >= 0 ||
            mask_msgcredit_timeout >= 0 || mask_invalid_actmsg >= 0 || mask_deact_ack >= 0 ||
-           mask_act_ack >= 0 || mask_fdi_link_down >= 0;
+           mask_act_ack >= 0 || mask_fdi_link_down >= 0 || mask_early_wdt >= 0;
   endfunction
 
   function bit any_timeout();

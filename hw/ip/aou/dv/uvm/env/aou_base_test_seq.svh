@@ -276,6 +276,10 @@ class aou_base_test_seq extends ocah_sequence;
   // ---------------------------------------------------------------------
   task program_cfg(aou_t1_feature_cfg f);
     last_prog = f;
+    // The threshold first, so a watchdog enabled below counts against it.
+    if (f.wdt_threshold >= 0)
+      write_field(p_sequencer.regs.write_early_response_wdt_ctl.wdt_threshold,
+                  uvm_reg_data_t'(f.wdt_threshold));
     for (int unsigned r = 0; r < cfg.n_rp; r++) begin
       if (f.split_ar[r] >= 0 || f.split_aw[r] >= 0) begin
         aou_reg_split_seq s = aou_reg_split_seq::type_id::create("split");
@@ -292,11 +296,12 @@ class aou_base_test_seq extends ocah_sequence;
         s.enable = f.aggregator[r];
         s.start(null);
       end
-      if (f.early_resp[r] >= 0) begin
+      if (f.early_resp[r] >= 0 || f.wdt_en[r] >= 0) begin
         aou_reg_early_resp_seq s = aou_reg_early_resp_seq::type_id::create("early");
         prep_reg(s);
         s.rp = r;
         s.enable = f.early_resp[r];
+        s.wdt_en = f.wdt_en[r];
         s.start(null);
       end
       if (f.dest_rp[r] >= 0) begin
@@ -360,6 +365,7 @@ class aou_base_test_seq extends ocah_sequence;
       s.deact_ack = f.mask_deact_ack;
       s.act_ack = f.mask_act_ack;
       s.fdi_link_down = f.mask_fdi_link_down;
+      s.early_wdt = f.mask_early_wdt;
       s.start(null);
     end
     if (f.any_timeout()) begin

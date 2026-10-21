@@ -54,7 +54,7 @@ out of the denominator and a hit is reported under the rule that owns it.
 | L2 link state (`aou_lsm_cov`) | `cg_link_state`, `cg_bringup_fsm` | PL state-machine transitions and the requests that cause them, the FDI state encoding the run used (`cp_fdi_enc`), the bring-up reference model's states and transitions
 | L3 protocol (`aou_l3_cov`) | `cg_act_fsm`, `cg_act_op`, `cg_msg`, `cg_flit_layout`, `cg_flit_occ`, `cg_credit` | Activation state machine and message operations by direction and legality, message kinds per RP and direction, granule start and size and flit spanning, flit occupancy (messages per flit, Misc halves, carry, credit-only flits), credit events per class and direction
 | AXI monitor (`aou_axi_monitor`) | `txn_cg`, `zero_cg` | Transaction direction, size, length and alignment at every port; zero-cycle `B`/`R` responses
-| T1 env | `attr_cg`, `excl_cg`, `chan_cg` (`aou_t1_xfer_cov`); `cg_crd` (`aou_t1_crd_flow_chk`); `cg_crd_rr` (`aou_t1_crd_rr_chk`); `cg_early_tbl` (`aou_t1_early_tbl_chk`); `cg_mo` (`aou_t1_mo_chk`) | Attributes, exclusives and channel orderings across the link; the credit classes an RP had work for and credit for; how many RPs a round-robin window owed; early-response table fill and stall release; M-port pending-ID table fill (requests in service)
+| T1 env | `attr_cg`, `excl_cg`, `chan_cg` (`aou_t1_xfer_cov`); `cg_crd` (`aou_t1_crd_flow_chk`); `cg_crd_rr` (`aou_t1_crd_rr_chk`); `cg_early_tbl` (`aou_t1_early_tbl_chk`); `cg_wdt` (`aou_t1_wdt_chk`); `cg_mo` (`aou_t1_mo_chk`) | Attributes, exclusives and channel orderings across the link; the credit classes an RP had work for and credit for; how many RPs a round-robin window owed; early-response table fill and stall release; write-watchdog expiries, restarts at the threshold, W1C and mask; M-port pending-ID table fill (requests in service)
 | Bound AXI4 monitors (`aou_axi4_coverage_mod`, `COV=1`) | `cg_aw_channel`, `cg_ar_channel`, `cg_w_channel`, `cg_r_channel`, `cg_b_channel`, `cg_cmd`, `cg_outstanding`, `cg_backpressure` | Per S and M port: address range and alignment, size, length, attributes, ID buckets, strobe patterns, last flags, responses, outstanding depth, back-pressure run lengths
 |===
 
@@ -124,6 +124,7 @@ or a cross exclusion by pattern (`XIGN`, `XILL`). The notable definitions:
 | `txn_cg`, `zero_cg` | 2.4 write (4.x), 2.5 read (5.x), 2.18 data integrity (18.x), 2.8 outstanding (8.x) | `datapath`, `stress`, `g1a`
 | `attr_cg`, `excl_cg`, `chan_cg` | 4.25-4.28, 4.31, 5.23-5.26, 8.14 (attributes, exclusives, channel orderings across the link) | every T1 traffic scenario (`aou_t1_attr_chk` samples); `aou_attr_test`, `aou_chan_test`
 | `cg_early_tbl` | 2.17 early response (16.11, 16.12, 16.17) | `features` (`aou_early_bresp_test`), every test with `EARLY_BRESP_EN`
+| `cg_wdt` | 2.17 early response (16.18-16.23, the write watchdog) | `features` (`aou_wdt_test`); every test that sets WDT_EN
 | `cg_mo` | 2.8 outstanding (9.20 M-port limit) | `datapath` (`aou_dp_outstanding_test`), `stress`
 | AXI4 monitor covergroups | 2.4, 2.5, 2.8, 2.13 (QoS values), 2.14 (sizes per width), 2.18 | every `COV=1` run of every configuration
 |===

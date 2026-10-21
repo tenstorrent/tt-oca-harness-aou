@@ -358,6 +358,45 @@ module tb_top;
   assign irq.slv_rid_agg          = u_dut.u_aou_core_top.u_aou_core.O_AXI_SLV_RID_MISMATCH_ERROR;
   assign irq.slv_bid_agg          = u_dut.u_aou_core_top.u_aou_core.O_AXI_SLV_BID_MISMATCH_ERROR;
 
+  // Write-transaction watchdog taps (aou_wdt_if): each RP's early-response
+  // controller ports, the SFR's watchdog outputs and status registers, and the
+  // SFR's core-clock APB port.
+`define AOU_WDT_SFR u_dut.u_aou_core_top.u_aou_core.u_aou_core_sfr
+`define AOU_WDT_CTRL(R) \
+    u_dut.u_aou_core_top.u_aou_core.gen_aou_core_rp[R].u_aou_core_rp.u_aou_early_bresp_s_ctrl
+  aou_wdt_if wdt (.clk(clk));
+  assign wdt.core_rst_n = rst.core_rst_n;
+  assign wdt.rst_n      = rst_n;
+  for (genvar r = 0; r < 4; r++) begin : g_wdt
+    if (r < RP_COUNT) begin : g_rp
+      assign wdt.aw_hs[r] = `AOU_WDT_CTRL(r).I_AXI_S_AWVALID & `AOU_WDT_CTRL(r).O_AXI_S_AWREADY;
+      assign wdt.b_hs[r]  = `AOU_WDT_CTRL(r).I_AXI_M_BVALID & `AOU_WDT_CTRL(r).O_AXI_M_BREADY;
+    end else begin : g_none
+      assign wdt.aw_hs[r] = 1'b0;
+      assign wdt.b_hs[r]  = 1'b0;
+    end
+  end
+  assign wdt.en = {`AOU_WDT_SFR.O_WRITE_EARLY_RESPONSE_RP3_WDT_EN,
+                   `AOU_WDT_SFR.O_WRITE_EARLY_RESPONSE_RP2_WDT_EN,
+                   `AOU_WDT_SFR.O_WRITE_EARLY_RESPONSE_RP1_WDT_EN,
+                   `AOU_WDT_SFR.O_WRITE_EARLY_RESPONSE_RP0_WDT_EN};
+  assign wdt.thr  = `AOU_WDT_SFR.O_WRITE_EARLY_RESPONSE_WDT_THRESHOLD;
+  assign wdt.mask = `AOU_WDT_SFR.O_AOU_INTERRUPT_MASK_INT_EARLY_WDT_MASK;
+  assign wdt.status = {`AOU_WDT_SFR.r_write_early_response_rp3_wdt_trans_timeout_err,
+                       `AOU_WDT_SFR.r_write_early_response_rp2_wdt_trans_timeout_err,
+                       `AOU_WDT_SFR.r_write_early_response_rp1_wdt_trans_timeout_err,
+                       `AOU_WDT_SFR.r_write_early_response_rp0_wdt_trans_timeout_err};
+  assign wdt.pin     = status.int_early_wdt_err;
+  assign wdt.psel    = `AOU_WDT_SFR.I_PSEL;
+  assign wdt.penable = `AOU_WDT_SFR.I_PENABLE;
+  assign wdt.pwrite  = `AOU_WDT_SFR.I_PWRITE;
+  assign wdt.paddr   = `AOU_WDT_SFR.I_PADDR[15:0];
+  assign wdt.pwdata  = `AOU_WDT_SFR.I_PWDATA;
+  assign wdt.prdata  = `AOU_WDT_SFR.O_PRDATA;
+  assign wdt.pready  = `AOU_WDT_SFR.O_PREADY;
+`undef AOU_WDT_SFR
+`undef AOU_WDT_CTRL
+
   AOU_TOP #(
       .RP_COUNT       (RP_COUNT),
       .FDI_CONFIG     (FDI_CFG),
@@ -611,6 +650,7 @@ module tb_top;
     uvm_config_db #(virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)))::set(null, "*", "apb", apb);
     uvm_config_db #(virtual aou_status_if)::set(null, "*", "status", status);
     uvm_config_db #(virtual aou_irq_if)::set(null, "*", "irq", irq);
+    uvm_config_db #(virtual aou_wdt_if)::set(null, "*", "wdt", wdt);
     uvm_config_db #(virtual aou_rst_if)::set(null, "*", "rst", rst);
     uvm_config_db #(virtual aou_axi4pc_ctl_if)::set(null, "*", "axi4pc_ctl", axi4pc_ctl);
     uvm_config_db #(virtual aou_fdi_checker_if)::set(null, "*", "fdi_chk", fdi_chk);

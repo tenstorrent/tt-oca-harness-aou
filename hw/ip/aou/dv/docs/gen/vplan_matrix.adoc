@@ -392,7 +392,13 @@
 | 16.14 | Change `early_bresp_en` when `write_resp_done=1` | P2 | `aou_early_bresp_test.early_en-0.early_toggle-1.dp_buf_pct-50`, `aou_early_bresp_test.early_en-1.early_toggle-1.dp_buf_pct-50`, `aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50`
 | 16.15 | Different `early_bresp_en` per RP | P2 | `aou_early_bresp_test.early_en-per_rp.dp_buf_pct-50`, `aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50`
 | 16.16 | B response presented zero cycles after the AW/W handshakes complete (issue 64) | P1 | `aou_dp_b_zero_test`
-| 16.17 | Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked) | P2 | `aou_early_bresp_test.early_en-1.early_full-1.early_over-1`
+| 16.17 | Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; the write watchdog that replaced it is 16.18-16.23) | P2 | `aou_early_bresp_test.early_en-1.early_full-1.early_over-1`
+| 16.18 | Write watchdog expiry: writes outstanding with no AW or B handshake for WDT_THRESHOLD cycles set WDT_TRANS_TIMEOUT_ERR and INT_EARLY_WDT_ERR, with early response on or off | P1 | `aou_wdt_test`, `aou_wdt_test.wdt_case-masked`, `aou_wdt_test.wdt_case-multi_rp.4x512-sp64`, `aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128`, `aou_wdt_test.wdt_case-near_miss.wdt_thr-64`, `aou_wdt_test.wdt_thr-0.wdt_reset-sw`
+| 16.19 | Write watchdog count restarted by an AW handshake up to the cycle that would have expired: no expiry | P2 | `aou_wdt_test.wdt_case-near_miss.wdt_thr-64`
+| 16.20 | Write watchdog with WDT_THRESHOLD 0: expiry on the first cycle with a write outstanding and no handshake | P2 | `aou_wdt_test.wdt_thr-0.wdt_reset-sw`
+| 16.21 | INT_EARLY_WDT_MASK gates INT_EARLY_WDT_ERR, not the status; clearing the mask with the status set raises the pin | P2 | `aou_wdt_test.wdt_case-masked`
+| 16.22 | Write watchdog expires once per reset: the W1C clears status and pin, no second expiry while the RP stays hung, and a software or hard reset re-arms it | P1 | `aou_wdt_test`, `aou_wdt_test.wdt_case-masked`, `aou_wdt_test.wdt_case-multi_rp.4x512-sp64`, `aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128`, `aou_wdt_test.wdt_case-near_miss.wdt_thr-64`, `aou_wdt_test.wdt_thr-0.wdt_reset-sw`
+| 16.23 | Write watchdog on several RPs: each expires on its own, and the pin stays high while any RP is set | P2 | `aou_wdt_test.wdt_case-multi_rp.4x512-sp64`, `aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128`
 |===
 ==== 2.17 AXI Aggregator Tests
 [cols="1,5,1,4",options="header"]

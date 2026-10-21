@@ -2391,10 +2391,58 @@
 - id: '16.17'
   section: '2.16'
   section_title: Write Early Response Tests
-  title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked)'
+  title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; the write watchdog that replaced it is 16.18-16.23)'
   priority: P2
   added: MAS 3.7.5
-  note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. PR #89 replaced the signal with a write-transaction watchdog the MAS does not yet specify.'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. With +early_over the early-table checker reports the watchdog pin while an AW waits at the limit.
+
+- id: '16.18'
+  section: '2.16'
+  section_title: Write Early Response Tests
+  title: 'Write watchdog expiry: writes outstanding with no AW or B handshake for WDT_THRESHOLD cycles set WDT_TRANS_TIMEOUT_ERR and INT_EARLY_WDT_ERR, with early response on or off'
+  priority: P1
+  added: 'MAS software-operation 7.2.6; RDL WRITE_EARLY_RESPONSE_RPn.WDT_*'
+  note: 'The watchdog PR #89 added in place of O_PENDING_CNT_OVER; aou_t1_wdt_chk (FEAT-R23 to R28).'
+
+- id: '16.19'
+  section: '2.16'
+  section_title: Write Early Response Tests
+  title: 'Write watchdog count restarted by an AW handshake up to the cycle that would have expired: no expiry'
+  priority: P2
+  added: 'MAS software-operation 7.2.6, architecture 3.7.5'
+  note: 'The S-port AW handshake reaches the watchdog in the same cycle, so the edge is placed from the pins.'
+
+- id: '16.20'
+  section: '2.16'
+  section_title: Write Early Response Tests
+  title: 'Write watchdog with WDT_THRESHOLD 0: expiry on the first cycle with a write outstanding and no handshake'
+  priority: P2
+  added: RDL WRITE_EARLY_RESPONSE_WDT_CTL
+  note: Interim expectation inferred from the RTL; the documents do not cover T = 0.
+
+- id: '16.21'
+  section: '2.16'
+  section_title: Write Early Response Tests
+  title: 'INT_EARLY_WDT_MASK gates INT_EARLY_WDT_ERR, not the status; clearing the mask with the status set raises the pin'
+  priority: P2
+  added: MAS interrupts INT_EARLY_WDT_ERR; RDL AOU_INTERRUPT_MASK
+  note: Added with the write-watchdog checker.
+
+- id: '16.22'
+  section: '2.16'
+  section_title: Write Early Response Tests
+  title: 'Write watchdog expires once per reset: the W1C clears status and pin, no second expiry while the RP stays hung, and a software or hard reset re-arms it'
+  priority: P1
+  added: MAS software-operation 7.2.6 step 2-3; RDL WDT_TRANS_TIMEOUT_ERR
+  note: 'MAS architecture 3.7.5 disagrees (a hung remote die keeps the bit set, so it sets again after a W1C); owner question open.'
+
+- id: '16.23'
+  section: '2.16'
+  section_title: Write Early Response Tests
+  title: 'Write watchdog on several RPs: each expires on its own, and the pin stays high while any RP is set'
+  priority: P2
+  added: MAS software-operation 7.2.6; RDL WRITE_EARLY_RESPONSE_RPn
+  note: Added with the write-watchdog checker.
 
 - id: '17.1'
   section: '2.17'

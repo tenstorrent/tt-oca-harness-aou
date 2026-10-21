@@ -31,7 +31,7 @@ interface aou_status_if ();
   logic int_si0_id_mismatch;
   logic int_mi0_id_mismatch;
   logic int_early_resp_err;
-  // Early-response write-transaction watchdog (PR #89); observed, not yet checked.
+  // Early-response write-transaction watchdog (PR #89); aou_t1_wdt_chk checks it.
   logic int_early_wdt_err;
   logic int_activate_start;
   logic int_deactivate_start;

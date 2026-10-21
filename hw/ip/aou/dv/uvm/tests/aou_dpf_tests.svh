@@ -20,6 +20,7 @@
 `include "features/aou_split_test.svh"
 `include "features/aou_aggregator_test.svh"
 `include "features/aou_early_bresp_test.svh"
+`include "features/aou_wdt_test.svh"
 `include "features/aou_qos_test.svh"
 `include "features/aou_dest_rp_test.svh"
 `include "features/aou_lp_mode_test.svh"

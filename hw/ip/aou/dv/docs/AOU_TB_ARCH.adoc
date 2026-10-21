@@ -97,6 +97,7 @@ tb_top                                  tb/tb_top.sv (no ports)
   fdi_lsm : aou_fdi_lsm_if              FDI link-state sideband
   apb : aou_apb_if
   status, irq, rst : aou_status_if, aou_irq_if, aou_rst_if
+  wdt : aou_wdt_if                      write-watchdog taps (early-response controllers, SFR)
   u_chk : AOU_FDI_CHECKER               single-PHY targets only; ports on aou_fdi_checker_if "fdi_chk"
   (COV=1) axi_tx_rp<n>, axi_rx_rp<n>    bound AXI4 coverage monitors (cov/sv/aou_axi4_cov_bind.sv)
   `ifdef UVM                            uvm_config_db registration of every interface, run_test()
@@ -154,7 +155,7 @@ packages, and calls `run_test()`. `tb/aou_waves.sv` is bound for `WAVES=1`.
 | `aou_t1_l4a_adapter` | Implements L3's `aou_l4a_if_c` responder over `aou_remote_axi_model.execute()`
 | `aou_t1_remote_mgr` | Remote managers: AXI transactions that originate on the remote die and travel through L3 to the DUT's M ports
 | `aou_fdi_chk_adapter` | Turns `AOU_FDI_CHECKER`'s status ports into `AOU-R*` rule reports
-| T1 checkers | `aou_t1_attr_chk` (attributes, exclusives, FLEX across the link), `aou_t1_crd_flow_chk` (T1-C01/C02), `aou_t1_crd_rr_chk` (T1-C03), `aou_t1_dbg_fifo_chk` (debug FIFO prediction), `aou_t1_early_tbl_chk` (FEAT-R15/R16), `aou_t1_mo_chk`, `aou_t1_rx_align_chk` (T1-C42, RX flit framing; also in the FDI-only env), `aou_t1_rx_fifo_chk`, `aou_t1_sw_reset_chk`, `aou_t1_lp_cfg_chk` (T1-LP03, TX low-power mode is programmed only while DISABLED), `aou_t1_axi4pc_ctl` (holds and releases the Axi4PC checkers on link events, expects the rules an injected orphan response trips); test-owned checkers in `uvm/env/chk/` (`aou_split_chk`, `aou_early_bresp_chk`, `aou_qos_order_chk`, `aou_mrp_chk`, `aou_flit_counter`)
+| T1 checkers | `aou_t1_attr_chk` (attributes, exclusives, FLEX across the link), `aou_t1_crd_flow_chk` (T1-C01/C02), `aou_t1_crd_rr_chk` (T1-C03), `aou_t1_dbg_fifo_chk` (debug FIFO prediction), `aou_t1_early_tbl_chk` (FEAT-R15/R16), `aou_t1_wdt_chk` (write watchdog, FEAT-R23 to R28), `aou_t1_mo_chk`, `aou_t1_rx_align_chk` (T1-C42, RX flit framing; also in the FDI-only env), `aou_t1_rx_fifo_chk`, `aou_t1_sw_reset_chk`, `aou_t1_lp_cfg_chk` (T1-LP03, TX low-power mode is programmed only while DISABLED), `aou_t1_axi4pc_ctl` (holds and releases the Axi4PC checkers on link events, expects the rules an injected orphan response trips); test-owned checkers in `uvm/env/chk/` (`aou_split_chk`, `aou_early_bresp_chk`, `aou_qos_order_chk`, `aou_mrp_chk`, `aou_flit_counter`)
 | `perf/` | `aou_perf_mon`, `aou_perf_chk`, `aou_perf_targets.svh`: throughput and latency windows for `aou_perf_test`, judged against targets from the d2d model (`scripts/perf_model.py`)
 | `aou_t1_xfer_cov` and the layer coverage classes | The covergroups and their copies in the coverage service (`AOU_FCOV.adoc`)
 |===

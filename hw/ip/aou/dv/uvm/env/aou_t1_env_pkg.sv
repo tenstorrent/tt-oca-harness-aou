@@ -186,6 +186,7 @@ package aou_t1_env_pkg;
   `include "aou_t1_crd_flow_chk.svh"
   `include "aou_t1_crd_rr_chk.svh"
   `include "aou_t1_early_tbl_chk.svh"
+  `include "aou_t1_wdt_chk.svh"
   `include "aou_t1_xfer_cov.svh"
   `include "aou_t1_attr_chk.svh"
   `include "aou_t1_rx_fifo_chk.svh"

@@ -5,15 +5,15 @@
 // Every rising edge of an error interrupt is a UVM_ERROR "<INT name>: ...",
 // which the expectation registry demotes when a test declared it.
 // INT_ACTIVATE_START / INT_DEACTIVATE_START belong to normal activation and
-// are only counted. INT_FDI_LINK_DOWN (the FDI link lost while AoU was
-// ACTIVATE, ENABLED or DEACTIVATE) is an error interrupt a link-event test
-// declares; on its rise the DUT must also report DISABLED within
-// LINK_DOWN_DISABLE_CYCLES without any handshake (T1-L48, AoU v0.8 8.3.3
-// ERROR -> DISABLED).
+// are only counted, as is INT_EARLY_WDT_ERR, which aou_t1_wdt_chk judges.
+// INT_FDI_LINK_DOWN (the FDI link lost while AoU was ACTIVATE, ENABLED or
+// DEACTIVATE) is an error interrupt a link-event test declares; on its rise
+// the DUT must also report DISABLED within LINK_DOWN_DISABLE_CYCLES without
+// any handshake (T1-L48, AoU v0.8 8.3.3 ERROR -> DISABLED).
 class aou_t1_status extends uvm_component;
   `uvm_component_utils(aou_t1_status)
 
-  localparam int N_INT = 7;
+  localparam int N_INT = 8;
   localparam int unsigned LINK_DOWN_DISABLE_CYCLES = 8;
 
   virtual aou_irq_if vif;
@@ -47,7 +47,8 @@ class aou_t1_status extends uvm_component;
       3: return "INT_EARLY_RESP_ERR";
       4: return "INT_ACTIVATE_START";
       5: return "INT_DEACTIVATE_START";
-      default: return "INT_FDI_LINK_DOWN";
+      6: return "INT_FDI_LINK_DOWN";
+      default: return "INT_EARLY_WDT_ERR";
     endcase
   endfunction
 
@@ -63,10 +64,10 @@ class aou_t1_status extends uvm_component;
   endfunction
 
   function bit [N_INT-1:0] sample();
-    return {vif.mon_cb.int_fdi_link_down, vif.mon_cb.int_deactivate_start,
-            vif.mon_cb.int_activate_start, vif.mon_cb.int_early_resp_err,
-            vif.mon_cb.int_mi0_id_mismatch, vif.mon_cb.int_si0_id_mismatch,
-            vif.mon_cb.int_req_linkreset};
+    return {vif.mon_cb.int_early_wdt_err, vif.mon_cb.int_fdi_link_down,
+            vif.mon_cb.int_deactivate_start, vif.mon_cb.int_activate_start,
+            vif.mon_cb.int_early_resp_err, vif.mon_cb.int_mi0_id_mismatch,
+            vif.mon_cb.int_si0_id_mismatch, vif.mon_cb.int_req_linkreset};
   endfunction
 
   // The DUT disables itself on a link loss: ACTIVATE_STATE_DISABLED within

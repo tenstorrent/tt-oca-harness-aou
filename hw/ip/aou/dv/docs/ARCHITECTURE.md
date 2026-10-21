@@ -105,6 +105,7 @@ not instantiated.
 | `status` | `aou_status_if` | interrupts, FSM state, SW pins |
 | `irq` | `aou_irq_if` | the same interrupts and activation status, clocked (T1 status watcher) |
 | `rst` | `aou_rst_if` | T1 reset agent: mid-test I_RESETN/I_PRESETN (ANDed with the top's power-on reset) |
+| `wdt` | `aou_wdt_if` | write-watchdog checker: per-RP AW/B handshakes at the early-response controller, the SFR's watchdog fields and its APB port (white-box taps) |
 | `fdi_chk` | `aou_fdi_checker_if` | AOU_FDI_CHECKER status ports (`aou_fdi_chk_adapter`) |
 
 One parameterization per interface type (widest width, with the real width in
@@ -362,6 +363,7 @@ this API goes through the integrator, because every ported test depends on it.
 | `sb`, `status`, `fdi_chk`, `expect` | scoreboard, interrupt/status watcher, FDI checker adapter, expectation registry |
 | `dbg_chk` | `aou_t1_dbg_fifo_chk`: predicts each RP's response error debug FIFO and checks every debug-window read and pop |
 | `crd_rr`, `early_tbl` | `aou_t1_crd_rr_chk`: round-robin MsgCredit order in a window a test opens (T1-C03); `aou_t1_early_tbl_chk`: early-table backpressure on RPs with EARLY_BRESP_EN (FEAT-R15/R16) |
+| `wdt_chk` | `aou_t1_wdt_chk`: the write-transaction watchdog of every RP, from a model of its count (FEAT-R23 to R28) |
 | `crd_chk` | `aou_t1_crd_flow_chk`: an RP with credit and queued work is not held back by another RP without credit (T1-C01), and the DUT uses the credit it holds (T1-C02) |
 | `vseqr` | `aou_t1_vseqr`: sequencer handles for all of the above, plus `env` |
 

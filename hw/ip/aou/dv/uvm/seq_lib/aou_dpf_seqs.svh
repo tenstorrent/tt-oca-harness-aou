@@ -11,4 +11,5 @@
 `include "aou_attr_vseq.svh"
 `include "aou_split_vseq.svh"
 `include "aou_early_bresp_vseq.svh"
+`include "aou_wdt_vseq.svh"
 `include "aou_lp_mode_vseq.svh"

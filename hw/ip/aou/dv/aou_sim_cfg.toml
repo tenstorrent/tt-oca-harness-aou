@@ -93,6 +93,7 @@ sources = [
   "hw/ip/aou/dv/tb/aou_status_if.sv",
   "hw/ip/aou/dv/tb/aou_irq_if.sv",
   "hw/ip/aou/dv/tb/aou_rst_if.sv",
+  "hw/ip/aou/dv/tb/aou_wdt_if.sv",
   "hw/ip/aou/dv/tb/aou_axi4pc_ctl_if.sv",
   "hw/ip/aou/dv/tb/aou_axi4pc_gate.sv",
   "hw/ip/aou/dv/uvm/env/axi4pc/aou_axi4pc_pkg.sv",

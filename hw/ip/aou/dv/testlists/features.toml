@@ -401,9 +401,79 @@ tags = ["features"]
 run_modes = ["features"]
 args = ["+early_en=1", "+early_full=1", "+early_over=1"]
 
+# 16.17-16.23: the write-transaction watchdog (MAS software-operation 7.2.6).
+# Writes hang until it expires; software reads and clears it, the device is
+# reset (AOU_SW_RESET or I_RESETN, random per seed unless +wdt_reset), and it
+# expires again; aou_t1_wdt_chk checks every step. Early
+# response, the RP that hangs and the reset are random per seed.
+[[tests]]
+name = "aou_wdt_test"
+module = { uvm = "aou_wdt_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = []
+
+# The count restarted by AW handshakes T-3..T idle cycles after the last one,
+# the last in the cycle that would have expired (no early expiry at the edge).
+[[tests]]
+name = "aou_wdt_test.wdt_case-near_miss.wdt_thr-64"
+module = { uvm = "aou_wdt_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+wdt_case=near_miss", "+wdt_thr=64"]
+
+[[tests]]
+name = "aou_wdt_test.wdt_thr-0.wdt_reset-sw"
+module = { uvm = "aou_wdt_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+wdt_thr=0", "+wdt_reset=sw"]
+
+# INT_EARLY_WDT_MASK set: the status sets, the pin stays low until the mask is
+# cleared with the status still set.
+[[tests]]
+name = "aou_wdt_test.wdt_case-masked"
+module = { uvm = "aou_wdt_test" }
+target = "1x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+wdt_case=masked"]
+
+# Every RP hangs, starts staggered: each expires on its own, and a W1C on one
+# leaves the pin high while another is set.
+[[tests]]
+name = "aou_wdt_test.wdt_case-multi_rp.4x512-sp64"
+module = { uvm = "aou_wdt_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+wdt_case=multi_rp"]
+
+[[tests]]
+name = "aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128"
+module = { uvm = "aou_wdt_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+wdt_case=multi_rp"]
+
 [[groups]]
 name = "features"
-expected_count = 39
+expected_count = 45
 tests = [
   "aou_split_test.split_aw-15.split_ar-15.dp_len-0_1_3_7_15",
   "aou_split_test.split_aw-7.split_ar-7.dp_len-15_31",
@@ -444,4 +514,10 @@ tests = [
   "aou_early_bresp_test.early_en-per_rp.early_toggle-1.dp_buf_pct-50",
   "aou_early_bresp_test.early_en-per_rp.dp_buf_pct-50",
   "aou_early_bresp_test.early_en-1.early_full-1.early_over-1",
+  "aou_wdt_test",
+  "aou_wdt_test.wdt_case-near_miss.wdt_thr-64",
+  "aou_wdt_test.wdt_thr-0.wdt_reset-sw",
+  "aou_wdt_test.wdt_case-masked",
+  "aou_wdt_test.wdt_case-multi_rp.4x512-sp64",
+  "aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128",
 ]

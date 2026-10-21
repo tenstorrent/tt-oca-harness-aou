@@ -141,7 +141,7 @@ In scope, by plan section (`docs/test_plan_items.yaml`, sections 2.1 to 2.22):
 | 2.14 | Data width converter | `matrix` (`aou_dw_test`), every mixed-width target
 | 2.15 | AXI transaction splitter | `features` (`aou_split_test`)
 | 2.16 | AXI aggregator | `features` (`aou_aggregator_test`)
-| 2.17 | Write early response | `features` (`aou_early_bresp_test`)
+| 2.17 | Write early response | `features` (`aou_early_bresp_test`; `aou_wdt_test` for the write watchdog)
 | 2.18 | Data integrity | every traffic scenario (the scoreboard), `datapath`
 | 2.19 | Interrupts | `err_int`, `errors`
 | 2.20 | Low power mode | `features`, `lifecycle`, `g1b`
