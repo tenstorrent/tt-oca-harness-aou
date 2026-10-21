@@ -88,7 +88,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |RP1_DEST |[5:4] |RW |0x1
 | | |Rsvd |[3:2] |RO |0x0
 | | |RP0_DEST |[1:0] |RW |0x0
-|PRIOR_RP_AXI |0x0018 | | | |
+|PRIOR_RP_AXI |0x0018 | | | |0x05A32100
 | | |Rsvd |[31:28] |RO |0x0
 | | |AXI_QOS_TO_NP |[27:24] |RW |0x5
 | | |AXI_QOS_TO_HP |[23:20] |RW |0xA
@@ -102,9 +102,9 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |RP0_PRIOR |[5:4] |RW |0x0
 | | |Rsvd |[3:2] |RO |0x0
 | | |ARB_MODE |[1:0] |RW |0x0
-|PRIOR_TIMER |0x001C | | | |0x00000000
-| | |TIMER_RESOLUTION |[31:16] |RW |0x0
-| | |TIMER_THRESHOLD |[15:0] |RW |0x0
+|PRIOR_TIMER |0x001C | | | |0x000F000F
+| | |TIMER_RESOLUTION |[31:16] |RW |0xF
+| | |TIMER_THRESHOLD |[15:0] |RW |0xF
 |AXI_SPLIT_TR_RP0 |0x0020 | | | |0x00000F0F
 | | |Rsvd |[31:16] |RO |0x0
 | | |MAX_AWBURSTLEN |[15:8] |RW |0xF

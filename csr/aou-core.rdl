@@ -138,20 +138,20 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "Priority RP AXI";
-        desc = "QoS thresholds, per-RP priority levels, and arbitration mode.";
+        desc = "QoS thresholds, per-RP priority levels, and arbitration mode for the TX AW and AR request arbiters. Program this register before the link is activated. It may be written in mission mode, but the arbitration of requests already accepted or in flight is then not guaranteed.";
         field { sw = r; } reserved_31_28[31:28] = 0;
         field { sw = rw; desc = "AXI QoS to normal priority boundary. In AXI QoS arbitration mode (arb_mode=2) the classifier tests axi_qos_to_hp first: a QoS value at or above axi_qos_to_hp is high priority. Otherwise a value at or above this threshold is normal priority, and a value below it is low priority. axi_qos_to_hp must be greater than this field. If it is not, the normal tier is empty."; } axi_qos_to_np[27:24] = 0x5;
         field { sw = rw; desc = "AXI QoS to high priority boundary. In AXI QoS arbitration mode (arb_mode=2) this threshold is tested before axi_qos_to_np. A QoS value at or above this threshold is high priority, including when it is also at or above axi_qos_to_np. A value at or above axi_qos_to_np and below this threshold is normal priority. This field must be greater than axi_qos_to_np; otherwise the normal tier is empty and every value at or above this threshold is high."; } axi_qos_to_hp[23:20] = 0xA;
         field { sw = r; } reserved_19_18[19:18] = 0;
-        field { sw = rw; desc = "Priority level for Resource Plane 3."; } rp3_prior[17:16] = 0x3;
+        field { sw = rw; desc = "Priority level for Resource Plane 3 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low)."; } rp3_prior[17:16] = 0x3;
         field { sw = r; } reserved_15_14[15:14] = 0;
-        field { sw = rw; desc = "Priority level for Resource Plane 2."; } rp2_prior[13:12] = 0x2;
+        field { sw = rw; desc = "Priority level for Resource Plane 2 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low)."; } rp2_prior[13:12] = 0x2;
         field { sw = r; } reserved_11_10[11:10] = 0;
-        field { sw = rw; desc = "Priority level for Resource Plane 1."; } rp1_prior[9:8] = 0x1;
+        field { sw = rw; desc = "Priority level for Resource Plane 1 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low)."; } rp1_prior[9:8] = 0x1;
         field { sw = r; } reserved_7_6[7:6] = 0;
-        field { sw = rw; desc = "Priority level for Resource Plane 0."; } rp0_prior[5:4] = 0x0;
+        field { sw = rw; desc = "Priority level for Resource Plane 0 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low). The reset value 0 makes RP0 low priority."; } rp0_prior[5:4] = 0x0;
         field { sw = r; } reserved_3_2[3:2] = 0;
-        field { sw = rw; desc = "TX arbitration mode for multi-RP scheduling on AW, W, and AR channels. 0: Round-Robin between valid RPs. 1: Port QoS, priority is set per-RP via rp*_prior fields (3 levels: High/Normal/Low). 2: AXI QoS, priority is derived from the AXI QoS field with boundaries set by axi_qos_to_hp and axi_qos_to_np. For Port QoS and AXI QoS modes, a starvation-prevention timeout promotes lower-priority requests to high priority."; } arb_mode[1:0] = 0;
+        field { sw = rw; desc = "TX arbitration mode between RPs on the AW and AR channels. W data is sent in the order of the granted AWs; B and R responses are arbitrated round-robin regardless of this field. 0: Round-Robin between valid RPs. 1: Port QoS, priority is set per-RP via the rp*_prior fields (3 levels: high/normal/low). 2: AXI QoS, priority is derived from the AXI AxQOS value with boundaries set by axi_qos_to_hp and axi_qos_to_np. 3: reserved, behaves as Round-Robin. In Port QoS and AXI QoS modes the highest tier present is served first and RPs at the same tier are served round-robin; the prior_timer starvation-prevention timeout promotes waiting normal and low priority requests to high priority."; } arb_mode[1:0] = 0;
     } prior_rp_axi @ 0x0018;
 
     // -------------------------------------------------------------------------
@@ -160,9 +160,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "Priority Timer";
-        desc = "Timer resolution and threshold for priority escalation.";
-        field { sw = rw; desc = "Priority timer resolution. Configures the clock cycle granularity used for the starvation-prevention timeout in Port QoS and AXI QoS arbitration modes."; } timer_resolution[31:16] = 0xF;
-        field { sw = rw; desc = "Priority timer threshold. In Port QoS and AXI QoS arbitration modes, if a normal or low priority request has been waiting longer than this threshold (in units of timer_resolution), it is promoted to high priority to prevent starvation."; } timer_threshold[15:0] = 0xF;
+        desc = "Starvation-prevention timer for the Port QoS and AXI QoS arbitration modes (prior_rp_axi.arb_mode 1 or 2). Each per-RP TX request buffer (one per RP for AW and one per RP for AR) has a 16-bit prescaler that ticks once every timer_resolution + 1 clock cycles while the buffer holds at least one request, and holds its count while the buffer is empty. Every normal or low priority request in the buffer counts ticks from the cycle it is accepted; when its count reaches timer_threshold it is arbitrated as high priority. The prescaler is shared by the requests in a buffer and is not restarted when a request arrives, so the first tick a request sees comes 1 to timer_resolution + 1 cycles after acceptance. At the reset values a request is promoted about 225 to 240 cycles after acceptance. The timer runs in Round-Robin mode but has no effect there. Program this register before the link is activated. It may be written in mission mode, but the promotion of requests already waiting is then not guaranteed.";
+        field { sw = rw; desc = "Priority timer resolution: prescaler period minus one, in clock cycles. The prescaler ticks once every timer_resolution + 1 cycles; 0 ticks every cycle and 0xFFFF every 65536 cycles."; } timer_resolution[31:16] = 0xF;
+        field { sw = rw; desc = "Priority timer threshold: the number of prescaler ticks a normal or low priority request waits before it is arbitrated as high priority. Counted from acceptance into the TX request buffer, not from reaching the head of the buffer; the count saturates at this value. 0 promotes every normal and low priority request at once, so all requests arbitrate as high priority and the result is round-robin."; } timer_threshold[15:0] = 0xF;
     } prior_timer @ 0x001C;
 
     // -------------------------------------------------------------------------
