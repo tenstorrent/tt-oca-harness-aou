@@ -279,7 +279,7 @@
   seed_dependent: true
   note: >-
     4xmix2144-sp64: RP3 WDATA credit is lost (the second granule's fields start at WDATA RP3),
-    and the shared AW/W path waits on RP3's WriteData (BUGS/045), so every RP's writes stop
+    and the shared AW/W path waits on RP3's WriteData (tenstorrent/tt-oca-harness-aou#97), so every RP's writes stop
     (+method=grant seed 2, waves aou_credit_return_test.rid.wvd.seed.2: decodes without a
     valid chunk at 5955.5-6534.5 ns; from 7391.5 ns RP3 holds 6 WDATA granules in the DUT,
     w_aou_tx_w_credit_valid 0x7, aligner r_aw_arb_grt 3 with r_s_wbusy_tt 1, while the remote
@@ -860,40 +860,6 @@
   note: >-
     CREDIT_MANAGE=1: DeactivateAck at 2486.5 ns, then credit in LP flit 466 at 2495.5 ns
     (waves vcs-t1-4x512-sp64 aou_zero_credit_test.rid.allw2.seed.1, +credit=rreq)
-
-# BUGS/045: the TX per-RP arbiters park on an RP that has no credit for its head message, and
-# the shared AW/W path holds a credit-less RP's write, so an RP with credit and queued work is
-# held back (T1-C01) and the DUT stops using the credit it holds (T1-C02). aou_t1_crd_flow_chk
-# checks every test; multi-RP builds reach it wherever one RP runs out of credit while another
-# has work: the zero-credit starve and limit modes and withheld or slow credit returns. Seeds
-# and classes decide which RP runs dry first.
-- test: aou_zero_credit_test
-  bug: BUGS/045
-  check: 'T1-C01: '
-  seed_dependent: true
-  note: one RP starved of a class (or of its credit limit) blocks the others' messages of that class
-
-- test: aou_zero_credit_test
-  bug: BUGS/045
-  check: 'T1-C02: '
-  requires: BUGS/045
-  seed_dependent: true
-  note: the same block outlasts the work-conservation bound
-
-- test: aou_credit_return_test
-  bug: BUGS/045
-  check: 'T1-C01: '
-  seed_dependent: true
-  note: >-
-    withheld or delayed returns leave one RP short of WDATA credit for a full-width WriteData; the
-    AW/W path and the W arbiter stay on it and the other RPs' writes wait
-
-- test: aou_credit_return_test
-  bug: BUGS/045
-  check: 'T1-C02: '
-  requires: BUGS/045
-  seed_dependent: true
-  note: the same block outlasts the work-conservation bound
 
 - test: aou_link_event_test
   bug: BUGS/024
