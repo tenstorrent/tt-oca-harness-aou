@@ -36,7 +36,7 @@ To achieve high efficiency, all TX requests and data messages are packed in a co
 
 It supports flow control for all exceptional cases defined in the UCIe standard. First, it handles the chunk valid/cancel signal, including the alternative implementation method described in the UCIe specification. Second, it handles the stall request signal received from the D2D Adapter while maintaining the Flit-aligned boundary. Interoperability is also supported when the remote device uses a different AXI data width.
 
-AOU_CORE supports a configurable number of Resource Plane(RPs), with both the number of RPs and each RPpass:[']s AXI data width fully parameterizable. A dedicated field in the SFR allows software to configure the target RP, enabling flexible RP mapping. For each RP, the AW, W and AR channel support three arbitration modes: Round Robin, AXI QoS scheme, and Port QoS scheme. Additionally, a starvation-prevention mechanism is implemented to ensure fair arbitration across all RP channels.
+AOU_CORE supports a configurable number of Resource Plane(RPs), with both the number of RPs and each RPpass:[']s AXI data width fully parameterizable. A dedicated field in the SFR allows software to configure the target RP, enabling flexible RP mapping. The AW and AR channels are arbitrated between RPs with one of three schemes: Round Robin, AXI QoS, and Port QoS; W data follows the order of the granted AWs. Additionally, a starvation-prevention mechanism is implemented to ensure fair arbitration across all RPs.
 
 The operating frequency of AOU_CORE targets 1 GHz and meets timing requirements without relying on multi-cycle paths. The TX buffer is configured with a minimal number of FIFO entries, while the RX Data buffer default depth is FDI-config aware: default 140 entries when [.monospaced]#++FDI_CONFIG++# selects a 1024b (128B) FDI interface ([.monospaced]#++FDI_CFG_SP_128B++# or [.monospaced]#++FDI_CFG_TP_64B_128B++#), and default 88 entries otherwise. The entry size takes into account the round-trip latency for credit consumption and return, and matches the per-RP [.monospaced]#++RP*_RX_W_FIFO_DEPTH++# / [.monospaced]#++RP*_RX_R_FIFO_DEPTH++# parameter defaults documented in xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2].
 
@@ -62,7 +62,7 @@ image::image1.png[Figure 1. Block Diagram of AOU_CORE and function description]
 * Selectable 32B / 64B / 128B single-PHY and 32B+64B / 64B+128B two-PHY FDI configurations, selected via the [.monospaced]#++FDI_CONFIG++# parameter (see xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2]). Two-PHY variants additionally require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY ports physically exist.
 * Configurable number of Resource Plane and each RPpass:[']s AXI data width
 * RP Remapping
-* QoS scheme between RP with AW, W, AR channel
+* QoS scheme between RPs on the AW and AR channels
 * Interoperability with different data width remote die
 * Handling of flit cancel and stall request as specified in the UCIe specification
 * Selectable AXI Aggregator added for BUS efficiency

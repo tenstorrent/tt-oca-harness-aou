@@ -49,7 +49,7 @@ xref:figure-3[Figure 3] shows the simplified block diagram of single RP AOU_TX_C
 [[figure-4]]
 image::image4.png[Figure 4. TX_CORE QoS Scheme]
 
-When multiple RP requests are issued from the TX core, a QoS scheme is applied. The TX core supports three QoS schemes: *Round-Robin*, *Port QoS*, and *AXI QoS*, selected by PRIOR_RP_AXI.ARB_MODE. Each transaction supports three QoS level: *High, Normal, Low.*
+When multiple RP requests are issued from the TX core, a QoS scheme is applied. The TX core supports three QoS schemes: *Round-Robin*, *Port QoS*, and *AXI QoS*, selected by PRIOR_RP_AXI.ARB_MODE. Each transaction has one of three QoS levels: *High, Normal, Low.*
 
 The scheme arbitrates the AW and AR channels between RPs. W data is sent in the order of the granted AWs, and B and R responses are arbitrated round-robin whatever the scheme. The arbitration SFRs (PRIOR_RP_AXI and PRIOR_TIMER) are intended to be programmed before the link is activated. They may be written in mission mode, but the arbitration of requests already accepted or in flight is then not guaranteed.
 
@@ -60,7 +60,7 @@ The scheme arbitrates the AW and AR channels between RPs. W data is sent in the 
 [[figure-5]]
 image::image5.png[Figure 5. Round-Robin arbitration example]
 
-*Port QoS (ARB_MODE = 2pass:[']b01):* For each RP, the QoS level is configured by an SFR. Arbitration is performed based on the QoS value is the SFR. The AXI QoS field is not used for arbitration.
+*Port QoS (ARB_MODE = 2pass:[']b01):* For each RP, the QoS level is configured by an SFR. Arbitration is performed based on the QoS value in the SFR. The AXI QoS field is not used for arbitration.
 
 The port QoS is divided into three levels: High, Normal, and Low priority. Port QoS can be configured by setting PRIOR_RP_AXI.RPx_PRIOR. A 2-bit field is used for QoS: 3 is High, 2 is Normal and 1 is Low. If the field is set to 0, it is treated as 1 (Low). At reset RP0 and RP1 are Low, RP2 is Normal and RP3 is High.
 
