@@ -38,7 +38,7 @@ analysis per covergroup and the owner's decisions it cites.
 | Code coverage of `RTL/`: line, condition, branch | 100% of what the configuration instantiates | Per configuration and on the union; the integrator-replaced library cells excluded (`cov/config/vcs/cov_exclude.hier`)
 | FSM coverage | Every state and every transition reachable without a reset | Reset-only transitions excluded (`cov/config/vcs/cov_fsm_reset.filter`)
 | Toggle | Reviewed, not a gate | Triage at the end of closure
-| Rule inventory | Every rule hit in a passing run; every negative rule fired in a negative, escape or mutation run | `scripts/rule_inventory.py`, `docs/checker_inventory.md`
+| Rule inventory | Every rule hit in a passing run; every negative rule fired in a negative test | `scripts/rule_inventory.py`, `docs/checker_inventory.md`
 |===
 
 A bin tagged `v0.8` describes AoU v0.8 behaviour the RTL does not implement; it

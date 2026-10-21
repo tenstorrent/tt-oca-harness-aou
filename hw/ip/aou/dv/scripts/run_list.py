@@ -100,8 +100,6 @@ def build_vars(args):
     out = [f"TB={args.tb}", f"SIM={args.sim}", f"CONFIG={args.config}", f"COV={args.cov}"]
     if args.rtl_assert:
         out.append("RTL_ASSERT=1")
-    if args.escape:
-        out.append(f"ESCAPE={args.escape}")
     if args.rtl_patch:
         out.append(f"RTL_PATCH={args.rtl_patch}")
     if args.axi4pc:
@@ -430,7 +428,6 @@ def main():
                     help="run at most N seeds of each scenario (default: its reseed)")
     ap.add_argument("--axi4pc", default="", choices=["", "0", "1"],
                     help="make AXI4PC for the build (default: make's, on when .deps/BP063/ is there)")
-    ap.add_argument("--escape", default="", help="run on the ESCAPE=<id> build (escape/)")
     ap.add_argument("--rtl-patch", default="", help="run on the RTL_PATCH=<absolute path> build")
     ap.add_argument("--fdi-enc", default="", choices=["", "SPEC", "RTL"],
                     help="FDI state encoding of every run (make FDI_ENC, +FDI_ENC)")

@@ -42,9 +42,8 @@ Verilator the open one it must also pass on. Every check reports under a rule
 ID traced to a specification section. Every run gets a verdict (PASS, XFAIL,
 FAIL, XPASS) against a list of known DUT bugs, so regressions stay green on
 known bugs while anything new fails. Coverage, code and functional, counts only
-passing runs, and the test plan and the fixed-bug history are each tied to the
-testlists by scripts, so that coverage of the plan and the ability to catch real
-bugs are measured rather than asserted.
+passing runs, and the test plan is tied to the testlists by scripts, so that
+coverage of the plan is measured rather than asserted.
 
 ## D0. Starting point: the PR 80 smoke flow
 
@@ -129,7 +128,7 @@ third-party AXI agent could be plugged in later behind one adapter.
 or Arm material.
 
 **Consequences.** We own the agents and their bugs. Every checker therefore
-needs evidence that it can fire (D4, D14), because no vendor stands behind it.
+needs evidence that it can fire (D4), because no vendor stands behind it.
 Arm's free `Axi4PC` assertions can be enabled as an optional extra (D13).
 
 **Measured effect on simulation speed.** Dropping the VIP also made the bench
@@ -287,8 +286,9 @@ demotes exactly those, and any other error still fails.
   `rule_inventory` shows rules with no checker, two primaries, a checker that
   never runs, or one that never fired.
 - Evidence matters more than the existence of a checker. The inventory says, per
-  rule, whether it fired in a negative test, an escape or mutation run (D14), or
-  was only ever evaluated in passing runs.
+  rule, whether it fired in a negative test or was only ever evaluated in
+  passing runs. (Escape and mutation runs also counted while the suite of D14
+  existed.)
 
 **Rejected.**
 
@@ -479,8 +479,8 @@ mixes verification and design changes in one history. *Filing into a tracker
 from the bench*: ties the public bench to one organisation's tools. *One agent
 investigating, fixing and judging*: prone to accepting its own hypothesis.
 
-**Where.** `RTL_PATCH` and `ESCAPE` in the Makefile (shared copy-and-patch
-mechanism), `run_list.py --rtl-patch`, `expected_fail.yaml`, AGENTS.md
+**Where.** `RTL_PATCH` in the Makefile (copy-and-patch of `RTL/` into the
+build directory), `run_list.py --rtl-patch`, `expected_fail.yaml`, AGENTS.md
 "Boundaries", CODING_GUIDELINES.md "Oracles"; the bug-draft location in the
 git-ignored `site/SITE.md`.
 
@@ -517,7 +517,7 @@ fresh plan*: loses the existing IDs and intent. *Test names as the link between
 plan and runs*: one test covers different items with different plusargs and
 configs, so the testlist scenario is the unit. *A test-by-test mapping to the
 VIP-based testbench*: kept for a while, then removed; this bench stands on the
-plan, its coverage and the escape suite, not on resemblance to another bench.
+plan, its coverage and its checkers, not on resemblance to another bench.
 
 **Where.** `docs/test_plan_items.yaml`, `docs/test_plan_corrections.yaml`,
 `testlists/*.toml`, `testlists/plan_ids.yaml`, `scripts/plan_status.py`,
@@ -615,7 +615,7 @@ the per-RP widths, and the FDI scheme breaks when two share an FDI.
 **Where.** `[targets.<CONFIG>]` in `aou_sim_cfg.toml` and `aou_reg_sim_cfg.toml`
 (`make configs`); README
 "Build configurations"; ARCHITECTURE.md "Build configuration"; `target` in
-testlist and escape entries.
+testlist entries.
 
 A configuration is a sim-config *target*: its defines (`RP_COUNT`,
 `AXI_DATA_WD_RP*`, `FDI_CONFIG`, `TWO_PHY`, `AXI_PEER_DIE_MAX_DATA_WD`,
@@ -848,7 +848,15 @@ AXI4 protocol assertions", CODING_GUIDELINES.md "Licensing".
 Earlier history on the integration branch carried internal references, which
 the planned squash removes (Open items).
 
-## D14. Bug-escape suite
+## D14. Bug-escape suite (retired)
+
+**Amendment, 2026-10-21: retired.** The escape patches, `testlists/escape.toml`,
+`scripts/escape.py`, `ESCAPE=` and `make escape` were removed. The suite did its
+job: it proved that every checker could fire and that the bench caught the bugs
+fixed on `main` so far. Keeping thirteen RTL patches applying against moving RTL
+had come to cost more than that evidence was still worth. `RTL_PATCH` (D7),
+which shared its copy-and-patch mechanism, stays. Rule fire evidence now comes
+from negative tests only (D4). The text below is the decision as it stood.
 
 **Decision.** Every real bug fixed on `main` must make the bench fail when it
 comes back. `escape/<id>.patch` reverses one fix; `make build ESCAPE=<id>`
@@ -936,7 +944,7 @@ change, not a local workaround.
   nothing (directory names, sim-config and testlist keys, `expect_fail`,
   `tags`, SPDX headers), and the bench's own mechanism is kept where the
   harness has none or a weaker one: the grader and `expected_fail.yaml` (D6),
-  the plan sidecar (D8), the escape suite (D14), the enumerated run directories
+  the plan sidecar (D8), the enumerated run directories
   and the control file (D12). Each such choice is a line in `OPEN_ITEMS.md`
   until it is either adopted by the harness or revisited here.
 

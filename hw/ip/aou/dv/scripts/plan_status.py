@@ -155,8 +155,6 @@ def scan_runs(out_dir, entries, args):
         if not os.path.isdir(run):
             continue
         build = os.path.basename(os.path.dirname(run))
-        if "-esc-" in build:
-            continue
         test = os.path.basename(run).split(".rid.")[0]
         run_sh = os.path.join(run, "run.sh")
         plusargs = run_plusargs(run_sh) if os.path.exists(run_sh) else None
@@ -217,8 +215,6 @@ def evaluate(args):
     items = listyaml.load(args.items)
     known = {i["id"] for i in items}
     aliases = {i["id"]: i["merged_into"] for i in items if i.get("merged_into")}
-    # escape.toml lists bug re-introductions, not plan coverage; escape builds
-    # (-esc-<id>) carry known bugs and are skipped in scan_runs.
     paths = args.runlist or [os.path.join(UVM_ROOT, sim_cfg.load(tb)["testlist"]["path"])
                              for tb in ("t1", "reg", "l3_unit", "axi_selftest")]
     side = testlist.load_plan_ids(args.plan_ids) if args.plan_ids else None

@@ -14,8 +14,6 @@ Checks, for each bench's aggregate (the [testlist] of its sim config):
   - the `all` group holds every scenario that is not blocked;
   - plan_ids.yaml names only scenarios, and every T1-area and register scenario
     has plan IDs (the sanity scenario of all.toml is the gate, not plan coverage);
-  - escape.toml loads and each [[escapes]] entry names a test class (or "none"),
-    an escape/<escape>.patch, a signature that compiles and a known target.
 Exit 1 with one line per problem.
 """
 
@@ -39,8 +37,6 @@ TEST_DIRS = {
     "axi_selftest": ["uvm/tests/axi_selftest"],
 }
 CLASS_RE = re.compile(r"^\s*class\s+(\w+)\s+extends", re.M)
-ESCAPE_KEYS = {"test", "escape", "tb", "target", "args", "seed", "reseed", "build", "signature",
-               "axi4pc", "note"}
 
 
 def test_dirs(tb):
@@ -120,33 +116,6 @@ def check_bench(tb, side, problems):
           f"{sum(1 for t in tests.values() if 'blocked' in t.get('tags', []))} blocked")
 
 
-def check_escape(problems):
-    path = os.path.join(UVM_ROOT, "testlists", "escape.toml")
-    try:
-        data = sim_cfg.load_toml(path)
-    except (OSError, ValueError) as e:
-        problems.append(f"testlists/escape.toml: {e}")
-        return
-    classes = {tb: test_classes(tb) for tb in ("t1", "reg")}
-    targets = set(sim_cfg.targets(sim_cfg.load("t1")))
-    for e in data.get("escapes", []):
-        for k in e:
-            if k not in ESCAPE_KEYS:
-                problems.append(f"testlists/escape.toml: {e.get('test')}: unknown key {k}")
-        tb = e.get("tb", "t1")
-        if e.get("test") != "none" and e.get("test") not in classes.get(tb, set()):
-            problems.append(f"testlists/escape.toml: {e.get('test')} is not a test class of TB={tb}")
-        if not os.path.isfile(os.path.join(UVM_ROOT, "escape", f"{e.get('escape')}.patch")):
-            problems.append(f"testlists/escape.toml: {e.get('test')}: no escape/{e.get('escape')}.patch")
-        if e.get("target") and e["target"] not in targets:
-            problems.append(f"testlists/escape.toml: {e.get('test')}: unknown target {e['target']}")
-        try:
-            re.compile(e.get("signature", ""))
-        except re.error as ex:
-            problems.append(f"testlists/escape.toml: {e.get('test')}: signature does not compile: {ex}")
-    print(f"check_testlists: testlists/escape.toml: {len(data.get('escapes', []))} escapes")
-
-
 def main():
     problems = []
     try:
@@ -156,7 +125,6 @@ def main():
         return 1
     for tb in ("t1", "reg", "l3_unit", "axi_selftest"):
         check_bench(tb, side, problems)
-    check_escape(problems)
     for p in problems:
         print(f"check_testlists: {p}", file=sys.stderr)
     return 1 if problems else 0

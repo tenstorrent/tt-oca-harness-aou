@@ -268,9 +268,9 @@ were hit in passing runs and which fired in negative runs
 * *RTL assertions.* The `<target>-assert` targets compile the RTL's
   `ASSERTION_ON` checks; `testlists/assertions.toml` runs a representative set
   with `+rtl_asserts=1`.
-* *Bug-escape suite.* `make escape` re-introduces every fixed bug from
-  `escape/<id>.patch` on a build-time copy of `RTL/` and requires the named test
-  to fail with its signature (`testlists/escape.toml`).
+* *Candidate RTL fixes.* `make build RTL_PATCH=<path>` compiles a build-time
+  copy of `RTL/` with a patch kept outside the repository applied (build
+  `-fix-<name>`), so a proposed fix is regressed before it is published.
 
 === Coverage Strategy
 

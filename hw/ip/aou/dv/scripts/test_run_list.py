@@ -414,14 +414,14 @@ class RunListControl(unittest.TestCase):
     def test_stale_build_warned_once(self):
         lst = self.runlist("a", [("t_a", 3)])
         warning = "WARNING: STALE BUILD /x/build/vcs-t1-1x512-sp64"
-        proc, _ = self.start([lst], "--escape", "pr28", sleep=0.1, env_extra={"FAKE_STALE": warning})
+        proc, _ = self.start([lst], "--rtl-patch", "/x/fix.patch", sleep=0.1, env_extra={"FAKE_STALE": warning})
         rc, text = self.finish(proc)
         self.assertEqual(rc, 0, text)
         self.assertEqual(text.count("STALE BUILD"), 1)
         self.assertIn(warning, self.log_text())
         for argv in self.make_args():
             self.assertIn("STALE_CHECK=0", argv)
-            self.assertIn("ESCAPE=pr28", argv)
+            self.assertIn("RTL_PATCH=/x/fix.patch", argv)
 
     def test_bad_value_ignored(self):
         lst = self.runlist("a", [("t_a", 3)])

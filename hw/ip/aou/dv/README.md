@@ -117,10 +117,9 @@ into one book with Asciidoctor.
 | `uvm/seq_lib/` | Every virtual sequence, by area |
 | `uvm/tests/` | `aou_tests.sv` (included by `tb_top.sv` under `UVM`), the test classes by area; `reg/`, `l3_unit/`, `axi_selftest/` for the other tops |
 | `cov/` | `sv/`: the coverage service, the AXI4 coverage monitors and binds; `config/vcs/`: coverage scope, exclusion and FSM reset filter files |
-| `testlists/` | TOML testlists (`all.toml` and the per-area lists, `registers.toml`, `l3_unit.toml`, `axi_selftest.toml`, `escape.toml`), `plan_ids.yaml` |
+| `testlists/` | TOML testlists (`all.toml` and the per-area lists, `registers.toml`, `l3_unit.toml`, `axi_selftest.toml`), `plan_ids.yaml` |
 | `docs/` | The documents above; `gen/` is generated |
 | `scripts/` | `run_list.py`, `check_run.py`, `sim_cfg.py`, `testlist.py`, the lint and report scripts, the harness-leg scripts; `bugs/`: the bug-report template and the tools that validate staged drafts, file them as GitHub issues and rewrite the bench's citations |
-| `escape/` | The bug-escape patches |
 | `aou_sim_cfg.toml`, `aou_reg_sim_cfg.toml`, `aou_l3_unit_sim_cfg.toml`, `aou_axi_selftest_sim_cfg.toml` | One sim config per top: sources, include directories, `[targets.<CONFIG>]` defines, run modes, testlist |
 | `expected_fail.yaml` | Known DUT-bug failures the grader accepts as XFAIL, each tied to its GitHub issue (`tenstorrent/tt-oca-harness-aou#<n>`; `BUGS/<NNN>` for a draft staged but not yet filed) |
 | `site/` | Git-ignored site settings (`site.mk`, `env.sh`, `public_patterns.txt`) |
@@ -334,7 +333,7 @@ python3 scripts/run_list.py --sim vcs --target 1x512-sp64 --rid nightly -j 8 \
 ```
 
 `--fdi-enc SPEC|RTL` passes `FDI_ENC` to every run (the FDI state encoding,
-`+FDI_ENC`); `--escape`, `--rtl-patch` and `--cov` pick the build as the make
+`+FDI_ENC`); `--rtl-patch` and `--cov` pick the build as the make
 variables of the same names do.
 
 Your own bsub options go in `LSF_EXTRA_OPTS`. Every build and run appends it
@@ -345,11 +344,9 @@ jobs off a host:
 export LSF_EXTRA_OPTS='-R "select[hname!=hostA]"'
 make build SIM=verilator                # or LSF_EXTRA_OPTS=... on the command line
 python3 scripts/run_list.py ...         # --lsf-extra-opts; default $LSF_EXTRA_OPTS
-make escape LSF_EXTRA_OPTS='-R "select[hname!=hostA]"'
 ```
 
-`run_list.py` and `escape.py` hand it to each `make` they start as a command-line
-variable, so it survives `escape.py` clearing the parent's `MAKEFLAGS`. A site can
+`run_list.py` hands it to each `make` it starts as a command-line variable. A site can
 also set `LSF_VERILATOR_BUILD_OPTS` for Verilator compiles only (hosts that can't
 build them), next to `LSF_VCS_BUILD_OPTS` for VCS compiles.
 
@@ -455,7 +452,7 @@ printing how many it merged and excluded.
 
 The register bench takes the same `CONFIG` as T1, so it builds the same DUT
 parameters, and `make cov_report TB=t1` folds in its passing runs from the same
-SIM, CONFIG and `ESCAPE`/`RTL_PATCH` (VCS maps them onto `AOU_CORE_TOP` with `urg -map`;
+SIM, CONFIG and `RTL_PATCH` (VCS maps them onto `AOU_CORE_TOP` with `urg -map`;
 Verilator and Questa merge the files directly). The report stops if that register
 build has no runs; `COV_WITH=` leaves them out.
 
@@ -624,8 +621,7 @@ Every checker counts its evaluations and violations in a rule ledger
 collects them from the runs under `out/` and writes `docs/checker_inventory.md`.
 For the AoU specification's 45 checkable rules and UCIe r1.1's 41 FDI handshake
 rules, it gives the primary checker, the test that exercises it most, and the
-evidence: fires in a negative test, in an escape or mutation run
-(`make escape`), and checks in passing runs. The summary lists the rules with no
+evidence: fires in a negative test, and checks in passing runs. The summary lists the rules with no
 checker, two primaries, a checker that never runs, or one that never fired.
 
 ## RTL assertions
@@ -643,51 +639,14 @@ its entries pass `+rtl_asserts=1`, which is fatal on a build without the
 assertions, so they cannot pass on an ordinary build. The assertions use SVA
 ranges (`##[0:500]`), so the build is VCS-only for now.
 
-## Bug-escape suite
+## Building against a candidate RTL fix
 
-Every real bug fixed on main must make the testbench fail when it comes back.
-`escape/<id>.patch` re-introduces one fix in reverse (`pr28` is main #28,
-and so on). `make build ESCAPE=<id>` copies `RTL/` into the build directory
-(`build/<sim>-...-esc-<id>/rtl/`), applies the patch there and compiles that
-copy, so the source tree is never modified. Runs of an escape build go to
-`out/<build>-esc-<id>/`, and `make plan_status` ignores them.
-
-`testlists/escape.toml` names, for each escape, the test that catches it
-and the failure signature (a regex over the `UVM_ERROR`/`UVM_FATAL` lines).
-`make escape` builds the clean and escape variants, runs every entry on both and
-reports each bug as CAUGHT (the clean run passes and the escape run fails with
-the signature), ESCAPED or CLEAN-FAILS. It writes `out/escape/escape_report.md`.
-`ESCAPE_OPTS="--escape pr49 --no-build"` narrows a rerun.
-
-| Escape | Fix on main | Caught by | Signature |
-|---|---|---|---|
-| pr28 | 951d93f: `*_TR_COMPLETE` AND of the RPs, not OR | `aou_link_act_deact_test`, `aou_lp_mode_traffic_test` | `T1-V05`: the DUT never sends DeactivateReq |
-| pr46 | 24c0364: `best_index_*` multi-driver | a Questa build only (`vopt-7033`) | no behavioural change: VCS, Xcelium and Verilator accept it |
-| pr49 | 37b480f: TX credit/LP timing | `aou_lp_mode_test +lp_mode=1 +lp_thr=0` | `AOU-R31`: a header credit is never returned |
-| pr75 | a168d1e: MAX_AxBURSTLEN clamp | `aou_reg_access_test` (TB=reg), `aou_split_test +split_aw=illegal` | `REG-R02`, `FEAT-R01` |
-| pr76 | b8b9060: RP1-RP3 RID/BID aggregates crossed | `aou_slv_id_mismatch_test` (CONFIG=4x512-sp64) | `T1-E18` (white-box; the DUT's pins OR both aggregates) |
-| pr77 | 800f5e1: QoS threshold resets and `>=` | `aou_reg_hw_reset_test` (TB=reg) | `REG-R01` on `PRIOR_RP_AXI` |
-| split_awvalid_drop | pre-release bug, fixed before the initial commit: AW/W register slices on the splitter's M port | `aou_split_test`, `aou_stress_test +st_bp=aw` | `T1-V08`: the dropped sub-burst AW strands its W (split test also `FEAT-R02`) |
-
-The same mechanism shows that new checkers fire: `mut_*` patches are RTL
-mutations, not main fixes, that break one rule (`mut_fdi_r16`: `lp_wake_req` low
-when `lp_state_req` leaves Reset, caught by FDI-R16 in `aou_fdi_t1_bringup_test`).
-
-split_awvalid_drop is the closest faithful mutation, not a literal reversal: the 1xN
-switch added since then holds the pin AWVALID in its own skid buffer, and the
-old combinational AWVALID (which waited for WREADY) deadlocks against the
-switch's WREADY (which waits for AWVALID). The patch removes the splitter's and
-the switch's AW slices. The drop then happens while the switch masks the
-splitter's AWVALID, so AXI-R01 on the pins never sees it; the lost write does.
-
-pr77 is caught through its reset values. Its other half, the `>` to `>=`
-classification, would escape on its own: nothing checks the TX arbitration
-order yet (FEAT-R11 in `uvm/env/checkers/rules.csv`).
-
-GitHub issues #14, #15 and #16 are still open, and #35 (pytest collection)
-has no fix. #27, #30 and #56 were closed without a behavioural RTL fix: #27 went
-away with the FDI_CONFIG refactor, #30 was the import-scoping chore in #31, and
-#56 was a stimulus bug. None of them has a fix to re-introduce.
+`make build RTL_PATCH=<absolute path>` copies `RTL/` into the build directory
+(`build/<sim>-...-fix-<name>/rtl/`, `<name>` being the patch's file name without its
+extension), applies the patch there and compiles that copy, so the source tree is
+never modified. Runs of that build go to `out/<build>-fix-<name>/`, and
+`run_list.py --rtl-patch <path>` runs a list on it. The patch stays outside the
+repository; this is how a proposed RTL fix is tested before it is published.
 
 ## Register tests
 

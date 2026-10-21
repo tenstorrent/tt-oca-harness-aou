@@ -107,27 +107,21 @@ ifeq ($(wildcard $(AXI4PC_DIR)/Axi4PC.sv),)
 $(error AXI4PC=1 but there is no Axi4PC.sv in AXI4PC_DIR=$(AXI4PC_DIR))
 endif
 endif
-# ESCAPE=<id> builds against a copy of RTL/ with escape/<id>.patch applied,
-# re-introducing a bug fixed on main (bug-escape suite, testlists/escape.toml).
-# The copy lives in the build directory; the source tree is never modified.
-ESCAPE ?=
-# RTL_PATCH=<absolute path> applies any patch the same way (candidate RTL fixes during
-# triage, kept outside the repository); the build is named -fix-<RTL_PATCH_NAME>.
+# RTL_PATCH=<absolute path> builds against a copy of RTL/ with that patch applied
+# (candidate RTL fixes during triage, kept outside the repository); the build is named
+# -fix-<RTL_PATCH_NAME>. The copy lives in the build directory; the source tree is never
+# modified.
 RTL_PATCH ?=
 RTL_PATCH_NAME ?= $(basename $(notdir $(RTL_PATCH)))
-ifneq ($(and $(ESCAPE),$(RTL_PATCH)),)
-$(error ESCAPE and RTL_PATCH are exclusive)
-endif
-ESCAPE_PATCH := $(if $(RTL_PATCH),$(RTL_PATCH),$(UVM_ROOT)/escape/$(ESCAPE).patch)
-ifneq ($(ESCAPE)$(RTL_PATCH),)
-ifeq ($(wildcard $(ESCAPE_PATCH)),)
-$(error no patch $(ESCAPE_PATCH))
+ifneq ($(RTL_PATCH),)
+ifeq ($(wildcard $(RTL_PATCH)),)
+$(error no patch $(RTL_PATCH))
 endif
 endif
-BUILD_NAME := $(SIM)-$(TB)$(if $(filter t1 reg,$(TB)),-$(CONFIG))$(if $(and $(filter t1,$(TB)),$(filter 0,$(T1_AXI))),-noaxi)$(if $(filter 1,$(COV)),-cov$(if $(filter 1,$(COV_FSM_RESET)),-fsmrst))$(if $(XPROP),-xprop-$(XPROP))$(if $(filter 1,$(RTL_ASSERT)),-assert)$(if $(AXI4PC_ON),-axi4pc)$(if $(filter 0,$(WAVES_BUILD)),-nowaves)$(if $(ESCAPE),-esc-$(ESCAPE))$(if $(RTL_PATCH),-fix-$(RTL_PATCH_NAME))
+BUILD_NAME := $(SIM)-$(TB)$(if $(filter t1 reg,$(TB)),-$(CONFIG))$(if $(and $(filter t1,$(TB)),$(filter 0,$(T1_AXI))),-noaxi)$(if $(filter 1,$(COV)),-cov$(if $(filter 1,$(COV_FSM_RESET)),-fsmrst))$(if $(XPROP),-xprop-$(XPROP))$(if $(filter 1,$(RTL_ASSERT)),-assert)$(if $(AXI4PC_ON),-axi4pc)$(if $(filter 0,$(WAVES_BUILD)),-nowaves)$(if $(RTL_PATCH),-fix-$(RTL_PATCH_NAME))
 BUILD_DIR ?= $(UVM_ROOT)/build/$(BUILD_NAME)
-# Where RTL/ comes from: the repository, or the escape build's patched copy.
-RTL_HOME := $(if $(ESCAPE)$(RTL_PATCH),$(BUILD_DIR)/rtl,$(ROOT))
+# Where RTL/ comes from: the repository, or the RTL_PATCH build's patched copy.
+RTL_HOME := $(if $(RTL_PATCH),$(BUILD_DIR)/rtl,$(ROOT))
 COV_DIR := $(BUILD_DIR)/cov
 # Each run gets its own directory outside build/, named like ttem's:
 #   out/<build>/<test>.rid.<RID>.seed.<SEED>.time.<timestamp>.uid.<uid>/
@@ -159,8 +153,8 @@ LSF_SITE_OPTS ?=
 LSF_VCS_BUILD_OPTS ?=
 LSF_VERILATOR_BUILD_OPTS ?=
 # LSF_EXTRA_OPTS: the user's own bsub options, added to every build and run after the site's,
-# e.g. LSF_EXTRA_OPTS='-R "select[hname!=hostA]"'. Exported so scripts/escape.py and
-# scripts/run_list.py hand it on to the makes they start.
+# e.g. LSF_EXTRA_OPTS='-R "select[hname!=hostA]"'. Exported so scripts/run_list.py
+# hands it on to the makes it starts.
 LSF_EXTRA_OPTS ?=
 export LSF_EXTRA_OPTS
 # Scheduler settings scripts/run_list.py passes per job: JOB_QUEUE and JOB_PRIORITY (bsub
@@ -404,10 +398,10 @@ endef
 # start time; make run warns when a source below is newer or the defines differ.
 # STALE_CHECK=0 skips it (run_list.py checks once, then runs with it off).
 STALE_CHECK ?= 1
-STALE_SOURCES = $(ROOT)/RTL $(ROOT)/csr/aou-core.rdl $(UVM_ROOT) $(SIM_CFG_FILE) $(if $(ESCAPE)$(RTL_PATCH),$(ESCAPE_PATCH)) \
+STALE_SOURCES = $(ROOT)/RTL $(ROOT)/csr/aou-core.rdl $(UVM_ROOT) $(SIM_CFG_FILE) $(RTL_PATCH) \
   $(if $(filter 1,$(COV)),$(subst +, ,$(COV_HIER)))
 STALE_REBUILD = make build SIM=$(SIM) TB=$(TB)$(if $(filter t1 reg,$(TB)), CONFIG=$(CONFIG))$(if $(filter 1,$(COV)), COV=1)$(if $(filter 1,$(RTL_ASSERT)), RTL_ASSERT=1)$(if $(AXI4PC_ON),,$(if $(AXI4PC_DIR),$(if $(filter t1,$(TB)), AXI4PC=0)))$(if \
-  $(filter 0,$(WAVES_BUILD)), WAVES_BUILD=0)$(if $(filter 0,$(T1_AXI)), T1_AXI=0)$(if $(ESCAPE), ESCAPE=$(ESCAPE))$(if $(RTL_PATCH), RTL_PATCH=$(RTL_PATCH))
+  $(filter 0,$(WAVES_BUILD)), WAVES_BUILD=0)$(if $(filter 0,$(T1_AXI)), T1_AXI=0)$(if $(RTL_PATCH), RTL_PATCH=$(RTL_PATCH))
 STALE_CMD = python3 -I $(UVM_ROOT)/scripts/stale_build.py --build-dir $(BUILD_DIR) --simv '$(SIMV)' \
   --defines '$(DEFINES)' --rebuild '$(STALE_REBUILD)' $(STALE_SOURCES)
 
@@ -415,7 +409,7 @@ STALE_CMD = python3 -I $(UVM_ROOT)/scripts/stale_build.py --build-dir $(BUILD_DI
 TB_SOURCES = $(shell find $(UVM_ROOT) -path $(UVM_ROOT)/.deps -prune -o -path $(UVM_ROOT)/build -prune -o -path $(UVM_ROOT)/out -prune \
                -o -path $(UVM_ROOT)/uvm/env/gen -prune -o -type f \( -name '*.sv' -o -name '*.svh' \) -print | sort)
 
-.PHONY: help configs setup ral docs build run test cov_report fc_report check-config lint clean clean-out check-public plan_status compare escape rule_inventory perf_report perf_targets perf_check job-hooks stale-check build-name
+.PHONY: help configs setup ral docs build run test cov_report fc_report check-config lint clean clean-out check-public plan_status compare rule_inventory perf_report perf_targets perf_check job-hooks stale-check build-name
 help:
 	@printf '%s\n' \
 	  'make setup                 Fetch the pinned UVM-core, OCAH library, z3, PeakRDL, pywellen' \
@@ -439,9 +433,7 @@ help:
 	  'make plan_status           Test-plan status from the testlists and out/ (out/plan_status.md)' \
 	  'make compare BASELINE=<d>  Compare the results*.csv under out/ with those under <d>' \
 	  '                           (out/compare.md; exit 1 on a degradation)' \
-	  'make escape                Bug-escape suite: re-introduce each fixed bug, report caught/escaped' \
 	  'make rule_inventory        Checker inventory from rules.csv and the runs (docs/checker_inventory.md)' \
-	  'make build ESCAPE=<id>     Build against RTL/ with escape/<id>.patch applied' \
 	  'make build RTL_PATCH=<abs> Build against RTL/ with any patch applied (triage fixes)' \
 	  'make perf_report           Performance data of passing aou_perf_test runs (out/perf_report.md)' \
 	  'make perf_targets          Regenerate uvm/env/perf/aou_perf_targets.svh (needs D2D_COMPARE)' \
@@ -487,8 +479,8 @@ build:
 	@mkdir -p $(BUILD_DIR) $(COV_DIR)$(shell mkdir -p $(BUILD_DIR))
 	$(if $(filter-out vcs,$(SIM)),$(file >$(BUILD_DIR)/aou_waves_bind.sv,bind $(TOP) aou_waves u_aou_waves();))
 	$(if $(XPROP),$(file >$(BUILD_DIR)/xprop.cfg,merge = $(XPROP);$(newline)instance {$(TOP).u_dut} {xpropOn};))
-	$(if $(ESCAPE)$(RTL_PATCH),@rm -rf $(RTL_HOME) && mkdir -p $(RTL_HOME) && cp -r $(ROOT)/RTL $(RTL_HOME)/ && \
-	  patch -d $(RTL_HOME) -p1 -s --no-backup-if-mismatch < $(ESCAPE_PATCH) && echo "Patch $(ESCAPE_PATCH) applied to $(RTL_HOME)/RTL")
+	$(if $(RTL_PATCH),@rm -rf $(RTL_HOME) && mkdir -p $(RTL_HOME) && cp -r $(ROOT)/RTL $(RTL_HOME)/ && \
+	  patch -d $(RTL_HOME) -p1 -s --no-backup-if-mismatch < $(RTL_PATCH) && echo "Patch $(RTL_PATCH) applied to $(RTL_HOME)/RTL")
 	$(file >$(BUILD_DIR)/build.sh,set -e$(newline)$(BUILD_CMD))
 	@printf '%s\n' $(DEFINES) > $(BUILD_DIR)/build.stamp.new
 	$(call submit,build,$(BUILD_NAME),$(LSF_BUILD_RES),$(BUILD_DIR)/build.sh,$(BUILD_DIR)/build.lsf)
@@ -562,11 +554,11 @@ check-public:
 # Coverage merges passing runs only (verdict.txt says PASS); see AGENTS.md.
 PASSING = python3 $(UVM_ROOT)/scripts/passing_runs.py $(OUT_DIR)
 # T1 reports also take the register bench's passing runs from the same SIM/CONFIG and the
-# same RTL (ESCAPE/RTL_PATCH build suffix), so the DUT parameters match (VCS maps them onto
+# same RTL (RTL_PATCH build suffix), so the DUT parameters match (VCS maps them onto
 # COV_MAP_MODULE). The report stops if that build has no runs; COV_WITH= leaves it out.
 COV_WITH ?= $(if $(filter t1,$(TB)),reg)
 COV_MAP_MODULE ?= AOU_CORE_TOP
-COV_WITH_BUILD = $(SIM)-$(COV_WITH)-$(CONFIG)-cov$(if $(ESCAPE),-esc-$(ESCAPE))$(if $(RTL_PATCH),-fix-$(RTL_PATCH_NAME))
+COV_WITH_BUILD = $(SIM)-$(COV_WITH)-$(CONFIG)-cov$(if $(RTL_PATCH),-fix-$(RTL_PATCH_NAME))
 COV_WITH_OUT = $(if $(COV_WITH),$(wildcard $(UVM_ROOT)/out/$(COV_WITH_BUILD)))
 COV_WITH_VDB = $(UVM_ROOT)/build/$(COV_WITH_BUILD)/cov/simv.vdb
 PASSING_WITH = python3 $(UVM_ROOT)/scripts/passing_runs.py $(COV_WITH_OUT)
@@ -601,12 +593,6 @@ compare:
 # Checker inventory: rules.csv against the rule ledgers of the runs under out/.
 rule_inventory:
 	python3 $(UVM_ROOT)/scripts/rule_inventory.py --out-dir $(PLAN_OUT)
-
-# Bug-escape suite (testlists/escape.toml): clean and ESCAPE=<id> builds,
-# each entry run on both; ESCAPE_OPTS="--escape pr28 --no-build" narrows it.
-ESCAPE_OPTS ?=
-escape:
-	python3 $(UVM_ROOT)/scripts/escape.py --sim $(SIM) $(ESCAPE_OPTS)
 
 # Performance data (plan 2.10) from passing aou_perf_test runs; reads files only.
 perf_report:

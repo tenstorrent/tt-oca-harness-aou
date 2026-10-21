@@ -36,7 +36,7 @@ BENCH_OF = {"registers": "reg", "l3_unit": "l3_unit", "axi_selftest": "axi_selft
 TEST_KEYS = {"name", "module", "target", "seed", "reseed", "timeout_sec", "tags", "run_modes", "tools",
              "firmware", "expect_fail", "expect_fail_match", "args", "overrides"}
 GROUP_KEYS = {"name", "tests", "expected_count"}
-LIST_KEYS = {"schema_version", "includes", "tests", "groups", "escapes"}
+LIST_KEYS = {"schema_version", "includes", "tests", "groups"}
 
 
 class TestlistError(Exception):

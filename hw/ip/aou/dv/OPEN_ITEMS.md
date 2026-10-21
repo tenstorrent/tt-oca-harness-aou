@@ -100,10 +100,9 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   break its build. Closing it takes a harness way to add a user-supplied
   source and define to a target (an optional overlay or a target that names
   `AXI4PC_DIR`), and a harness sweep with it on.
-- **Escape suite, `RTL_PATCH`, `FDI_ENC`.** `make escape` and the patched-RTL
-  builds are standalone only. A harness equivalent needs targets that compile
-  a patched copy of `RTL/` (`exclude_files` plus `sources`) and a replacement
-  for `escape.py`'s CAUGHT/ESCAPED grading.
+- **`RTL_PATCH`, `FDI_ENC`.** The patched-RTL builds are standalone only. A
+  harness equivalent needs targets that compile a patched copy of `RTL/`
+  (`exclude_files` plus `sources`).
 - **Regression steering and metrics.** The harness's LSF executor has no live
   control file (`run_ctl.py`), no per-job CPU and memory record
   (`build/metrics.jsonl`) and draws random seeds in regression mode; a
@@ -146,8 +145,7 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   `ocah_env`, `ocah_scoreboard` and `ocah_checker` (with their `CHK-*` evidence
   and `CHECKER_SUMMARY`) and `ocah_axi_vip` were out of scope; the bench's
   layered models and rule-based checkers remain. Adopting them is an owner
-  decision per component, measured against the rule ledger and the escape
-  suite.
+  decision per component, measured against the rule ledger.
 - **Fetched versus vendored.** `ocah_lib` is fetched by `make setup` at the pin
   in `scripts/get_ocah_lib.sh`. Vendoring it into aou-rtl would remove the
   network dependency of `make setup` at the cost of a copy to keep current.
@@ -158,8 +156,7 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   `csr/aou-core.rdl` by repository path; through the harness those are under
   the vendored root, and the harness's document index does not list them.
 - **PR and issue numbers in existing comments.** Files inherited from before
-  the migration (the escape patches' notes, `BUGS/` references, some class
-  headers) cite GitHub PR and issue numbers; the harness convention keeps
+  the migration (`BUGS/` references, some class headers) cite GitHub PR and issue numbers; the harness convention keeps
   tracker references out of code comments. New files follow the convention;
   the old references are cleaned as the files are touched.
 - **Hygiene checker findings in inherited text.** The OSS document hygiene
@@ -178,7 +175,7 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   table in `docs/AOU_FCOV.adoc` is the hand-maintained mapping meanwhile.
 - **Baseline scope.** The pre-migration baseline the parity check compares
   against is every testlist on every VCS target, the register bench and the
-  assertion targets on VCS, the escape suite on VCS, and the short lists
+  assertion targets on VCS, the escape suite on VCS (since retired), and the short lists
   (`g1a`, `g1b`, `t1_api`) and the register bench on Verilator. The long lists
   have no Verilator baseline, so a Verilator-only degradation in them would
   not be caught by the comparison; the standalone Verilator smoke is the gate

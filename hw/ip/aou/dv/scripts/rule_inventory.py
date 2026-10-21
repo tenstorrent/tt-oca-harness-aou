@@ -9,8 +9,8 @@ reference) and the rule ledger every T1 run prints at its end
 from the runs under out/. For each rule of the two normative lists (AOU-R1..R45,
 the AoU spec's checkable rules; FDI-R01..R41, the UCIe r1.1 FDI handshake rules)
 it reports the primary checker, the test that exercises it most, and the
-evidence: fires in a passing negative test (the test expected them), in an
-escape run (a re-introduced DUT bug), and checks in passing runs.
+evidence: fires in a passing negative test (the test expected them) and checks in
+passing runs.
 
 A checker named "via AOU-Rn" reports under that rule's ID; its evidence is that
 rule's. Scope DUT: the rule binds the DUT; MODEL: it binds our model of the partner
@@ -58,7 +58,6 @@ def scan(out_dir):
         build = os.path.basename(os.path.dirname(run))
         test = os.path.basename(run).split(".rid.")[0]
         verdict = verdict_of(run)
-        escape = "-esc-" in build
         lines = []
         with open(log, encoding="utf-8", errors="replace") as fh:
             for ln in fh:
@@ -72,12 +71,11 @@ def scan(out_dir):
             e = led[(rule, who)]
             checks, fires = int(checks), int(fires)
             # Hits count on the DUT only (T1 builds); unit benches check our models.
-            if verdict in ("PASS", "XFAIL") and not escape and "-t1-" in build:
+            if verdict in ("PASS", "XFAIL") and "-t1-" in build:
                 e["checks"] += checks
                 e["check_tests"][test] += checks
             if fires:
-                kind = "escape" if escape else ("negative" if verdict in ("PASS", "XFAIL")
-                                                else "failing")
+                kind = "negative" if verdict in ("PASS", "XFAIL") else "failing"
                 e["fires"].append((test, fires, kind, build))
     return led, nruns
 
@@ -110,7 +108,7 @@ def fmt_fires(fires):
     for test, n, kind, build in fires:
         k = (kind, test)
         best[k] = best.get(k, 0) + n
-    order = {"negative": 0, "escape": 1, "failing": 2}
+    order = {"negative": 0, "failing": 1}
     parts = [f"{kind}: {test} ({n})" for (kind, test), n in
              sorted(best.items(), key=lambda kv: (order[kv[0][0]], -kv[1]))[:3]]
     return "; ".join(parts)
@@ -141,7 +139,7 @@ def main():
             vrow = rules.get(via, {})
             ev_rule, ev_who = via, primary_of(vrow)[0]
         checks, fires, top = evidence(led, ev_rule, ev_who) if ev_who else (0, [], "")
-        good_fire = [f for f in fires if f[2] in ("negative", "escape")]
+        good_fire = [f for f in fires if f[2] == "negative"]
         if scope == "N/A":
             status = "n/a"
         elif kind == "none":
@@ -184,9 +182,8 @@ def main():
         "Evidence: *checks* counts the rule's evaluations by its primary checker in "
         "passing clean T1 runs (hits on the DUT); *fired* lists runs where it reported a "
         "violation: a *negative* test that expected it (injection, including the L3 unit "
-        "bench), an *escape* run (a re-introduced main bug or an RTL mutation, "
-        "`make escape`) or a *failing* run. Status *fired* means fired in a negative, "
-        "escape or mutation run; *hit* means only evaluated in passing runs.", "",
+        "bench) or a *failing* run. Status *fired* means fired in a negative test; *hit* "
+        "means only evaluated in passing runs.", "",
         f"Runs with a ledger: {nruns}.", "",
         "## Summary", "",
         "| | Rules |", "|---|---|",
@@ -199,7 +196,7 @@ def main():
         f"| Two or more primary checkers | {len(counts['duplicated'])} "
         f"{' '.join(counts['duplicated'])} |",
         f"| Checker never runs | {len(counts['never runs'])} {' '.join(counts['never runs'])} |",
-        f"| Fired in a negative test, escape or mutation run | {len(counts['fired'])} |",
+        f"| Fired in a negative test | {len(counts['fired'])} |",
         f"| Hit in passing runs only (never fired) | {len(counts['hit'])} "
         f"{' '.join(counts['hit'])} |",
         f"| Primary never fired (hit-only plus never-runs) | {len(counts['never fired'])} |",

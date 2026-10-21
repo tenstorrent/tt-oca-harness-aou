@@ -21,8 +21,7 @@ no group (the harness schema has no key for a scenario that must not run).
 all.toml includes the T1 areas and defines the aou_sanity_test scenario and
 the smoke, functional and all groups; registers.yaml becomes registers.toml
 (the register bench's aggregate); assertions.yaml entries go on the
-<CONFIG>-assert targets; escape.yaml becomes escape.toml ([[escapes]], read by
-escape.py only). The plan IDs go to plan_ids.yaml, keyed by scenario name.
+<CONFIG>-assert targets. The plan IDs go to plan_ids.yaml, keyed by scenario name.
 
 With --expected-fail and --baseline-results, an entry whose every baseline
 run was XFAIL and whose test has bug-specific expected_fail entries (no
@@ -381,43 +380,6 @@ def main():
         with open(os.path.join(a.out, f"{area}.toml"), "a", encoding="utf-8") as fh:
             fh.write("\n".join(write_group("smoke", [smoke])) + "\n")
             fh.write("\n".join(write_group("all", tests)) + "\n")
-
-    # escape.toml: standalone-only.
-    lines = [HEADER.rstrip(), "", "schema_version = 1", "",
-             "# Bug-escape suite (acceptance A3), read by scripts/escape.py (make escape) only: every",
-             "# real bug fixed on main, re-introduced by escape/<escape>.patch on a build-time copy",
-             "# of RTL/, must make the test fail with `signature` (a regex matched against the",
-             "# UVM_ERROR/UVM_FATAL lines) while the same run passes on the clean build. Keys: test",
-             "# (UVM class, or \"none\" for a compile-time catch), escape, signature, tb (t1 or reg;",
-             "# default t1), target, args, seed, reseed, build (the simulator whose compile catches",
-             "# it), note. [[escapes]] is this bench's own schema, not the harness's [[tests]]."]
-    lines += ["#"] + [f"# {n}" if n else "#" for n in header_comments(os.path.join(a.yaml_dir, "escape.yaml"))]
-    ypath = os.path.join(a.yaml_dir, "escape.yaml")
-    comments = entry_comments(ypath)
-    for i, e in enumerate(listyaml.load(ypath)):
-        if not e.get("test"):
-            continue
-        lines.append("")
-        lines += [f"# {c}" if c else "#" for c in comments[i]]
-        lines += ["[[escapes]]", f"test = {q(e['test'])}", f"escape = {q(e['escape'])}"]
-        if e.get("tb"):
-            lines.append(f"tb = {q(e['tb'])}")
-        if e.get("config"):
-            lines.append(f"target = {q(e['config'])}")
-        if e.get("plusargs"):
-            lines.append(f"args = {arr(e['plusargs'].split())}")
-        if e.get("seeds"):
-            seed, reseed = seeds_of(e.get("seeds"))
-            lines.append(f"seed = {seed}")
-            if reseed != 1:
-                lines.append(f"reseed = {reseed}")
-        if e.get("build"):
-            lines.append(f"build = {q(e['build'])}")
-        lines.append(f"signature = {q(e['signature'])}")
-        if e.get("note"):
-            lines.append(f"note = {q(e['note'])}")
-    with open(os.path.join(a.out, "escape.toml"), "w", encoding="utf-8") as fh:
-        fh.write("\n".join(lines) + "\n")
 
     # plan_ids.yaml
     lines = [HEADER.rstrip(), "#",
