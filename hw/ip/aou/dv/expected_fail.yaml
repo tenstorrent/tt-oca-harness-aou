@@ -1629,51 +1629,6 @@
     right on the gate (1x512 bw_rd l2r 0.9704 in the first gated run, passing); not
     seed-dependent on this deterministic bench, but borderline, so it may or may not fire
 
-# BUGS/048: with bursts the RP splits, the M port carries more than
-# M_RD_MO_CNT (32) reads outstanding (aou_t1_mo_chk counts M-port bursts). Unsplit traffic stops
-# at 32, so aou_dp_outstanding_test (plan 9.20) has no entry.
-- test: aou_split_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_dp_burst_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_perf_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: perf bw windows on the mixed-width configs split long bursts and go one read past M_RD_MO_CNT
-
-- test: aou_dp_random_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_stress_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_t1_link_event_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: a narrow RP (2xmix-sp64-rxf RP1, seed 2) splits the remote reads past M_RD_MO_CNT
-
 - test: aou_dft_scan_test
   bug: BUGS/052
   check: 'T1-DFT01: the core reset was asserted for'

@@ -201,6 +201,7 @@ class aou_t1_env extends uvm_env;
     foreach (m_sub[r]) orphan.vif[r] = m_sub[r].cfg.vif;
     mo_chk.vif = new[cfg.n_rp];
     foreach (m_sub[r]) mo_chk.vif[r] = m_sub[r].cfg.vif;
+    mo_chk.rm = regs.model;
     xfer_cov.s_vif = new[cfg.n_rp];
     xfer_cov.m_vif = new[cfg.n_rp];
     foreach (s_mgr[r]) xfer_cov.s_vif[r] = s_mgr[r].cfg.vif;

@@ -9,8 +9,9 @@
 // +dp_mfull=<cycles> (plan 9.20): remote-originated only, the local
 // subordinate answers every burst that many cycles late and the remote die
 // keeps 64 requests of one kind in flight per RP, so the M-port pending-ID
-// tables fill: the env's aou_t1_mo_chk holds the M port to 32 (FEAT-R22) and
-// its cg_mo full bin records that the limit was reached; the DUT must
+// tables fill: the env's aou_t1_mo_chk holds the RP to 32 requests in service
+// at the M port (FEAT-R22) and its cg_mo full bin records that the limit was
+// reached; the DUT must
 // back-pressure without an error or a lost transfer.
 class aou_dp_outstanding_test extends aou_dp_base_test;
   `uvm_component_utils(aou_dp_outstanding_test)
