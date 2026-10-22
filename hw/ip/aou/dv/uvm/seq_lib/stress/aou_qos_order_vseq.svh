@@ -59,9 +59,9 @@ class aou_qos_order_vseq extends aou_dp_vseq;
     for (int r = 0; r < int'(cfg.n_rp); r++) rps.push_back(r);
     rps.shuffle();
     if (bounds == "inv") begin
-      // HP at or below NP (MAS 3.2.1: the Normal tier is empty). Interim
-      // (BUGS/049): a QoS at or above HP is High even
-      // when it is below NP, so High is [HP, 15] and Low [0, HP-1].
+      // HP at or below NP (MAS 3.2.1: the Normal tier is empty). The
+      // classifier tests HP first, so a QoS at or above HP is High even
+      // when it is below NP: High is [HP, 15] and Low [0, HP-1].
       if (arb != 2 || ntier != 2)
         `uvm_fatal(get_type_name(), "+qos_bounds=inv needs +arb_mode=2 +qos_tiers=2")
       hp = $urandom_range(15, 1);
@@ -101,8 +101,8 @@ class aou_qos_order_vseq extends aou_dp_vseq;
     if (arb == 2) foreach (tier[r]) if (tier[r] != 0) k.feat.rp_prior[r] = $urandom_range(3);
     if (arb != 2) foreach (qos_of[r]) qos_of[r] = 4'($urandom_range(15));
     if (timer == "sweep") timer = ($urandom_range(1) == 1) ? "promote" : "off";
-    // Timer extremes (plan 13.22). TIMER_RESOLUTION 0 is taken as one cycle
-    // per unit (BUGS/049 interim), so it promotes only
+    // Timer extremes (plan 13.22). TIMER_RESOLUTION 0 ticks every cycle
+    // (MAS 3.2.1, starvation-prevention timer), so it promotes only
     // with a short threshold; THRESHOLD 0 promotes at once whatever the
     // resolution; 0xFFFF units outlast every round.
     case (timer)

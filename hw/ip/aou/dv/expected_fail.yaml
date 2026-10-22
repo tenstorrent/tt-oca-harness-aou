@@ -595,7 +595,7 @@
 
 - test: '*'
   bug: BUGS/059
-  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: DeactivateReq( (WriteResp|ReadData\d+))+( \(\+1 continuing\))?$'
+  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: DeactivateReq( (WriteResp|ReadData\d+))*( \(\+1 continuing\))?$'
   when_re: 'DUT rules: AoU v0\.8 \(\+v0p8\)'
   seed_dependent: true
   note: >-
@@ -605,12 +605,13 @@
 
 - test: aou_act_flit_test
   bug: BUGS/059
-  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: (ActivateAck|DeactivateReq) '
-  when_re: 'DUT rules: AoU v0\.8 \(\+v0p8\)'
+  check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: ActivateAck '
+  when_re: 'DUT rules: AoU v0\.8 \(\+v0p8\)[\s\S]*\[aou_act_flit_vseq\] requests while DISABLED'
   note: >-
-    +v0p8: the stimulus this test exists for. Requests held across the activation leave in the
-    ActivateAck's flit, and responses in the DeactivateReq's; the DUT follows v0.7.1 (Activation
-    at G0 only)
+    +v0p8 +mode=act_req: the stimulus this test exists for. Requests held across the activation
+    leave in the ActivateAck's flit; the DUT follows v0.7.1 (Activation at G0 only). +mode=deact_rsp
+    needs no entry of its own: its ActivateAck+CrdtGrant and DeactivateReq+response flits are the
+    two layouts the all-test entries above cover (an entry here would never match, an XPASS)
 
 - test: aou_act_flit_test
   bug: BUGS/060

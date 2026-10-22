@@ -12,7 +12,7 @@
 //   FEAT-R16: an AW held while the table was full is accepted within
 //             free_bound cycles of the WriteResp that frees an entry.
 //   FEAT-R21 (plan 16.17) is not checked: the O_PENDING_CNT_OVER it observed
-//             (MAS 3.7.5) was unconnected (BUGS/005) and PR #89 removed it,
+//             (MAS 3.7.5) was unconnected and PR #89 removed it,
 //             adding a write-transaction watchdog (INT_EARLY_WDT_ERR) instead.
 //             With over_chk (+early_over) the watchdog pin is only counted
 //             while an AW waits at the limit, for the report, until the MAS

@@ -39,7 +39,7 @@
   priority: P2
   old_test: aou_activation_property_test
   dropped: PropertyReq on ActivateReq has no defined effect in v0.7 and is replaced by ProfileID/Rev/Opt in v0.8.
-  note: Coverage-closure decision D9. v0.8 makes PropertyReq RsvdZero; 2.7 keeps the DUT's own DeactivateReq and 2.10 the register with PropertyReq 0 only.
+  note: 'Coverage-closure decision D9. v0.8 makes PropertyReq RsvdZero; 2.7 keeps the DUT''s own DeactivateReq and 2.10 the register with PropertyReq 0 only.'
 
 - id: '1.5'
   section: '2.1'
@@ -1294,8 +1294,8 @@
   title: 'Remote RX credit overrun: the remote die sends beyond the credit the DUT advertised (AoU 6.1)'
   priority: P2
   old_test: aou_credit_underflow_test
-  old_title: Internal check for negative credit count
   dropped: 'AoU v0.8 6.1 binds the sender only; the receiver''s reaction to a credit overrun is undefined.'
+  old_title: Internal check for negative credit count
   note: 'Spec v0.8 decision (2026-10-20): aou_credit_violation_test removed. Coverage-closure D9 had retitled it "Remote RX credit overrun".'
 
 - id: '9.6'
@@ -1423,7 +1423,7 @@
   title: ReadData wider than the remote AXI width (a violation per the MAS; reaction unspecified)
   priority: P2
   added: MAS overview 2.1
-  dropped: 'AoU v0.8 5.7 makes ReadData wider than ARSIZE a peer violation with no defined reaction.'
+  dropped: AoU v0.8 5.7 makes ReadData wider than ARSIZE a peer violation with no defined reaction.
   note: Coverage-closure gap analysis 4.3 (decision D9). Spec v0.8 decision (2026-10-20) removed aou_rdata_wide_test.
 
 - id: '9.22'
@@ -1671,7 +1671,7 @@
   section_title: Corner Case Tests
   title: 'I_RESETN and I_PRESETN independent: each alone, in each order'
   priority: P2
-  added: integration guide; BUGS/016
+  added: integration guide 3.1.1
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '11.17'
@@ -1794,7 +1794,7 @@
   priority: P2
   old_test: aou_rp_remap_asym_test
   dropped: 'An asymmetric DEST_RP is a misconfiguration MAS 3.10.1 forbids, with undefined behaviour.'
-  note: Coverage-closure decision D9. aou_dest_rp_asym_test removed (spec v0.8 decision, 2026-10-20).
+  note: 'Coverage-closure decision D9. aou_dest_rp_asym_test removed (spec v0.8 decision, 2026-10-20).'
 
 - id: '12.14'
   section: '2.12'
@@ -2136,8 +2136,8 @@
   title: AXI_PEER_DIE_MAX_DATA_WD below 1024
   priority: P2
   added: integration guide parameters
-  dropped: AXI_PEER_DIE_MAX_DATA_WD is a localparam fixed at 1024, the widest AoU data message; the RX data path is always sized for a 1024-bit remote die and there is no narrower build to test.
-  note: Coverage-closure gap analysis 4.3 (decision D9) added it when the parameter was configurable; retired with the parameter (DECISIONS D9 amendment, 2026-10-20).
+  dropped: 'AXI_PEER_DIE_MAX_DATA_WD is a localparam fixed at 1024, the widest AoU data message; the RX data path is always sized for a 1024-bit remote die and there is no narrower build to test.'
+  note: 'Coverage-closure gap analysis 4.3 (decision D9) added it when the parameter was configurable; retired with the parameter (DECISIONS D9 amendment, 2026-10-20).'
 
 - id: '15.1'
   section: '2.15'
@@ -2393,7 +2393,7 @@
   section_title: Write Early Response Tests
   title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked)'
   priority: P2
-  added: MAS 3.7.5; BUGS/005
+  added: MAS 3.7.5
   note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. PR #89 replaced the signal with a write-transaction watchdog the MAS does not yet specify.'
 
 - id: '17.1'
@@ -2595,7 +2595,7 @@
   section_title: UCIe FDI Interface Tests
   title: 'LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery'
   priority: P2
-  added: 'UCIe r1.1 8.3.3.7, Table 8-2; BUGS/002'
+  added: 'UCIe r1.1 8.3.3.7, Table 8-2'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '18.15'
@@ -2619,7 +2619,7 @@
   section_title: UCIe FDI Interface Tests
   title: 'LinkReset: Adapter state and the DUT''s request, O_AOU_REQ_LINKRESET and its mask'
   priority: P2
-  added: 'UCIe r1.1 8.3.3.5; BUGS/014'
+  added: UCIe r1.1 8.3.3.5; BUGS/014
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '18.18'
@@ -2959,9 +2959,11 @@
 - id: '21.7'
   section: '2.21'
   section_title: Low Power Mode Tests
-  title: 'Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)'
+  title: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
   priority: P2
   old_test: aou_lp_mode_transition_test
+  old_title: Switch between LP mode enabled/disabled
+  note: 'Main #105 - TX_LP_MODE is static configuration, written only while DISABLED.'
 
 - id: '22.1'
   section: '2.22'
@@ -3013,5 +3015,5 @@
   section_title: FDI Bringup Controller Tests
   title: 'Restart after link-down is software''s on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset'
   priority: P2
-  added: UCIe r1.1 8.3.3.8; BUGS/001 (owner decision 7)
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (BUGS/038, not a bug) when the owner assigned the restart to software.
+  added: UCIe r1.1 8.3.3.8 (owner decision 7)
+  note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (not a bug) when the owner assigned the restart to software.'

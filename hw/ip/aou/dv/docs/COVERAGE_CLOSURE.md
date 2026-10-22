@@ -171,7 +171,7 @@ Notes on the FC numbers:
 - The axi4 groups sum over the 2, 6 or 8 AXI4 interfaces each config has.
 - d04b2da all-configs was 3334/4271 (78.06%). The 29 new bins are the link-down/Disabled bins and
   `cp_fdi_enc`. Of those, only `cp_fdi_enc rtl` is hit.
-- The `spec` bin needs a passing SPEC-encoded run, which waits on BUGS/001.
+- The `spec` bin needs a passing SPEC-encoded run, possible since PR #108 made the DUT use the UCIe encodings.
 
 **Of the 963 holes in the union:**
 
@@ -248,7 +248,7 @@ They match the d04b2da analysis to within a few items, so that analysis carries 
    - The LSM driver enters LinkError only from Active.
    - L1 exit is always initiated by the PL.
    - `I_SW_RETRAIN_REQ` is never driven.
-   - The linkerror and linkdown spec tests XFAIL on BUGS/001/002/038.
+   - The linkerror and linkdown spec tests XFAILed on the FDI bring-up findings PR #108 fixed.
 
 ### 2.2 Ranked modules (uncovered line/cond/branch/FSM per config, cov3)
 
@@ -345,7 +345,8 @@ bringup FSM 17→31/35 and **global FSM 34→48/58**.
 - MI: SETUP and ACCESS last 1 cycle each because `AOU_CORE_SFR.v:1355` ties `O_PREADY=1`.
   Reaching them needs cycle-exact `I_RESETN` or the filter.
 - Also worth an assertion: after an MI-side reset, SI's request is still pending, so the access
-  replays into freshly reset SFRs. This is unspecified (BUGS/016).
+  replays into freshly reset SFRs. The integration guide (3.1.1) now requires the bridge to be idle
+  before either reset, so this is outside legal use.
 
 **FSM outlook:**
 
@@ -410,8 +411,8 @@ for 512→1024).
   addresses as INCR.
 - So a downsized 16-beat WRAP becomes a 64-beat "WRAP", which AXI forbids. The MAS is silent on
   whether WRAP and FIXED are accepted on the S port.
-- Before any WRAP/FIXED stimulus: file a bug/doc draft (BUGS/039), with an interim expectation
-  that the DUT converts to INCR addressing on the S side and emits INCR. See decision D1.
+- Decision D1 settled it: INCR bursts only. WRAP and FIXED are out of scope and AXI-R19 flags
+  them as a stimulus error (DECISIONS D5).
 
 ### 2.6 RX and TX cores
 
@@ -487,9 +488,9 @@ can't mean what it says. They are listed for owner review because the denominato
 | **axi4.*.cg_os / cg_bp** (`os_mid/hi/max`, `*_stall_at_max_os`, `stall_len cyc_gt_1k`) | ~56 | **a:** deep outstanding (`+dp_batch=64 +dp_wr_pct=100`, small remote credit) and long back-pressure at max outstanding. Plan 8.3/8.6, 16.11. Also check that `MAX_OUTSTANDING` in the FC module matches `S_WR_MO_CNT`=32. |
 | **l1.cg_fdi_cancel** | `cp_half h1`, `cp_repeat second/more`, `x_half_kind h1,*` (5) | **a:** a flit cancel on the second 128 B half, and consecutive cancels (L1 driver knobs; `aou_t1_slice_test` only cancels the first half). r2.0 R20-04 adds a `nop` kind (§5). |
 | **l1.cg_fdi_stall** | `cp_hold h1/h2_4`; `x_where_lat boundary×{l3,l4_6,l7_up}`, `mid_flit,l2` (6) | **a:** short stall holds and stallreq at a flit boundary with a slow ack. 2-PHY builds hit 2 more, so the latency depends on the FDI width. Add R20-03 `cp_seq` and R20-02 `cp_state` (§5). |
-| **l2.cg_bringup_fsm** | `retrain_linkerr`, `l1_wake` (a); `active_linkdown`, `deact_linkdown`, `linkdown_unwake` (b) | `retrain_linkerr` and `l1_wake`: WP5 (LP-initiated L1 exit). The linkdown bins are the **bench model's** expected link-down path, so they are **b**: the linkdown and linkerror spec tests XFAIL on BUGS/001 and 038. With `+FDI_ENC=RTL` they still fail on 038 (the DUT has no LINKDOWN state). They close only with the 038 fix. |
+| **l2.cg_bringup_fsm** | `retrain_linkerr`, `l1_wake` (a); `active_linkdown`, `deact_linkdown`, `linkdown_unwake` (b) | `retrain_linkerr` and `l1_wake`: WP5 (LP-initiated L1 exit). The linkdown bins are the **bench model's** expected link-down path, so they are **b**: the linkdown and linkerror spec tests XFAILed until PR #108 fixed the DUT's link-down handling, so they close with passing runs on a bench that has it. |
 | **l2.cg_link_state cp_tr** | `retrain_linkerror`, `active_linkreset`, `linkreset_reset`, `active_disabled`, `disabled_reset`, `reset_linkerror`; `cp_sts linkreset/disabled` | **a/b.** Adapter-driven transitions. `link_event +event=link_reset/inband_drop` used to XFAIL on the since-retired SW-reset sightings because of traffic and SW reset. A **quiet** link-event variant closes them now. `reset_linkerror` and `retrain_linkerror` come with WP5. |
-| **l2.cg_link_state cp_fdi_enc spec** | 1 | **b**, BUGS/001 (informational bin) |
+| **l2.cg_link_state cp_fdi_enc spec** | 1 | **b** until PR #108's UCIe encodings (informational bin) |
 | **l3.cg_act_op** (after the fix) | `tx,illegal` × op0-3 and reserved (5) | **a:** sample the inject path. `aou_invalid_actmsg_test` covers every op×state, but those runs XFAIL on 019/013/023, so run the check-then-hard-reset variant (WP3). |
 | **l3.cg_credit** (after the fix) | `zero_stall,tx` for wreq/rreq/wresp; the new DUT-side bins | **a:** the model must exhaust the DUT's credit (`aou_zero_credit_test +credit=...` exists for model→DUT; the model-stalled direction needs bursts of remote-initiated requests beyond the DUT's advertised RX depth). |
 | **l3.cg_flit_layout** | `g[47],g2` and `g2,multi_flit` (CrdtGrant starting at G47 and spanning into G0; legal per AoU §4.4) | **a:** an L3 packer policy knob to place the initial CrdtGrant at G47. g4 cells are v0.8 (§3.3). |
@@ -631,10 +632,10 @@ the item and a `plan_ids` entry), 36 have a checker, and 11 have an FC bin.
 | AXI (2) | 4.30 FLEX/USER carriage; 4.31 W before AW | AoU §5.2; AXI4 A3.3.1 |
 | Errors and debug (8) | 9.15 RP ≥ RP_COUNT received; 9.16 reserved MISCOP/DLENGTH/RsvdZero/stray MsgStart; 9.17-9.19 debug FIFO depth, disable and narrow-RP read; 9.20 M-port tables full; 9.21 ReadData wider than the remote; 9.22 subordinate ID-check enable | AoU Table 15, §4.4, §6.4.1; MAS 7.2.2, 7.2.4, §2.1; BUGS/003, 012, 028, 035 |
 | Performance (2) | 10.14 numeric bounds; 10.15 back-pressure per channel | MAS PPA tables 8/9; AXI4 A3.2.1; UCIe r1.1 §8.2.4 |
-| Reset, CDC, build (4) | 11.16 independent I_RESETN/I_PRESETN; 11.17 PCLK:CLK ratios; 11.18 an ASSERTION_ON build; 11.19 DFT scan mode (drop candidate) | integration guide 8.7, 3.13.1; BUGS/016 |
-| RP, QoS, width, early (6) | 12.20 local and remote RP count differ; 13.19-13.22 reserved ARB_MODE, PRIOR=0, HP≤NP misconfiguration, timer extremes; 14.17 peer max width < 1024; 16.17 write kept waiting at the early-response limit (O_PENDING_CNT_OVER, removed by PR #89) | MAS 3.2.1, 3.7.5, 3.10.1; AoU §6.2; BUGS/005 |
-| UCIe FDI (14) | 18.13 Retrain with traffic; 18.14 LinkError; 18.15 L1 with the MAS PM sequence; 18.16 L2 (unsupported: drop or document); 18.17 LinkReset; 18.18 Disabled; 18.19 rx_active; 18.20 wake; 18.21 inband_pres drop; 18.22 stall corners; 18.23 state leaves Active mid-flit; 18.24 cancel corners; 18.25 two-PHY with PHY1 active (`+active_phy` exists, and no entry uses it); 18.26 flit-header fields | UCIe r1.1 §8.2.3-8.2.9, §8.3.2-8.3.3, Table 8-2; BUGS/002, 014, 015, 037, 038 |
-| Bringup (2) | 22.6 every AOU_FDI_BRINGUP_CTRL transition (this ties the FSM work to the plan); 22.7 restart after link-down needs NOP→Active | integration guide 6.6; UCIe r1.1 §8.3.3.8; BUGS/038 |
+| Reset, CDC, build (4) | 11.16 independent I_RESETN/I_PRESETN; 11.17 PCLK:CLK ratios; 11.18 an ASSERTION_ON build; 11.19 DFT scan mode (drop candidate) | integration guide 3.1.1, 8.7, 3.13.1 |
+| RP, QoS, width, early (6) | 12.20 local and remote RP count differ; 13.19-13.22 reserved ARB_MODE, PRIOR=0, HP≤NP misconfiguration, timer extremes; 14.17 peer max width < 1024 (dropped: PR #96 fixed the width at 1024); 16.17 write kept waiting at the early-response limit (O_PENDING_CNT_OVER, removed by PR #89) | MAS 3.2.1, 3.7.5, 3.10.1; AoU §6.2 |
+| UCIe FDI (14) | 18.13 Retrain with traffic; 18.14 LinkError; 18.15 L1 with the MAS PM sequence; 18.16 L2 (unsupported: drop or document); 18.17 LinkReset; 18.18 Disabled; 18.19 rx_active; 18.20 wake; 18.21 inband_pres drop; 18.22 stall corners; 18.23 state leaves Active mid-flit; 18.24 cancel corners; 18.25 two-PHY with PHY1 active (`+active_phy` exists, and no entry uses it); 18.26 flit-header fields | UCIe r1.1 §8.2.3-8.2.9, §8.3.2-8.3.3, Table 8-2; BUGS/014, 015 |
+| Bringup (2) | 22.6 every AOU_FDI_BRINGUP_CTRL transition (this ties the FSM work to the plan); 22.7 restart after link-down needs NOP→Active | integration guide 6.6; UCIe r1.1 §8.3.3.8 |
 
 The r2.0 items in §5 add four more if adopted: reset values (R20-01), NOP-flit discard (R20-04),
 the LinkError hold (R20-09), and remote-initiated link-down (R20-11).
@@ -666,7 +667,7 @@ The DUT also ignores the flit header on RX.
 | R20-07 | Table 8-2 → Table 10-3 | Once Active, `pl_inband_pres` drops only in LinkReset, Disabled or LinkError | model legality | FDI-R55 (MODEL); limit `aou_lsm_inband_drop_seq` | **adopt** |
 | R20-08 | §8.2.9 → §10.2.9 | A PM response or PMNAK acts only from Active | no (the DUT never requests PM) | — | ignore | public-ok
 | R20-09 | §8.3.3.7 → §10.3.3.7 | The lower layer may hold LinkError after an Active request | **yes**: the DUT must keep requesting Active | LSM `linkerror_hold`; FDI-R49 extended; `cg_link_state cp_le_exit {prompt, held}` | **adopt** | public-ok
-| R20-10 | §8.3.3.8 → §10.3.3.8 | After LinkError/LinkReset/Disabled→Reset, training may restart on NOP→Active **or any Ch. 4 trigger** | partly: other agents can restart the link | re-cite FDI-R51; optional `restart_by` bin | **ask**: does this change BUGS/038's framing or severity? | public-ok
+| R20-10 | §8.3.3.8 → §10.3.3.8 | After LinkError/LinkReset/Disabled→Reset, training may restart on NOP→Active **or any Ch. 4 trigger** | partly: other agents can restart the link | re-cite FDI-R51; optional `restart_by` bin | answered: the owner assigned the restart to software | public-ok
 | R20-11 | (none) → §10.3.3.8 Impl. Note | Streaming LinkReset/Disabled flow: exit = an Active request, then NOP→Active in Reset; the remote may go on to Reset or return to Disabled | **yes**: the spec basis for the link-down behaviour and FDI-R51. FDI-R50 stays an interim expectation | L2 scenarios (remote-initiated, local-only with RDI down, Adapter-autonomous → Reset); `cg_link_state cp_ld_origin` | **adopt** | public-ok
 | R20-12 | (none) → §10.3.3.8 | L2 vs virtual-L2 exit | no (no L2) | — | ignore | public-ok
 | R20-13 | §8.2.8 → §10.2.8 | Adapter sequence-number handshake and NOPs before local Active | no | — | ignore | public-ok
@@ -684,7 +685,7 @@ The DUT also ignores the flit header on RX.
 - `lp_linkerror`, the clock request/ack rules, flit-cancel timing, the four-phase stall rules,
   Retrain, Reset and the Format 6 map.
 
-So adopting r2.0 changes nothing for BUGS/001, 002 or 037.
+So adopting r2.0 changed nothing for the FDI encoding and `lp_linkerror` findings (fixed by PR #108) or for the early `lp_linkerror` question (not a bug).
 
 **Bench cost of the nine "adopt" rows:**
 - four rules: FDI-R52 to R55;
@@ -706,7 +707,7 @@ code coverage where it differs.
 | **WP1** | **Bench hygiene and unpinning** | (1) `plan_status.py`: add `aou_fc_json=` to `INFRA_ARG`. (2) Unpin the `datapath.toml` and `features.toml` entries (aggregator, early_bresp, split, qos, lp_mode, dest_rp) so they run on every config, with per-RP `data_bytes` in the aggregator checker. (3) Add plan IDs for 4.23, 4.24, 5.21, 5.22, 14.5, 18.1, 18.3, 18.4, 18.5, 18.11, 18.12, 20.10, 20.12, 20.13 to existing passing entries, and drop 9.7 from the run list. (4) Triage the two new FAILs (4x512 `act_after_deact` AOU-R26; 4xmix `pack crossflit` AXI-R10) and match their signatures. | Plan: 259 → ~270 covered. Code per non-1x512 config: +34-117 lines, +120-366 cond, +40-120 branches (aggregator, agg_info, early_table, split, regfifo). FSM 31 → **34/58 on every config**. Union: the 1024- and 256-bit aggregators (~30 lines, ~35 cond, ~70 branches). | none | **S** | none | Done: `aou_fc_json=` is in `INFRA_ARG`, the data-path and feature entries run on every config, the plan IDs are on passing entries and 9.7 is gone. |
 | **WP2** | **FC2 covergroup fixes** | Every row of §3.1: `x_txn` and `cx_size_x_len` AXI-illegal ignores; explicit `x_sts_req`; drop `l1_active`; v0.7 `cg_act_fsm` bins; `cg_act_op` inject sampling; re-homed `cg_credit` with DUT-side events; `cg_msg` Misc without RP; g1 multi_flit. Tag v0.8 bins (a `spec` field in `fc.json`). | Union FC **77.6% → ~82.7%** (−286 / +18 bins) with no new run | none | **S-M** | approve the bin removals (D2) | Done: every §3.1 fix is in the bins tables, and the v0.8 bins carry a `spec` tag. |
 | **WP3** | **Bug-avoiding variants** | (1) Reg bench `+reg_skip_known_bugs` entries. (2) tenstorrent/tt-oca-harness-aou#90-avoiding `aou_dw_test` (aligned, or size ≠ 6) on 1x256 and 4xmix. (3) Check-then-hard-reset variants of `invalid_actmsg` (per state and op) and the `act_ack` timeout. (4) Same for `id_mismatch` (029), if D8 allows. (5) A quiet `link_event` (`link_reset`, `inband_drop`, `linkerror`) without traffic or SW reset (021/024). (6) `err_resp` at matching remote widths (035). (7) `+FDI_ENC=RTL` runs of the linkerror and linkdown spec tests. | Code per config: SFR ~35 lines, ~80 cond, ~45 branches, ~1.5k bits; ACTIVATION FSM +1; dn_1024_256 and 3X1_256 CH2 ~6 lines, ~120 cond, ~37 branches, ~60k bits; ERROR_INFO 24 lines on 4xmix and 1x256; SFR/CORE_RP/SLV_AXI_INFO ~40 lines (029). FC: `cg_link_state` LinkReset/Disabled (~8 bins), `cg_act_op tx,illegal` (5). Plan: 20.4, 20.10, 20.12, 20.15, 20.16 (and 9.9, 9.10, 19.8 with D8). | WP2 for the act_op bins | **M** | D8 (weakened 029 check) | Partly: `+detect_only` (029) and the aligned `aou_dw_test` on both 4xmix builds are done; the reg skip-known-bugs entries, check-then-hard-reset `invalid_actmsg`/`act_ack`, a quiet `link_event`, matching-width `err_resp`, `+FDI_ENC=RTL` spec runs and a 1x256 aligned entry are missing. |
-| **WP4** | **AXI stimulus knobs** | `+lock_pct` and remote EXOKAY for exclusive pairs; `+max_len=255`; `+max_id=1023`; a low address window per RP; programming MAX_AWBURSTLEN/ARBURSTLEN=255 for long M-port bursts; deep outstanding and long back-pressure at max outstanding (`+dp_batch=64`, slow remote B/R, `cyc_gt_1k`); narrow and unaligned through converters on every config; `+fixed_pct/+wrap_pct` **only after D1**. New AXI-S06 attribute check. | FC: about 168 AXI4 attribute and OS/BP bins and most of the 288 legal `cx_size_x_len` cells; `txn_cg` legal FIXED/WRAP (106) after D1. Code: upsizer and downsizer back-pressure cond, AXI4MUX AW FIFO full, RDATA_ORDER, and pending-table toggles. Plan: 4.25-4.28, 5.23-5.26, 8.3, 8.6, 8.14 (and 4.16/4.17 after D1). | D1 for FIXED/WRAP; maybe BUGS/039 | **M** | D1 | Partly: exclusives with EXOKAY, the attribute check (`aou_attr_test`), W-first and R-interleave, high IDs and 64-deep M-port tables are done; `+max_len`/`+max_id` for random traffic, a low address window per RP and back-pressure over 1k cycles are missing (FIXED/WRAP dropped by D1). |
+| **WP4** | **AXI stimulus knobs** | `+lock_pct` and remote EXOKAY for exclusive pairs; `+max_len=255`; `+max_id=1023`; a low address window per RP; programming MAX_AWBURSTLEN/ARBURSTLEN=255 for long M-port bursts; deep outstanding and long back-pressure at max outstanding (`+dp_batch=64`, slow remote B/R, `cyc_gt_1k`); narrow and unaligned through converters on every config; `+fixed_pct/+wrap_pct` **only after D1**. New AXI-S06 attribute check. | FC: about 168 AXI4 attribute and OS/BP bins and most of the 288 legal `cx_size_x_len` cells; `txn_cg` legal FIXED/WRAP (106) after D1. Code: upsizer and downsizer back-pressure cond, AXI4MUX AW FIFO full, RDATA_ORDER, and pending-table toggles. Plan: 4.25-4.28, 5.23-5.26, 8.3, 8.6, 8.14 (and 4.16/4.17 after D1). | D1 for FIXED/WRAP | **M** | D1 | Partly: exclusives with EXOKAY, the attribute check (`aou_attr_test`), W-first and R-interleave, high IDs and 64-deep M-port tables are done; `+max_len`/`+max_id` for random traffic, a low address window per RP and back-pressure over 1k cycles are missing (FIXED/WRAP dropped by D1). |
 | **WP5** | **FDI corner stimulus and r2.0 adopt items (FC3)** | `aou_fdi_t1_bringup_corner_test` with the three LSM extensions (event-at-state, wake_ack delay, LP-initiated L1 exit); `pulse_sw` retrain; second-half and repeated flit cancel; stall hold and latency knobs; the nine r2.0 adopt items (NOP flit R20-04, stall sequences R20-02/03, LinkError hold R20-09, remote link-down R20-11, reset-zero R20-01, inband rule R20-07, re-cites); `+active_phy=1` entries on the TP configs. | FSM **34 → 48/58**; `cg_bringup_fsm` +2; `cg_link_state` ~6; `l1.cg_fdi_cancel` +5 and `cg_fdi_stall` +6; new r2.0 bins (~25); plan 18.4/18.5 PHY1, new 18.13-18.25 | D7 (r2.0 asks) | **M-L** | D7 | Partly: second-half and repeated flit cancels, stall knobs, PHY1 entries and plan 18.13-18.26 are done; `aou_fdi_t1_bringup_corner_test`, its LSM extensions and a SW retrain pulse are missing, and the r2.0 items are blocked on D7. |
 | **WP6** | **Reset-in-state** | `aou_reset_test +when=retrain/apb_access/agg_halt` and the cycle-exact WAKE_ASSERT/DEACTIVATE/L1_CLK_WAKE/MI resets, **or** `-cm_fsmresetfilter` | FSM +9 (58/58), or denominator 49 | D4 | **S** (filter) / **M** (tests) | D4 | Done by the filter (D4): COV=1 builds pass `-cm_fsmresetfilter` (`COV_FSM_RESET=1` keeps the transitions), and an `XPROP` build checks reset behaviour. |
 | **WP7** | **Exclusions and toggle triage** | A reviewed `cov/cov_exclude.el` (or `-cm_noconst`) for D1-D9; a toggle triage script that maps untoggled ranges onto `packet_def_pkg` fields | Upsizer branch → 100%; ~10 FSM-default lines and branches; 1x256 PHY1 ~17 cond and branches; separates more than half of the 212k toggle bits as structural | D5, D6 | **S** after the decision | D5, D6 | Not started: no `.el` or `-cm_noconst` (deferred by D5) and no toggle triage script; only whole-module exclusions exist. |
@@ -747,7 +748,7 @@ from the owner.
 1. **D1: AXI WRAP/FIXED.**
    - The facts: AoU carries no AxBURST (INCR assumed, §2.5), and the converters compute
      addresses as INCR. A downsized WRAP becomes an illegal-length WRAP. The MAS is silent.
-   - Approve a bug/doc draft (BUGS/039) and an interim expectation, then WRAP/FIXED stimulus.
+   - Approve an interim expectation, then WRAP/FIXED stimulus.
    - Otherwise, declare WRAP/FIXED unsupported on the S port and drop `burst` from `axi.txn_cg`
      (−107 bins) and plan items 4.16/4.17.
 2. **D2: the FC2 bin corrections (§3.1, about 286 bins).**
@@ -771,7 +772,7 @@ from the owner.
      them, or re-model the bins per RP width?
 7. **D7: UCIe r2.0.**
    - Adopt the 9 rows marked adopt (R20-01 to -07, -09, -11)?
-   - R20-10: does r2.0's "any training trigger" change BUGS/038's framing or severity?
+   - R20-10: answered: restarting the link after a link-down is software's (owner decision).
    - R20-19: do the 32 B FDI configs (1x256-sp32, 2x512-tp32_64) stay in closure scope?
 8. **D8: weakened-check variants.** Allow the BUGS/029 "detect, then hard reset" variant for
    9.9, 9.10 and 19.8? It drops the 500-cycle acceptance check that 029 is about.

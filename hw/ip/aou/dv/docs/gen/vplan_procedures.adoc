@@ -1364,7 +1364,7 @@ stall and its release (FEAT-R15/R16), the vseq WRITE_RESP_DONE once drained.
 ----
 
 reports INT_EARLY_WDT_ERR while an AW waits at the limit (FEAT-R21 is not
-checked: O_PENDING_CNT_OVER, BUGS/005, was removed by PR #89 for the watchdog).
+checked: O_PENDING_CNT_OVER was removed by PR #89 for the watchdog).
 
 ----
 +early_toggle=1 (16.14): two traffic phases; between them, with every write

@@ -86,6 +86,9 @@
 - id: '1.9'
   title: Send ActivateReq while ENABLED; INVALID_ACTMSG and INT_REQ_LINKRESET, the ActivateAck is still sent
   note: 'Main #79 (MAS) - ActivateReq after the handshake has completed is a link error; the ack is still sent.'
+- id: '21.7'
+  title: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
+  note: 'Main #105 - TX_LP_MODE is static configuration, written only while DISABLED.'
 
 # Duplicates: the second ID reports through the first.
 - id: '2.4'
@@ -340,7 +343,7 @@
   title: 'Back-pressure on every AXI channel and on FDI trdy: throughput and correctness under stall'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '11.16'
-  added: 'integration guide; BUGS/016'
+  added: 'integration guide 3.1.1'
   priority: P2
   title: 'I_RESETN and I_PRESETN independent: each alone, in each order'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
@@ -391,7 +394,7 @@
   dropped: AXI_PEER_DIE_MAX_DATA_WD is a localparam fixed at 1024, the widest AoU data message; the RX data path is always sized for a 1024-bit remote die and there is no narrower build to test.
   note: Coverage-closure gap analysis 4.3 (decision D9) added it when the parameter was configurable; retired with the parameter (DECISIONS D9 amendment, 2026-10-20).
 - id: '16.17'
-  added: 'MAS 3.7.5; BUGS/005'
+  added: 'MAS 3.7.5'
   priority: P2
   title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; watchdog INT_EARLY_WDT_ERR observed, not checked)'
   note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. PR #89 replaced the signal with a write-transaction watchdog the MAS does not yet specify.'
@@ -401,7 +404,7 @@
   title: 'Retrain while ENABLED with traffic is transparent to AoU (interim expectation)'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '18.14'
-  added: 'UCIe r1.1 8.3.3.7, Table 8-2; BUGS/002'
+  added: 'UCIe r1.1 8.3.3.7, Table 8-2'
   priority: P2
   title: 'LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
@@ -471,7 +474,7 @@
   title: 'Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '22.7'
-  added: 'UCIe r1.1 8.3.3.8; BUGS/001 (owner decision 7)'
+  added: 'UCIe r1.1 8.3.3.8 (owner decision 7)'
   priority: P2
   title: 'Restart after link-down is software''s on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (BUGS/038, not a bug) when the owner assigned the restart to software.
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (not a bug) when the owner assigned the restart to software.

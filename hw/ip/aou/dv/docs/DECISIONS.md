@@ -1083,7 +1083,7 @@ have reached `hw/ip/aou`.
 - *An RTL change that clears the activation FSM on link-down.* It is neither
   sufficient (the queued TX flit survives) nor documented.
 
-The owner has since decided (BUGS/001, 2026-10-22) that a routine deactivation
+The owner has since decided (2026-10-22) that a routine deactivation
 leaves the FDI link up, that only an error takes it down from the IP, and that
 restarting the link after a reset or error is software's job on the UCIe
 controller, never the IP's. This decision's "software resets both dies,

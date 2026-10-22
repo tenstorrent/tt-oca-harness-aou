@@ -10,7 +10,7 @@ interface aou_irq_if (input logic clk);
   logic int_mi0_id_mismatch;
   logic int_early_resp_err;
   // Early-response write-transaction watchdog, INT_EARLY_WDT_ERR (PR #89). It
-  // replaces the per-RP O_PENDING_CNT_OVER that BUGS/005 found unconnected;
+  // replaces the per-RP O_PENDING_CNT_OVER, which was unconnected;
   // sampled for observation, no checker consumes it yet.
   logic int_early_wdt_err;
   logic int_activate_start;
