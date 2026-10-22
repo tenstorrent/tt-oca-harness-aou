@@ -357,6 +357,7 @@ module tb_top;
   assign fdi_lsm.lp_linkerror      = 1'b0;
 `endif
   assign fdi_lsm.act_st_disabled   = u_dut.w_aou_activate_st_disabled;
+  assign fdi_lsm.sw_reset          = u_dut.w_sw_reset;
   assign fdi_lsm.int_activate_start   = status.int_activate_start;
   assign fdi_lsm.int_deactivate_start = status.int_deactivate_start;
   assign status.activate_st_disabled = u_dut.w_aou_activate_st_disabled;

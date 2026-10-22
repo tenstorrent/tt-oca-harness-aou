@@ -78,6 +78,7 @@ class aou_lsm_monitor extends uvm_monitor;
     o.int_deactivate = lsm_vif.mon_cb.int_deactivate_start === 1'b1;
     o.req_linkreset  = lsm_vif.mon_cb.int_req_linkreset === 1'b1;
     o.act_st_disabled = lsm_vif.mon_cb.act_st_disabled === 1'b1;
+    o.sw_reset       = lsm_vif.mon_cb.sw_reset === 1'b1;
     return o;
   endfunction
 

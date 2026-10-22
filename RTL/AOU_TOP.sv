@@ -329,6 +329,7 @@ import packet_def_pkg::*;
     logic        w_aou_req_linkreset;
     logic        w_int_activate_start;
     logic        w_int_deactivate_start;
+    logic        w_sw_reset;
 
     // Mux pl_state_sts / stallreq based on active PHY. Under TWO_PHY both PHYs
     // are valid and I_PHY_TYPE selects which one drives the bringup
@@ -378,6 +379,7 @@ import packet_def_pkg::*;
         .I_SW_DEACTIVATE_START      ( I_SW_DEACTIVATE_START         ),
         .I_SW_RETRAIN_REQ           ( I_SW_RETRAIN_REQ              ),
         .I_SW_LINKERROR_INJECT      ( I_SW_LINKERROR_INJECT         ),
+        .I_SW_RESET                 ( w_sw_reset                    ),
 
         .O_FSM_STATE                ( O_FDI_FSM_STATE               ),
         .O_LINK_UP                  ( O_FDI_LINK_UP                 )
@@ -577,6 +579,7 @@ import packet_def_pkg::*;
         .O_AOU_ACTIVATE_ST_DISABLED  ( w_aou_activate_st_disabled    ),
         .O_AOU_ACTIVATE_ST_ENABLED   ( w_aou_activate_st_enabled     ),
         .O_AOU_REQ_LINKRESET         ( w_aou_req_linkreset           ),
+        .O_SW_RESET                  ( w_sw_reset                    ),
 
         .TIEL_DFT_MODESCAN           ( TIEL_DFT_MODESCAN             )
     );

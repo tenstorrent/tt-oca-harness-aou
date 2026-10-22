@@ -69,6 +69,7 @@ module AOU_FDI_BRINGUP_CTRL (
     input  logic        I_SW_DEACTIVATE_START,
     input  logic        I_SW_RETRAIN_REQ,
     input  logic        I_SW_LINKERROR_INJECT,
+    input  logic        I_SW_RESET,          // AOU_CON0.AOU_SW_RESET in effect
 
     // ----------------------------------------------------------------
     // Status outputs
@@ -145,6 +146,30 @@ module AOU_FDI_BRINGUP_CTRL (
             r_pl_inband_pres_d1 <= 1'b0;
         end else begin
             r_pl_inband_pres_d1 <= I_PL_INBAND_PRES;
+        end
+    end
+
+    // ================================================================
+    // AOU_SW_RESET seen since LINKERROR entry
+    //
+    // A LinkError may leave Active in the middle of a flit in either
+    // direction (UCIe r1.1 8.3.3.7). AOU_CORE's FDI data paths keep
+    // their beat position across it and are cleared only by
+    // AOU_CON0.AOU_SW_RESET, which the MAS LinkReset sequence already
+    // requires. Until software has applied that reset the link is held
+    // down: LINKERROR keeps requesting Reset and does not leave for
+    // RESET, so a flit abandoned by the LinkError can never be resumed
+    // against a fresh Adapter flit boundary.
+    // ================================================================
+    logic r_sw_reset_seen;
+
+    always_ff @(posedge I_CLK or negedge I_RESETN) begin
+        if (!I_RESETN) begin
+            r_sw_reset_seen <= 1'b0;
+        end else if (r_cur_st != ST_LINKERROR) begin
+            r_sw_reset_seen <= 1'b0;
+        end else if (I_SW_RESET) begin
+            r_sw_reset_seen <= 1'b1;
         end
     end
 
@@ -251,10 +276,11 @@ module AOU_FDI_BRINGUP_CTRL (
 
             // ----------------------------------------------------------
             // LINKERROR: Drive lp_state_req = RESET. Wait for PL to
-            // reach RESET, then restart.
+            // reach RESET and for software to apply AOU_SW_RESET (in
+            // either order), then restart.
             // ----------------------------------------------------------
             ST_LINKERROR: begin
-                if (w_pl_reset) begin
+                if (w_pl_reset && r_sw_reset_seen) begin
                     w_nxt_st = ST_RESET;
                 end
             end

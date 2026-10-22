@@ -207,6 +207,12 @@ software pulses `I_SW_ACTIVATE_START` after `sw_restart_delay` cycles
 trains again by itself, like an Adapter or remote die that restarts the link
 without the trigger.
 
+After a LinkError the DUT holds the link down until software has written
+`AOU_CON0.AOU_SW_RESET` (integration guide §6.6.3). In the FDI T1 tests that
+write comes from the test itself, a random number of cycles after
+`O_FDI_FSM_STATE` reports LinkError; `+sw_reset_delay_max=N` bounds the delay
+(default 300). The lifecycle tests reset through `recover()` as before.
+
 `+pclk_ps=<period in ps>` sets the APB clock of the T1 and register benches
 (default 10000, 100 MHz; the core clock stays 1 GHz). The APB bridge is
 asynchronous (integration guide 8.5.3), so the testlists try slow (40000),

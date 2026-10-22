@@ -29,6 +29,7 @@ class aou_lsm_obs extends uvm_sequence_item;
   bit             int_deactivate = '0;
   bit             req_linkreset = '0;
   bit             act_st_disabled = '0;
+  bit             sw_reset = '0;
 
   function new(string name = "aou_lsm_obs");
     super.new(name);

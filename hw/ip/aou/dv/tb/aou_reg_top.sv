@@ -68,7 +68,7 @@ module aou_reg_top;
   wire [FDI_W-1:0]                lp_data;
   wire                            lp_valid, lp_irdy, lp_stallack;
   wire [6:0]                      irq;
-  wire                            st_disabled, st_enabled, req_linkreset;
+  wire                            st_disabled, st_enabled, req_linkreset, sw_reset;
 
   AOU_CORE_TOP #(
       .RP_COUNT       (RP_COUNT),
@@ -192,6 +192,7 @@ module aou_reg_top;
       .O_AOU_ACTIVATE_ST_DISABLED(st_disabled),
       .O_AOU_ACTIVATE_ST_ENABLED (st_enabled),
       .O_AOU_REQ_LINKRESET       (req_linkreset),
+      .O_SW_RESET                (sw_reset),
 
       .TIEL_DFT_MODESCAN(1'b0)
   );

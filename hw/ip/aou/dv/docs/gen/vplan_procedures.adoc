@@ -185,7 +185,12 @@ poisoned cancelled halves and bubbles go to the DUT RX;
 3. APB AOU_INIT.activate_start (0x08 bit 0) makes the core send an
 ActivateReq, which the L1 monitor must capture on the DUT TX;
 4. link events (Retrain, L1 entry/exit) and more flits.
-The bringup model and the L1/L2 rule checks run throughout.
+The bringup model and the L1/L2 rule checks run throughout. Software's
+part of LinkError recovery (MAS §7.3.6) runs in the background: once
+O_FDI_FSM_STATE reports LinkError it writes AOU_CON0.AOU_SW_RESET after a
+random delay (+sw_reset_delay_max=N bounds it), before or after the
+Adapter has reached Reset. Until then the DUT must hold the link down
+(guide §6.6.3), which the bringup model checks.
 
 *Procedure.* The class's own `run_phase` (see the file).
 

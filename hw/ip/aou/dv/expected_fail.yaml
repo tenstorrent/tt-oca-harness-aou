@@ -1854,31 +1854,6 @@
   check: 'T1-DFT02: aou_core.lp_linkreset.msgcredit_time_out_value read 0x0, expected 0x6'
   note: the SFRs are held in reset in scan mode, so the marker reads 0 (before and after the AOU_SW_RESET write)
 
-# BUGS/056: after a LinkError entered mid-DUT-TX-flit (+le_mid_flit_pct, plan 18.23) the
-# DUT's TX beat counter keeps the abandoned flit's position, so every later flit reaches
-# the Adapter shifted (FDI-R45 on the Flit Header and CRC bytes). When the Adapter then
-# leaves Active at what it counts as a boundary, the DUT is mid-flit (FDI-R43, FDI-R02).
-# The plain link-stress runs never leave Active mid-flit, hence seed_dependent.
-- test: aou_fdi_t1_link_stress_test
-  bug: BUGS/056
-  check_re: 'FDI-R45: phy\d+ Adapter-owned bytes: FH='
-  seed_dependent: true
-  note: UCIe r1.1 8.3.3.7 requires the upper layer to clean up its data path in LinkError
-
-- test: aou_fdi_t1_link_stress_test
-  bug: BUGS/056
-  requires: BUGS/056
-  check_re: 'FDI-R43: phy\d+ TX flit starts while pl_state_sts='
-  seed_dependent: true
-  note: follow-on of the shifted TX flits; the DUT is mid-flit when the Adapter leaves Active
-
-- test: aou_fdi_t1_link_stress_test
-  bug: BUGS/056
-  requires: BUGS/056
-  check_re: 'FDI-R02: phy\d+ bubble inside a TX flit at beat'
-  seed_dependent: true
-  note: follow-on of the shifted TX flits; the Adapter's flit boundary falls inside a DUT flit
-
 # Plan 1.10, 2.5, 2.10, 2.12, 3.20/3.23/3.25: deactivations in these tests meet the same
 # credit-after-DeactivateAck findings as the activation tests.
 

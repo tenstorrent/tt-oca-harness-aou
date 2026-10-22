@@ -63,6 +63,15 @@
 // protocol layer hold it back). Until then BRG_RESET predicts NOP and
 // lp_wake_req=0 (FDI-M01/M02).
 //
+// LinkError holds the link down until software has applied
+// AOU_CON0.AOU_SW_RESET (guide §6.6.3, MAS §7.3.6): a LinkError can
+// interrupt a flit in either direction and only that reset clears the
+// DUT's data-path position. So BRG_LINKERROR leaves for BRG_RESET only once
+// the Adapter reports Reset and a software reset has been seen since the
+// LinkError began (either order). With fdi_enc=SPEC the Active request
+// that takes the Adapter from LinkError to Reset is still expected; once
+// the Adapter is in Reset the prediction returns to NOP for the hold.
+//
 // Any other output that differs from the prediction for more than ref_slack
 // cycles is an error (FDI-M01..M07). Where the guide is silent the interim
 // expectations are listed in BUGS/011.
@@ -80,6 +89,8 @@ class aou_bringup_model extends uvm_object;
   local bit          le_seen;      // the Adapter has reported LinkError since
   local bit          le_raised;    // lp_linkerror has been high since
   local bit          le_fell;      // ... and has fallen before the Adapter reported LinkError
+  local bit          le_pl_reset;  // the Adapter has reported Reset since the LinkError began
+  local bit          le_sw_reset;  // a software reset has been seen since LINKERROR entry
   local bit          rt_nop_seen;  // NOP on lp_state_req since Retrain entry
   local bit          rst_down;     // BRG_RESET entered after a link-down (fdi_enc=SPEC)
   local bit          rst_nop_seen; // NOP on lp_state_req since then
@@ -103,7 +114,8 @@ class aou_bringup_model extends uvm_object;
       BRG_REQ_ACTIVE, BRG_ACTIVE: return LSM_REQ_ACTIVE;
       BRG_RETRAIN:                return spec() ? LSM_REQ_NOP : LSM_REQ_RETRAIN;
       BRG_L1, BRG_L1_CLK_WAKE:    return LSM_REQ_L1;
-      BRG_LINKERROR:              return spec() && le_seen ? LSM_REQ_ACTIVE : LSM_REQ_NOP;
+      BRG_LINKERROR:              return spec() && le_seen && !le_pl_reset ? LSM_REQ_ACTIVE
+                                                                           : LSM_REQ_NOP;
       BRG_DEACTIVATE:             return spec() ? LSM_REQ_LINKRESET : LSM_REQ_NOP;
       BRG_LINKDOWN:               return LSM_REQ_ACTIVE;
       default:                    return LSM_REQ_NOP;
@@ -129,7 +141,10 @@ class aou_bringup_model extends uvm_object;
   // Why the prediction holds, for the states BUGS/001 item 4 is about.
   local function string why();
     case (st)
-      BRG_LINKERROR: return {" (Adapter reported LinkError: LinkError->Reset needs Active with ",
+      BRG_LINKERROR: return le_pl_reset ?
+                            {" (held down after a LinkError until AOU_SW_RESET; guide 6.6.3, ",
+                             "MAS 7.3.6)"} :
+                            {" (Adapter reported LinkError: LinkError->Reset needs Active with ",
                              "lp_linkerror=0, NOP is ignored; UCIe r1.1 8.3.3.7, Table 8-3)"};
       BRG_DEACTIVATE: return {" (teardown from Active: NOP is ignored there, request LinkReset ",
                               "or Disabled; UCIe r1.1 Table 8-3, 8.3.3.8)"};
@@ -195,6 +210,8 @@ class aou_bringup_model extends uvm_object;
       le_seen = 1'b0;
       le_raised = 1'b0;
       le_fell = 1'b0;
+      le_pl_reset = 1'b0;
+      le_sw_reset = 1'b0;
       rt_nop_seen = 1'b0;
       rst_down = 1'b0;
       rst_nop_seen = 1'b0;
@@ -279,13 +296,19 @@ class aou_bringup_model extends uvm_object;
 
     nxt = next_state(o);
     if (nxt != BRG_LINKERROR || o.sts == LSM_LINKERROR) check_linkerror_raised();
+    // The DUT registers the software reset it sees in LINKERROR and leaves on
+    // the registered flag, so the reset counts from the next clock.
+    if (st == BRG_LINKERROR && o.sw_reset) le_sw_reset = 1'b1;
     if (nxt == BRG_LINKERROR && st != BRG_LINKERROR) begin
       le_by_req = o.sts != LSM_LINKERROR;
       le_seen = 1'b0;
       le_raised = 1'b0;
       le_fell = 1'b0;
+      le_pl_reset = 1'b0;
+      le_sw_reset = 1'b0;
     end
     if (nxt == BRG_LINKERROR && o.sts == LSM_LINKERROR) le_seen = 1'b1;
+    if (nxt == BRG_LINKERROR && le_seen && o.sts == LSM_RESET) le_pl_reset = 1'b1;
     if (nxt == BRG_RETRAIN && st != BRG_RETRAIN) rt_nop_seen = 1'b0;
     if (nxt != BRG_RESET) rst_down = 1'b0;
     else if (st != BRG_RESET) rst_down = spec() && st inside {BRG_LINKERROR, BRG_UNWAKE_WAIT};
@@ -358,7 +381,7 @@ class aou_bringup_model extends uvm_object;
         if (o.sts == LSM_L1) return BRG_L1;
         if (pl_reset) return BRG_RESET;
       end
-      BRG_LINKERROR:     if (pl_reset) return BRG_RESET;
+      BRG_LINKERROR:     if (pl_reset && le_sw_reset) return BRG_RESET;
       BRG_RETRAIN:       if (pl_active) return BRG_ACTIVE;
       BRG_DEACTIVATE:    if (!spec() || pl_reset) return BRG_UNWAKE_WAIT;
       BRG_LINKDOWN:      if (pl_reset) return BRG_UNWAKE_WAIT;

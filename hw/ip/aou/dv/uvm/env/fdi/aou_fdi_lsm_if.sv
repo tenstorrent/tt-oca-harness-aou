@@ -40,6 +40,7 @@ interface aou_fdi_lsm_if (
   logic       int_deactivate_start;
   logic       int_req_linkreset;
   logic       act_st_disabled;
+  logic       sw_reset;               // AOU_CON0.AOU_SW_RESET in effect (AOU_CORE in reset)
 
   clocking drv_cb @(posedge clk);
     output pl_inband_pres, pl_clk_req, pl_wake_ack, pl_rx_active_req, phy_type,
@@ -53,7 +54,7 @@ interface aou_fdi_lsm_if (
           sw_activate_start, sw_deactivate_start, sw_retrain_req, sw_linkerror_inject,
           fdi_fsm_state, fdi_link_up,
           int_activate_start, int_deactivate_start, int_req_linkreset, act_st_disabled,
-          rst_n;
+          sw_reset, rst_n;
   endclocking
 
 endinterface

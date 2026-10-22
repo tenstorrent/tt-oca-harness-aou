@@ -285,6 +285,9 @@ set INT_CTRL_OUTPUTS {
 
 set_output_delay -clock clk_core $CORE_COMB_OUTPUT_DELAY [get_ports $INT_CTRL_OUTPUTS]
 
+# O_SW_RESET is driven straight from a register (r_sw_reset).
+set_output_delay -clock clk_core $CORE_REG_OUTPUT_DELAY [get_ports O_SW_RESET]
+
 # ==============================================================================
 # 13. Control inputs (combinational)
 # ==============================================================================

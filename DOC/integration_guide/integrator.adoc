@@ -40,7 +40,8 @@ bringup control, bringup status
 
 |B |[.monospaced]#++AOU_CORE_TOP++# |You have an external UCIe controller or custom FDI
 state machine |Must be handled externally |[.monospaced]#++I_INT_FSM_IN_ACTIVE++#,
-[.monospaced]#++O_AOU_ACTIVATE_ST_*++#, [.monospaced]#++O_AOU_REQ_LINKRESET++#
+[.monospaced]#++O_AOU_ACTIVATE_ST_*++#, [.monospaced]#++O_AOU_REQ_LINKRESET++#,
+[.monospaced]#++O_SW_RESET++#
 |=======================================================================
 
 ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
@@ -789,6 +790,9 @@ state indicator.
 |O_AOU_ACTIVATE_ST_ENABLED |output |1 |Activation state enabled.
 
 |O_AOU_REQ_LINKRESET |output |1 |AOU link reset request.
+
+|O_SW_RESET |output |1 |[.monospaced]#++AOU_CON0.AOU_SW_RESET++# in effect: AOU_CORE
+is held in reset this cycle (registered).
 |=======================================================================
 
 * [.monospaced]#++I_INT_FSM_IN_ACTIVE++# is an input signal that indicates that the
@@ -811,6 +815,13 @@ is asserted to notify the UCIE_CORE.
 * [.monospaced]#++O_AOU_REQ_LINKRESET++# is asserted together with
 [.monospaced]#++INT_REQ_LINKRESET++# when the AOU_CORE detects an AoU protocol
 violation, to notify the UCIE_CORE.
+* [.monospaced]#++O_SW_RESET++# is asserted while
+[.monospaced]#++AOU_CON0.AOU_SW_RESET++# holds AOU_CORE in reset. An external FDI
+state machine should use it the way [.monospaced]#++AOU_FDI_BRINGUP_CTRL++# does
+(xref:aou-ig-supported-state-transitions[Section 6.6.3]): after a LinkError,
+AOU_CORE's FDI data paths keep the position of the flit the LinkError
+interrupted until this reset, so the link must not return to Active before
+it has been applied.
 
 [[aou-ig-dft]]
 === 3.13 DFT
@@ -1001,6 +1012,10 @@ Fed back to bringup FSM.
 
 |O_AOU_REQ_LINKRESET |output |Protocol-level LinkReset request. Fed back
 to bringup FSM.
+
+|O_SW_RESET |output |[.monospaced]#++AOU_CON0.AOU_SW_RESET++# in effect. Fed
+back to bringup FSM, which holds the link down after a LinkError until it
+has been seen.
 |=======================================================================
 
 
@@ -1400,7 +1415,8 @@ or [.monospaced]#++I_SW_LINKERROR_INJECT++#
 
 |ACTIVE |L1 |[.monospaced]#++pl_state_sts = L1++# (PL-initiated only)
 
-|LINKERROR |RESET |[.monospaced]#++pl_state_sts = RESET++#
+|LINKERROR |RESET |[.monospaced]#++pl_state_sts = RESET++# AND
+[.monospaced]#++AOU_CON0.AOU_SW_RESET++# applied since LINKERROR entry (either order)
 
 |RETRAIN |ACTIVE |[.monospaced]#++pl_state_sts = ACTIVE++#
 
@@ -1416,6 +1432,25 @@ or [.monospaced]#++I_SW_LINKERROR_INJECT++#
 
 |L1_CLK_WAKE |WAKE_ASSERT |Unconditional (1 cycle, asserts [.monospaced]#++lp_clk_ack++#)
 |=======================================================================
+
+*LinkError recovery.* A LinkError may take the Adapter out of ACTIVE in
+the middle of a flit in either direction. AOU_CORE's FDI data paths keep
+the position of that flit, and only [.monospaced]#++AOU_CON0.AOU_SW_RESET++# clears
+it, so the FSM holds the link down in LINKERROR
+([.monospaced]#++lp_state_req = RESET++#, [.monospaced]#++O_FDI_FSM_STATE = LinkError++#,
+[.monospaced]#++O_FDI_LINK_UP = 0++#) until software has applied that reset, whether
+the LinkError came from the Adapter, from [.monospaced]#++O_AOU_REQ_LINKRESET++# or
+from [.monospaced]#++I_SW_LINKERROR_INJECT++#. [.monospaced]#++pl_clk_req++# is still
+acknowledged meanwhile, but does not restart the link. Recovery is the
+LinkReset sequence of
+xref:../MAS/software-operation.adoc#aou-736-pm-entry--linkreset--linkdisabled-sequence[MAS Section 7.3.6]:
+software observes [.monospaced]#++O_FDI_FSM_STATE = LinkError++# (or
+[.monospaced]#++INT_REQ_LINKRESET++#, when AOU_CORE raised the error), writes
+[.monospaced]#++AOU_SW_RESET++#, reprograms the configuration registers, and starts
+bringup again with an activation request. The FSM then leaves LINKERROR
+once [.monospaced]#++pl_state_sts = RESET++# and passes through RESET and
+WAIT_PRESENCE as after a cold reset. Integrators of
+[.monospaced]#++AOU_CORE_TOP++# get the reset on [.monospaced]#++O_SW_RESET++#.
 
 [[aou-ig-phy-type-mux]]
 ==== 6.6.4 PHY Type Mux

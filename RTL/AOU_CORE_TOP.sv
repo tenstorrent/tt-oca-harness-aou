@@ -324,6 +324,9 @@ import packet_def_pkg::*;
     output                                          O_AOU_ACTIVATE_ST_DISABLED,
     output                                          O_AOU_ACTIVATE_ST_ENABLED,
     output                                          O_AOU_REQ_LINKRESET,
+    // AOU_CON0.AOU_SW_RESET in effect: AOU_CORE is held in reset this cycle.
+    // The FDI bringup controller releases a LinkError hold on it.
+    output                                          O_SW_RESET,
 
     //DFT signal
     input                                           TIEL_DFT_MODESCAN
@@ -857,5 +860,6 @@ import packet_def_pkg::*;
     assign INT_SI0_ID_MISMATCH  = w_axi_slv_rid_mismatch_error || w_axi_slv_bid_mismatch_error;
     assign INT_MI0_ID_MISMATCH  = w_err_info_rid_mismatch_err || w_err_info_split_bid_mismatch_err;
     assign O_AOU_REQ_LINKRESET  = w_int_aou_req_linkreset;
+    assign O_SW_RESET           = r_sw_reset;
 
 endmodule

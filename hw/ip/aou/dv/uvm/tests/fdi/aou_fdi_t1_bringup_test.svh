@@ -10,7 +10,12 @@
 // 3. APB AOU_INIT.activate_start (0x08 bit 0) makes the core send an
 //    ActivateReq, which the L1 monitor must capture on the DUT TX;
 // 4. link events (Retrain, L1 entry/exit) and more flits.
-// The bringup model and the L1/L2 rule checks run throughout.
+// The bringup model and the L1/L2 rule checks run throughout. Software's
+// part of LinkError recovery (MAS §7.3.6) runs in the background: once
+// O_FDI_FSM_STATE reports LinkError it writes AOU_CON0.AOU_SW_RESET after a
+// random delay (+sw_reset_delay_max=N bounds it), before or after the
+// Adapter has reached Reset. Until then the DUT must hold the link down
+// (guide §6.6.3), which the bringup model checks.
 class aou_fdi_t1_bringup_test extends uvm_test;
   `uvm_component_utils(aou_fdi_t1_bringup_test)
 
@@ -22,7 +27,9 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   virtual aou_fdi_lsm_if lsm_vif;
 
   int unsigned link_timeout = 20000;
+  int unsigned sw_reset_delay_max = 300;
   int unsigned n_flits_sent;
+  int unsigned n_sw_reset;
   bit          saw_linkreset;
 
   function new(string name, uvm_component parent);
@@ -39,6 +46,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       `uvm_fatal(get_type_name(), "no apb in config_db")
     if (!uvm_config_db #(virtual aou_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
       `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
+    void'($value$plusargs("sw_reset_delay_max=%d", sw_reset_delay_max));
     configure();
   endfunction
 
@@ -63,6 +71,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
     fork
       collect_tx();
       watch_linkreset();
+      sw_reset_on_linkerror();
     join_none
 
     while (lsm_vif.mon_cb.rst_n !== 1'b1 || lsm_vif.mon_cb.pl_inband_pres !== 1'b1)
@@ -172,6 +181,37 @@ class aou_fdi_t1_bringup_test extends uvm_test;
     end
   endtask
 
+  // Software's LinkError handling (MAS §7.3.6): AOU_CON0.AOU_SW_RESET once
+  // O_FDI_FSM_STATE reports LinkError, after a random delay. The state is
+  // matched in both encodings, since software knows the one its DUT has.
+  // The write lands only after the Adapter has left Active: AOU_CORE's TX
+  // is gated by pl_state_sts alone, so a reset while the Adapter still
+  // accepts flits would tear the one in flight. A working Adapter answers
+  // lp_state_req within cycles, long before any interrupt service; the
+  // wait only matters when it does not (fdi_enc=SPEC, where the Adapter
+  // does not recognise the DUT's LinkError request).
+  local task sw_reset_on_linkerror();
+    bit ok;
+    logic [3:0] le_rtl = sts_code(LSM_LINKERROR, AOU_FDI_ENC_RTL, ok);
+    logic [3:0] le_spec = sts_code(LSM_LINKERROR, AOU_FDI_ENC_SPEC, ok);
+    forever begin
+      int unsigned delay;
+      @(lsm_vif.mon_cb);
+      if (!(lsm_vif.mon_cb.fdi_fsm_state === le_rtl || lsm_vif.mon_cb.fdi_fsm_state === le_spec))
+        continue;
+      while (env.lsm.drv.state == LSM_ACTIVE) @(lsm_vif.mon_cb);
+      delay = $urandom_range(sw_reset_delay_max);
+      repeat (delay) @(lsm_vif.mon_cb);
+      `uvm_info(get_type_name(), $sformatf(
+                "LinkError: software writes AOU_CON0.AOU_SW_RESET (+%0d cycles, pl_state_sts %s)",
+                delay, env.lsm.drv.state.name()), UVM_LOW)
+      apb_write(32'h0000_0004, 32'h0000_0010);
+      n_sw_reset++;
+      while (lsm_vif.mon_cb.fdi_fsm_state === le_rtl || lsm_vif.mon_cb.fdi_fsm_state === le_spec)
+        @(lsm_vif.mon_cb);
+    end
+  endtask
+
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
     if (msg_log.n_activate_req == 0) `uvm_error(get_type_name(), "no ActivateReq captured")
@@ -190,6 +230,9 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   function void report_phase(uvm_phase phase);
     string q[$];
     super.report_phase(phase);
+    if (n_sw_reset != 0)
+      `uvm_info(get_type_name(), $sformatf("%0d AOU_SW_RESET writes after LinkError", n_sw_reset),
+                UVM_LOW)
     aou_rule_log::lines(q);
     foreach (q[i]) `uvm_info(get_type_name(), q[i], UVM_NONE)
   endfunction
