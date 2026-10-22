@@ -2959,7 +2959,7 @@
 - id: '21.7'
   section: '2.21'
   section_title: Low Power Mode Tests
-  title: Switch between LP mode enabled/disabled
+  title: 'Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)'
   priority: P2
   old_test: aou_lp_mode_transition_test
 

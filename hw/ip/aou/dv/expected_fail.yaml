@@ -901,51 +901,6 @@
     52 on the current stimulus; first seen at seed 1 of an earlier one, waves rid.wp12tri,
     CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
 
-# BUGS/034: enabling TX_LP_MODE while a TX flit is in progress abandons the flit
-# after its first beat (FDI-R02); seen in 2xmix-tp64_128 and 1x256-sp32.
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/034
-  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
-  seed_dependent: true
-  note: the AOU_CON0.TX_LP_MODE write lands on beat 0 of an idle flit
-
-- test: aou_t1_lp_mode_test
-  bug: BUGS/034
-  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
-  seed_dependent: true
-  note: the AOU_CON0.TX_LP_MODE write lands on beat 0 of an idle flit
-
-# After the truncated flit AOU_FDI_CHECKER (single-PHY builds) counts beats from
-# the wrong flit start and decodes every later DUT flit as garbage.
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/034
-  check: 'AOU_FDI_CHECKER'
-  requires: BUGS/034
-  seed_dependent: true
-  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
-
-- test: aou_t1_lp_mode_test
-  bug: BUGS/034
-  check: 'AOU_FDI_CHECKER'
-  requires: BUGS/034
-  seed_dependent: true
-  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
-
-# aou_lp_mode_align_test aims the TX_LP_MODE write at chunk 0's lower half on a
-# half-width path, so every such build hits BUGS/034 at one sweep offset.
-- test: aou_lp_mode_align_test
-  bug: BUGS/034
-  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
-  seed_dependent: true
-  note: LP mode engages on the edge chunk 0's lower half goes out; only half-width builds (SP_32B, PHY0 of two-PHY)
-
-- test: aou_lp_mode_align_test
-  bug: BUGS/034
-  check: 'AOU_FDI_CHECKER'
-  requires: BUGS/034
-  seed_dependent: true
-  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
-
 # BUGS/035: the debug-window read of an RP narrower than the remote die is split
 # into a burst that AOU_ERROR_INFO answers with one beat, so it never completes.
 # Only builds with a 256-bit RP (4xmix4211-sp128, 4xmix2144-sp64, 1x256-sp32) reach it.

@@ -11,8 +11,10 @@
 //                                ceil(W / max(T+1, flit cycles)) + 1
 //                                (BUGS/017 interim).
 // Traffic both ways runs in LP mode, so the remote side completes only if the
-// DUT still returns credits (21.6), and the mode is switched on and off
-// mid-traffic (21.7).
+// DUT still returns credits (21.6). TX_LP_MODE and its threshold are static
+// configuration, written only while the DUT is DISABLED (T1-LP03), so every
+// mode change is a new activation session: deactivate, program, activate,
+// run traffic (21.7).
 // Knobs: +threshold=0..255 (random, 0 one time in three) +T1_TXN.
 class aou_lp_mode_traffic_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_lp_mode_traffic_vseq)
@@ -42,7 +44,7 @@ class aou_lp_mode_traffic_vseq extends aou_link_base_vseq;
     if (base < win / FLIT_CYCLES / 4)
       `uvm_error(get_type_name(), $sformatf("T1-L20: TX_LP_MODE=0 but %0d flits in %0d cycles",
                                             base, win))
-    lp_mode(1'b1, thr);
+    reprogram(1'b1, thr);
     check_traffic(num_txns);
     idle_flits(win);
     lp = idle_n;
@@ -54,21 +56,26 @@ class aou_lp_mode_traffic_vseq extends aou_link_base_vseq;
       `uvm_error(get_type_name(), $sformatf(
                  "T1-L22: LP heartbeat %0d flits in %0d cycles (threshold %0d, BUGS/017 interim)",
                  lp, win, thr))
-    // Mode changes while traffic runs must not lose or corrupt anything.
-    traffic_nb(AOU_T1_BOTH_DIRS, num_txns);
+    // Mode changes between sessions must not lose or corrupt anything.
     repeat ($urandom_range(4, 1)) begin
-      wait_cycles($urandom_range(400, 20));
-      lp_mode(1'($urandom_range(1)), $urandom_range(2) == 0 ? 0 : $urandom_range(255, 1));
+      reprogram(1'($urandom_range(1)), $urandom_range(2) == 0 ? 0 : $urandom_range(255, 1));
+      check_traffic(num_txns);
     end
-    wait_traffic();
-    drain();
-    lp_mode(1'b0, -1);
+    reprogram(1'b0, -1);
     idle_flits(win);
     lp = idle_n;
     if (lp < win / FLIT_CYCLES / 4)
       `uvm_error(get_type_name(), $sformatf("T1-L20: %0d idle flits after TX_LP_MODE returned to 0",
                                             lp))
     sw_deactivate();
+  endtask
+
+  // A new activation session with the mode programmed while DISABLED.
+  task reprogram(bit en, int threshold);
+    sw_deactivate();
+    ensure_link();
+    lp_mode(en, threshold);
+    sw_activate();
   endtask
 
   // idle_n: DUT flits received by the remote die in `win` cycles, after a settling

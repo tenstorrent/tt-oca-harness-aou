@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 227
+expected_count = 224
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -290,9 +290,6 @@ tests = [
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",
-  "aou_lp_mode_align_test.1x256-sp32",
-  "aou_lp_mode_align_test.2x512-tp32_64",
-  "aou_lp_mode_align_test.2xmix-tp64_128",
   "aou_reset_test.reset-sw",
   "aou_reset_test.reset-core.when-traffic",
   "aou_reset_test.reset-apb.when-traffic",
@@ -320,7 +317,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 441
+expected_count = 438
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -589,9 +586,6 @@ tests = [
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",
-  "aou_lp_mode_align_test.1x256-sp32",
-  "aou_lp_mode_align_test.2x512-tp32_64",
-  "aou_lp_mode_align_test.2xmix-tp64_128",
   "aou_reset_test.reset-sw",
   "aou_reset_test.reset-core.when-traffic",
   "aou_reset_test.reset-apb.when-traffic",
