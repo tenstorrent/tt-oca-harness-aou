@@ -210,9 +210,6 @@ import packet_def_pkg::*;
     output logic    [RP_CNT-1:0][1:0]                           O_AOU_TX_RDATA_DLENGTH,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_WRESPVALID,
 
-
-    input  logic                                                I_AOU_WRITEFULL_MSGTYPE_EN,
-
     input  logic    [7:0]                                       I_AOU_TX_LP_MODE_THRESHOLD,
     input  logic                                                I_AOU_TX_LP_MODE,
 
@@ -481,7 +478,7 @@ always_comb begin
     w_wdata_granule_size = 0;
     for (int unsigned i = 0 ; i < RP_CNT ; i ++) begin
         if (i == w_aou_fifo_w_rp) begin
-            w_wdata_granule_size = (I_AOU_WRITEFULL_MSGTYPE_EN && w_aou_fifo_wstrb_full) ? RP_NO_STRB_W_G_SIZE[i] : RP_W_G_SIZE[i];
+            w_wdata_granule_size = w_aou_fifo_wstrb_full ? RP_NO_STRB_W_G_SIZE[i] : RP_W_G_SIZE[i];
         end
     end
 end
@@ -685,7 +682,6 @@ AOU_TX_AXI_BUFFER
     .I_PRIOR_TIMER_TIMER_RESOLUTION         ( I_PRIOR_TIMER_TIMER_RESOLUTION    ),
     .I_PRIOR_TIMER_TIMER_THRESHOLD          ( I_PRIOR_TIMER_TIMER_THRESHOLD     ),
 
-    .I_AOU_WRITEFULL_MSGTYPE_EN             ( I_AOU_WRITEFULL_MSGTYPE_EN        ),
     .O_AOU_TX_B_FIFO_SVALID                 ( w_aou_tx_b_fifo_svalid            )
 );
 
@@ -844,7 +840,7 @@ always_comb begin
     if (w_aou_fifo_w_hs) begin
         for (int unsigned i = 0 ; i < RP_CNT ; i ++) begin
             if (w_aou_fifo_w_rp == i) begin
-                if (I_AOU_WRITEFULL_MSGTYPE_EN && w_aou_fifo_wstrb_full) begin
+                if (w_aou_fifo_wstrb_full) begin
                     for (int unsigned n=0; n < RP_NO_STRB_W_G_SIZE[i]; n++) begin
                         nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_wo_strb_message[n*40 +: 40];
                         nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);

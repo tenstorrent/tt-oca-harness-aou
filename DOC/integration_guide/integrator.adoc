@@ -119,11 +119,11 @@ Interoperability is also supported when the remote device uses a
 different AXI data width. AOU_CORE supports a configurable number of
 Resource Plane(RPs), with both the number of RPs and each RP’s AXI data
 width fully parameterizable. A dedicated field in the SFR allows
-software to configure the target RP, enabling flexible RP mapping. For
-each RP, the AW, W and AR channel support three arbitration modes: Round
-Robin, AXI QoS scheme, and Port QoS scheme. Additionally, a
-starvation-prevention mechanism is implemented to ensure fair
-arbitration across all RP channels.
+software to configure the target RP, enabling flexible RP mapping. The
+AW and AR channels are arbitrated between RPs with one of three schemes:
+Round Robin, AXI QoS, and Port QoS; W data follows the order of the
+granted AWs. Additionally, a starvation-prevention mechanism is
+implemented to ensure fair arbitration across all RPs.
 
 AOU_CORE_TOP implements the subset of FDI signals required specifically
 for transporting AXI across UCIe. FDI bringup/teardown and FDI sideband
@@ -190,7 +190,7 @@ require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY 
 physically exist.
 * Parameterized number of Resource Plane and each RP’s AXI data width
 * RP Remapping
-* QoS scheme between RP with AW, W, AR channel
+* QoS scheme between RPs on the AW and AR channels
 * Interoperability with different data width remote die
 * Handling of flit cancel and stall request as specified in the UCIe
 specification

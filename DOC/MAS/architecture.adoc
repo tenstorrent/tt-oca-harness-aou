@@ -49,20 +49,22 @@ xref:figure-3[Figure 3] shows the simplified block diagram of single RP AOU_TX_C
 [[figure-4]]
 image::image4.png[Figure 4. TX_CORE QoS Scheme]
 
-When multiple RP requests are issued from the TX core, a QoS scheme is applied. The TX core supports three QoS schemes: *Round-Robin*, *Port QoS*, and *AXI QoS*. Each transaction supports three QoS level: *High, Normal, Low.*
+When multiple RP requests are issued from the TX core, a QoS scheme is applied. The TX core supports three QoS schemes: *Round-Robin*, *Port QoS*, and *AXI QoS*, selected by PRIOR_RP_AXI.ARB_MODE. Each transaction has one of three QoS levels: *High, Normal, Low.*
 
-*Round-Robin (ARB_MODE = 2pass:[']b00)* : Round-robin arbitration between valid RP. When a handshake occurs, the RP that will receive the next grant is determined.
+The scheme arbitrates the AW and AR channels between RPs. W data is sent in the order of the granted AWs, and B and R responses are arbitrated round-robin whatever the scheme. The arbitration SFRs (PRIOR_RP_AXI and PRIOR_TIMER) are intended to be programmed before the link is activated. They may be written in mission mode, but the arbitration of requests already accepted or in flight is then not guaranteed.
+
+*Round-Robin (ARB_MODE = 2pass:[']b00)* : Round-robin arbitration between valid RP. When a handshake occurs, the RP that will receive the next grant is determined. ARB_MODE = 2pass:[']b11 is reserved and behaves as Round-Robin.
 
 [caption=""]
 .Figure 5. Round-Robin arbitration example
 [[figure-5]]
 image::image5.png[Figure 5. Round-Robin arbitration example]
 
-*Port QoS (ARB_MODE = 2pass:[']b01):* For each RP, the QoS level is configured by an SFR. Arbitration is performed based on the QoS value is the SFR. The AXI QoS field is not used for arbitration.
+*Port QoS (ARB_MODE = 2pass:[']b01):* For each RP, the QoS level is configured by an SFR. Arbitration is performed based on the QoS value in the SFR. The AXI QoS field is not used for arbitration.
 
-The port QoS is divided into three levels: High, Normal, and Low priority. Port QoS can be configured by setting PRIOR_RP_AXI.PRx_PRIOR. A 2-bit field is used for QoS and supports values from 1 to 3. If the field is set to 0, it is treated as 1.
+The port QoS is divided into three levels: High, Normal, and Low priority. Port QoS can be configured by setting PRIOR_RP_AXI.RPx_PRIOR. A 2-bit field is used for QoS: 3 is High, 2 is Normal and 1 is Low. If the field is set to 0, it is treated as 1 (Low). At reset RP0 and RP1 are Low, RP2 is Normal and RP3 is High.
 
-By default, arbitration is performed in the order *High → Normal → Low*. If a timeout occurs while a request is at Normal or Low priority, the request is promoted and treated as High priority. Timeout value can be configured by setting PRIOR_TIMER.TIMER_THRESHOLD. The resolution used for timeout determination can be configured through PRIOR_TIMER.TIMER_RESOLUTION.
+By default, arbitration is performed in the order *High → Normal → Low*. If a timeout occurs while a request is at Normal or Low priority, the request is promoted and treated as High priority. The timeout is configured by PRIOR_TIMER (see <<aou-321-starvation-prevention-timer>>).
 
 If multiple RPs have the same priority, arbitration among them is performed in a round-robin manner.
 
@@ -71,12 +73,19 @@ If multiple RPs have the same priority, arbitration among them is performed in a
 [[figure-6]]
 image::image6.png[Figure 6. Port QoS arbitration example]
 
-*AXI QoS (ARB_MODE = 2pass:[']b10):* For each RP, the QoS level is determined by the value of the AXI QoS field. Arbitration is performed based on the AXI QoS value. For the 4-bit AXI QoS field, the High and Normal boundaries are the SFR fields [.monospaced]#++AXI_QOS_TO_HP++# and [.monospaced]#++AXI_QOS_TO_NP++#. A QoS value at or above [.monospaced]#++AXI_QOS_TO_HP++# is High, a value at or above [.monospaced]#++AXI_QOS_TO_NP++# and below [.monospaced]#++AXI_QOS_TO_HP++# is Normal, and a value below [.monospaced]#++AXI_QOS_TO_NP++# is Low. [.monospaced]#++AXI_QOS_TO_HP++# must be greater than [.monospaced]#++AXI_QOS_TO_NP++#; otherwise the Normal tier is empty. The reset pair is High [.monospaced]#++0xA++# and Normal [.monospaced]#++0x5++#, so QoS 10–15 is High, 5–9 is Normal, and 0–4 is Low. By default, arbitration is performed in the order *High → Normal → Low*. If a timeout occurs while a request is at Normal or Low priority, the request is promoted and treated as High priority. If multiple RPs have the same priority, arbitration among them is performed in a round-robin manner.
+*AXI QoS (ARB_MODE = 2pass:[']b10):* For each RP, the QoS level is determined by the value of the AXI QoS field. Arbitration is performed based on the AXI QoS value. For the 4-bit AXI QoS field, the High and Normal boundaries are the SFR fields [.monospaced]#++AXI_QOS_TO_HP++# and [.monospaced]#++AXI_QOS_TO_NP++#. The classifier tests [.monospaced]#++AXI_QOS_TO_HP++# first: a QoS value at or above [.monospaced]#++AXI_QOS_TO_HP++# is High. Otherwise a value at or above [.monospaced]#++AXI_QOS_TO_NP++# is Normal, and a value below [.monospaced]#++AXI_QOS_TO_NP++# is Low. [.monospaced]#++AXI_QOS_TO_HP++# must be greater than [.monospaced]#++AXI_QOS_TO_NP++#. If it is not, the Normal tier is empty: every value at or above [.monospaced]#++AXI_QOS_TO_HP++# is High, including values that are also at or above [.monospaced]#++AXI_QOS_TO_NP++#, and every value below [.monospaced]#++AXI_QOS_TO_HP++# is Low. The reset pair is High [.monospaced]#++0xA++# and Normal [.monospaced]#++0x5++#, so QoS 10–15 is High, 5–9 is Normal, and 0–4 is Low. By default, arbitration is performed in the order *High → Normal → Low*. If a timeout occurs while a request is at Normal or Low priority, the request is promoted and treated as High priority (see <<aou-321-starvation-prevention-timer>>). If multiple RPs have the same priority, arbitration among them is performed in a round-robin manner.
 
 [caption=""]
 .Figure 7. AXI QoS arbitration example
 [[figure-7]]
 image::image7.png[Figure 7. AXI QoS arbitration example]
+
+[[aou-321-starvation-prevention-timer]]
+*Starvation-prevention timer (Port QoS and AXI QoS):* PRIOR_TIMER bounds how long a Normal or Low request can wait behind higher-priority traffic. Each RP has one TX request buffer for AW and one for AR. Each buffer has a 16-bit prescaler that advances every clock cycle while the buffer holds at least one request, holds its count while the buffer is empty, and ticks when it reaches PRIOR_TIMER.TIMER_RESOLUTION, that is once every TIMER_RESOLUTION + 1 cycles. TIMER_RESOLUTION = 0 ticks every cycle; 0xFFFF ticks every 65536 cycles.
+
+Every Normal or Low request in the buffer counts ticks from the cycle it is accepted, not from the time it reaches the head of its buffer. When its count reaches PRIOR_TIMER.TIMER_THRESHOLD, the request is arbitrated as High; the count saturates at TIMER_THRESHOLD. The prescaler is shared by all requests in a buffer and is not restarted when a request arrives, so the first tick a request sees comes 1 to TIMER_RESOLUTION + 1 cycles after acceptance. TIMER_THRESHOLD = 0 promotes every Normal and Low request at once, so all requests arbitrate as High and the result is round-robin. At the reset values (TIMER_RESOLUTION = TIMER_THRESHOLD = 0xF) a request is promoted about 225 to 240 cycles after acceptance.
+
+The timer runs in the Round-Robin scheme too but has no effect there.
 
 [[aou-33-rx_core]]
 === 3.3. RX_CORE

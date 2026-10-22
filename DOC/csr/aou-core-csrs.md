@@ -357,7 +357,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x18
 - Size: 0x4
 
-<p>QoS thresholds, per-RP priority levels, and arbitration mode.</p>
+<p>QoS thresholds, per-RP priority levels, and arbitration mode for the TX AW and AR request arbiters. Program this register before the link is activated. It may be written in mission mode, but the arbitration of requests already accepted or in flight is then not guaranteed.</p>
 
 | Bits|  Identifier  |Access|Reset|Name|
 |-----|--------------|------|-----|----|
@@ -377,23 +377,23 @@ Don't override. Generated from: aou_core
 
 #### arb_mode field
 
-<p>TX arbitration mode for multi-RP scheduling on AW, W, and AR channels. 0: Round-Robin between valid RPs. 1: Port QoS, priority is set per-RP via rp*_prior fields (3 levels: High/Normal/Low). 2: AXI QoS, priority is derived from the AXI QoS field with boundaries set by axi_qos_to_hp and axi_qos_to_np. For Port QoS and AXI QoS modes, a starvation-prevention timeout promotes lower-priority requests to high priority.</p>
+<p>TX arbitration mode between RPs on the AW and AR channels. W data is sent in the order of the granted AWs; B and R responses are arbitrated round-robin regardless of this field. 0: Round-Robin between valid RPs. 1: Port QoS, priority is set per-RP via the rp*_prior fields (3 levels: high/normal/low). 2: AXI QoS, priority is derived from the AXI AxQOS value with boundaries set by axi_qos_to_hp and axi_qos_to_np. 3: reserved, behaves as Round-Robin. In Port QoS and AXI QoS modes the highest tier present is served first and RPs at the same tier are served round-robin; the prior_timer starvation-prevention timeout promotes waiting normal and low priority requests to high priority.</p>
 
 #### rp0_prior field
 
-<p>Priority level for Resource Plane 0.</p>
+<p>Priority level for Resource Plane 0 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low). The reset value 0 makes RP0 low priority.</p>
 
 #### rp1_prior field
 
-<p>Priority level for Resource Plane 1.</p>
+<p>Priority level for Resource Plane 1 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low).</p>
 
 #### rp2_prior field
 
-<p>Priority level for Resource Plane 2.</p>
+<p>Priority level for Resource Plane 2 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low).</p>
 
 #### rp3_prior field
 
-<p>Priority level for Resource Plane 3.</p>
+<p>Priority level for Resource Plane 3 in Port QoS arbitration mode (arb_mode=1): 3 = high, 2 = normal, 1 = low; 0 is treated as 1 (low).</p>
 
 #### axi_qos_to_hp field
 
@@ -409,7 +409,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x1C
 - Size: 0x4
 
-<p>Timer resolution and threshold for priority escalation.</p>
+<p>Starvation-prevention timer for the Port QoS and AXI QoS arbitration modes (prior_rp_axi.arb_mode 1 or 2). Each per-RP TX request buffer (one per RP for AW and one per RP for AR) has a 16-bit prescaler that ticks once every timer_resolution + 1 clock cycles while the buffer holds at least one request, and holds its count while the buffer is empty. Every normal or low priority request in the buffer counts ticks from the cycle it is accepted; when its count reaches timer_threshold it is arbitrated as high priority. The prescaler is shared by the requests in a buffer and is not restarted when a request arrives, so the first tick a request sees comes 1 to timer_resolution + 1 cycles after acceptance. At the reset values a request is promoted about 225 to 240 cycles after acceptance. The timer runs in Round-Robin mode but has no effect there. Program this register before the link is activated. It may be written in mission mode, but the promotion of requests already waiting is then not guaranteed.</p>
 
 | Bits|   Identifier   |Access|Reset|Name|
 |-----|----------------|------|-----|----|
@@ -418,11 +418,11 @@ Don't override. Generated from: aou_core
 
 #### timer_threshold field
 
-<p>Priority timer threshold. In Port QoS and AXI QoS arbitration modes, if a normal or low priority request has been waiting longer than this threshold (in units of timer_resolution), it is promoted to high priority to prevent starvation.</p>
+<p>Priority timer threshold: the number of prescaler ticks a normal or low priority request waits before it is arbitrated as high priority. Counted from acceptance into the TX request buffer, not from reaching the head of the buffer; the count saturates at this value. 0 promotes every normal and low priority request at once, so all requests arbitrate as high priority and the result is round-robin.</p>
 
 #### timer_resolution field
 
-<p>Priority timer resolution. Configures the clock cycle granularity used for the starvation-prevention timeout in Port QoS and AXI QoS arbitration modes.</p>
+<p>Priority timer resolution: prescaler period minus one, in clock cycles. The prescaler ticks once every timer_resolution + 1 cycles; 0 ticks every cycle and 0xFFFF every 65536 cycles.</p>
 
 ### axi_split_tr_rp0 register
 
