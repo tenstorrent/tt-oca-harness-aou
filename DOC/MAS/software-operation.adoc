@@ -288,6 +288,7 @@ The DISABLED signal is asserted to indicate that deactivation has been completed
 
 * For lowering power, AOU_CORE uses low power mode. By setting AOU_CON0.TX_LP_MODE = 1, AOU_CORE only sends payload to FDI when there are remaining AXI messages to send. Since AOU_CORE need to send Credit when there are no remaining AXI messages, by setting AOU_CON0.TX_LP_MODE_THRESHOLD value, SW can configure the message transmission frequency.
 * AOU_CON0.TX_LP_MODE_THRESHOLD = 0 selects a fully-gated low-power mode: the periodic heartbeat is disabled and the TX only launches an FDI flit when there is real work to send (AXI traffic, CrdtGrant credit-return messages, or pending MsgCredit-header credits). Once a flit is started it always finishes; any granule slots that were not filled are sent as zeros and the corresponding MsgStart bits are 0.
+* AOU_CON0.TX_LP_MODE and AOU_CON0.TX_LP_MODE_THRESHOLD are static configuration. Program them only while the activation FSM is DISABLED (ACTIVATE_STATE_DISABLED = 1): before AOU_INIT.ACTIVATE_START, or after a deactivation has completed. They must not be changed while the link is activating, ENABLED or deactivating; the TX core may be in the middle of a flit, and the flit is not preserved across a change of mode.
 
 [caption=""]
 .Figure 22. Bubble inserted when Transmitter de-assert LP_VALID
