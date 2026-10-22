@@ -308,9 +308,22 @@ granule ring and the current packing state. 1: the chunk is computed from the
 look-ahead (next) packing state and ring contents and registered before the
 FDI output mux, so the FDI TX data leaves a register.
 
-|M_RD_MO_CNT |parameter |32 |Master read outstanding count.
+|M_RD_MO_CNT |parameter |32 |Number of remote read requests an RP keeps in
+service at its AXI manager port (one pending-ID table entry per request, from
+the first AR it issues for the request until the last R beat). A request the
+splitter cuts into sub-bursts ([.monospaced]#++AOU_SPLIT_TR_RPn.MAX_ARBURSTLEN++#,
+xref:../MAS/architecture.adoc#aou-36-axi-transaction-splitter[MAS Section 3.6])
+holds one entry for all of them, so the manager port may have up to
+[.monospaced]#++M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts
+outstanding, where [.monospaced]#++beats++# is the request's length at the
+manager port's data width. The local interconnect may back-pressure AR as usual.
 
-|M_WR_MO_CNT |parameter |32 |Master write outstanding count.
+|M_WR_MO_CNT |parameter |32 |Number of remote write requests an RP keeps in
+service at its AXI manager port (one pending-ID table entry per request, from
+the first AW it issues for the request until the last B). As for reads, a split
+request holds one entry for all of its sub-bursts, so the manager port may have
+up to [.monospaced]#++M_WR_MO_CNT x ceil(beats / (MAX_AWBURSTLEN + 1))++# write
+bursts outstanding.
 
 |RP0_AGG_WCH_FIFO_DEPTH ... RP3_AGG_WCH_FIFO_DEPTH |localparam in
 [.monospaced]#++AOU_CORE_TOP++# (parameter of [.monospaced]#++AOU_CORE++#) |16 |Depth of the per-RP
