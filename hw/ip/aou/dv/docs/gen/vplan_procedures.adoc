@@ -345,7 +345,10 @@ Class `aou_t1_lp_mode_test` extends `aou_base_test` (`uvm/tests/aou_t1_lp_mode_t
 TX low-power mode (plan 21.x). With TX_LP_MODE=0 the DUT keeps sending
 flits on an idle ENABLED link; with TX_LP_MODE=1 and threshold 0 it sends
 none without work (BUGS/017 interim: threshold 0 = no heartbeat). Traffic
-must pass in both modes.
+must pass in both modes. TX_LP_MODE is static configuration (T1-LP03), so
+each mode is its own activation session: deactivate, program, activate.
+
+*Rules named.* `T1-LP03`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -362,7 +365,7 @@ must pass in both modes.
 * 21.1: `tx_lp_mode=0`; verify continuous FDI transmission
 * 21.2: `tx_lp_mode=1`; verify TX only on pending traffic
 * 21.4: `tx_lp_mode_threshold = 0`; verify no idle flits
-* 21.7: Switch between LP mode enabled/disabled
+* 21.7: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
 
 [[aou-proc-aou_t1_inject_test]]
 ===== 10. `aou_t1_inject_test`
@@ -2730,9 +2733,13 @@ TX_LP_MODE=1, threshold T    a heartbeat: at least one flit and at most
 ceil(W / max(T+1, flit cycles)) + 1
 (BUGS/017 interim).
 Traffic both ways runs in LP mode, so the remote side completes only if the
-DUT still returns credits (21.6), and the mode is switched on and off
-mid-traffic (21.7).
+DUT still returns credits (21.6). TX_LP_MODE and its threshold are static
+configuration, written only while the DUT is DISABLED (T1-LP03), so every
+mode change is a new activation session: deactivate, program, activate,
+run traffic (21.7).
 Knobs: +threshold=0..255 (random, 0 one time in three) +T1_TXN.
+
+*Rules named.* `T1-LP03`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2752,65 +2759,10 @@ Knobs: +threshold=0..255 (random, 0 one time in three) +T1_TXN.
 * 21.4: `tx_lp_mode_threshold = 0`; verify no idle flits
 * 21.5: Test various `tx_lp_mode_threshold` values
 * 21.6: Verify credit-only flits still sent in LP mode
-* 21.7: Switch between LP mode enabled/disabled
-
-[[aou-proc-aou_lp_mode_align_test]]
-===== 56. `aou_lp_mode_align_test`
-Class `aou_lp_mode_align_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_lp_mode_align_test.svh`).
-
-*Purpose.* TX_LP_MODE written on the edge a flit's first half-chunk goes out, with a
-message waiting for the next cycle (aou_lp_mode_align_vseq, BUGS/034). The
-Adapter keeps pl_trdy high, and the remote die uses PHY0, the half-width
-path of the two-PHY builds.
-
-*Procedure.* Virtual sequence `aou_lp_mode_align_vseq` (`uvm/seq_lib/lifecycle/aou_lp_mode_align_vseq.svh`):
-
-TX_LP_MODE switched on at the edge where the lower half of a flit's first
-chunk goes out on a half-width FDI path (BUGS/034; MAS software-operation
-7.1 "Low Power mode": once a flit is started it always finishes). On
-SP_32B, and on PHY0 of the two-PHY builds, a 64- or 128-byte packing chunk
-leaves as two FDI beats, so the DUT has to keep the flit going between
-them even when the write makes it idle, and must not let a new message into
-that chunk.
-
-Each step, with pl_trdy high on every cycle the Adapter allows it:
-1. TX_LP_MODE=0, so the DUT sends empty flits back to back;
-2. pl_trdy is held low at a flit boundary, so the DUT waits on beat 0
-(chunk 0, lower half) of an empty flit;
-3. a local write to remote memory is started; it waits in the DUT behind
-the held TX, ready to enter the very next chunk;
-4. an APB read ends on a pclk edge, then TX_LP_MODE=1 with threshold 0 is
-written while pl_trdy returns `off` core cycles later, so beat 0
-transfers on one fixed edge relative to the register write;
-5. the write must complete and the link must drain.
-`off` sweeps a range that holds the edge where the register takes effect,
-so one step makes LP mode engage on exactly the beat-0 edge with the
-write's message waiting for the next cycle. Any bubble inside the flit is
-FDI-R02; a message that enters the half-sent chunk corrupts the flit (L3
-and AOU_FDI_CHECKER), or the write is lost (T1-V06) or wrong (scoreboard).
-The sweep stops at the first error.
-Knobs: +align_min=N +align_max=N (core cycles, default 0..63).
-
-*Rules named.* `FDI-R02`, `T1-V06`
-
-*Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
-
-*Scenarios.*
-
-[cols="3,2,1,1,3",options="header"]
-|===
-| Scenario | Arguments | Seeds | Target | Plan items
-| `aou_lp_mode_align_test.1x256-sp32` |  | 1-2 | `1x256-sp32` | 21.7
-| `aou_lp_mode_align_test.2x512-tp32_64` |  | 1 | `2x512-tp32_64` | 21.7
-| `aou_lp_mode_align_test.2xmix-tp64_128` |  | 1 | `2xmix-tp64_128` | 21.7
-|===
-
-*Plan items.*
-
-* 21.7: Switch between LP mode enabled/disabled
+* 21.7: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
 
 [[aou-proc-aou_reset_test]]
-===== 57. `aou_reset_test`
+===== 56. `aou_reset_test`
 Class `aou_reset_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_reset_test.svh`).
 
 *Purpose.* Software and hard resets mid-traffic, mid-activation and with queued messages (aou_reset_vseq).
@@ -2871,7 +2823,7 @@ rand +loops +T1_TXN.
 * 11.17: PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK
 
 [[aou-proc-aou_dft_scan_test]]
-===== 58. `aou_dft_scan_test`
+===== 57. `aou_dft_scan_test`
 Class `aou_dft_scan_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_dft_scan_test.svh`).
 
 *Purpose.* DFT scan mode and the software reset path (aou_dft_scan_vseq, plan 11.19).
@@ -2907,7 +2859,7 @@ to 0 (BUGS/052).
 * 11.19: DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path
 
 [[aou-proc-aou_mrp_test]]
-===== 59. `aou_mrp_test`
+===== 58. `aou_mrp_test`
 Class `aou_mrp_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_mrp_test.svh`).
 
 *Purpose.* Multi-RP traffic (plan 2.12): aou_mrp_vseq's scenarios with aou_mrp_chk's
@@ -2997,7 +2949,7 @@ MsgCredit order (round robin, 3.19)
 * 12.20: Local and remote RP_COUNT differ: the effective count is the smaller, and a larger remote die is configured down to it (AoU v0.8 6.2)
 
 [[aou-proc-aou_dest_rp_dup_test]]
-===== 60. `aou_dest_rp_dup_test`
+===== 59. `aou_dest_rp_dup_test`
 Class `aou_dest_rp_dup_test` extends `aou_dest_rp_test` (`uvm/tests/matrix/aou_dest_rp_dup_test.svh`).
 
 *Purpose.* [NEG] Duplicate DEST_RP values (plan 12.12, MAS 3.10.3): RP1 is mapped to
@@ -3029,7 +2981,7 @@ describes. Needs 4 RPs.
 * 12.12: [NEG] Configure duplicate `dest_rp` values; verify behavior
 
 [[aou-proc-aou_dw_test]]
-===== 61. `aou_dw_test`
+===== 60. `aou_dw_test`
 Class `aou_dw_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_dw_test.svh`).
 
 *Purpose.* Data width conversion (plan 2.14). The remote die's width per RP comes from
@@ -3119,7 +3071,7 @@ DLENGTH and that every targeted conversion happened.
 * 18.5: Configure `FDI_CFG_TP_64B_128B` with `+define+TWO_PHY`
 
 [[aou-proc-aou_dw_down1024_test]]
-===== 62. `aou_dw_down1024_test`
+===== 61. `aou_dw_down1024_test`
 Class `aou_dw_down1024_test` extends `aou_dw_test` (`uvm/tests/matrix/aou_dw_test.svh`).
 
 *Purpose.* A 1024-bit remote die on the 256-bit RPs (plan 14.5), 512 bits on the
@@ -3156,7 +3108,7 @@ every write as WriteData1024, through the 1024-bit downsizer.
 * 14.16: Verify narrow R data duplicated to match local bus width
 
 [[aou-proc-aou_perf_test]]
-===== 63. `aou_perf_test`
+===== 62. `aou_perf_test`
 Class `aou_perf_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_perf_test.svh`).
 
 *Purpose.* Performance (plan 2.10): aou_perf_vseq's windows (+perf_scn=S1..S5, or
@@ -3293,7 +3245,7 @@ the DUT; then one grant per RP releases them (10.7)
 * 18.5: Configure `FDI_CFG_TP_64B_128B` with `+define+TWO_PHY`
 
 [[aou-proc-aou_sanity_test]]
-===== 64. `aou_sanity_test`
+===== 63. `aou_sanity_test`
 Class `aou_sanity_test` extends `aou_base_test` (`uvm/tests/aou_sanity_test.svh`).
 
 *Purpose.* Bring-up gate test and the default T1 test: the DUT comes up through the
@@ -3317,7 +3269,7 @@ simulator seed; +T1_TXN=<n> sets the transaction count (default 8).
 
 ==== Register bench (`aou_reg_top`, APB only)
 [[aou-proc-aou_reg_hw_reset_test]]
-===== 65. `aou_reg_hw_reset_test`
+===== 64. `aou_reg_hw_reset_test`
 Class `aou_reg_hw_reset_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_hw_reset_test.svh`).
 
 *Purpose.* Reset values of every register against the RDL (uvm_reg_hw_reset_seq).
@@ -3340,7 +3292,7 @@ Class `aou_reg_hw_reset_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_re
 * 20.14: Verify all registers reset to documented values
 
 [[aou-proc-aou_reg_bit_bash_test]]
-===== 66. `aou_reg_bit_bash_test`
+===== 65. `aou_reg_bit_bash_test`
 Class `aou_reg_bit_bash_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_bit_bash_test.svh`).
 
 *Purpose.* Walks a 1 and a 0 through every bit of every register (uvm_reg_bit_bash_seq).
@@ -3381,7 +3333,7 @@ are bashed: writing 1 to a clear flag must leave it 0.
 * 20.13: Read/W1C slave ID errors
 
 [[aou-proc-aou_reg_access_test]]
-===== 67. `aou_reg_access_test`
+===== 66. `aou_reg_access_test`
 Class `aou_reg_access_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_access_test.svh`).
 
 *Purpose.* Every field behaves as its RDL access policy says (see aou_reg_access_seq).
@@ -3418,7 +3370,7 @@ Class `aou_reg_access_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_
 * 20.13: Read/W1C slave ID errors
 
 [[aou-proc-aou_reg_reserved_test]]
-===== 68. `aou_reg_reserved_test`
+===== 67. `aou_reg_reserved_test`
 Class `aou_reg_reserved_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_reserved_test.svh`).
 
 *Purpose.* Reserved bits read 0 and unmapped offsets are inert (see aou_reg_reserved_seq).
@@ -3441,7 +3393,7 @@ Class `aou_reg_reserved_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_re
 * 20.16: Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers
 
 [[aou-proc-aou_reg_alias_test]]
-===== 69. `aou_reg_alias_test`
+===== 68. `aou_reg_alias_test`
 Class `aou_reg_alias_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_alias_test.svh`).
 
 *Purpose.* Addresses above the 64 KiB window alias the registers (see aou_reg_alias_seq).
@@ -3463,7 +3415,7 @@ Class `aou_reg_alias_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_a
 * 20.16: Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers
 
 [[aou-proc-aou_reg_feature_seq_test]]
-===== 70. `aou_reg_feature_seq_test`
+===== 69. `aou_reg_feature_seq_test`
 Class `aou_reg_feature_seq_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_feature_seq_test.svh`).
 
 *Purpose.* Every feature-programming sequence programs the fields it names
@@ -3494,7 +3446,7 @@ Class `aou_reg_feature_seq_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou
 
 ==== L3 protocol-model unit bench (no DUT)
 [[aou-proc-aou_l3_codec_test]]
-===== 71. `aou_l3_codec_test`
+===== 70. `aou_l3_codec_test`
 Class `aou_l3_codec_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_codec_test.svh`).
 
 *Purpose.* Encodings without time: granule counts for every type and DLENGTH, pack /
@@ -3514,7 +3466,7 @@ cross-check of every encoder against PR 80's independent aou_pkg.
 |===
 
 [[aou-proc-aou_l3_credit_test]]
-===== 72. `aou_l3_credit_test`
+===== 71. `aou_l3_credit_test`
 Class `aou_l3_credit_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_credit_test.svh`).
 
 *Purpose.* Credit manager scenarios (spec chapter 6): zero credit holds a message
@@ -3537,7 +3489,7 @@ returns; RP round robin; and an overflow by the peer is AOU-R16.
 |===
 
 [[aou-proc-aou_l3_crossflit_test]]
-===== 73. `aou_l3_crossflit_test`
+===== 72. `aou_l3_crossflit_test`
 Class `aou_l3_crossflit_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_crossflit_test.svh`).
 
 *Purpose.* Every multi-granule message at every start granule, through the packer and
@@ -3559,7 +3511,7 @@ exactly at G47 and a continuation followed by a new message.
 |===
 
 [[aou-proc-aou_l3_dest_rp_test]]
-===== 74. `aou_l3_dest_rp_test`
+===== 73. `aou_l3_dest_rp_test`
 Class `aou_l3_dest_rp_test` extends `aou_l3_loopback_test` (`uvm/tests/l3_unit/aou_l3_dest_rp_test.svh`).
 
 *Purpose.* Loopback with a non-identity DEST_RP (MAS 3.10): die A maps its planes
@@ -3583,7 +3535,7 @@ bookkeeping (AOU-R13) by plane, not by the RP a response arrives on.
 |===
 
 [[aou-proc-aou_l3_inject_test]]
-===== 75. `aou_l3_inject_test`
+===== 74. `aou_l3_inject_test`
 Class `aou_l3_inject_test` extends `aou_l3_unit_env_test` (`uvm/tests/l3_unit/aou_l3_inject_test.svh`).
 
 *Purpose.* One error injected by model B (the remote die) after legal traffic, chosen
@@ -3623,7 +3575,7 @@ the checker's windows depend on the class.
 |===
 
 [[aou-proc-aou_l3_link_test]]
-===== 76. `aou_l3_link_test`
+===== 75. `aou_l3_link_test`
 Class `aou_l3_link_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_link_test.svh`).
 
 *Purpose.* Link controller, two models back to back without time. Legal sequences:
@@ -3652,7 +3604,7 @@ flit are not), and v0.8's ERROR state with its recovery.
 |===
 
 [[aou-proc-aou_l3_loopback_test]]
-===== 77. `aou_l3_loopback_test`
+===== 76. `aou_l3_loopback_test`
 Class `aou_l3_loopback_test` extends `aou_l3_unit_env_test` (`uvm/tests/l3_unit/aou_l3_loopback_test.svh`).
 
 *Purpose.* Legal traffic both ways between two L3 models under the chosen packer and
@@ -3673,7 +3625,7 @@ from AOU_FDI_CHECKER.
 |===
 
 [[aou-proc-aou_l3_unit_env_test]]
-===== 78. `aou_l3_unit_env_test`
+===== 77. `aou_l3_unit_env_test`
 Class `aou_l3_unit_env_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_unit_env_test.svh`).
 
 *Purpose.* Clocked unit environment: two L3 agents (A on the LP stream in the DUT's
@@ -3699,7 +3651,7 @@ Plusargs: +L3_POLICY=dut|sparse|min|max|random|split, +L3_FORK=1,
 
 ==== AXI agent self-test bench (no DUT)
 [[aou-proc-aou_axi_selftest_test]]
-===== 79. `aou_axi_selftest_test`
+===== 78. `aou_axi_selftest_test`
 Class `aou_axi_selftest_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_axi_selftest_test.svh`).
 
 *Purpose.* Loopback self-test: random traffic, then the #56 and #64 directed sequences,
@@ -3723,7 +3675,7 @@ e.g. AOU_AXI_TIMING_STALL> (default: random per seed), +AXI_NUM_TXNS=<n>.
 |===
 
 [[aou-proc-aou_axi_selftest_neg_test]]
-===== 80. `aou_axi_selftest_neg_test`
+===== 79. `aou_axi_selftest_neg_test`
 Class `aou_axi_selftest_neg_test` extends `aou_axi_selftest_test` (`uvm/tests/axi_selftest/aou_axi_selftest_neg_test.svh`).
 
 *Purpose.* Checks the checkers: the subordinate flips read-data bits, drops writes and
@@ -3743,7 +3695,7 @@ errors are demoted to info and counted; the test fails if either count is 0.
 |===
 
 [[aou-proc-aou_axi_sb_reset_test]]
-===== 81. `aou_axi_sb_reset_test`
+===== 80. `aou_axi_sb_reset_test`
 Class `aou_axi_sb_reset_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_axi_sb_reset_test.svh`).
 
 *Purpose.* Directed check of the scoreboard's reset rule (BUGS/015 interim), with no

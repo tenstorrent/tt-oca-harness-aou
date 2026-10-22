@@ -260,6 +260,7 @@ T1-L46,aou_t1_rx_fifo_chk,,DUT,"A DeactivateReq (PropertyReq 0) comes at least 2
 T1-L47,aou_t1_rx_fifo_chk,,DUT,"With CREDIT_MANAGE=0 the DUT sends DeactivateReq only once it has answered every remote request older than the link crossing time",MAS software-operation 7.1 (DEACTIVATE_START condition 1)/7.3.1; plan 2.5
 T1-LP01,aou_t1_lp_mode_vseq,,DUT,With TX_LP_MODE=0 the DUT keeps sending flits in an idle window (at least window/16),MAS software-operation 7.1 Low Power mode
 T1-LP02,aou_t1_lp_mode_vseq,,DUT,With TX_LP_MODE=1 and threshold 0 the DUT sends at most 4 flits in an idle window,MAS software-operation 7.1 Low Power mode
+T1-LP03,aou_t1_lp_cfg_chk,,MODEL,AOU_CON0.TX_LP_MODE and TX_LP_MODE_THRESHOLD change only while the DUT reports ACTIVATE_STATE_DISABLED (static configuration; a change on a live link may land mid-flit),MAS software-operation 7.1 Low Power mode; project ruling: LP mode is programmed before activation or between sessions
 T1-RA01,aou_t1_remote_act_vseq,,DUT,Each remote-initiated activation is serviced once as INT_ACTIVATE_START,MAS software-operation 7.3.5
 T1-RA02,aou_t1_remote_act_vseq,,DUT,A remote-initiated deactivation is serviced once as INT_DEACTIVATE_START,MAS software-operation 7.3.5
 T1-RM01,aou_t1_remote_mgr_driver,,DUT,A WriteResp the DUT sends matches a remote write outstanding on its RP and ID (late answers to aborted writes excepted),AXI4 A5.2

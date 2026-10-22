@@ -4,7 +4,8 @@
 // TX low-power mode (plan 21.x). With TX_LP_MODE=0 the DUT keeps sending
 // flits on an idle ENABLED link; with TX_LP_MODE=1 and threshold 0 it sends
 // none without work (BUGS/017 interim: threshold 0 = no heartbeat). Traffic
-// must pass in both modes.
+// must pass in both modes. TX_LP_MODE is static configuration (T1-LP03), so
+// each mode is its own activation session: deactivate, program, activate.
 class aou_t1_lp_mode_vseq extends aou_base_test_seq;
   `uvm_object_utils(aou_t1_lp_mode_vseq)
 
@@ -25,6 +26,13 @@ class aou_t1_lp_mode_vseq extends aou_base_test_seq;
     n_idle = env.bridge.n_flits - start;
   endtask
 
+  // A new activation session with the mode programmed while DISABLED.
+  task session(bit en, int threshold);
+    deactivate(AOU_T1_BY_APB);
+    lp_mode(en, threshold);
+    activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
+  endtask
+
   task body();
     int unsigned n_off;
     int unsigned n_on;
@@ -33,7 +41,7 @@ class aou_t1_lp_mode_vseq extends aou_base_test_seq;
     traffic(AOU_T1_BOTH_DIRS, num_txns / 2 + 1, null);
     idle_flits();
     n_off = n_idle;
-    lp_mode(1'b1, 0);
+    session(1'b1, 0);
     traffic(AOU_T1_BOTH_DIRS, num_txns / 2 + 1, null);
     idle_flits();
     n_on = n_idle;
@@ -44,7 +52,7 @@ class aou_t1_lp_mode_vseq extends aou_base_test_seq;
     if (n_on > 4)
       `uvm_error(get_type_name(), $sformatf(
                  "T1-LP02: %0d idle flits with TX_LP_MODE=1, threshold 0", n_on))
-    lp_mode(1'b0, 0);
+    session(1'b0, 0);
     traffic(AOU_T1_BOTH_DIRS, num_txns / 2 + 1, null);
     drain();
   endtask

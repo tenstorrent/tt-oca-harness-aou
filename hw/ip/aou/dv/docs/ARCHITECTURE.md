@@ -370,7 +370,7 @@ Every test's virtual sequence extends this and composes these tasks:
 | `pause_traffic()` / `resume_traffic()` | quiesce or resume all traffic sources |
 | `drain(timeout)` | wait until nothing is outstanding anywhere |
 | `link_event(kind)` | PL-initiated Retrain, LinkError, L1 entry/exit, Reset, inband_pres drop, clk_req wake |
-| `lp_mode(en, threshold)` | TX low-power mode |
+| `lp_mode(en, threshold)` | TX low-power mode; static configuration, only while the DUT is DISABLED (T1-LP03) |
 | `hold_tx()` / `release_tx()` | back-pressure on the DUT's TX: L1 holds pl_trdy low from the next flit boundary (`aou_fdi_cfg.tx_hold`), so requests back up behind the DUT's ring buffer and arbiters |
 | `hold_remote_tx()` / `release_remote_tx()` | the remote die's counterpart: L3 holds back credited messages (`pol.hold_credited`), then packs the backlog densely |
 | `inject(kind, args)` | L3 error injection (bad type, reserved bits, credit violations, out-of-state Activate/Deactivate, MsgStart, placement, over-grant, ...) and AXI error responses from memories |

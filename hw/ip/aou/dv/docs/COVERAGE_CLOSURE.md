@@ -274,7 +274,7 @@ They match the d04b2da analysis to within a few items, so that analysis carries 
 | AOU_DATA_R/W_FIFO_NS1M_TPSRAM | 8/12/3 | 8/12/3 | 8/12/3 | 0/2/0 | 16/16/6 | 0/8/0 | 8/12/3 | 0/2/0 | a: multi-request decode chunks (back-to-back 256-bit read data, `+pk=full`) |
 | AOU_4X1_RR_ARBITER / 3X1_RR | 4/-/5 | 0/-/1 | 4/-/5 | 0/-/1 | 14/-/12 | 4/-/5 | 4/-/5 | 0/-/1 | c: absent requesters with fewer RPs; a: 3X1_RR needs three remote widths contending on one RP |
 | AOU_AXI_UP | 0/1/6 | 0/1/6 | 0/1/6 | 4/0/15 | n/a | 4/0/15 | 0/1/6 | 2/0/14 | d: §2.5 (every branch hole is dead); a: three cond (back-pressure) |
-| AOU_TX_AXI_BUFFER / TX_CORE / TX_FDI_IF | 4/4/3, 0/9/0, 0/6/0 | | | 0/17/4 | 6/12/4, 4/12/2 | | | 0/18/0, 0/15/0 | c/d: DLENGTH arms dead for the build's widths. a: TX_LP_MODE with an activation in flight (BUGS/034-adjacent on SP_32B and two-PHY); TX_FDI_IF `trdy` outside Active (R20-02 makes it legal only during a LinkError stall) and stall-release ordering (R20-03) |
+| AOU_TX_AXI_BUFFER / TX_CORE / TX_FDI_IF | 4/4/3, 0/9/0, 0/6/0 | | | 0/17/4 | 6/12/4, 4/12/2 | | | 0/18/0, 0/15/0 | c/d: DLENGTH arms dead for the build's widths. a: TX_LP_MODE with an activation in flight (illegal stimulus: LP mode is static configuration, programmed only while DISABLED; accepted exclusion); TX_FDI_IF `trdy` outside Active (R20-02 makes it legal only during a LinkError stall) and stall-release ordering (R20-03) |
 
 **Toggle.** Most of the 212k uncovered union bits are in wide datapath registers:
 - `AOU_FWD_RS` and `AOU_FIFO_RP` (about 26k each in 1x512);
@@ -369,7 +369,7 @@ The filter option name still needs confirming on X-2025.06. The choice is decisi
 | 035 | ERROR_INFO debug FIFO on 4xmix and 1x256 | **Yes:** `err_resp` with the remote width equal to each RP's width. |
 | 021/024 | LinkReset, LinkError and inband drop in `link_event` with traffic | **Yes:** a quiet variant (no AXI traffic, no SW reset) gives the cg_link_state LinkReset/Disabled bins. |
 | 001/002/038 | linkerror and linkdown spec tests (bringup linkdown bins, SW-inject conds) | **Partly.** `+FDI_ENC=RTL` removes the 001 failure. 002/038 still fail where the test checks `lp_linkerror` or NOP→Active, so check which assertions remain. |
-| 030, 031, 010, 034 | small | 030: none (it's the bug itself). 031: undefined behaviour. 010: spec decision. 034: avoid turning LP mode on mid-flit. |
+| 030, 031, 010, 034 | small | 030: none (it's the bug itself). 031: undefined behaviour. 010: spec decision. 034: none (LP mode is static configuration; the tests program it only while DISABLED). |
 
 The rerun gains when fixes land are in §6, WP13.
 
@@ -424,8 +424,8 @@ for 512→1024).
   - The RX FDI staging buffer and `r_phase` (plan 18.11/18.12) need a white-box FC group (§4.2).
 - **AOU_TX_CORE / TX_AXI_BUFFER / TX_FDI_IF:**
   - DLENGTH byte-swap arms for widths the build doesn't have (c/d).
-  - TX_LP_MODE switched while an activation message is in flight (a; watch BUGS/034 on SP_32B
-    and two-PHY builds).
+  - TX_LP_MODE switched while an activation message is in flight (a): illegal stimulus, LP
+    mode is static configuration programmed only while DISABLED (T1-LP03); accepted exclusion.
   - TX_FDI_IF `pl_trdy` outside Active: r2.0 (R20-02) makes it legal only during a stall in
     LinkError, so there is a stimulus for it.
   - Stall-release ordering: R20-03 sequences A and B.
@@ -614,7 +614,7 @@ today. The new groups below are white-box where allowed. Each new bin gets `plan
 | 2.18 FDI | `dut.cg_rx_fdi_if` (phase step, phase at cancel, staging valid); add `cp_fdi_cfg` and `cp_active_phy` to `l1.cg_fdi_xfer` |
 | 2.19 Interrupts | `tb.cg_irq`: src × {raised, masked while pending, unmask raises, W1C cleared, W1C race}; concurrency |
 | 2.20 Registers | reg bench: uvm_reg coverage (`UVM_CVR_ADDR_MAP`, `UVM_CVR_FIELD_VALS`) fed into the service as `reg.cg_access` and `reg.cg_field_kind` |
-| 2.21 Low power | `dut.cg_lp`: lp_mode × threshold bucket × {heartbeat seen}; credit-only flit in LP; switch on/off × idle/traffic; switch mid-flit (BUGS/034) |
+| 2.21 Low power | `dut.cg_lp`: lp_mode × threshold bucket × {heartbeat seen}; credit-only flit in LP; programmed in DISABLED × {before the first activation, between sessions}; traffic after each switch |
 
 These map onto the earlier FC plan's Part A (A1-A9) and Part B (B1-B6). The cross-layer groups
 X1-X4 (link event × activation state × outstanding; reset × state × mid-burst; zero credit × FDI

@@ -325,6 +325,15 @@ class aou_base_test_seq extends ocah_sequence;
     end
     if (f.lp_mode >= 0 || f.lp_threshold >= 0) begin
       aou_reg_lp_mode_seq s = aou_reg_lp_mode_seq::type_id::create("lp");
+      // Static configuration (MAS software-operation 7.1, T1-LP03): only while
+      // the DUT is DISABLED. A test that gets here on a live link is wrong, and
+      // the rest of its run would exercise an illegal state, so stop it.
+      if (!env.status.disabled) begin
+        string st = env.status.enabled ? "ENABLED" : "activating or deactivating";
+        `uvm_fatal(get_type_name(), $sformatf(
+                   {"TX_LP_MODE/THRESHOLD programmed while the DUT is %s; LP mode is static ",
+                    "configuration, program it before activation or after deactivation"}, st))
+      end
       prep_reg(s);
       s.enable = f.lp_mode;
       s.threshold = f.lp_threshold;
@@ -363,6 +372,8 @@ class aou_base_test_seq extends ocah_sequence;
                                           uvm_reg_data_t'(f.credit_manage));
   endtask
 
+  // TX low-power mode. Static configuration: call it only while the DUT is
+  // DISABLED (before activation, or after a deactivation has completed).
   task lp_mode(bit en, int threshold = -1);
     aou_t1_feature_cfg f = aou_t1_feature_cfg::type_id::create("lp");
     f.lp_mode = int'(en);
