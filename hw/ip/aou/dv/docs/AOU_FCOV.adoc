@@ -74,8 +74,8 @@ ignored bin (`IGN`), an illegal bin (`ILL`, with the rule that reports a hit)
 or a cross exclusion by pattern (`XIGN`, `XILL`). The notable definitions:
 
 * `cg_link_state.cp_fdi_enc` is informational: it records whether the merged
-  runs include SPEC-encoded ones (`rtl` is the DUT's private encoding,
-  BUGS/001).
+  runs include SPEC-encoded ones (`rtl`, the private encoding of RTL from
+  before the UCIe encoding fix, is an ignored bin).
 * `cg_act_op.x_op_dir_legal` crosses activation operation, direction and
   legality, so every out-of-state activation message the L3 injection
   sequences send is a bin.
@@ -160,8 +160,6 @@ this table so `fc_report` can report coverage per plan item is an open item
   `AOU_SOC_BUF`) are excluded from code coverage with their reasons in
   `cov/config/vcs/cov_exclude.hier`; reset-only FSM transitions through
   `cov/config/vcs/cov_fsm_reset.filter`.
-* `cg_link_state.cp_fdi_enc spec` needs a passing SPEC-encoded run, which
-  waits on BUGS/001; until then it is a hole.
 * The `v0.8` bins (`cg_act_op` four-granule ActivateReq, the ERROR state,
   `cg_flit_occ` half-flit Misc limit) need an AoU v0.8 DUT or partner.
 * `AOU_FDI_CHECKER` is not instantiated on the two-PHY configurations; the

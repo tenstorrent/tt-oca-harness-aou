@@ -1,0 +1,31 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active, AoU ENABLED
+    ADP->>BRG: pl_rx_active_req = 0
+    BRG->>ADP: lp_rx_active_sts = 0
+    ADP->>BRG: pl_state_sts = LinkError (1010), pl_inband_pres = 0
+    Note over CORE,ADP: LINKERROR - NOP, O_FDI_LINK_UP = 0, O_FDI_FSM_STATE = 0xA, lp_linkerror stays 0
+    BRG->>CORE: O_INT_FSM_IN_ACTIVE = 0 (link lost)
+    Note over CORE,BRG: activation FSM -> DISABLED, AOU_INIT.INT_FDI_LINK_DOWN = 1
+    CORE->>SW: INT_FDI_LINK_DOWN (unless masked)
+    SW->>CORE: APB read AOU_INIT (INT_FDI_LINK_DOWN = 1)
+    SW->>CORE: APB write AOU_CON0.AOU_SW_RESET = 1
+    CORE->>BRG: O_SW_RESET (r_sw_reset_seen = 1)
+    REM->>REM: resets its own AoU state
+    SW->>ADP: clear the error on the UCIe controller
+    ADP->>BRG: pl_state_sts = Reset (0000)
+    Note over BRG: RESET (both conditions met)
+    SW->>CORE: reprogram configuration
+    SW->>ADP: Start UCIe Link Training on the UCIe controller
+    ADP->>BRG: pl_inband_pres = 1, pl_clk_req = 1
+    Note over BRG,ADP: bring-up as in the cold bring-up sequences, through to ACTIVE
+    SW->>CORE: APB write AOU_INIT.ACTIVATE_START = 1
+    CORE->>REM: ActivateReq
+    REM->>CORE: ActivateAck
+    Note over CORE: ENABLED

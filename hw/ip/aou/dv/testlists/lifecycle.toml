@@ -62,6 +62,36 @@ tags = ["lifecycle"]
 run_modes = ["lifecycle"]
 args = ["+event=inband_drop"]
 
+# INT_FDI_LINK_DOWN masked: the pin stays low through the link losses and the
+# sticky bit is read instead (T1-L49).
+[[tests]]
+name = "aou_link_event_test.event-link_reset.link_down_mask-1"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=link_reset", "+link_down_mask=1"]
+
+# ACTIVATE_START written with the link in L1 (the DUT wakes it) and in Retrain
+# (T1-L50): I_INT_FSM_IN_ACTIVE stays asserted through both.
+[[tests]]
+name = "aou_link_event_test.event-l1_act"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=l1_act"]
+
+[[tests]]
+name = "aou_link_event_test.event-retrain_act"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=retrain_act"]
+
 [[tests]]
 name = "aou_link_event_test"
 module = { uvm = "aou_link_event_test" }
@@ -273,7 +303,7 @@ expect_fail_match = "T1-DFT01: the core reset was asserted for|T1-DFT02: aou_cor
 
 [[groups]]
 name = "lifecycle"
-expected_count = 31
+expected_count = 34
 tests = [
   "aou_link_event_test.event-retrain",
   "aou_link_event_test.event-clk_wake",
@@ -281,6 +311,9 @@ tests = [
   "aou_link_event_test.event-linkerror",
   "aou_link_event_test.event-link_reset",
   "aou_link_event_test.event-inband_drop",
+  "aou_link_event_test.event-link_reset.link_down_mask-1",
+  "aou_link_event_test.event-l1_act",
+  "aou_link_event_test.event-retrain_act",
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",

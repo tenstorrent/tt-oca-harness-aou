@@ -1,0 +1,35 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active (or Retrain), AoU handshake or session in progress
+    Note over CORE,BRG: activation, deactivation or MsgCredit timeout, or an out-of-step activation message
+    Note over CORE,BRG: activation FSM -> DISABLED, LP_LINKRESET error bit set
+    CORE->>BRG: O_AOU_REQ_LINKRESET = 1
+    CORE->>SW: INT_REQ_LINKRESET (unless masked)
+    Note over CORE,ADP: LINKERROR - lp_state_req = NOP, O_FDI_LINK_UP = 0, O_FDI_FSM_STATE = 0xA
+    BRG->>CORE: O_INT_FSM_IN_ACTIVE = 0
+    Note over CORE: already DISABLED - no INT_FDI_LINK_DOWN
+    BRG->>ADP: lp_linkerror = 1 (same edge)
+    Note over BRG,REM: Table 8-2 - enters LinkError, holds it while lp_linkerror = 1
+    ADP->>BRG: pl_state_sts = LinkError (1010), pl_inband_pres = 0
+    BRG->>ADP: lp_linkerror = 0 (one cycle after the report)
+    SW->>CORE: APB read LP_LINKRESET (which error)
+    SW->>CORE: APB write AOU_CON0.AOU_SW_RESET = 1
+    CORE->>BRG: O_SW_RESET (r_sw_reset_seen = 1)
+    REM->>REM: resets its own AoU state
+    SW->>ADP: clear the error on the UCIe controller
+    ADP->>BRG: pl_state_sts = Reset (0000)
+    Note over CORE,ADP: RESET - the exit needed Reset reported AND AOU_SW_RESET seen (LinkError hold)
+    SW->>CORE: reprogram configuration
+    SW->>ADP: Start UCIe Link Training on the UCIe controller
+    ADP->>BRG: pl_inband_pres = 1, pl_clk_req = 1
+    Note over BRG,ADP: bring-up as in the cold bring-up sequences, through to ACTIVE
+    SW->>CORE: APB write AOU_INIT.ACTIVATE_START = 1
+    CORE->>REM: ActivateReq
+    REM->>CORE: ActivateAck
+    Note over CORE: ENABLED

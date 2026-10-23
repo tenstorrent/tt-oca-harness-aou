@@ -1,0 +1,37 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active, AoU DISABLED (software deactivated first, MAS 7.3.6)
+    SW->>ADP: PM entry on the UCIe controller
+    ADP->>BRG: pl_state_sts = L1 (0100)
+    Note over CORE,ADP: L1 - lp_state_req = L1, lp_wake_req = 0, O_FDI_LINK_UP = 0, O_FDI_FSM_STATE = 0x4
+    Note over CORE,ADP: O_INT_FSM_IN_ACTIVE stays 1 - no INT_FDI_LINK_DOWN
+    opt software activates from L1
+        SW->>CORE: APB write AOU_INIT.ACTIVATE_START = 1
+        Note over CORE,BRG: ActivateReq queued (O_INT_FSM_IN_ACTIVE is 1), held in the TX path with its Ack timer running - the write wakes nothing
+    end
+    alt PM exit by software on the UCIe controller, or by the remote die
+        SW->>ADP: PM exit on the UCIe controller
+        ADP->>BRG: pl_clk_req = 1
+        BRG->>ADP: lp_clk_ack = 1
+        Note over BRG: L1_CLK_WAKE, then WAKE_ASSERT
+    else local traffic arrives with AoU DISABLED (ACTIVATE_START = 0)
+        CORE->>SW: INT_ACTIVATE_START
+        CORE->>BRG: I_INT_ACTIVATE_START = 1
+        Note over BRG: WAKE_ASSERT
+    end
+    BRG->>ADP: lp_wake_req = 1
+    ADP->>BRG: pl_wake_ack = 1
+    Note over BRG: REQ_ACTIVE
+    BRG->>ADP: lp_state_req = Active (0001)
+    ADP->>BRG: pl_state_sts = Active (0001)
+    Note over BRG: ACTIVE - O_FDI_LINK_UP = 1
+    Note over SW,CORE: writes ACTIVATE_START now if it did not above
+    CORE->>REM: ActivateReq
+    REM->>CORE: ActivateAck
+    Note over CORE: ENABLED

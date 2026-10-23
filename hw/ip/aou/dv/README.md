@@ -195,17 +195,20 @@ reuse one build. A run passes when its log reaches the UVM report summary with
 no `UVM_ERROR` or `UVM_FATAL`.
 
 Run-time plusargs go in `PLUSARGS` (for example
-`make run TEST=aou_fdi_t1_linkdown_spec_test FDI_ENC=SPEC PLUSARGS=+train_trigger=0`).
-`+train_trigger=0|1` sets how the L2 Adapter model trains again after
-LinkError, LinkReset or Disabled -> Reset. With 1, the default, it waits for a
-NOP->Active transition on `lp_state_req` (UCIe r1.1 §8.3.3.8), and with
-`FDI_ENC=SPEC` FDI-R51 fails the run if the DUT doesn't give one. After a
-deliberate teardown (the DUT's own LinkReset request, or Disabled) the DUT gives
-it only after an activation request; if the test gives none, the model's
-software pulses `I_SW_ACTIVATE_START` after `sw_restart_delay` cycles
-(`+sw_restart_delay=N`, 0 never; random in [50:1500] by default). With 0 it
-trains again by itself, like an Adapter or remote die that restarts the link
-without the trigger.
+`make run TEST=aou_fdi_t1_linkdown_spec_test PLUSARGS=+sw_restart_delay=0`).
+After LinkError, LinkReset or Disabled -> Reset the link is restarted by
+software on the UCIe controller, never by the DUT (integration guide §6.6.2):
+the L2 Adapter model stays in Reset for `sw_restart_delay` cycles
+(`+sw_restart_delay=N`, 0 trains at once; random in [50:1500] by default) and
+then trains again by itself, and the bringup model checks that the DUT requests
+nothing meanwhile (FDI-M01/M02). An AoU deactivation leaves the link Active
+(FDI-M06).
+
+After a LinkError the DUT holds the link down until software has written
+`AOU_CON0.AOU_SW_RESET` (integration guide §6.6.3). In the FDI T1 tests that
+write comes from the test itself, a random number of cycles after
+`O_FDI_FSM_STATE` reports LinkError; `+sw_reset_delay_max=N` bounds the delay
+(default 300). The lifecycle tests reset through `recover()` as before.
 
 `+pclk_ps=<period in ps>` sets the APB clock of the T1 and register benches
 (default 10000, 100 MHz; the core clock stays 1 GHz). The APB bridge is
@@ -495,10 +498,11 @@ ignored (`IGN`, no target) or illegal (`ILL`, out of the denominator; a hit is
 reported under the rule that owns it), and a cross cell is ignored or made
 illegal by pattern (`XIGN`, `XILL`; see `aou_fc_point::mark`). The service's
 count is the number; the simulators' covergroup scores are not used.
-`cg_link_state.cp_fdi_enc` records the FDI state encoding each run used (`rtl`,
-the DUT's private codes, or `spec`, UCIe r1.1 Table 8-2). It is informational:
-it shows whether the merged coverage includes SPEC-encoded runs. The `rtl` bin
-goes when BUGS/001 is fixed and SPEC becomes the default.
+`cg_link_state.cp_fdi_enc` records the FDI state encoding each run used (`spec`,
+UCIe r1.1 Table 8-2 and the default, or `rtl`, the private codes of RTL from
+before the UCIe encoding fix, selected with `FDI_ENC=RTL`). It is informational: it
+shows whether the merged coverage includes SPEC-encoded runs. `rtl` is an
+ignored bin, not a target.
 
 With `COV=1` each run writes `<run>/fc.json`: every group, coverpoint and
 cross, every declared bin with its hit count (zero-hit bins included, so holes

@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// The bringup test with UCIe state encodings. Reset/Active bringup works
-// (those codes agree), then the Adapter reports Retrain as 1011b. A
-// compliant DUT leaves Active and ends Retrain with a NOP->Active request;
-// with BUGS/001 the DUT ignores the code. Expected to fail
-// (expected_fail.yaml).
+// The bringup test with UCIe state encodings and a Retrain alone as its link
+// event: the Adapter reports Retrain as 1011b, and a compliant DUT leaves
+// Active and ends Retrain with a NOP->Active request (FDI-R48).
 class aou_fdi_t1_bringup_spec_test extends aou_fdi_t1_bringup_test;
   `uvm_component_utils(aou_fdi_t1_bringup_spec_test)
 

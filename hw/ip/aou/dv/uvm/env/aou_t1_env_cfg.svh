@@ -16,7 +16,7 @@ class aou_t1_env_cfg extends uvm_object;
   int unsigned   remote_max_burst = 256;   // remote splitter's longest burst (2^n beats)
   bit            remote_max_burst_rand = 1'b0;  // re-pick it while the remote is idle
   aou_spec_rev_e spec_rev = AOU_SPEC_V07;
-  aou_fdi_enc_e  fdi_enc = AOU_FDI_ENC_RTL;
+  aou_fdi_enc_e  fdi_enc = AOU_FDI_ENC_SPEC;
 
   // Agent configs
   aou_fdi_cfg    fdi_cfg[AOU_T1_N_PHY];
@@ -40,8 +40,8 @@ class aou_t1_env_cfg extends uvm_object;
   bit            l1_cancel_mix = 1'b0;     // cancel plans over every shape, repeats included
 
   // System model on an FDI link-down (LinkReset, LinkError or Disabled,
-  // whoever started it, including the DUT's own teardown after a
-  // deactivation). The owners' documents assign AOU_SW_RESET only to the
+  // whoever started it; a deactivation never takes the link down). The
+  // owners' documents assign AOU_SW_RESET only to the
   // LinkReset AOU_CORE requests itself (MAS 7.3.6) and are silent on the
   // rest; AoU v0.8 reads as the interface state not surviving an FDI reset.
   // With this set, software or the system reset controller resets both dies
@@ -95,10 +95,11 @@ class aou_t1_env_cfg extends uvm_object;
     lsm_cfg = aou_lsm_cfg::type_id::create("lsm_cfg");
     lsm_cfg.n_phy = AOU_T1_N_PHY;
     // T1 tests answer the DUT's LinkReset request themselves (recover():
-    // an Adapter LinkError, whose exit still checks FDI-R49). The Adapter's
-    // own reaction to lp_linkerror is run by errors.toml with
-    // +react_linkerror=1. Turning it on for every T1 test changes when the
-    // link goes down in all of them and has not been measured.
+    // an Adapter LinkError, which still waits for lp_linkerror to fall,
+    // FDI-R49). The Adapter's own reaction to lp_linkerror is run by
+    // errors.toml with +react_linkerror=1. Turning it on for every T1 test
+    // changes when the link goes down in all of them and has not been
+    // measured.
     lsm_cfg.react_linkerror_en = 1'b0;
     foreach (fdi_cfg[p]) begin
       fdi_cfg[p] = aou_fdi_cfg::type_id::create($sformatf("fdi_cfg%0d", p));

@@ -100,7 +100,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field slv_tr_complete;
         rand uvm_reg_field mst_tr_complete;
         rand uvm_reg_field int_deactivate_property;
-        rand uvm_reg_field reserved_31_12;
+        rand uvm_reg_field int_fdi_link_down;
+        rand uvm_reg_field reserved_31_13;
 
         function new(string name = "aou_core__aou_init");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -127,8 +128,10 @@ package aou_core_csr_uvm_pkg;
             this.mst_tr_complete.configure(this, 1, 10, "RO", 1, 'h0, 0, 1, 0);
             this.int_deactivate_property = new("int_deactivate_property");
             this.int_deactivate_property.configure(this, 1, 11, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_12 = new("reserved_31_12");
-            this.reserved_31_12.configure(this, 20, 12, "RO", 1, 'h0, 1, 1, 0);
+            this.int_fdi_link_down = new("int_fdi_link_down");
+            this.int_fdi_link_down.configure(this, 1, 12, "W1C", 1, 'h0, 1, 1, 0);
+            this.reserved_31_13 = new("reserved_31_13");
+            this.reserved_31_13.configure(this, 19, 13, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__aou_init
 
@@ -143,7 +146,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field int_req_linkreset_deact_ack_mask;
         rand uvm_reg_field int_req_linkreset_act_ack_mask;
         rand uvm_reg_field int_early_wdt_mask;
-        rand uvm_reg_field reserved_31_10;
+        rand uvm_reg_field int_fdi_link_down_mask;
+        rand uvm_reg_field reserved_31_11;
 
         function new(string name = "aou_core__aou_interrupt_mask");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -168,8 +172,10 @@ package aou_core_csr_uvm_pkg;
             this.int_req_linkreset_act_ack_mask.configure(this, 1, 8, "RW", 1, 'h0, 1, 1, 0);
             this.int_early_wdt_mask = new("int_early_wdt_mask");
             this.int_early_wdt_mask.configure(this, 1, 9, "RW", 1, 'h0, 1, 1, 0);
-            this.reserved_31_10 = new("reserved_31_10");
-            this.reserved_31_10.configure(this, 22, 10, "RO", 1, 'h0, 1, 1, 0);
+            this.int_fdi_link_down_mask = new("int_fdi_link_down_mask");
+            this.int_fdi_link_down_mask.configure(this, 1, 10, "RW", 1, 'h0, 1, 1, 0);
+            this.reserved_31_11 = new("reserved_31_11");
+            this.reserved_31_11.configure(this, 21, 11, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__aou_interrupt_mask
 

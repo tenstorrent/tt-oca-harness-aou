@@ -1,0 +1,18 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active, AoU ENABLED, traffic in flight
+    ADP->>BRG: pl_state_sts = Retrain (1011)
+    Note over CORE,ADP: RETRAIN - O_FDI_LINK_UP = 0, O_FDI_FSM_STATE = 0xB, lp_wake_req stays 1
+    Note over CORE,ADP: O_INT_FSM_IN_ACTIVE stays 1 - no INT_FDI_LINK_DOWN, AoU stays ENABLED
+    BRG->>ADP: lp_state_req = NOP (0000) for one cycle
+    BRG->>ADP: lp_state_req = Active (0001)
+    Note over ADP: retrains, flits are held (pl_trdy = 0)
+    ADP->>BRG: pl_state_sts = Active (0001)
+    Note over BRG: ACTIVE - O_FDI_LINK_UP = 1
+    Note over CORE,REM: traffic resumes where it stopped

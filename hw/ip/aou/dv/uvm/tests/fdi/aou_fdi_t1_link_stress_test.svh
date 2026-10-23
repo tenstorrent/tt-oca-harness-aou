@@ -4,7 +4,8 @@
 // The bringup test followed by random Adapter-initiated link events
 // (Retrain, L1, LinkError, LinkReset, clk_req wake) with flits between them,
 // a random pl_trdy policy and random stand-alone stalls. pl_clk_req is held
-// through bringup so the DUT restarts by itself after LinkError/LinkReset.
+// through bringup so the DUT leaves WAIT_PRESENCE on it after the Adapter's
+// restart from LinkError/LinkReset.
 class aou_fdi_t1_link_stress_test extends aou_fdi_t1_bringup_test;
   `uvm_component_utils(aou_fdi_t1_link_stress_test)
 

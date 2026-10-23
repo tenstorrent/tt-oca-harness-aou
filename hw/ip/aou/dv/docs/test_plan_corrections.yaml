@@ -416,7 +416,7 @@
   title: 'L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "L2 is not supported (documented bringup gap)" when the FDI corner runs showed the DUT never requests L2.
 - id: '18.17'
-  added: 'UCIe r1.1 8.3.3.5; BUGS/014, BUGS/038'
+  added: 'UCIe r1.1 8.3.3.5; BUGS/014'
   priority: P2
   title: 'LinkReset: Adapter state and the DUT''s request, O_AOU_REQ_LINKRESET and its mask'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
@@ -471,7 +471,7 @@
   title: 'Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '22.7'
-  added: 'UCIe r1.1 8.3.3.8; BUGS/038'
+  added: 'UCIe r1.1 8.3.3.8; BUGS/001 (owner decision 7)'
   priority: P2
-  title: 'Restart after link-down needs NOP to Active on lp_state_req'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  title: 'Restart after link-down is software''s on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (BUGS/038, not a bug) when the owner assigned the restart to software.

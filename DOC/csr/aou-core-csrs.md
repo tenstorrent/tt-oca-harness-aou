@@ -160,7 +160,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x8
 - Size: 0x4
 
-<p>Activate/deactivate control; status from HW. int_deactivate_property, mst_tr_complete, slv_tr_complete, activate_state_disabled, activate_state_enabled are read-only inputs (I_*), driven in AOU_CORE.sv from internal/output signals. Write 1 to clear int_activate_start/int_deactivate_start.</p>
+<p>Activate/deactivate control; status from HW. int_deactivate_property, mst_tr_complete, slv_tr_complete, activate_state_disabled, activate_state_enabled are read-only inputs (I_*), driven in AOU_CORE.sv from internal/output signals. Write 1 to clear int_fdi_link_down/int_activate_start/int_deactivate_start.</p>
 
 | Bits|        Identifier       |  Access |Reset|Name|
 |-----|-------------------------|---------|-----|----|
@@ -174,7 +174,8 @@ Don't override. Generated from: aou_core
 |  9  |     slv_tr_complete     |    r    |  —  |  — |
 |  10 |     mst_tr_complete     |    r    |  —  |  — |
 |  11 | int_deactivate_property |    r    |  —  |  — |
-|31:12|      reserved_31_12     |    r    | 0x0 |  — |
+|  12 |    int_fdi_link_down    |rw, woclr| 0x0 |  — |
+|31:13|      reserved_31_13     |    r    | 0x0 |  — |
 
 #### activate_start field
 
@@ -216,13 +217,17 @@ Don't override. Generated from: aou_core
 
 <p>Deactivation property status. Read-only, driven by HW.</p>
 
+#### int_fdi_link_down field
+
+<p>FDI link lost with AoU in use. Set by HW on the falling edge of I_INT_FSM_IN_ACTIVE (the FDI bring-up controller left Active for LinkError, LinkReset, Disabled or Reset; Retrain and L1 do not count) while the activation FSM is in ACTIVATE, ENABLED or DEACTIVATE, or in DISABLED with an ActivateReq already sent or received (its entry to ACTIVATE is cancelled). The activation FSM returns to DISABLED. Write 1 to clear. Source of INT_FDI_LINK_DOWN.</p>
+
 ### aou_interrupt_mask register
 
 - Absolute Address: 0xC
 - Base Offset: 0xC
 - Size: 0x4
 
-<p>Interrupt mask bits for linkreset and early response errors. Write 1 to mask the corresponding interrupt source.</p>
+<p>Interrupt mask bits for linkreset, early response and FDI link-down interrupts. Write 1 to mask the corresponding interrupt source.</p>
 
 | Bits|               Identifier               |Access|Reset|Name|
 |-----|----------------------------------------|------|-----|----|
@@ -235,7 +240,8 @@ Don't override. Generated from: aou_core
 |  7  |    int_req_linkreset_deact_ack_mask    |  rw  | 0x0 |  — |
 |  8  |     int_req_linkreset_act_ack_mask     |  rw  | 0x0 |  — |
 |  9  |           int_early_wdt_mask           |  rw  | 0x0 |  — |
-|31:10|             reserved_31_10             |   r  | 0x0 |  — |
+|  10 |         int_fdi_link_down_mask         |  rw  | 0x0 |  — |
+|31:11|             reserved_31_11             |   r  | 0x0 |  — |
 
 #### int_si0_id_mismatch_mask field
 
@@ -268,6 +274,10 @@ Don't override. Generated from: aou_core
 #### int_early_wdt_mask field
 
 <p>Mask bit for the early-response write-transaction watchdog interrupt (INT_EARLY_WDT_ERR).</p>
+
+#### int_fdi_link_down_mask field
+
+<p>Mask bit for the FDI link-down interrupt (INT_FDI_LINK_DOWN).</p>
 
 ### lp_linkreset register
 

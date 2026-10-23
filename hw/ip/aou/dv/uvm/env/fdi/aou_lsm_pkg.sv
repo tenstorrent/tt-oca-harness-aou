@@ -7,8 +7,9 @@
 // bringup controller (integrator guide §3.14-3.16, §6.6; UCIe r1.1 §8.2-8.3).
 //
 // fdi_enc selects the state encodings on pl_state_sts, lp_state_req and
-// O_FDI_FSM_STATE: SPEC is UCIe; RTL is the DUT's documented encoding
-// (BUGS/001), the default until that is fixed.
+// O_FDI_FSM_STATE: SPEC is UCIe and the default; RTL is the private encoding
+// of RTL from before the UCIe encoding fix, kept for runs against such RTL
+// (+FDI_ENC=RTL).
 
 package aou_lsm_pkg;
   import uvm_pkg::*;
@@ -59,11 +60,9 @@ package aou_lsm_pkg;
     BRG_ACTIVE,
     BRG_LINKERROR,
     BRG_RETRAIN,
-    BRG_DEACTIVATE,
-    BRG_UNWAKE_WAIT,
     BRG_L1,
     BRG_L1_CLK_WAKE,
-    BRG_LINKDOWN         // Adapter in LinkReset/Disabled (fdi_enc=SPEC; BUGS/001 item 4)
+    BRG_LINKDOWN         // Adapter in LinkReset/Disabled (fdi_enc=SPEC)
   } aou_brg_state_e;
 
   typedef enum bit [3:0] {
@@ -72,18 +71,16 @@ package aou_lsm_pkg;
     LSM_EV_LINKERROR,    // Active to LinkError, then Reset and bringup
     LSM_EV_L1_ENTRY,     // stallreq/ack, Active to L1
     LSM_EV_L1_EXIT,      // clk_req wake, back to Active
-    LSM_EV_LINK_RESET,   // Active to LinkReset (RTL encoding: Reset), then bringup
+    LSM_EV_LINK_RESET,   // Active to LinkReset (RTL encoding: Reset), then Reset and bringup
     LSM_EV_INBAND_DROP,  // inband_pres low for a while in Reset
     LSM_EV_CLK_WAKE,     // a pl_clk_req handshake
     LSM_EV_IDLE,         // wait `cycles`
     LSM_EV_DISABLED      // Active to Disabled (fdi_enc=SPEC), then Reset and bringup
   } aou_lsm_ev_e;
 
-  // Bringup software pins of the DUT
-  typedef enum bit [1:0] {
+  // Bringup software pins of the DUT (integrator guide §3.15)
+  typedef enum bit {
     LSM_SW_ACTIVATE,
-    LSM_SW_DEACTIVATE,
-    LSM_SW_RETRAIN,
     LSM_SW_LINKERROR
   } aou_lsm_sw_e;
 

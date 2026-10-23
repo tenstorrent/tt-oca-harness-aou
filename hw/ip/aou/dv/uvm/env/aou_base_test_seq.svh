@@ -29,6 +29,11 @@ class aou_base_test_seq extends ocah_sequence;
   int unsigned           n_sysrst;    // system resets on an FDI link-down (sys_reset())
   bit                    sysrst_done; // the last relink() reset both dies
   protected aou_t1_feature_cfg last_prog; // the last program_cfg(), reapplied after a reset
+  // INT_FDI_LINK_DOWN bookkeeping (expect_link_down()).
+  bit                    link_down_masked;  // the test set INT_FDI_LINK_DOWN_MASK
+  protected int unsigned n_ld_min;          // link-downs that found AoU in use
+  protected int unsigned n_ld_max;          // link-downs
+  protected bit          ld_expected;       // the last link-down found AoU in use
   // Longest wait from the AOU_SW_RESET write to the core reset (sw_reset()); the
   // DUT may first wait for its AXI handshakes to complete.
   localparam int unsigned SW_RESET_WAIT_CYCLES = 10000;
@@ -161,9 +166,8 @@ class aou_base_test_seq extends ocah_sequence;
     order = pick_order(order);
     env.sw_isr.wait_idle();
     if (!link_is_up()) begin
-      // A remote-initiated deactivation makes the DUT's bringup controller drop
-      // wake and wait for the Adapter to reset the link (BUGS/011); the
-      // Adapter (L2) then resets and brings the link up again.
+      // A link an earlier event left down (a deactivation never takes it
+      // down): the Adapter (L2) resets and brings it up again.
       `uvm_info(get_type_name(), "link down before activation: Adapter LinkReset and bringup",
                 UVM_LOW)
       relink();
@@ -242,12 +246,10 @@ class aou_base_test_seq extends ocah_sequence;
       aou_reg_activation_seq s = aou_reg_activation_seq::type_id::create("deact");
       prep_reg(s);
       s.wait_done = 1'b0;
+      // Deactivation has no pin (only I_SW_ACTIVATE_START exists), so BY_PIN
+      // deactivates through the register like BY_APB.
       s.op = forced ? AOU_REG_FORCE_DEACTIVATE : AOU_REG_DEACTIVATE;
-      if (who == AOU_T1_BY_PIN) begin
-        env.lsm.drv.pulse_sw(LSM_SW_DEACTIVATE, 2);
-      end else begin
-        s.start(null);
-      end
+      s.start(null);
     end
     env.l3.model.maybe_release_deact();
     env.l3.model.kick();
@@ -357,6 +359,7 @@ class aou_base_test_seq extends ocah_sequence;
       s.invalid_actmsg = f.mask_invalid_actmsg;
       s.deact_ack = f.mask_deact_ack;
       s.act_ack = f.mask_act_ack;
+      s.fdi_link_down = f.mask_fdi_link_down;
       s.start(null);
     end
     if (f.any_timeout()) begin
@@ -570,6 +573,52 @@ class aou_base_test_seq extends ocah_sequence;
   // ---------------------------------------------------------------------
   // Link events, injection, resets, expectations
   // ---------------------------------------------------------------------
+  // INT_FDI_LINK_DOWN (T1-L49): an Adapter LinkError, LinkReset or Disabled
+  // that finds the DUT out of DISABLED with the link established raises it
+  // exactly once (the DUT disables itself, T1-L48 in aou_t1_status); one
+  // that finds it DISABLED may not (0..1: a remote activation message can be
+  // moving the DUT as the link goes down). A link the DUT already took down
+  // itself (its own LinkError request on an Ack time-out or an invalid
+  // message, bringup model in LINKERROR) has no edge left to report: the
+  // DUT disabled itself then, and the Adapter's report changes nothing.
+  // The same holds for any event issued while the link is already down
+  // (bringup model in RESET, LINKERROR or LINKDOWN: the Adapter LinkReset
+  // sw_reset() issues after a LinkError, for one): no edge, so neither
+  // bound moves, and one loss stays exactly one interrupt. Nothing else
+  // raises it: the watcher reports a rise no test declared, and the upper
+  // bound a second one per event. With the mask set the pin never rises (no
+  // declaration, so any rise is an error) and the status bit is checked
+  // instead (check_link_down_status()).
+  protected function void expect_link_down(aou_lsm_ev_e kind);
+    if (!(kind inside {LSM_EV_LINKERROR, LSM_EV_LINK_RESET, LSM_EV_DISABLED})) return;
+    if (env.lsm.mon.model.st inside {BRG_RESET, BRG_LINKERROR, BRG_LINKDOWN}) return;
+    if (!env.status.disabled &&
+        env.lsm.mon.model.st inside {BRG_ACTIVE, BRG_RETRAIN, BRG_L1, BRG_L1_CLK_WAKE}) begin
+      ld_expected = 1'b1;   // until check_link_down_status()
+      n_ld_min++;
+    end
+    n_ld_max++;
+    if (!link_down_masked) expect_event("INT_FDI_LINK_DOWN", n_ld_min, n_ld_max);
+  endfunction
+
+  // With INT_FDI_LINK_DOWN masked the sticky bit is still set by a link loss
+  // with AoU in use (the mask gates the pin only); read before the system
+  // reset clears it with the other registers.
+  task check_link_down_status();
+    uvm_reg_data_t v;
+    aou_reg_base_seq s = aou_reg_base_seq::type_id::create("s");
+    bit due = link_down_masked && ld_expected;
+    ld_expected = 1'b0;
+    if (!due) return;
+    prep_reg(s);
+    s.rd_field(p_sequencer.regs.aou_init.int_fdi_link_down, v);
+    `uvm_info(get_type_name(), $sformatf("masked INT_FDI_LINK_DOWN: status bit reads %0d", v),
+              UVM_LOW)
+    if (v != 1)
+      `uvm_error(get_type_name(),
+                 "T1-L49: AOU_INIT.INT_FDI_LINK_DOWN reads 0 after a link loss with AoU in use")
+  endtask
+
   task link_event(aou_lsm_ev_e kind, int unsigned cycles = 0);
     aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("ev");
     // A link-down the Adapter brings back up by itself while AoU state is in
@@ -580,12 +629,14 @@ class aou_base_test_seq extends ocah_sequence;
       cfg.lsm_cfg.rebringup_after_down = 1'b0;
       link_event(kind, cycles);
       cfg.lsm_cfg.rebringup_after_down = 1'b1;
+      check_link_down_status();
       sys_reset();
       link_event(LSM_EV_BRINGUP);
       if (last_prog != null) program_cfg(last_prog);
       activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
       return;
     end
+    expect_link_down(kind);
     s.ev_kind = kind;
     s.ev_cycles = cycles;
     `uvm_info(get_type_name(), {"link event ", kind.name()}, UVM_LOW)
@@ -598,12 +649,12 @@ class aou_base_test_seq extends ocah_sequence;
     end
   endtask
 
-  // Brings a link the DUT left down back up: an Adapter LinkReset and
-  // bringup, or only the bringup when the Adapter already took the link to
-  // Reset (fdi_enc=SPEC: its answer to the DUT's LinkReset request). If AoU
-  // state is still in use, the system resets both dies while the link is
-  // down (sys_reset()); both are then DISABLED and the caller activates them
-  // as after any relink. Returns with sysrst_done set when it reset them.
+  // Brings a link that is down back up: an Adapter LinkReset and bringup, or
+  // only the bringup when the Adapter is already in Reset (fdi_enc=SPEC:
+  // after a LinkError it took down on the DUT's lp_linkerror). If AoU state
+  // is still in use, the system resets both dies while the link is down
+  // (sys_reset()); both are then DISABLED and the caller activates them as
+  // after any relink. Returns with sysrst_done set when it reset them.
   task relink();
     bit spec_down = cfg.lsm_cfg.fdi_enc == AOU_FDI_ENC_SPEC && env.lsm.drv.state == LSM_RESET;
     sysrst_done = 1'b0;
@@ -616,6 +667,7 @@ class aou_base_test_seq extends ocah_sequence;
       cfg.lsm_cfg.rebringup_after_down = 1'b0;
       link_event(LSM_EV_LINK_RESET);
       cfg.lsm_cfg.rebringup_after_down = keep;
+      check_link_down_status();
     end
     sys_reset();
     link_event(LSM_EV_BRINGUP);
@@ -760,6 +812,7 @@ class aou_base_test_seq extends ocah_sequence;
     cfg.lsm_cfg.rebringup_after_down = 1'b0;
     link_event(LSM_EV_LINK_RESET);
     cfg.lsm_cfg.rebringup_after_down = rebringup;
+    check_link_down_status();
     sw_reset_core();
     link_event(LSM_EV_BRINGUP);
     if (reprogram != null) program_cfg(reprogram);

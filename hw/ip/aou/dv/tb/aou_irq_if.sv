@@ -15,6 +15,9 @@ interface aou_irq_if (input logic clk);
   logic int_early_wdt_err;
   logic int_activate_start;
   logic int_deactivate_start;
+  // FDI link lost while AoU was ACTIVATE, ENABLED or DEACTIVATE
+  // (INT_FDI_LINK_DOWN); the activation FSM returns to DISABLED by itself.
+  logic int_fdi_link_down;
   logic act_st_disabled;
   logic act_st_enabled;
   // White-box: AOU_CORE's per-type subordinate ID-mismatch aggregates, which
@@ -25,6 +28,6 @@ interface aou_irq_if (input logic clk);
   clocking mon_cb @(posedge clk);
     input rst_n, int_req_linkreset, int_si0_id_mismatch, int_mi0_id_mismatch,
           int_early_resp_err, int_early_wdt_err, int_activate_start, int_deactivate_start,
-          act_st_disabled, act_st_enabled, slv_rid_agg, slv_bid_agg;
+          int_fdi_link_down, act_st_disabled, act_st_enabled, slv_rid_agg, slv_bid_agg;
   endclocking
 endinterface

@@ -266,7 +266,7 @@
 | 11.8 | WriteData1024 (28 granules) - maximum | P1 | merged into 4.8
 | 11.9 | Fill flit with 48 WriteResp messages | P2 | `aou_pack_test.pk-wresp48`
 | 11.10 | Assert reset during activation handshake | P2 | `aou_reset_test`, `aou_reset_test.reset-both.when-activating`
-| 11.11 | Assert reset mid-transaction | P2 | `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-linkerror`, `aou_reset_test`, `aou_reset_test.reset-apb.when-traffic`, `aou_reset_test.reset-core.when-traffic`, `aou_reset_test.reset-sw`
+| 11.11 | Assert reset mid-transaction | P2 | `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-link_reset.link_down_mask-1`, `aou_link_event_test.event-linkerror`, `aou_reset_test`, `aou_reset_test.reset-apb.when-traffic`, `aou_reset_test.reset-core.when-traffic`, `aou_reset_test.reset-sw`
 | 11.12 | Assert reset with TX queue non-empty | P2 | `aou_reset_test`, `aou_reset_test.when-queued`
 | 11.13 | AWLEN=0 / ARLEN=0 (single beat) | P0 | `aou_dp_size_test.dp_size-0_1_2_3_4_5_6`
 | 11.14 | Test various `prof` and `profextlen` values | P2 | `aou_pack_test.pk-prof`
@@ -429,12 +429,12 @@
 | 18.10 | Verify correct FDI valid/ready protocol | P0 | `aou_fdi_t1_bringup_test`, `aou_link_act_deact_test`, `aou_link_event_test.event-retrain`, `aou_t1_link_event_test`, `aou_t1_slice_test`
 | 18.11 | Verify `r_phase` increments correctly across chunks | P1 | `aou_t1_slice_test`
 | 18.12 | Verify `AOU_RX_FDI_IF` staging buffer operation | P1 | `aou_t1_slice_test`
-| 18.13 | Retrain while ENABLED with traffic is transparent to AoU (interim expectation) | P2 | `aou_link_event_test.event-retrain`
+| 18.13 | Retrain while ENABLED with traffic is transparent to AoU (interim expectation) | P2 | `aou_link_event_test.event-retrain`, `aou_link_event_test.event-retrain_act`
 | 18.14 | LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery | P2 | `aou_link_event_test.event-linkerror`
-| 18.15 | L1 entry and exit with the MAS power-management sequence, including the clk_req wake | P2 | `aou_link_event_test.event-clk_wake`, `aou_link_event_test.event-l1`
+| 18.15 | L1 entry and exit with the MAS power-management sequence, including the clk_req wake | P2 | `aou_link_event_test.event-clk_wake`, `aou_link_event_test.event-l1`, `aou_link_event_test.event-l1_act`
 | 18.16 | L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested | P2 | `aou_fdi_t1_link_stress_test`, `aou_fdi_t1_link_stress_test.fdi_rx_early-40`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40`
-| 18.17 | LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask | P2 | `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-teardown_int`, `aou_remote_react_test`
-| 18.18 | Disabled: Adapter-initiated entry and exit | P2 | `aou_fdi_t1_linkdown_spec_test`, `aou_link_event_test.event-disabled`
+| 18.17 | LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask | P2 | `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-link_reset.link_down_mask-1`, `aou_remote_react_test`
+| 18.18 | Disabled: Adapter-initiated entry and exit | P2 | `aou_fdi_t1_linkdown_spec_test`, `aou_link_event_test.event-disabled`, `aou_link_event_test.event-sw_disable`
 | 18.19 | rx_active request/status handshake: raise and fall rules | P2 | `aou_fdi_t1_link_stress_test.fdi_rx_early-40`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40`, `aou_t1_slice_test`
 | 18.20 | wake_req/wake_ack handshake | P2 | `aou_t1_slice_test`
 | 18.21 | pl_inband_pres drop | P2 | `aou_link_event_test.event-inband_drop`
@@ -498,11 +498,11 @@
 [cols="1,5,1,4",options="header"]
 |===
 | Item | Requirement | Priority | Scenarios
-| 22.1 | Verify `AOU_FDI_BRINGUP_CTRL` state transitions | P1 | `aou_fdi_t1_bringup_spec_test`, `aou_fdi_t1_bringup_test`, `aou_fdi_t1_linkdown_spec_test`, `aou_fdi_t1_linkerror_spec_test`, `aou_link_event_test`, `aou_link_event_test.event-clk_wake`, `aou_link_event_test.event-inband_drop`, `aou_link_event_test.event-l1`, `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-linkerror`, `aou_link_event_test.event-retrain`, `aou_t1_deact_test`, `aou_t1_link_event_test`
+| 22.1 | Verify `AOU_FDI_BRINGUP_CTRL` state transitions | P1 | `aou_fdi_t1_bringup_spec_test`, `aou_fdi_t1_bringup_test`, `aou_fdi_t1_linkdown_spec_test`, `aou_fdi_t1_linkerror_spec_test`, `aou_link_event_test`, `aou_link_event_test.event-clk_wake`, `aou_link_event_test.event-inband_drop`, `aou_link_event_test.event-l1`, `aou_link_event_test.event-l1_act`, `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-link_reset.link_down_mask-1`, `aou_link_event_test.event-linkerror`, `aou_link_event_test.event-retrain`, `aou_link_event_test.event-retrain_act`, `aou_t1_deact_test`, `aou_t1_link_event_test`
 | 22.2 | Verify FDI initialization handshake | P1 | `aou_fdi_t1_bringup_test`, `aou_t1_link_event_test`, `aou_t1_slice_test`
 | 22.3 | Verify FDI ready indication to AOU_CORE | P1 | `aou_fdi_t1_bringup_test`, `aou_t1_link_event_test`, `aou_t1_slice_test`
-| 22.4 | Verify bringup error handling | P2 | `aou_fdi_t1_linkdown_spec_test`, `aou_fdi_t1_linkerror_spec_test`, `aou_link_event_test`, `aou_link_event_test.event-inband_drop`, `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-linkerror`
+| 22.4 | Verify bringup error handling | P2 | `aou_fdi_t1_linkdown_spec_test`, `aou_fdi_t1_linkerror_spec_test`, `aou_link_event_test`, `aou_link_event_test.event-inband_drop`, `aou_link_event_test.event-link_reset`, `aou_link_event_test.event-link_reset.link_down_mask-1`, `aou_link_event_test.event-linkerror`
 | 22.5 | Compare integration with and without bringup controller | P2 | dropped: The bench integrates only AOU_TOP; AOU_CORE_TOP shares the same core, and 22.1-22.4 cover the bringup controller.
 | 22.6 | Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers | P2 | `aou_link_event_test`
-| 22.7 | Restart after link-down needs NOP to Active on lp_state_req | P2 | `aou_fdi_t1_linkdown_spec_test` (expected failure only)
+| 22.7 | Restart after link-down is software's on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset | P2 | `aou_fdi_t1_linkdown_spec_test`
 |===

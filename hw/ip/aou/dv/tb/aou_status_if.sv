@@ -35,19 +35,23 @@ interface aou_status_if ();
   logic int_early_wdt_err;
   logic int_activate_start;
   logic int_deactivate_start;
+  // FDI link lost with AoU in use (INT_FDI_LINK_DOWN); the DUT disables itself.
+  logic int_fdi_link_down;
 
   modport dut (
     output activate_st_disabled, activate_st_enabled, req_linkreset,
            o_aou_req_linkreset,
            int_si0_id_mismatch, int_mi0_id_mismatch, int_early_resp_err,
-           int_early_wdt_err, int_activate_start, int_deactivate_start
+           int_early_wdt_err, int_activate_start, int_deactivate_start,
+           int_fdi_link_down
   );
 
   modport mon (
     input activate_st_disabled, activate_st_enabled, req_linkreset,
           o_aou_req_linkreset,
           int_si0_id_mismatch, int_mi0_id_mismatch, int_early_resp_err,
-          int_early_wdt_err, int_activate_start, int_deactivate_start
+          int_early_wdt_err, int_activate_start, int_deactivate_start,
+          int_fdi_link_down
   );
 
 endinterface

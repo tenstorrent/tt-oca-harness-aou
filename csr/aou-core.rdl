@@ -65,8 +65,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AOU Init";
-        desc = "Activate/deactivate control; status from HW. int_deactivate_property, mst_tr_complete, slv_tr_complete, activate_state_disabled, activate_state_enabled are read-only inputs (I_*), driven in AOU_CORE.sv from internal/output signals. Write 1 to clear int_activate_start/int_deactivate_start.";
-        field { sw = r; } reserved_31_12[31:12] = 0;
+        desc = "Activate/deactivate control; status from HW. int_deactivate_property, mst_tr_complete, slv_tr_complete, activate_state_disabled, activate_state_enabled are read-only inputs (I_*), driven in AOU_CORE.sv from internal/output signals. Write 1 to clear int_fdi_link_down/int_activate_start/int_deactivate_start.";
+        field { sw = r; } reserved_31_13[31:13] = 0;
+        field { sw = rw; hw = rw; onwrite = woclr; desc = "FDI link lost with AoU in use. Set by HW on the falling edge of I_INT_FSM_IN_ACTIVE (the FDI bring-up controller left Active for LinkError, LinkReset, Disabled or Reset; Retrain and L1 do not count) while the activation FSM is in ACTIVATE, ENABLED or DEACTIVATE, or in DISABLED with an ActivateReq already sent or received (its entry to ACTIVATE is cancelled). The activation FSM returns to DISABLED. Write 1 to clear. Source of INT_FDI_LINK_DOWN."; } int_fdi_link_down[12:12] = 0;
         field { sw = r; hw = w; desc = "Deactivation property status. Read-only, driven by HW."; } int_deactivate_property[11:11];
         field { sw = r; hw = w; desc = "Master transaction completion status. Read-only, driven by HW."; } mst_tr_complete[10:10];
         field { sw = r; hw = w; desc = "Slave transaction completion status. Read-only, driven by HW."; } slv_tr_complete[9:9];
@@ -85,8 +86,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AOU Interrupt Mask";
-        desc = "Interrupt mask bits for linkreset and early response errors. Write 1 to mask the corresponding interrupt source.";
-        field { sw = r; } reserved_31_10[31:10] = 0;
+        desc = "Interrupt mask bits for linkreset, early response and FDI link-down interrupts. Write 1 to mask the corresponding interrupt source.";
+        field { sw = r; } reserved_31_11[31:11] = 0;
+        field { sw = rw; desc = "Mask bit for the FDI link-down interrupt (INT_FDI_LINK_DOWN)."; } int_fdi_link_down_mask[10:10] = 0;
         field { sw = rw; desc = "Mask bit for the early-response write-transaction watchdog interrupt (INT_EARLY_WDT_ERR)."; } int_early_wdt_mask[9:9] = 0;
         field { sw = rw; desc = "Mask bit for activation ACK timeout link reset interrupt."; } int_req_linkreset_act_ack_mask[8:8] = 0;
         field { sw = rw; desc = "Mask bit for deactivation ACK timeout link reset interrupt."; } int_req_linkreset_deact_ack_mask[7:7] = 0;

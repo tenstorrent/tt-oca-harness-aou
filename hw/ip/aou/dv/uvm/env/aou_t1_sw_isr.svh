@@ -25,6 +25,11 @@
 // On INT_MI0_ID_MISMATCH software clears every RP's SPLIT_RID/BID_MISMATCH_ERR
 // with write 1 (MAS 7.2.2), which also ends the DUT's TX credit block on an ID
 // mismatch (937a8a8). service_id_mismatch = 0 leaves it to the test.
+// On INT_FDI_LINK_DOWN (the link lost with AoU in use; the DUT is DISABLED
+// by then) software reads AOU_INIT and clears the sticky bit with write 1
+// (MAS 7.3.6). The rest of the recovery, AOU_SW_RESET while the link is down
+// and the link restart, is the system's (aou_base_test_seq::sys_reset, D18),
+// not this ISR's. service_link_down = 0 leaves the bit to the test.
 class aou_t1_sw_isr extends uvm_component;
   `uvm_component_utils(aou_t1_sw_isr)
 
@@ -37,6 +42,8 @@ class aou_t1_sw_isr extends uvm_component;
   bit               drain_before_deact = 1'b0;
   bit               held = 1'b0;
   bit               service_id_mismatch = 1'b1;
+  bit               service_link_down = 1'b1;
+  int unsigned      n_link_down;
   int unsigned      n_rp = 1;
   int unsigned      n_id_mismatch;
   int unsigned      state_timeout = 20000;
@@ -98,7 +105,7 @@ class aou_t1_sw_isr extends uvm_component;
     hold_requests(1'b1);
     while ((drain_before_deact && count_reqs(1'b1) != 0) || (cm && count_reqs(1'b0) != 0)) begin
       @(status.vif.mon_cb);
-      if (g != gen || status.vif.mon_cb.int_req_linkreset === 1'b1) return;
+      if (g != gen || link_lost()) return;
       if (++n >= state_timeout) begin
         `uvm_info(get_type_name(), $sformatf("quiesce: %0d request(s) open after %0d cycles",
                                              count_reqs(drain_before_deact), n), UVM_LOW)
@@ -130,18 +137,24 @@ class aou_t1_sw_isr extends uvm_component;
            (en ? status.n_enabled : status.n_disabled) != n0;
   endfunction
 
+  // The link is lost: the state a service waits for may never come.
+  protected function bit link_lost();
+    return status.vif.mon_cb.int_req_linkreset === 1'b1 ||
+           status.vif.mon_cb.int_fdi_link_down === 1'b1;
+  endfunction
+
   // Waits for ENABLED (en=1) or DISABLED, reached since entry count n0;
-  // ok_r[en] = 0 when cancelled, on INT_REQ_LINKRESET or after state_timeout
-  // cycles.
+  // ok_r[en] = 0 when cancelled, on INT_REQ_LINKRESET / INT_FDI_LINK_DOWN or
+  // after state_timeout cycles.
   protected task wait_state(bit en, int unsigned g, int unsigned n0);
     int unsigned n = 0;
     ok_r[en] = 1'b1;
     tmo_r[en] = 1'b0;
     while (!reached(en, n0)) begin
       @(status.vif.mon_cb);
-      if (g != gen || status.vif.mon_cb.int_req_linkreset === 1'b1 || ++n >= state_timeout) begin
+      if (g != gen || link_lost() || ++n >= state_timeout) begin
         ok_r[en] = 1'b0;
-        tmo_r[en] = g == gen && status.vif.mon_cb.int_req_linkreset !== 1'b1;
+        tmo_r[en] = g == gen && !link_lost();
         break;
       end
     end
@@ -208,11 +221,33 @@ class aou_t1_sw_isr extends uvm_component;
     end
   endtask
 
+  // Software's first step on a link loss (MAS 7.3.6): read AOU_INIT, clear
+  // the sticky INT_FDI_LINK_DOWN with write 1. Bounded like the ID-mismatch
+  // service; the pin stays high only while the bit is set.
+  protected task service_link_down_irq();
+    int unsigned g = gen;
+    int unsigned n = 0;
+    busy++;
+    while (service_link_down && g == gen && status.vif.mon_cb.int_fdi_link_down === 1'b1 &&
+           n++ < 4) begin
+      n_link_down++;
+      `uvm_info(get_type_name(), "INT_FDI_LINK_DOWN: FDI link lost, clearing the interrupt",
+                UVM_LOW)
+      write_field(rm.aou_init.int_fdi_link_down, 1);
+      repeat (4) @(status.vif.mon_cb);
+    end
+    done();
+  endtask
+
   task run_phase(uvm_phase phase);
     fork
       forever begin
         status.mi0_id_mismatch_ev.wait_trigger();
         service_id_mismatch_irq();
+      end
+      forever begin
+        status.link_down_ev.wait_trigger();
+        service_link_down_irq();
       end
       forever begin
         status.act_start_ev.wait_trigger();

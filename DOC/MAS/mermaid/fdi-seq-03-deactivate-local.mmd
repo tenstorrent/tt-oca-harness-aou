@@ -1,0 +1,17 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active, AoU ENABLED
+    SW->>CORE: APB write AOU_INIT.DEACTIVATE_START = 1
+    Note over CORE: DEACTIVATE - drains, then
+    CORE->>REM: DeactivateReq
+    REM->>CORE: DeactivateAck
+    Note over CORE: DISABLED, DEACTIVATE_START self-clears
+    Note over CORE,ADP: unchanged - ACTIVE, lp_state_req = Active, O_FDI_LINK_UP = 1, O_INT_FSM_IN_ACTIVE = 1
+    Note over ADP: pl_state_sts stays Active (0001)
+    Note over SW: nothing on the UCIe controller

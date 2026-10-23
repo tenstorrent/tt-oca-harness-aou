@@ -1,0 +1,28 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over BRG: RESET (NOP)
+    ADP->>BRG: pl_state_sts = Reset (0000), pl_inband_pres = 1
+    Note over BRG: WAIT_PRESENCE (NOP)
+    ADP->>BRG: pl_clk_req = 1
+    BRG->>ADP: lp_clk_ack = 1
+    Note over BRG: WAKE_ASSERT
+    BRG->>ADP: lp_wake_req = 1
+    ADP->>BRG: pl_wake_ack = 1
+    Note over BRG: REQ_ACTIVE
+    BRG->>ADP: lp_state_req = Active (0001)
+    ADP->>BRG: pl_state_sts = Active (0001)
+    ADP->>BRG: pl_rx_active_req = 1
+    BRG->>ADP: lp_rx_active_sts = 1
+    Note over BRG: ACTIVE - O_FDI_LINK_UP = 1
+    BRG->>CORE: O_INT_FSM_IN_ACTIVE = 1
+    REM->>CORE: ActivateReq
+    CORE->>SW: INT_ACTIVATE_START
+    SW->>CORE: APB write AOU_INIT.ACTIVATE_START = 1
+    CORE->>REM: ActivateAck
+    Note over CORE: ENABLED

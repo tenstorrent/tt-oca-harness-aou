@@ -24,8 +24,8 @@ class aou_lsm_agent extends uvm_agent;
     super.build_phase(phase);
     if (cfg == null && !uvm_config_db #(aou_lsm_cfg)::get(this, "", "cfg", cfg))
       cfg = aou_lsm_cfg::type_id::create("cfg");
-    // +FDI_ENC=SPEC|RTL overrides the test's choice (runs against a DUT with a
-    // BUGS/001 fix).
+    // +FDI_ENC=SPEC|RTL overrides the test's choice (RTL: runs against RTL from
+    // before the UCIe encoding fix).
     if ($value$plusargs("FDI_ENC=%s", enc)) begin
       if (enc == "SPEC") cfg.fdi_enc = AOU_FDI_ENC_SPEC;
       else if (enc == "RTL") cfg.fdi_enc = AOU_FDI_ENC_RTL;
@@ -33,13 +33,10 @@ class aou_lsm_agent extends uvm_agent;
     end
     // +react_linkerror=0|1 overrides cfg.react_linkerror_en.
     void'($value$plusargs("react_linkerror=%b", cfg.react_linkerror_en));
-    // +train_trigger=0 lets the Adapter train again after a link-down without
-    // waiting for NOP->Active (an Adapter or remote die that restarts by itself).
-    void'($value$plusargs("train_trigger=%b", cfg.train_trigger_en));
-    // +sw_restart_delay=N: cycles in Reset after a deliberate teardown before
-    // software pulses I_SW_ACTIVATE_START (0: never); random in [50:1500]
-    // otherwise, so a DUT that releases its trigger on a timer rather than
-    // on the request is caught at many delays.
+    // +sw_restart_delay=N: cycles the Adapter stays in Reset after a link-down
+    // before software restarts the training (0: at once); random in [50:1500]
+    // otherwise, so a DUT that requests anything of the link meanwhile is
+    // caught at many delays.
     if (!$value$plusargs("sw_restart_delay=%d", cfg.sw_restart_delay))
       cfg.sw_restart_delay = $urandom_range(1500, 50);
     void'($value$plusargs("le_mid_flit_pct=%d", cfg.le_mid_flit_pct));

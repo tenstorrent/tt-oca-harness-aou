@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Adapter-initiated FDI link events while AoU is ENABLED and traffic runs
-// (fdi_enc=RTL). AoU's reaction is unspecified (BUGS/015); the interim
-// expectations are:
+// Adapter-initiated FDI link events while AoU is ENABLED and traffic runs.
+// AoU's reaction is unspecified (BUGS/015); the interim expectations are:
 //   retrain, clk_wake  transparent: AoU stays ENABLED, no interrupt, every
 //                      transaction completes with correct data;
 //   l1                 software deactivates first (MAS §7.3.6), the adapter
@@ -15,17 +14,31 @@
 //   disabled           transactions are aborted by the reset (an M-port ID
 //                      mismatch interrupt is tolerated); all later traffic
 //                      must complete. Disabled is Adapter-initiated and needs
-//                      fdi_enc=SPEC, which the test selects for it.
-//   teardown_int       a deliberate teardown (software deactivation, then
-//                      I_SW_DEACTIVATE_START): the DUT holds the training
-//                      trigger until an activation request. Only
-//                      I_INT_ACTIVATE_START gives it here, raised by local
-//                      traffic queued while the link is down; the Adapter's
-//                      software pulse is off, so a DUT that ignores the
-//                      interrupt fails FDI-R51. fdi_enc=SPEC.
+//                      fdi_enc=SPEC.
+//   sw_disable         software deactivates AoU (the FDI link stays Active:
+//                      the bringup model holds BRG_ACTIVE) and then disables
+//                      the link on the UCIe controller (Adapter Disabled).
+//                      Local traffic queued while the link is down raises
+//                      INT_ACTIVATE_START; the DUT must request nothing of
+//                      the link until software restarts it (the model's NOP
+//                      in LINKDOWN and RESET), and the activation then runs
+//                      on the interrupt once the link is up. fdi_enc=SPEC.
+//   l1_act             software deactivates, the adapter enters L1, and
+//                      software writes ACTIVATE_START while the link is in
+//                      L1: the link stays in L1 (the write wakes nothing),
+//                      the handshake starts and its ActivateReq waits; the
+//                      Adapter's PM exit (clk_req, Retrain, Active) lets the
+//                      activation complete (T1-L50).
+//   retrain_act        software deactivates and writes ACTIVATE_START while
+//                      the Adapter holds the link in Retrain: the handshake
+//                      completes once the link is Active again (T1-L50).
+// A link loss with AoU in use (linkerror, link_reset, inband_drop, disabled)
+// raises INT_FDI_LINK_DOWN once and the DUT disables itself (T1-L48/L49,
+// aou_base_test_seq); with +link_down_mask=1 the pin stays low and the
+// sticky bit is checked instead.
 // Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|
-// teardown_int|rand (rand never picks disabled or teardown_int)
-// +loops +T1_TXN.
+// sw_disable|l1_act|retrain_act|rand (rand never picks disabled, sw_disable,
+// l1_act or retrain_act) +link_down_mask +loops +T1_TXN.
 class aou_link_event_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_link_event_vseq)
 
@@ -40,6 +53,12 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     int unsigned loops = arg_range("loops", 2, 4);
     string arg = arg_str("event", "rand");
     link_up();
+    if (arg_int("link_down_mask", 0) != 0) begin
+      aou_t1_feature_cfg f = aou_t1_feature_cfg::type_id::create("f");
+      f.mask_fdi_link_down = 1;
+      link_down_masked = 1'b1;
+      program_cfg(f);
+    end
     sw_activate();
     for (int unsigned i = 0; i < loops; i++) begin
       string ev = (arg == "rand") ? evs[$urandom_range(5)] : arg;
@@ -51,7 +70,9 @@ class aou_link_event_vseq extends aou_link_base_vseq;
         "link_reset": link_down(LSM_EV_LINK_RESET, 1'b0);
         "inband_drop": link_down(LSM_EV_LINK_RESET, 1'b1);
         "disabled": link_down(LSM_EV_DISABLED, 1'b0);
-        "teardown_int": teardown_int();
+        "sw_disable": sw_disable();
+        "l1_act": l1_act();
+        "retrain_act": retrain_act();
         default: `uvm_fatal(get_type_name(), {"unknown link event ", ev})
       endcase
     end
@@ -72,43 +93,87 @@ class aou_link_event_vseq extends aou_link_base_vseq;
   task l1_cycle();
     check_traffic(num_txns);
     sw_deactivate();
-    // A deactivation the remote side started also tears the FDI link down
-    // (BUGS/011); the adapter completes that before any PM entry.
-    ensure_link();
     link_event(LSM_EV_L1_ENTRY);
     wait_cycles($urandom_range(400, 20));
     link_event(LSM_EV_L1_EXIT);
     sw_activate();
   endtask
 
-  task teardown_int();
-    int unsigned keep = cfg.lsm_cfg.sw_restart_delay;
-    int unsigned n;
+  task sw_disable();
+    bit keep = cfg.lsm_cfg.rebringup_after_down;
     check_traffic(num_txns);
     sw_deactivate(AOU_T1_BY_APB);
-    if (!link_is_up()) relink();
-    `uvm_info(get_type_name(), "teardown: pulsing I_SW_DEACTIVATE_START", UVM_LOW)
-    env.lsm.drv.pulse_sw(LSM_SW_DEACTIVATE, 2);
-    while (env.lsm.drv.state != LSM_RESET || link_is_up()) begin
-      wait_cycles(1);
-      if (++n == cfg.link_timeout) begin
-        `uvm_error(get_type_name(), "T1-L04: no FDI teardown after I_SW_DEACTIVATE_START")
-        return;
-      end
-    end
-    // Only the DUT's own interrupt may release the training trigger now.
-    cfg.lsm_cfg.sw_restart_delay = 0;
+    if (!link_is_up())
+      `uvm_error(get_type_name(), "T1-L04: the FDI link left Active on an AoU deactivation")
+    // Software's Link Disable on the UCIe controller. Both dies are cleanly
+    // DISABLED, so no system reset is due (D18) and the Adapter alone brings
+    // the link back, after its software restart delay.
+    cfg.lsm_cfg.rebringup_after_down = 1'b0;
+    link_event(LSM_EV_DISABLED);
+    cfg.lsm_cfg.rebringup_after_down = keep;
     traffic_nb(AOU_T1_L2R, num_txns);
-    relink();
-    cfg.lsm_cfg.sw_restart_delay = keep;
+    wait_cycles($urandom_range(200, 20));
+    link_event(LSM_EV_BRINGUP);
     fork
       wait_l3(AOU_LS_ENABLED, cfg.act_timeout);
       env.status.wait_act_state(1'b1, cfg.act_timeout);
     join
     if (!l3_ok || !env.status.act_ok)
-      `uvm_error(get_type_name(), "T1-L04: not ENABLED again after the interrupt-driven restart")
+      `uvm_error(get_type_name(), "T1-L04: not ENABLED again after the link restart")
     wait_traffic();
     drain();
+  endtask
+
+  // Waits for ENABLED on both sides after an ACTIVATE_START written with
+  // the link in L1 or Retrain (T1-L50).
+  task wait_enabled(string how);
+    env.l3.model.kick();
+    fork
+      wait_l3(AOU_LS_ENABLED, cfg.act_timeout);
+      env.status.wait_act_state(1'b1, cfg.act_timeout);
+    join
+    if (!l3_ok || !env.status.act_ok)
+      `uvm_error(get_type_name(), {"T1-L50: not ENABLED after ACTIVATE_START ", how})
+    if (!link_is_up())
+      `uvm_error(get_type_name(), {"T1-L50: FDI link not Active after ACTIVATE_START ", how})
+  endtask
+
+  // ACTIVATE_START written with the link in L1. Writing it does not wake the
+  // link (the bring-up controller wakes on pl_clk_req, I_SW_ACTIVATE_START or
+  // INT_ACTIVATE_START, and the write clears the latter's condition), so the
+  // handshake starts at once (I_INT_FSM_IN_ACTIVE is 1), the ActivateReq waits
+  // in the TX path, and the activation completes when the Adapter exits L1.
+  task l1_act();
+    check_traffic(num_txns);
+    sw_deactivate();
+    link_event(LSM_EV_L1_ENTRY);
+    wait_cycles($urandom_range(400, 20));
+    `uvm_info(get_type_name(), "ACTIVATE_START with the link in L1", UVM_LOW)
+    dut_activate(AOU_T1_BY_APB);
+    wait_cycles($urandom_range(400, 50));
+    if (env.lsm.drv.state != LSM_L1)
+      `uvm_error(get_type_name(), $sformatf("T1-L50: FDI link %s after ACTIVATE_START in L1",
+                 env.lsm.drv.state.name()))
+    if (env.status.enabled)
+      `uvm_error(get_type_name(), "T1-L50: ENABLED with the link in L1 (no flit can have crossed)")
+    link_event(LSM_EV_L1_EXIT);
+    wait_enabled("in L1");
+  endtask
+
+  task retrain_act();
+    int unsigned n = 0;
+    check_traffic(num_txns);
+    sw_deactivate();
+    fork
+      link_event(LSM_EV_RETRAIN, 3000);
+      begin
+        while (env.lsm.drv.state != LSM_RETRAIN && ++n < cfg.link_timeout) @(env.lsm_vif.mon_cb);
+        wait_cycles($urandom_range(200, 10));
+        `uvm_info(get_type_name(), "ACTIVATE_START with the link in Retrain", UVM_LOW)
+        dut_activate(AOU_T1_BY_APB);
+      end
+    join
+    wait_enabled("in Retrain");
   endtask
 
   task link_down(aou_lsm_ev_e ev, bit inband_drop);
@@ -121,7 +186,8 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     expect_event("INT_MI0_ID_MISMATCH", 0, 0);
     traffic_nb(AOU_T1_BOTH_DIRS, num_txns);
     wait_cycles($urandom_range(500, 20));
-    recover(null, 1'b1, ev, inband_drop);
+    // last_prog carries the interrupt mask (+link_down_mask) across the reset.
+    recover(last_prog, 1'b1, ev, inband_drop);
     wait_traffic();
     drain();
   endtask

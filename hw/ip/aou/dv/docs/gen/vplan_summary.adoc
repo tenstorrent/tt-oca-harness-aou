@@ -18,9 +18,9 @@
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
-| `aou_fdi_t1_bringup_spec_test` | `aou_fdi_t1_bringup_spec_test` |  | 1 |  | 22.1 | BUGS/001 (expected_fail.yaml)
-| `aou_fdi_t1_linkerror_spec_test` | `aou_fdi_t1_linkerror_spec_test` |  | 1 |  | 22.1,22.4 | BUGS/001, BUGS/002, BUGS/038 (expected_fail.yaml)
-| `aou_fdi_t1_linkdown_spec_test` | `aou_fdi_t1_linkdown_spec_test` |  | 1 |  | 22.1,22.4,22.7,18.18 | BUGS/001, BUGS/038 (expected_fail.yaml)
+| `aou_fdi_t1_bringup_spec_test` | `aou_fdi_t1_bringup_spec_test` |  | 1 |  | 22.1 | 
+| `aou_fdi_t1_linkerror_spec_test` | `aou_fdi_t1_linkerror_spec_test` |  | 1 |  | 22.1,22.4 | 
+| `aou_fdi_t1_linkdown_spec_test` | `aou_fdi_t1_linkdown_spec_test` |  | 1 |  | 22.1,22.4,22.7,18.18 | 
 |===
 ===== `testlists/t1_api.toml` (5 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
@@ -49,7 +49,7 @@
 | `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40` | `aou_fdi_t1_link_stress_test` | `+le_mid_flit_pct=100 +fdi_rx_early=40` | 1-3 |  | 18.16,18.19,18.23 | 
 | `aou_link_event_test.event-linkerror.le_mid_flit_pct-100` | `aou_link_event_test` | `+event=linkerror +le_mid_flit_pct=100` | 1-2 |  | 18.23 | 
 | `aou_link_event_test.event-disabled` | `aou_link_event_test` | `+event=disabled` | 1-2 |  | 18.18 | 
-| `aou_link_event_test.event-teardown_int` | `aou_link_event_test` | `+event=teardown_int` | 1-2 |  | 18.17 | 
+| `aou_link_event_test.event-sw_disable` | `aou_link_event_test` | `+event=sw_disable` | 1-2 |  | 18.18 | 
 | `aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128` | `aou_t1_slice_test` | `+active_phy=1 +park_idle_phy=1` | 1-2 | `2xmix-tp64_128` | 18.25 | 
 | `aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128` | `aou_dp_random_test` | `+dp_dir=both +active_phy=1 +park_idle_phy=1 +fdi_trdy=holes +fdi_stall_pct=5 +fdi_stall_mid_pct=50` | 1-2 | `2xmix-tp64_128` | 18.25 | 
 | `aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128` | `aou_link_event_test` | `+event=l1 +active_phy=1 +park_idle_phy=1` | 1 | `2xmix-tp64_128` | 18.25 | 
@@ -307,7 +307,7 @@
 | `aou_axi_err_resp_test.part-fifo.1x256-sp32` | `aou_axi_err_resp_test` | `+part=fifo` | 1-3 | `1x256-sp32` | 9.19 | 
 | `aou_axi_err_resp_test.part-fifo.4xmix4211-sp128` | `aou_axi_err_resp_test` | `+part=fifo` | 1-2 | `4xmix4211-sp128` | 9.19 | 
 |===
-===== `testlists/lifecycle.toml` (31 scenarios)
+===== `testlists/lifecycle.toml` (34 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -317,6 +317,9 @@
 | `aou_link_event_test.event-linkerror` | `aou_link_event_test` | `+event=linkerror` | 1-2 |  | 22.1,22.4,11.11,18.14 | 
 | `aou_link_event_test.event-link_reset` | `aou_link_event_test` | `+event=link_reset` | 1 |  | 22.1,22.4,11.11,18.17 | 
 | `aou_link_event_test.event-inband_drop` | `aou_link_event_test` | `+event=inband_drop` | 1 |  | 22.1,22.4,18.21 | 
+| `aou_link_event_test.event-link_reset.link_down_mask-1` | `aou_link_event_test` | `+event=link_reset +link_down_mask=1` | 1 |  | 22.1,22.4,11.11,18.17 | 
+| `aou_link_event_test.event-l1_act` | `aou_link_event_test` | `+event=l1_act` | 1-2 |  | 22.1,2.4,18.15 | 
+| `aou_link_event_test.event-retrain_act` | `aou_link_event_test` | `+event=retrain_act` | 1-2 |  | 22.1,18.13 | 
 | `aou_link_event_test` | `aou_link_event_test` |  | 1-2 |  | 22.1,22.4,22.6 | 
 | `aou_lp_mode_traffic_test.threshold-0` | `aou_lp_mode_traffic_test` | `+threshold=0` | 1 |  | 21.2,21.4,21.6,21.7 | 
 | `aou_lp_mode_traffic_test` | `aou_lp_mode_traffic_test` |  | 1-3 |  | 21.2,21.3,21.5,21.6,21.7 | 

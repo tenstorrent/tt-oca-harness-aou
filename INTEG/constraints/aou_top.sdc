@@ -289,6 +289,7 @@ set INT_CTRL_OUTPUTS {
     INT_MI0_ID_MISMATCH
     INT_EARLY_RESP_ERR
     INT_EARLY_WDT_ERR
+    INT_FDI_LINK_DOWN
     INT_ACTIVATE_START
     INT_DEACTIVATE_START
 }
@@ -307,9 +308,11 @@ set_output_delay -clock clk_core $CORE_COMB_OUTPUT_DELAY [get_ports $INT_CTRL_OU
 #
 # Registration analysis (per AOU_FDI_BRINGUP_CTRL.sv):
 #   - PL->LP inputs feed FSM next-state / output decode (combinational).
-#   - LP->PL outputs: O_LP_STATE_REQ is a combinational decode of r_cur_st;
-#     O_LP_WAKE_REQ / O_LP_CLK_ACK / O_LP_RX_ACTIVE_STS are registered
-#     (driven directly from r_wake_req / r_clk_ack / r_rx_active_sts flops).
+#   - LP->PL outputs: O_LP_STATE_REQ is a combinational decode of r_cur_st
+#     and r_retrain_nop_sent;
+#     O_LP_WAKE_REQ / O_LP_CLK_ACK / O_LP_RX_ACTIVE_STS / O_LP_LINKERROR are
+#     registered (driven directly from r_wake_req / r_clk_ack /
+#     r_rx_active_sts / r_lp_linkerror flops).
 # ==============================================================================
 
 # --- PL->LP inputs (combinational) ---
@@ -322,7 +325,8 @@ set FDI_BRINGUP_COMB_INPUTS {
 
 set_input_delay -clock clk_core $CORE_COMB_INPUT_DELAY [get_ports $FDI_BRINGUP_COMB_INPUTS]
 
-# --- LP->PL combinational outputs (state-req decode) ---
+# --- LP->PL combinational outputs (state-req decode of r_cur_st and
+#     r_retrain_nop_sent) ---
 set FDI_BRINGUP_COMB_OUTPUTS {
     O_LP_STATE_REQ
 }
@@ -334,6 +338,7 @@ set FDI_BRINGUP_REG_OUTPUTS {
     O_LP_WAKE_REQ
     O_LP_CLK_ACK
     O_LP_RX_ACTIVE_STS
+    O_LP_LINKERROR
 }
 
 set_output_delay -clock clk_core $CORE_REG_OUTPUT_DELAY [get_ports $FDI_BRINGUP_REG_OUTPUTS]
@@ -344,8 +349,6 @@ set_output_delay -clock clk_core $CORE_REG_OUTPUT_DELAY [get_ports $FDI_BRINGUP_
 
 set FDI_BRINGUP_SW_INPUTS {
     I_SW_ACTIVATE_START
-    I_SW_DEACTIVATE_START
-    I_SW_RETRAIN_REQ
     I_SW_LINKERROR_INJECT
 }
 
@@ -355,6 +358,10 @@ set_input_delay -clock clk_core $CORE_COMB_INPUT_DELAY [get_ports $FDI_BRINGUP_S
 # 16. FDI bringup controller -- status outputs (combinational)
 #
 # O_FDI_FSM_STATE / O_FDI_LINK_UP are combinational decodes of r_cur_st.
+# O_FDI_LINK_UP is "FSM in Active" only; the internal O_INT_FSM_IN_ACTIVE
+# (link established: set on entry to Active, cleared on a link loss, so it
+# holds through Retrain, L1 and the L1 exit) is a register of its own and
+# never leaves AOU_TOP.
 # ==============================================================================
 
 set FDI_BRINGUP_STATUS_OUTPUTS {

@@ -40,7 +40,8 @@ bringup control, bringup status
 
 |B |[.monospaced]#++AOU_CORE_TOP++# |You have an external UCIe controller or custom FDI
 state machine |Must be handled externally |[.monospaced]#++I_INT_FSM_IN_ACTIVE++#,
-[.monospaced]#++O_AOU_ACTIVATE_ST_*++#, [.monospaced]#++O_AOU_REQ_LINKRESET++#
+[.monospaced]#++O_AOU_ACTIVATE_ST_*++#, [.monospaced]#++O_AOU_REQ_LINKRESET++#,
+[.monospaced]#++O_SW_RESET++#
 |=======================================================================
 
 ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
@@ -68,7 +69,7 @@ instantiates two submodules:
 * *[.monospaced]#++AOU_FDI_BRINGUP_CTRL++#* -- A UCIe 3.0 FDI state machine that manages
 the four FDI handshake pairs (wake, clock, state negotiation, RX
 activation) required to bring the FDI link from RESET to ACTIVE and
-handle teardown, LinkError recovery, Retrain, and L1 entry/exit.
+follow LinkError, LinkReset, Disabled, Retrain, and L1 entry/exit.
 * *[.monospaced]#++AOU_CORE_TOP++#* -- The AXI-over-UCIe protocol engine described in
 xref:aou-ig-aou_core_top[Section 1.2].
 
@@ -776,6 +777,9 @@ multiplexing: 0 = PHY0, 1 = PHY1. See xref:aou-ig-phy-type-mux[Section 6.6.4].
 |INT_EARLY_RESP_ERR |output |1 |Early response error.
 |INT_EARLY_WDT_ERR |output |1 |Early-response write-transaction watchdog
 expired on an RP (see xref:aou-ig-interrupts[Section 5]).
+|INT_FDI_LINK_DOWN |output |1 |FDI link lost ([.monospaced]#++I_INT_FSM_IN_ACTIVE++#
+fell) while the AoU activation FSM was in ACTIVATE, ENABLED or DEACTIVATE;
+the FSM returns to DISABLED (see xref:aou-ig-interrupts[Section 5]).
 |INT_ACTIVATE_START |output |1 |Activate start.
 |INT_DEACTIVATE_START |output |1 |Deactivate start.
 |=============================================================
@@ -794,21 +798,34 @@ ________________________________________________________________________________
 [width="100%",cols="<25%,<25%,<25%,<25%",options="header",]
 |=======================================================================
 |Signal |Direction |Width |Description
-|I_INT_FSM_IN_ACTIVE |input |1 |Initialization done / FSM in active
-state indicator.
+|I_INT_FSM_IN_ACTIVE |input |1 |FDI link established. 1 from the first
+Active until the link is lost (LinkError, LinkReset, Disabled, Reset);
+must stay 1 through Retrain and L1. Its falling edge raises
+[.monospaced]#++INT_FDI_LINK_DOWN++# when the activation FSM is not DISABLED, or
+is DISABLED with an ActivateReq already sent or received.
 
 |O_AOU_ACTIVATE_ST_DISABLED |output |1 |Activation state disabled.
 
 |O_AOU_ACTIVATE_ST_ENABLED |output |1 |Activation state enabled.
 
 |O_AOU_REQ_LINKRESET |output |1 |AOU link reset request.
+
+|O_SW_RESET |output |1 |[.monospaced]#++AOU_CON0.AOU_SW_RESET++# in effect: AOU_CORE
+is held in reset this cycle (registered).
 |=======================================================================
 
 * [.monospaced]#++I_INT_FSM_IN_ACTIVE++# is an input signal that indicates that the
-link up is complete. When starting the test, [.monospaced]#++I_INT_FSM_IN_ACTIVE++#
+link is established. When starting the test, [.monospaced]#++I_INT_FSM_IN_ACTIVE++#
 should be 0, and when you want to activate AOU_CORE,
 [.monospaced]#++I_INT_FSM_IN_ACTIVE++# should be 1. When testing with IP standalone,
-you must force [.monospaced]#++I_INT_FSM_IN_ACTIVE++#.
+you must force [.monospaced]#++I_INT_FSM_IN_ACTIVE++#. An external controller must
+keep it asserted through Retrain and L1 and drop it only when the link is
+lost (LinkError, LinkReset, Disabled, or Reset); AOU_CORE treats every
+falling edge while its activation FSM is not DISABLED as a link loss,
+returns the FSM to DISABLED and raises [.monospaced]#++INT_FDI_LINK_DOWN++#, so a
+controller that drops it on every Retrain gives software that interrupt on
+every Retrain. This is what [.monospaced]#++AOU_FDI_BRINGUP_CTRL++#'s
+[.monospaced]#++O_INT_FSM_IN_ACTIVE++# does inside [.monospaced]#++AOU_TOP++#.
 * Bus quiescence (whether every request sent to or received from the
 remote die has been answered) is tracked inside AOU_CORE and reported in
 [.monospaced]#++AOU_INIT.SLV_TR_COMPLETE++# / [.monospaced]#++AOU_INIT.MST_TR_COMPLETE++#; no external
@@ -823,7 +840,19 @@ UCIE_CORE.
 is asserted to notify the UCIE_CORE.
 * [.monospaced]#++O_AOU_REQ_LINKRESET++# is asserted together with
 [.monospaced]#++INT_REQ_LINKRESET++# when the AOU_CORE detects an AoU protocol
-violation, to notify the UCIE_CORE.
+violation, to notify the UCIE_CORE. It is a level: the sticky
+[.monospaced]#++LP_LINKRESET++# status bits through their interrupt masks, held
+until software clears the status, and absent for a masked cause.
+[.monospaced]#++AOU_FDI_BRINGUP_CTRL++# acts on it in ACTIVE and RETRAIN; raised while
+the link is in L1 or exiting it, the request is deferred until the link is next
+Active (xref:aou-ig-supported-state-transitions[Section 6.6.3]).
+* [.monospaced]#++O_SW_RESET++# is asserted while
+[.monospaced]#++AOU_CON0.AOU_SW_RESET++# holds AOU_CORE in reset. An external FDI
+state machine should use it the way [.monospaced]#++AOU_FDI_BRINGUP_CTRL++# does
+(xref:aou-ig-supported-state-transitions[Section 6.6.3]): after a LinkError,
+AOU_CORE's FDI data paths keep the position of the flit the LinkError
+interrupted until this reset, so the link must not return to Active before
+it has been applied.
 
 [[aou-ig-dft]]
 === 3.13 DFT
@@ -928,8 +957,9 @@ FSM waits for this before initiating the wake handshake.
 |I_PL_RX_ACTIVE_REQ |input |1 |PL requests RX activation. LP responds
 with [.monospaced]#++O_LP_RX_ACTIVE_STS++#.
 
-|O_LP_STATE_REQ |output |[3:0] |LP state request (RESET=0, ACTIVE=1,
-LinkError=2, Retrain=3, L1=4).
+|O_LP_STATE_REQ |output |[3:0] |LP state request, UCIe encoding: NOP=0000b,
+Active=0001b, L1=0100b. Nothing else is requested: Retrain, L2, LinkReset
+and Disabled are never requested by the bringup FSM.
 
 |O_LP_WAKE_REQ |output |1 |LP-initiated wake request.
 
@@ -937,6 +967,12 @@ LinkError=2, Retrain=3, L1=4).
 
 |O_LP_RX_ACTIVE_STS |output |1 |LP RX active status in response to
 [.monospaced]#++I_PL_RX_ACTIVE_REQ++#.
+
+|O_LP_LINKERROR |output |1 |LP request to take the link to LinkError
+(UCIe [.monospaced]#++lp_linkerror++#). Set when the bringup FSM enters LinkError
+on the LPpass:[']s own request ([.monospaced]#++I_AOU_REQ_LINKRESET++# or
+[.monospaced]#++I_SW_LINKERROR_INJECT++#); cleared when the PL reports LinkError or
+the FSM leaves LinkError.
 |=======================================================================
 
 The four handshake pairs correspond to UCIe 3.0 FDI bringup control
@@ -964,19 +1000,25 @@ These top-level ports provide direct software control over the FDI
 bringup FSM. They are *not SFR-mapped*; the integrator must drive them
 from external logic or tie them as needed.
 
+There is no software pin to take the link down or to retrain it. The
+bringup FSM takes the link down only for an error (via
+[.monospaced]#++O_LP_LINKERROR++#). A link-down for PM entry, LinkReset or Link
+Disable, and the restart of the link afterwards, are done by software on
+the UCIe controller (D2D adapter), as described in
+xref:aou-ig-pm-entry-linkreset-linkdisabled-sequence[Section 6.5] and
+xref:aou-ig-bringup-sequence[Section 6.6.2]; the FSM follows what the PL
+reports. UCIe does not allow the Protocol Layer to request Retrain outside
+Raw Format.
+
 [width="100%",cols="<25%,<25%,<25%,<25%",options="header",]
 |=======================================================================
 |Signal |Direction |Width |Description
 |I_SW_ACTIVATE_START |input |1 |Trigger FDI bringup (RESET to ACTIVE).
 ORed internally with the corepass:[']s [.monospaced]#++INT_ACTIVATE_START++#.
 
-|I_SW_DEACTIVATE_START |input |1 |Trigger FDI teardown. ORed internally
-with the corepass:[']s [.monospaced]#++INT_DEACTIVATE_START++#.
-
-|I_SW_RETRAIN_REQ |input |1 |Request link retrain (LP-initiated).
-
 |I_SW_LINKERROR_INJECT |input |1 |Force the bringup FSM into LinkError
-state for debug/test.
+state for debug/test. Drives [.monospaced]#++O_LP_LINKERROR++# like
+[.monospaced]#++I_AOU_REQ_LINKRESET++#.
 |=======================================================================
 
 [[aou-ig-fdi-bringup-status-aou_top-only]]
@@ -985,9 +1027,12 @@ state for debug/test.
 [width="100%",cols="<25%,<25%,<25%,<25%",options="header",]
 |=======================================================================
 |Signal |Direction |Width |Description
-|O_FDI_FSM_STATE |output |[3:0] |Current FDI state. Encoding matches
-UCIe 3.0: RESET=0, ACTIVE=1, LinkError=2, Retrain=3, L1=4, L2=5,
-Disabled=6.
+|O_FDI_FSM_STATE |output |[3:0] |Current FDI state, in the UCIe
+[.monospaced]#++pl_state_sts++# encoding: Reset=0000b, Active=0001b, L1=0100b,
+LinkReset=1001b, LinkError=1010b, Retrain=1011b, Disabled=1100b. The
+bringup states before ACTIVE (RESET, WAIT_PRESENCE, WAKE_ASSERT,
+WAKE_WAIT_ACK, REQ_ACTIVE) report Reset, L1 and L1_CLK_WAKE report L1,
+and LINKDOWN reports LinkReset or Disabled as the PL last reported.
 
 |O_FDI_LINK_UP |output |1 |Asserted when the FDI bringup FSM is in the
 ACTIVE state.
@@ -1003,17 +1048,27 @@ internally by [.monospaced]#++AOU_FDI_BRINGUP_CTRL++#.
 [width="100%",cols="<34%,<33%,<33%",options="header",]
 |=======================================================================
 |Signal |Direction (on AOU_CORE_TOP) |Description
-|I_INT_FSM_IN_ACTIVE |input |FDI link active indicator. Driven by the
-bringup FSMpass:[']s [.monospaced]#++O_INT_FSM_IN_ACTIVE++# inside [.monospaced]#++AOU_TOP++#.
+|I_INT_FSM_IN_ACTIVE |input |FDI link established indicator. Driven by the
+bringup FSMpass:[']s [.monospaced]#++O_INT_FSM_IN_ACTIVE++# inside [.monospaced]#++AOU_TOP++#:
+set on entry to ACTIVE, cleared on entry to LINKERROR, LINKDOWN or RESET,
+so 1 through RETRAIN, L1, L1_CLK_WAKE and the wake handshake that ends an
+L1; 0 before the first Active and after a link loss. Wider than
+[.monospaced]#++O_FDI_LINK_UP++#, which is ACTIVE only.
 
 |O_AOU_ACTIVATE_ST_DISABLED |output |Protocol activation state:
-disabled. Fed back to bringup FSM.
+disabled. Not used inside [.monospaced]#++AOU_TOP++#: an AOU deactivation does
+not change the FDI link state.
 
 |O_AOU_ACTIVATE_ST_ENABLED |output |Protocol activation state: enabled.
 Fed back to bringup FSM.
 
 |O_AOU_REQ_LINKRESET |output |Protocol-level LinkReset request. Fed back
-to bringup FSM.
+to bringup FSM, which enters LinkError and drives
+[.monospaced]#++O_LP_LINKERROR++#.
+
+|O_SW_RESET |output |[.monospaced]#++AOU_CON0.AOU_SW_RESET++# in effect. Fed
+back to bringup FSM, which holds the link down after a LinkError until it
+has been seen.
 |=======================================================================
 
 
@@ -1081,6 +1136,19 @@ protocol violation. Refer to the _AOU_CORE Micro-Architecture
 Specification_ ([.monospaced]#++DOC/MAS/interrupts-errors.adoc++#) for debugging details.
 When AOU_CORE receives a protocol violation, SW needs to do SW reset
 AOU_CORE and re-enter the activation sequence.
+* *INT_FDI_LINK_DOWN* An interrupt that occurs when the FDI link is lost
+while AoU is in use: [.monospaced]#++I_INT_FSM_IN_ACTIVE++# falls (on
+[.monospaced]#++AOU_TOP++#, the bringup FSM left ACTIVE for LINKERROR, LINKDOWN or
+RESET; Retrain and L1 do not count) while the activation FSM is in
+ACTIVATE, ENABLED or DEACTIVATE. The activation FSM returns to DISABLED in
+the same cycle and drops any handshake in flight, so no Ack timeout
+follows. The status bit is AOU_CORE.AOU_INIT.INT_FDI_LINK_DOWN (bit 12,
+write pass:[']1pass:['] to clear; cleared with the other AOU_CORE registers by
+AOU_CON0.AOU_SW_RESET, so the handler reads it before the reset) and the
+mask is AOU_CORE.AOU_INTERRUPT_MASK.INT_FDI_LINK_DOWN_MASK (bit 10; the
+mask gates the pin, not the status bit). Recovery is the LinkReset
+sequence of xref:aou-ig-link-reset-sw-sequence[Section 6.5.3]. See
+[.monospaced]#++DOC/MAS/interrupts-errors.adoc++# section 4.
 
 [[aou-ig-activation-flow]]
 == 6. Activation Flow
@@ -1094,26 +1162,27 @@ xref:aou-ig-fdi-bringup-flow-aou_top-only[Section 6.6] for the FDI bringup
 sequence.
 ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
 
-The Activation of AOU_CORE begins after the UCIe Link-up process has
-been successfully completed. The completion of UCIe link-up is indicated
-by the *I_INT_FSM_IN_ACTIVE* signal of the *AOU_CORE_TOP*. There is no
+The Activation of AOU_CORE begins after the UCIe link has been
+established. This is indicated by the *I_INT_FSM_IN_ACTIVE* signal of the
+*AOU_CORE_TOP*, which stays asserted through Retrain and L1 and falls only
+when the link is lost (xref:aou-ig-ucie-external-control-and-status[Section 3.12]). There is no
 dependency between the activation of the local die and the remote die.
 Each die may initiate the activation sequence independently, which means
 the timing of sending *ActivateReq* can differ. Both dies must exchange
 *ActivateReq* and *ActivateAck* messages to transition to the *ENABLED*
 state, at which point credited messages can be transmitted.
 
-Regardless of its own activation state, a die must send an ActivateAck
-in response to an ActivateReq from the other die, to acknowledge receipt
-of the request. Acknowledging the request does not make it legal once
-the activate handshake has completed. If the local activation FSM is
-ENABLED, or is in DEACTIVATE, that ActivateReq is also an invalid
-activation message (see
-[.monospaced]#++DOC/MAS/software-operation.adoc++# section 7.2.3). It
-means the remote die has lost the activation state, for example because
-of a bug or a local reset. The local die requests LinkReset. Software
-resets AOU_CORE and both dies run activation again so they share one
-state. Sending ActivateAck does not start a second handshake.
+A die sends an ActivateAck in response to an ActivateReq from the other
+die while its own activation FSM is DISABLED or ACTIVATE. If the local
+activation FSM is ENABLED, or is in DEACTIVATE, that ActivateReq is an
+invalid activation message (see
+[.monospaced]#++DOC/MAS/software-operation.adoc++# section 7.2.3) and
+is not answered: AoU specification v0.8 treats it as an inconsistent
+Req/Ack that moves the interface to its error state, in which nothing
+is transmitted (sections 8.3.3 and 8.4). It means the remote die has
+lost the activation state, for example because of a bug or a local
+reset. The local die requests LinkReset at once. Software resets
+AOU_CORE and both dies run activation again so they share one state.
 
 [[aou-ig-credit-management-type]]
 === 6.1 Credit Management Type
@@ -1346,6 +1415,16 @@ that an error has occurred which requires the Link to go down.
 While handling LinkReset, SW needs to do AOU_CORE SW reset by setting
 AOU_CON0.AOU_SW_RESET.
 
+SW learns of a LinkReset, Disabled or Adapter-reported LinkError that
+took the link down while AoU was in use from INT_FDI_LINK_DOWN
+(xref:aou-ig-interrupts[Section 5]) or from the UCIe controller; the
+activation FSM is already DISABLED when the handler runs. The sequence
+is the same: read AOU_INIT (the status bit is cleared with the other
+registers by AOU_CON0.AOU_SW_RESET; write pass:[']1pass:['] clears it when the
+handler does not reset the core), AOU_CON0.AOU_SW_RESET, restart the link
+on the UCIe controller, reprogram the configuration registers,
+ACTIVATE_START.
+
 [[aou-ig-fdi-bringup-flow-aou_top-only]]
 === 6.6 FDI Bringup Flow (AOU_TOP only)
 
@@ -1358,18 +1437,35 @@ ________________________________________________________________________________
 [[aou-ig-overview]]
 ==== 6.6.1 Overview
 
-[.monospaced]#++AOU_FDI_BRINGUP_CTRL++# manages the UCIe 3.0 FDI state machine, handling
+[.monospaced]#++AOU_FDI_BRINGUP_CTRL++# manages the UCIe FDI state machine, handling
 the four handshake pairs required to bring the FDI link from RESET to
-ACTIVE and to manage teardown, LinkError recovery, Retrain, and L1
-entry/exit.
+ACTIVE, and follows the D2D adapter through LinkError, LinkReset,
+Disabled, Retrain, and L1 entry/exit. It takes the link down only for an
+error ([.monospaced]#++O_LP_LINKERROR++#) and never restarts it: a link-down for PM
+entry, LinkReset or Link Disable, and training the link again, are done
+by software on the UCIe controller (xref:aou-ig-bringup-sequence[Section 6.6.2]).
+An AOU deactivation does not change the FDI link state. One sequence
+diagram per case (bring-up, deactivation, link-down with AoU idle and in
+use, LinkError from either side, Retrain, L1) is in
+xref:../MAS/software-operation.adoc#aou-737-fdi-link-lifecycle-sequences[MAS Section 7.3.7].
 
-The bringup FSM operates in the [.monospaced]#++I_CLK++# domain and uses 12 internal
-states. The status output [.monospaced]#++O_FDI_FSM_STATE++# maps these to the standard
-UCIe 3.0 FDI state encoding.
+The bringup FSM operates in the [.monospaced]#++I_CLK++# domain and uses 11 internal
+states: RESET, WAIT_PRESENCE, WAKE_ASSERT, WAKE_WAIT_ACK, REQ_ACTIVE,
+ACTIVE, RETRAIN, LINKERROR, L1, L1_CLK_WAKE and LINKDOWN. The status
+output [.monospaced]#++O_FDI_FSM_STATE++# maps these to the UCIe
+[.monospaced]#++pl_state_sts++# encoding (xref:aou-ig-fdi-bringup-status-aou_top-only[Section 3.16]).
 
 Once the bringup FSM reaches ACTIVE, it asserts [.monospaced]#++O_INT_FSM_IN_ACTIVE++#
 into [.monospaced]#++AOU_CORE_TOP++#, which enables protocol-level activation as
-described in xref:aou-ig-activation-flow[Section 6].
+described in xref:aou-ig-activation-flow[Section 6]. The two status
+outputs differ on purpose: [.monospaced]#++O_FDI_LINK_UP++# is 1 in ACTIVE only,
+while [.monospaced]#++O_INT_FSM_IN_ACTIVE++# (link established) is set on entry to
+ACTIVE and cleared on entry to LINKERROR, LINKDOWN or RESET, so it stays 1
+through RETRAIN, L1, L1_CLK_WAKE and the wake handshake that ends an L1
+(WAKE_ASSERT, WAKE_WAIT_ACK, REQ_ACTIVE, which are 0 on the cold bring-up
+path). Its
+falling edge is what raises [.monospaced]#++INT_FDI_LINK_DOWN++# in AOU_CORE when the
+activation FSM is not DISABLED.
 
 [[aou-ig-bringup-sequence]]
 ==== 6.6.2 Bringup Sequence
@@ -1396,7 +1492,28 @@ trigger. The trigger can be:
 [.monospaced]#++pl_rx_active_req = 1++#.
 5.  *ACTIVE*: The FDI link is up. [.monospaced]#++O_FDI_LINK_UP++# and
 [.monospaced]#++O_INT_FSM_IN_ACTIVE++# are asserted. Protocol-level activation
-(xref:aou-ig-activation-flow[Section 6]) can now proceed.
+(xref:aou-ig-activation-flow[Section 6]) can now proceed. The FSM stays
+in ACTIVE across AOU deactivations and re-activations; it leaves only
+on an error or on a state change the PL reports. In RETRAIN, L1 and
+L1_CLK_WAKE, and through the wake handshake of an L1 exit,
+[.monospaced]#++O_FDI_LINK_UP++# is 0 and [.monospaced]#++O_INT_FSM_IN_ACTIVE++#
+stays 1; in LINKERROR, LINKDOWN and RESET both are 0.
+
+*After a link-down*: after a LinkError (once [.monospaced]#++AOU_CON0.AOU_SW_RESET++#
+has been applied, see below), or a LinkReset or Disabled the PL reports,
+the FSM drives [.monospaced]#++lp_state_req = NOP++# with [.monospaced]#++lp_wake_req = 0++#,
+follows the PL to Reset and waits in RESET for [.monospaced]#++pl_inband_pres++#,
+exactly as after a cold reset. It gives no training trigger of its own.
+Software restarts the link on the UCIe controller (the D2D adapterpass:[']s
+Start UCIe Link Training, or the remote die trains), after which
+[.monospaced]#++pl_inband_pres++# rises and bringup continues from step 2 with the
+next activation request; software then re-activates AOU once
+[.monospaced]#++O_FDI_LINK_UP++# is back. Each of these link-downs drops
+[.monospaced]#++O_INT_FSM_IN_ACTIVE++#, and AOU_CORE raises
+[.monospaced]#++INT_FDI_LINK_DOWN++# and returns its activation FSM to DISABLED if AoU
+was in use (xref:aou-ig-interrupts[Section 5]). An activation request seen while the
+FSM is in LINKERROR, LINKDOWN or RESET is dropped; the request that counts
+is the one seen in WAIT_PRESENCE.
 
 [[aou-ig-supported-state-transitions]]
 ==== 6.6.3 Supported State Transitions
@@ -1404,31 +1521,88 @@ trigger. The trigger can be:
 [width="100%",cols="<34%,<33%,<33%",options="header",]
 |=======================================================================
 |From |To |Trigger
-|ACTIVE |LINKERROR |[.monospaced]#++pl_state_sts = LinkError++#, [.monospaced]#++I_AOU_REQ_LINKRESET++#,
-or [.monospaced]#++I_SW_LINKERROR_INJECT++#
+|Any state except LINKERROR |LINKERROR |[.monospaced]#++pl_state_sts = LinkError++#
 
-|ACTIVE |RETRAIN |[.monospaced]#++pl_state_sts = Retrain++# or [.monospaced]#++I_SW_RETRAIN_REQ++#
+|ACTIVE, RETRAIN |LINKERROR |[.monospaced]#++I_AOU_REQ_LINKRESET++# or
+[.monospaced]#++I_SW_LINKERROR_INJECT++# (own request; drives [.monospaced]#++O_LP_LINKERROR++#).
+Not taken in L1, L1_CLK_WAKE or the wake states: [.monospaced]#++I_AOU_REQ_LINKRESET++#
+is a level and is acted on once the link is Active again (software exits L1 on
+the UCIe controller first); an [.monospaced]#++I_SW_LINKERROR_INJECT++# pulse there is
+ignored
 
-|ACTIVE |DEACTIVATE |Deactivate request AND [.monospaced]#++AOU_ACTIVATE_ST_DISABLED++#
+|Any state except LINKERROR and LINKDOWN |LINKDOWN |[.monospaced]#++pl_state_sts++# =
+LinkReset or Disabled
+
+|RESET |WAIT_PRESENCE |[.monospaced]#++pl_state_sts = RESET++# AND [.monospaced]#++pl_inband_pres = 1++#
+
+|WAIT_PRESENCE |WAKE_ASSERT |[.monospaced]#++I_SW_ACTIVATE_START++#, [.monospaced]#++I_INT_ACTIVATE_START++#
+or [.monospaced]#++pl_clk_req = 1++#
+
+|WAIT_PRESENCE |RESET |[.monospaced]#++pl_inband_pres = 0++#
+
+|WAKE_ASSERT |WAKE_WAIT_ACK |Unconditional (1 cycle)
+
+|WAKE_WAIT_ACK |REQ_ACTIVE |[.monospaced]#++pl_wake_ack = 1++#
+
+|WAKE_WAIT_ACK, REQ_ACTIVE |RESET |[.monospaced]#++pl_inband_pres = 0++# AND
+[.monospaced]#++pl_state_sts = RESET++#
+
+|REQ_ACTIVE |ACTIVE |[.monospaced]#++pl_state_sts = ACTIVE++# AND [.monospaced]#++pl_rx_active_req = 1++#
+
+|ACTIVE |RETRAIN |[.monospaced]#++pl_state_sts = Retrain++# (PL-initiated only)
 
 |ACTIVE |L1 |[.monospaced]#++pl_state_sts = L1++# (PL-initiated only)
 
-|LINKERROR |RESET |[.monospaced]#++pl_state_sts = RESET++#
+|ACTIVE |RESET |[.monospaced]#++pl_state_sts = RESET++#
 
-|RETRAIN |ACTIVE |[.monospaced]#++pl_state_sts = ACTIVE++#
+|RETRAIN |ACTIVE |[.monospaced]#++pl_state_sts = ACTIVE++#. RETRAIN drives
+[.monospaced]#++lp_state_req = NOP++# for one cycle, then Active (the NOP to Active
+transition that ends a Retrain, UCIe r1.1 8.3.3.4).
 
-|RETRAIN |LINKERROR |[.monospaced]#++pl_state_sts = LinkError++#
+|LINKERROR |RESET |[.monospaced]#++pl_state_sts = RESET++# AND
+[.monospaced]#++AOU_CON0.AOU_SW_RESET++# applied since LINKERROR entry (either order)
 
-|DEACTIVATE |UNWAKE_WAIT |Unconditional (1 cycle)
-
-|UNWAKE_WAIT |RESET |[.monospaced]#++pl_wake_ack = 0++# AND [.monospaced]#++pl_state_sts = RESET++#
+|LINKDOWN |RESET |[.monospaced]#++pl_state_sts = RESET++#. LINKDOWN drives
+[.monospaced]#++lp_state_req = NOP++#, which LinkReset and Disabled ignore; the PL
+leaves for Reset on its own (software on the UCIe controller).
 
 |L1 |L1_CLK_WAKE |[.monospaced]#++pl_clk_req = 1++#
 
 |L1 |WAKE_ASSERT |Activate request
 
+|L1 |RESET |[.monospaced]#++pl_state_sts = RESET++#
+
 |L1_CLK_WAKE |WAKE_ASSERT |Unconditional (1 cycle, asserts [.monospaced]#++lp_clk_ack++#)
 |=======================================================================
+
+There is no transition out of ACTIVE on an AOU deactivation, and no
+state requests Active except REQ_ACTIVE, ACTIVE and the Retrain exit.
+Nothing in LINKERROR, LINKDOWN or RESET reacts to an activation request.
+
+*LinkError recovery.* A LinkError may take the Adapter out of ACTIVE in
+the middle of a flit in either direction. AOU_CORE's FDI data paths keep
+the position of that flit, and only [.monospaced]#++AOU_CON0.AOU_SW_RESET++# clears
+it, so the FSM holds the link down in LINKERROR
+([.monospaced]#++lp_state_req = NOP++#, [.monospaced]#++O_FDI_FSM_STATE = LinkError++#,
+[.monospaced]#++O_FDI_LINK_UP = 0++#) until software has applied that reset, whether
+the LinkError came from the Adapter, from [.monospaced]#++O_AOU_REQ_LINKRESET++# or
+from [.monospaced]#++I_SW_LINKERROR_INJECT++#. On its own request the FSM drives
+[.monospaced]#++O_LP_LINKERROR++# until the PL reports LinkError. It requests nothing
+to leave LinkError: the Adapter leaves for Reset on its own internal
+request (software on the UCIe controller). [.monospaced]#++pl_clk_req++# is still
+acknowledged meanwhile, but does not restart the link. Recovery is the
+LinkReset sequence of
+xref:../MAS/software-operation.adoc#aou-736-pm-entry--linkreset--linkdisabled-sequence[MAS Section 7.3.6]:
+software observes [.monospaced]#++O_FDI_FSM_STATE = LinkError++# (or
+[.monospaced]#++INT_REQ_LINKRESET++#, when AOU_CORE raised the error, or
+[.monospaced]#++INT_FDI_LINK_DOWN++#, when the Adapter took the link down with AoU
+in use), writes
+[.monospaced]#++AOU_SW_RESET++#, reprograms the configuration registers, restarts
+the link on the UCIe controller, and re-activates AOU with an activation
+request. The FSM leaves LINKERROR once [.monospaced]#++pl_state_sts = RESET++# and
+passes through RESET and WAIT_PRESENCE as after a cold reset
+(xref:aou-ig-bringup-sequence[Section 6.6.2]). Integrators of
+[.monospaced]#++AOU_CORE_TOP++# get the reset on [.monospaced]#++O_SW_RESET++#.
 
 [[aou-ig-phy-type-mux]]
 ==== 6.6.4 PHY Type Mux
@@ -1459,11 +1633,13 @@ to [.monospaced]#++AOU_CORE_TOP++# unchanged -- the corepass:[']s [.monospaced]#
 [[aou-ig-software-bringup-control]]
 ==== 6.6.5 Software Bringup Control
 
-The [.monospaced]#++I_SW_ACTIVATE_START++# and [.monospaced]#++I_SW_DEACTIVATE_START++# ports on [.monospaced]#++AOU_TOP++#
-are *not SFR-mapped*. They are top-level pins that must be driven by
-external logic (e.g. a system controller or GPIO). The bringup FSM ORs
-[.monospaced]#++I_SW_ACTIVATE_START++# with the corepass:[']s internal [.monospaced]#++INT_ACTIVATE_START++# to
-form the combined activation trigger.
+The [.monospaced]#++I_SW_ACTIVATE_START++# port on [.monospaced]#++AOU_TOP++# is *not SFR-mapped*.
+It is a top-level pin that must be driven by external logic (e.g. a
+system controller or GPIO). The bringup FSM ORs [.monospaced]#++I_SW_ACTIVATE_START++#
+with the corepass:[']s internal [.monospaced]#++INT_ACTIVATE_START++# to form the combined
+activation trigger, which is consumed in WAIT_PRESENCE (and in L1, where
+it starts the wake handshake). There is no software pin to take the link
+down or to retrain it (xref:aou-ig-fdi-bringup-software-control-aou_top-only[Section 3.15]).
 
 _________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________________
 *Note (GAP-15):* The SFR register at address 0x8 bit[0]
@@ -1489,7 +1665,13 @@ FSM hangs in ST_WAKE_WAIT_ACK indefinitely.
 
 |GAP-3 |L2 (deep low-power) state is not implemented.
 
-|GAP-4 |Disabled state is not implemented.
+|GAP-4 |Closed. A PL-reported Disabled (or LinkReset) takes the FSM to
+LINKDOWN: [.monospaced]#++O_FDI_LINK_UP++# and [.monospaced]#++O_INT_FSM_IN_ACTIVE++# drop
+(AOU_CORE raises [.monospaced]#++INT_FDI_LINK_DOWN++# if AoU was in use),
+[.monospaced]#++O_FDI_FSM_STATE++# reports Disabled (or LinkReset) as the PL did,
+[.monospaced]#++lp_state_req++# is NOP and [.monospaced]#++lp_wake_req++# is 0. The FSM
+leaves for RESET when the PL reports Reset. The FSM never requests
+Disabled itself; software does that on the UCIe controller.
 
 |GAP-9 |LP-initiated L1 entry is not supported (L1 entry is PL-initiated
 only).
@@ -1760,9 +1942,9 @@ Constraint files are located in [.monospaced]#++INTEG/constraints/++#.
 The SDC file defines timing constraints for synthesis and STA. All delay
 budget variables are declared at the top of the file and can be
 overridden by the integrating project. The port groups follow the
-current port list: [.monospaced]#++INT_EARLY_WDT_ERR++# is in the combinational
-interrupt-output group, and the former [.monospaced]#++I_*_BUS_CLEANY_COMPLETE++#
-inputs are gone.
+current port list: [.monospaced]#++INT_EARLY_WDT_ERR++# and
+[.monospaced]#++INT_FDI_LINK_DOWN++# are in the combinational interrupt-output
+group, and the former [.monospaced]#++I_*_BUS_CLEANY_COMPLETE++# inputs are gone.
 
 [[aou-ig-clock-definitions]]
 ==== 8.5.1 Clock Definitions

@@ -184,7 +184,7 @@ reports any reset asserted otherwise. A test that resets mid-access on purpose p
   monitor publishes `ap_tx` (flits the DUT sent, after cancel rollback) and `ap_rx`
   (flits delivered to the DUT).
 - **L2:** `aou_lsm_cfg` holds the encoding map `fdi_enc = RTL|SPEC` (default
-  `RTL` until BUGS/001 is fixed) and the latency ranges. The agent publishes state
+  `SPEC`; `RTL` is the private encoding of RTL from before the UCIe encoding fix) and the latency ranges. The agent publishes state
   changes, and L1 only drives while L2 reports Active.
 - **L3 ↔ L4a:** L3 publishes decoded messages from the DUT (`aou_msg` subclasses)
   and accepts messages to send through `aou_l3_agent.send(aou_msg)`. Credits,

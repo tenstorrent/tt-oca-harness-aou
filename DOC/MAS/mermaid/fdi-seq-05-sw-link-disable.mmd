@@ -1,0 +1,29 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active, AoU DISABLED
+    SW->>ADP: Link Disable on the UCIe controller
+    ADP->>BRG: pl_rx_active_req = 0
+    BRG->>ADP: lp_rx_active_sts = 0
+    ADP->>BRG: pl_state_sts = Disabled (1100), pl_inband_pres = 0
+    Note over CORE,ADP: LINKDOWN - lp_state_req = NOP, lp_wake_req = 0, O_FDI_LINK_UP = 0, O_FDI_FSM_STATE = 0xC
+    BRG->>CORE: O_INT_FSM_IN_ACTIVE = 0
+    Note over CORE: already DISABLED - no INT_FDI_LINK_DOWN
+    ADP->>BRG: pl_state_sts = Reset (0000)
+    Note over BRG: RESET - NOP held while the link is down
+    opt an activation request arrives meanwhile
+        SW->>CORE: APB write AOU_INIT.ACTIVATE_START = 1
+        Note over CORE,BRG: waits for O_INT_FSM_IN_ACTIVE - nothing wakes the link in RESET (NOP held)
+    end
+    SW->>ADP: Start UCIe Link Training on the UCIe controller
+    ADP->>BRG: pl_inband_pres = 1, pl_clk_req = 1
+    Note over BRG,ADP: bring-up as in the cold bring-up sequences, through to ACTIVE
+    BRG->>CORE: O_INT_FSM_IN_ACTIVE = 1
+    CORE->>REM: ActivateReq
+    REM->>CORE: ActivateAck
+    Note over CORE: ENABLED

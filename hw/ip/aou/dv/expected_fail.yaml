@@ -80,22 +80,6 @@
   seed_dependent: true
   note: only seeds whose alias walk writes aou_con0 (Verilator seed 2 never touches it)
 
-- test: aou_fdi_t1_bringup_spec_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_RETRAIN'
-
-- test: aou_fdi_t1_bringup_spec_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_RETRAIN'
-
-- test: aou_fdi_t1_bringup_spec_test
-  bug: BUGS/001
-  check: 'FDI-M06: O_FDI_LINK_UP mismatch in BRG_RETRAIN'
-
-- test: aou_fdi_t1_bringup_spec_test
-  bug: BUGS/001
-  check: 'FDI-R48: lp_state_req stayed 0x1'
-
 - test: aou_link_force_deact_test
   bug: BUGS/010
   check: 'DeactivateReq: PropertyReq on a non-ActivateReq opcode'
@@ -128,6 +112,16 @@
   check: 'T1-L15: 1 answers to an invalid deact_ack'
   seed_dependent: true
   note: in ACTIVATE the DUT re-sends ActivateReq after an invalid DeactivateAck (+state=activate)
+
+- test: aou_invalid_actmsg_test
+  bug: BUGS/019
+  check: 'INT_FDI_LINK_DOWN: interrupt asserted'
+  requires: BUGS/019
+  seed_dependent: true
+  note: >-
+    the re-sent ActivateReq is accepted in the cycle the requested LinkError takes the link
+    down, so the activation FSM reports it lost instead of waiting on a dead link
+    (+state=activate)
 
 - test: aou_invalid_actmsg_test
   bug: BUGS/020
@@ -176,6 +170,16 @@
   seed_dependent: true
   note: on the ActivateAck time-out the DUT sends a second ActivateReq (+src=act_ack only)
 
+- test: aou_linkreset_timeout_test
+  bug: BUGS/019
+  check: 'INT_FDI_LINK_DOWN: interrupt asserted'
+  requires: BUGS/019
+  seed_dependent: true
+  note: >-
+    the second ActivateReq is accepted in the cycle the requested LinkError takes the link
+    down, so the activation FSM reports it lost instead of waiting on a dead link
+    (+src=act_ack only)
+
 - test: aou_link_act_deact_test
   bug: BUGS/009
   check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
@@ -212,22 +216,6 @@
     testbench (the remote model, not the DUT): with CREDIT_MANAGE=1 it returns RDATA/WRESP
     credit after its own DeactivateAck, as the MAS mode does; AOU_FDI_CHECKER's interim
     (v0.8 8.4 is silent on response credits after the Ack) keeps v0.7's rule and reports it
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/023
-  check: 'T1-L25: INT_ACTIVATE_START on an invalid ActivateReq'
-  seed_dependent: true
-  note: a late ActivateReq in ENABLED/DEACTIVATE sends the FSM to DISABLED then ACTIVATE (+state=enabled/deactivate)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/023
-  check: 'AOU-R21: AOU_FDI_CHECKER VIOL_CRD_OVERFLOW LP(DUT->peer)'
-  requires: BUGS/023
-  seed_dependent: true
-  note: >-
-    the restarted activation advertises the whole RX buffer again while the remote die,
-    still ENABLED, holds the first advertisement; with the 4xmix builds' 1024-bit RP buffers the sum
-    passes AOU_FDI_CHECKER's 2048-credit counter
 
 - test: aou_credit_return_test
   bug: BUGS/009
@@ -574,6 +562,42 @@
   note: the M-port R beat presented when the link dropped is never accepted after AOU_SW_RESET (waves aou_link_event_test.rid.w7.seed.1)
 
 - test: aou_link_event_test
+  bug: BUGS/029
+  check: 'T1-RM01: WriteResp with no write outstanding'
+  requires: BUGS/021
+  seed_dependent: true
+  note: >-
+    BUGS/029 cause 1 reached through BUGS/021: the B for a write the recovery's AOU_SW_RESET
+    aborted is a stray on the DUT M port once the DUT has re-activated; the DUT raises
+    INT_MI0_ID_MISMATCH, re-sets it after every W1C while the B is presented, and sends a WriteResp
+    with the previous legitimate ID to the remote die each time. Reached since the DUT disables
+    itself on the link loss and re-activates as soon as the link is back (INT_FDI_LINK_DOWN, BUGS/015);
+    seen with +event=linkerror and +event=disabled, seed 2, CONFIG=1x512-sp64 (RID c015a)
+
+- test: aou_link_event_test
+  bug: BUGS/029
+  check: 'T1-RM02: ReadData with no read outstanding'
+  requires: BUGS/021
+  seed_dependent: true
+  note: >-
+    the read counterpart of the entry above: the R data for a read the recovery's AOU_SW_RESET
+    aborted comes back on the DUT M port once the DUT has re-activated and goes to the remote die
+    as ReadData for a read it no longer has outstanding (the m1022 report's follow-up 4;
+    CONFIG=2x512-tp32_64, 3x512-sp64, 4x512-sp64, 4xmix2144-sp64, seed 1, RID c015c)
+
+- test: aou_link_event_test
+  bug: BUGS/021
+  check: 'T1-RM04: RLAST='
+  requires: BUGS/021
+  seed_dependent: true
+  note: >-
+    a remote read's data mis-framed by the recovery's AOU_SW_RESET: the DUT ends the ReadData
+    early with the beats it still had (RLAST=1 on beat 0 of 11), or a beat of the cut read sits
+    ahead of the next read's data (RLAST=0 on the last beat); the m1022 report's follow-up 4.
+    CONFIG=1x256-sp32 +event=inband_drop, 3x512-sp64 and 4xmix4211-sp128 +event=link_reset
+    +link_down_mask=1, seed 1, RID c015c
+
+- test: aou_link_event_test
   bug: BUGS/021
   check: 'T1-V02: remote (L3) not ENABLED'
   requires: BUGS/024
@@ -791,19 +815,6 @@
   note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck (deactivation stuck after BUGS/021, +when=queued)
 
 # Entries added on the integration branch by streams I, J, K and L.
-- test: aou_fdi_t1_linkerror_spec_test
-  bug: BUGS/002
-  check: 'FDI-M07: lp_linkerror mismatch in BRG_LINKERROR'
-  note: >-
-    TB=t1, fdi_enc=SPEC. I_SW_LINKERROR_INJECT takes the bringup controller to
-    LINKERROR (lp_state_req NOP); AOU_TOP has no lp_linkerror, so the Adapter is
-    never told and stays Active until it takes the link down itself.
-
-- test: aou_fdi_t1_linkerror_spec_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKERROR'
-  note: O_FDI_FSM_STATE reports LINKERROR as 0x2, not the UCIe 1010b the guide claims
-
 - test: aou_reset_test
   bug: BUGS/021
   check: 'T1-L05: no INT_ACTIVATE_START after a remote ActivateReq'
@@ -939,544 +950,6 @@
   note: >-
     with +max_arburstlen=0 on a 256-bit RP the error read is split into narrow beats, each pushing its
     own FIFO entry (BUGS/041); reached only with the BUGS/043 split knobs on unpatched RTL
-
-# BUGS/001 item 4 (link-down exits, fdi_enc=SPEC).
-# They fire on the unpatched RTL and on the first candidate fix (Retrain, lp_linkerror);
-# list tests reach these states depending on seed and plusargs.
-- test: aou_axi_err_resp_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_credit_return_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_credit_return_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_credit_return_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M06: O_FDI_LINK_UP mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: LinkReset/Disabled not decoded; O_FDI_LINK_UP stays 1 while the Link Status is Down (Table 8-2)
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
-  seed_dependent: true
-  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
-
-- test: aou_fdi_t1_linkerror_spec_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_fdi_t1_linkerror_spec_test
-  bug: BUGS/001
-  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
-  seed_dependent: true
-  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
-
-- test: aou_id_mismatch_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_id_mismatch_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
-  seed_dependent: true
-  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/001
-  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
-  seed_dependent: true
-  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
-
-- test: aou_link_act_deact_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_link_act_deact_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_link_act_deact_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M06: O_FDI_LINK_UP mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled not decoded; O_FDI_LINK_UP stays 1 while the Link Status is Down (Table 8-2)
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-R49: no lp_state_req=Active with lp_linkerror=0'
-  seed_dependent: true
-  note: the Adapter never sees Active with lp_linkerror=0 in a DUT-requested LinkError (8.3.3.7); attempt-1 RTL only (needs lp_linkerror)
-
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request to return to Reset
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LinkReset (1001b)/Disabled (1100b) not decoded; O_FDI_FSM_STATE keeps Active or Reset
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: LINKERROR drives NOP after the Adapter reports LinkError; the exit needs Active with lp_linkerror=0 (8.3.3.7)
-
-- test: aou_rx_msg_error_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_rx_msg_error_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_t1_deact_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_t1_deact_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_t1_deact_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_t1_remote_act_test
-  bug: BUGS/001
-  check: 'FDI-M01: lp_state_req mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: teardown drives NOP, which Active ignores (UCIe r1.1 Table 8-3); needs LinkReset or Disabled
-
-- test: aou_t1_remote_act_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_DEACTIVATE (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: the bringup controller leaves DEACTIVATE at once for UNWAKE_WAIT (reports Reset) instead of waiting for the Adapter
-
-- test: aou_t1_remote_act_test
-  bug: BUGS/001
-  check: 'FDI-M02: lp_wake_req mismatch in BRG_LINKDOWN (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: lp_wake_req low in LinkReset/Disabled, where the Active request that leaves them needs the wake handshake
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-M05: O_FDI_FSM_STATE mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: unpatched RTL only, LinkError reported as 0x2
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/002
-  check: 'FDI-M07: lp_linkerror mismatch in BRG_LINKERROR (fdi_enc=AOU_FDI_ENC_SPEC)'
-  seed_dependent: true
-  note: unpatched RTL only, AOU_TOP has no lp_linkerror
-
-# BUGS/001 item 4: the Adapter's own LinkReset/Disabled ends on the DUT's Active request
-# (fdi_enc=SPEC, FDI-R50). Same tests as the BRG_LINKDOWN entries above.
-- test: aou_credit_return_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_int_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_link_act_deact_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_link_event_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_reset_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_t1_deact_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-- test: aou_t1_remote_act_test
-  bug: BUGS/001
-  check: 'FDI-R50: no lp_state_req=Active in'
-  seed_dependent: true
-  note: LinkReset/Disabled from the Adapter not decoded; no Active request returns it to Reset (8.3.3.5/8.3.3.6)
-
-# BUGS/038: after LinkError/LinkReset/Disabled -> Reset the DUT gives no NOP->Active, so a
-# compliant Adapter doesn't train again (fdi_enc=SPEC, FDI-R51). Every test that takes the link
-# down; list tests do so depending on seed and plusargs.
-- test: aou_fdi_t1_linkdown_spec_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_fdi_t1_linkerror_spec_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_credit_return_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_id_mismatch_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_int_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_link_act_deact_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_link_event_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_pack_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_reset_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_rx_msg_error_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_t1_deact_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_t1_remote_act_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
-
-- test: aou_t1_sw_reset_test
-  bug: BUGS/038
-  check: 'FDI-R51: no NOP->Active on lp_state_req in Reset after'
-  seed_dependent: true
-  note: ST_RESET waits for pl_inband_pres and never gives the NOP->Active that restarts training (UCIe r1.1 8.3.3.8)
 
 # BUGS/021 and BUGS/007 mechanisms that the BUGS/024/029 deadlock hid: with the 029 fix
 # the traffic after AOU_SW_RESET runs on, and these follow. T1-L28 is the bug-specific
@@ -1638,31 +1111,6 @@
   bug: BUGS/052
   check: 'T1-DFT02: aou_core.lp_linkreset.msgcredit_time_out_value read 0x0, expected 0x6'
   note: the SFRs are held in reset in scan mode, so the marker reads 0 (before and after the AOU_SW_RESET write)
-
-# BUGS/056: after a LinkError entered mid-DUT-TX-flit (+le_mid_flit_pct, plan 18.23) the
-# DUT's TX beat counter keeps the abandoned flit's position, so every later flit reaches
-# the Adapter shifted (FDI-R45 on the Flit Header and CRC bytes). When the Adapter then
-# leaves Active at what it counts as a boundary, the DUT is mid-flit (FDI-R43, FDI-R02).
-# The plain link-stress runs never leave Active mid-flit, hence seed_dependent.
-- test: aou_fdi_t1_link_stress_test
-  bug: BUGS/056
-  check_re: 'FDI-R45: phy\d+ Adapter-owned bytes: FH='
-  seed_dependent: true
-  note: UCIe r1.1 8.3.3.7 requires the upper layer to clean up its data path in LinkError
-
-- test: aou_fdi_t1_link_stress_test
-  bug: BUGS/056
-  requires: BUGS/056
-  check_re: 'FDI-R43: phy\d+ TX flit starts while pl_state_sts='
-  seed_dependent: true
-  note: follow-on of the shifted TX flits; the DUT is mid-flit when the Adapter leaves Active
-
-- test: aou_fdi_t1_link_stress_test
-  bug: BUGS/056
-  requires: BUGS/056
-  check_re: 'FDI-R02: phy\d+ bubble inside a TX flit at beat'
-  seed_dependent: true
-  note: follow-on of the shifted TX flits; the Adapter's flit boundary falls inside a DUT flit
 
 # Plan 1.10, 2.5, 2.10, 2.12, 3.20/3.23/3.25: deactivations in these tests meet the same
 # credit-after-DeactivateAck findings as the activation tests.

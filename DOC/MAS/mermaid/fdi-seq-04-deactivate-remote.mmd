@@ -1,0 +1,17 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Software
+    participant CORE as AOU_CORE
+    participant BRG as AOU_FDI_BRINGUP_CTRL
+    participant ADP as UCIe Adapter
+    participant REM as Remote die
+    Note over CORE,ADP: Link Active, AoU ENABLED
+    REM->>CORE: DeactivateReq
+    CORE->>SW: INT_DEACTIVATE_START
+    SW->>CORE: APB write AOU_INIT.DEACTIVATE_START = 1
+    CORE->>REM: DeactivateReq
+    REM->>CORE: DeactivateAck
+    Note over CORE: DISABLED
+    Note over CORE,ADP: unchanged - ACTIVE, lp_state_req = Active, O_FDI_LINK_UP = 1
+    Note over SW,CORE: INT_DEACTIVATE_START is a CPU notification only - it does not reach BRG

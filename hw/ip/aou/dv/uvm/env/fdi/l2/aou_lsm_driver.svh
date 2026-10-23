@@ -9,21 +9,18 @@
 // and lowers rx_active (FDI-R29); every entry to Active repeats the
 // rx_active handshake (FDI-R34). Reset aborts the current event.
 //
-// With fdi_enc=SPEC (and cfg.react_en) the Adapter also answers the DUT's own
-// requests while no event runs and the link is Active (r1.1 §8.3.3.5-8.3.3.8,
-// Table 8-2):
-//  - lp_linkerror (cfg.react_linkerror_en): LinkError, then Reset once the
-//    DUT requests Active with lp_linkerror=0 (FDI-R49). A later
-//    LSM_EV_LINKERROR, the test's own answer to the same request, then only
-//    runs the bringup.
-//  - LinkReset/Disabled on lp_state_req: that state, then Reset once the DUT
-//    requests Active. No bringup follows.
-// After LinkError/LinkReset/Disabled -> Reset it trains again only on a
-// NOP->Active request (cfg.train_trigger_en, FDI-R51; §8.3.3.8). After a
-// deliberate teardown (the DUT's own LinkReset request, or Disabled) the DUT
-// gives that request only after an activation request; without
-// one from the test, software pulses I_SW_ACTIVATE_START after
-// cfg.sw_restart_delay cycles.
+// With fdi_enc=SPEC (and cfg.react_en, cfg.react_linkerror_en) the Adapter
+// also answers the DUT's lp_linkerror while no event runs and the link is
+// Active (r1.1 Table 8-2): LinkError, held while lp_linkerror is 1, then
+// Reset on its own internal request after the dwell (software clearing the
+// error; §8.3.3.7). A later LSM_EV_LINKERROR, the test's own answer to the
+// same request, then only runs the bringup. The DUT requests nothing else of
+// the link (the bringup model checks that).
+// The link is restarted by software on the UCIe controller, not by the DUT:
+// after LinkError/LinkReset/Disabled -> Reset the Adapter waits
+// cfg.sw_restart_delay cycles (software's Start UCIe Link Training) and then
+// trains again by itself, without waiting for a NOP->Active request
+// (§8.3.3.8 allows either trigger).
 class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   `uvm_component_utils(aou_lsm_driver)
 
@@ -42,9 +39,6 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   local bit       reacting;      // answering a DUT request (react_loop)
   local bit       le_absorbed;   // react_loop took a DUT LinkError down to Reset
   local bit       down_reset;    // Reset entered from LinkError/LinkReset/Disabled
-  local bit       down_held;     // ... and that link-down was a deliberate teardown
-  local bit       down_act;      // an activation request has come since it began
-  local int unsigned trn_trig;   // NOP->Active progress since (retrain_trigger())
   local bit       clk_req_q;
   local bit       wake_ack_q;
   local bit       rx_req_q;
@@ -57,7 +51,6 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     drive_idle();
     fork
       wake_responder();
-      train_trigger_watch();
     join_none
     forever begin
       while (lsm_vif.drv_cb.rst_n !== 1'b1) @(lsm_vif.drv_cb);
@@ -66,6 +59,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
           fork
             main_loop();
             react_loop();
+            pm_exit_loop();
             while (lsm_vif.drv_cb.rst_n === 1'b1) @(lsm_vif.drv_cb);
           join_any
           disable fork;
@@ -88,13 +82,12 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     set_clk_req(1'b0);
     set_rx_req(1'b0);
     lsm_vif.drv_cb.phy_type <= cfg.active_phy == 1;
-    for (int i = 0; i < 4; i++) set_sw(aou_lsm_sw_e'(i), 1'b0);
+    set_sw(LSM_SW_ACTIVATE, 1'b0);
+    set_sw(LSM_SW_LINKERROR, 1'b0);
     foreach (cfg.gate[i]) cfg.gate[i].open = 1'b0;
     foreach (cfg.gate[i]) cfg.gate[i].rx_early = 1'b0;
     link_active = 1'b0;
     down_reset = 1'b0;
-    down_held = 1'b0;
-    down_act = 1'b0;
   endtask
 
   local task main_loop();
@@ -114,29 +107,43 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     end
   endtask
 
-  // The Adapter's answers to the DUT's own requests (fdi_enc=SPEC).
+  // The Adapter's answer to the DUT's lp_linkerror (fdi_enc=SPEC).
   local task react_loop();
     forever begin
-      aou_lsm_req_e r;
       @(lsm_vif.drv_cb);
-      if (cfg.fdi_enc != AOU_FDI_ENC_SPEC || !cfg.react_en || busy || ev_busy || reacting ||
-          state != LSM_ACTIVE || !link_active)
+      if (cfg.fdi_enc != AOU_FDI_ENC_SPEC || !cfg.react_en || !cfg.react_linkerror_en || busy ||
+          ev_busy || reacting || state != LSM_ACTIVE || !link_active)
         continue;
-      r = req_decode(lsm_vif.drv_cb.lp_state_req, cfg.fdi_enc);
-      if (lsm_vif.drv_cb.lp_linkerror === 1'b1 && cfg.react_linkerror_en) begin
+      if (lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
         reacting = 1'b1;
         `uvm_info(get_type_name(), "lp_linkerror: Adapter enters LinkError (Table 8-2)", UVM_LOW)
         n_le_react++;
         linkerror_down(cfg.dwell());
         le_absorbed = 1'b1;
         reacting = 1'b0;
-      end else if (r inside {LSM_REQ_LINKRESET, LSM_REQ_DISABLED}) begin
-        reacting = 1'b1;
-        `uvm_info(get_type_name(), $sformatf("lp_state_req %s: Adapter takes the link down",
-                                             r.name()), UVM_LOW)
-        link_down(r == LSM_REQ_DISABLED ? LSM_DISABLED : LSM_LINKRESET, cfg.dwell(), 1'b1);
-        reacting = 1'b0;
       end
+    end
+  endtask
+
+  // The Adapter's answer to a PM exit the Protocol Layer starts in L1
+  // (lp_wake_req; UCIe r1.1 8.2.9): pl_wake_ack (wake_responder), Retrain,
+  // and Active once the DUT requests it. The DUT does this on an activation
+  // request while the link is in L1 (integrator guide 6.6): I_SW_ACTIVATE_START
+  // or INT_ACTIVATE_START (pending local traffic or a remote ActivateReq with
+  // ACTIVATE_START clear), not the ACTIVATE_START write itself.
+  local task pm_exit_loop();
+    forever begin
+      @(lsm_vif.drv_cb);
+      if (!cfg.react_en || busy || ev_busy || reacting || state != LSM_L1 ||
+          lsm_vif.drv_cb.lp_wake_req !== 1'b1)
+        continue;
+      reacting = 1'b1;
+      `uvm_info(get_type_name(), "lp_wake_req in L1: Adapter exits L1 (8.2.9)", UVM_LOW)
+      wait_cycles(cfg.lat());
+      set_state(LSM_RETRAIN);
+      wait_req(LSM_REQ_ACTIVE, "FDI-R41");
+      active_entry();
+      reacting = 1'b0;
     end
   endtask
 
@@ -169,17 +176,6 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
       `uvm_fatal(get_type_name(), $sformatf("%s has no %s encoding", s.name(), cfg.fdi_enc.name()))
     if (s != state) `uvm_info(get_type_name(), $sformatf("pl_state_sts %s -> %s (0x%0h)",
                                                          state.name(), s.name(), code), UVM_MEDIUM)
-    // A LinkReset the DUT asked for (its teardown from DEACTIVATE) or a
-    // Disabled (software Link Disable) is deliberate; a LinkError, or a
-    // LinkReset the Adapter starts on its own, is not.
-    if (s == LSM_LINKERROR) begin
-      down_held = 1'b0;
-    end else if (s inside {LSM_LINKRESET, LSM_DISABLED} && s != state) begin
-      bit held = s == LSM_DISABLED ||
-                 lsm_vif.drv_cb.lp_state_req === req_code(LSM_REQ_LINKRESET, cfg.fdi_enc);
-      if (held && !down_held) down_act = 1'b0;
-      down_held = held;
-    end
     state = s;
     if (s inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) down_reset = 1'b1;
     for (int p = 0; p < cfg.n_phy && p < 2; p++) begin
@@ -209,10 +205,8 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
 
   task set_sw(aou_lsm_sw_e which, bit v);
     case (which)
-      LSM_SW_ACTIVATE:   lsm_vif.drv_cb.sw_activate_start <= v;
-      LSM_SW_DEACTIVATE: lsm_vif.drv_cb.sw_deactivate_start <= v;
-      LSM_SW_RETRAIN:    lsm_vif.drv_cb.sw_retrain_req <= v;
-      default:           lsm_vif.drv_cb.sw_linkerror_inject <= v;
+      LSM_SW_ACTIVATE: lsm_vif.drv_cb.sw_activate_start <= v;
+      default:         lsm_vif.drv_cb.sw_linkerror_inject <= v;
     endcase
   endtask
 
@@ -326,11 +320,17 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
 
   // §8.2.8: clk_req handshake, inband_pres, then wait for the DUT's
   // NOP->Active request (FDI-R33 in the monitor) and run the Active entry.
+  // After a link-down the training is software's to restart (its Start UCIe
+  // Link Training write, cfg.sw_restart_delay cycles later); the DUT waits in
+  // Reset meanwhile and requests nothing (the bringup model checks that).
   task do_bringup();
     set_state(LSM_RESET);
-    if (down_reset) wait_train_trigger();
+    if (down_reset && cfg.sw_restart_delay != 0) begin
+      `uvm_info(get_type_name(), $sformatf("link-down: software restarts the link in %0d cycles",
+                                           cfg.sw_restart_delay), UVM_MEDIUM)
+      wait_cycles(cfg.sw_restart_delay);
+    end
     down_reset = 1'b0;
-    down_held = 1'b0;
     wait_cycles(cfg.lat());
     clk_handshake(1'b1);
     wait_cycles(cfg.lat());
@@ -339,60 +339,6 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     wait_req(LSM_REQ_ACTIVE, "FDI-R33");
     active_entry();
     if (clk_req_q) clk_handshake(1'b0);
-  endtask
-
-  local task train_trigger_watch();
-    forever begin
-      @(lsm_vif.drv_cb);
-      if (lsm_vif.drv_cb.rst_n !== 1'b1 || state != LSM_RESET || !down_reset) trn_trig = 0;
-      else trn_trig = retrain_trigger(trn_trig);
-      if (down_held && (lsm_vif.mon_cb.sw_activate_start === 1'b1 ||
-                        lsm_vif.mon_cb.int_activate_start === 1'b1))
-        down_act = 1'b1;
-    end
-  endtask
-
-  // §8.3.3.8: after LinkError/LinkReset/Disabled -> Reset the Physical Layer
-  // does not train again until it sees a NOP->Active transition on
-  // lp_state_req (or a software or remote trigger). Without one, after
-  // train_timeout cycles software starts the training so the test goes on.
-  // After a deliberate teardown the DUT holds the trigger until an activation
-  // request (UCIe r3.0 10.3.3.8 allows it; aou_bringup_model checks
-  // the hold). If none has come after sw_restart_delay cycles, software
-  // restarts the link with I_SW_ACTIVATE_START, and FDI-R51 counts from there.
-  local task wait_train_trigger();
-    int unsigned n;
-    if (cfg.fdi_enc != AOU_FDI_ENC_SPEC || !cfg.train_trigger_en) return;
-    // sw_restart_delay=0: software never pulses; the test's own (or the DUT's
-    // INT_ACTIVATE_START) request must come within train_timeout.
-    if (down_held) begin
-      while (!down_act && trn_trig < 2) begin
-        @(lsm_vif.drv_cb);
-        ++n;
-        if (cfg.sw_restart_delay != 0 && n >= cfg.sw_restart_delay) begin
-          `uvm_info(get_type_name(), {"deliberate link-down, no activation request: software ",
-                                      "pulses I_SW_ACTIVATE_START"}, UVM_MEDIUM)
-          pulse_sw(LSM_SW_ACTIVATE, 2);
-          break;
-        end
-        if (cfg.sw_restart_delay == 0 && n >= cfg.train_timeout) break;
-      end
-      n = 0;
-    end
-    aou_rule_log::check("FDI-R51", get_type_name());
-    while (trn_trig < 2) begin
-      @(lsm_vif.drv_cb);
-      if (++n == cfg.train_timeout) begin
-        aou_rule_log::fire("FDI-R51", get_type_name());
-        `uvm_error(get_type_name(), $sformatf({"FDI-R51: no NOP->Active on lp_state_req in Reset ",
-                   "after a link-down, after %0d cycles (lp_state_req=0x%0h): the Physical Layer ",
-                   "does not train again without it (UCIe r1.1 8.3.3.8); software starts the ",
-                   "training"}, n, lsm_vif.drv_cb.lp_state_req))
-        return;
-      end
-    end
-    `uvm_info(get_type_name(), $sformatf("training trigger NOP->Active (+%0d cycles)", n),
-              UVM_MEDIUM)
   endtask
 
   task do_retrain(int unsigned dwell);
@@ -422,8 +368,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     active_entry();
   endtask
 
-  // NOP->Active progress (Retrain, or Reset after a link-down): 0 none, 1 NOP
-  // seen, 2 Active after NOP.
+  // NOP->Active progress in Retrain: 0 none, 1 NOP seen, 2 Active after NOP.
   local function int unsigned retrain_trigger(int unsigned trig);
     logic [3:0] r = lsm_vif.drv_cb.lp_state_req;
     if (trig == 0 && r === req_code(LSM_REQ_NOP, cfg.fdi_enc)) return 1;
@@ -484,10 +429,10 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
                 n_le_mid_rx), UVM_LOW)
   endfunction
 
-  // LinkError, the dwell as minimum residency, then Reset. A LinkError the
-  // DUT asked for on lp_linkerror ends only on its Active request with
-  // lp_linkerror=0 (wait_linkerror_exit); the Adapter's own ends on its
-  // internal request after the dwell (§8.3.3.7 allows both).
+  // LinkError, the dwell as minimum residency, then Reset on the Adapter's
+  // internal request (software clearing the error; §8.3.3.7). A LinkError the
+  // DUT asked for on lp_linkerror is held while lp_linkerror is 1 (Table 8-2,
+  // wait_linkerror_release).
   local task linkerror_down(int unsigned dwell);
     bit by_lp = lsm_vif.drv_cb.lp_linkerror === 1'b1;
     close_gates();
@@ -496,34 +441,30 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     set_inband(1'b0);
     rx_active(1'b0);
     wait_cycles(dwell);
-    if (cfg.fdi_enc == AOU_FDI_ENC_SPEC && by_lp) wait_linkerror_exit();
+    if (cfg.fdi_enc == AOU_FDI_ENC_SPEC && by_lp) wait_linkerror_release();
     set_state(LSM_RESET);
   endtask
 
-  // §8.3.3.7: nothing internal holds or ends this LinkError, so the Adapter
-  // leaves it on lp_state_req = Active with lp_linkerror = 0; NOP is ignored
-  // (Table 8-3). Without that request the link would stay in LinkError: an
-  // error after req_timeout cycles, then the Adapter leaves on an internal
-  // request (software clearing the error) so the test goes on.
-  local task wait_linkerror_exit();
+  // Table 8-2: the Adapter stays in LinkError while lp_linkerror is 1. The
+  // DUT lowers it once the Adapter has reported LinkError (FDI-M07), so the
+  // wait is short; lp_linkerror still high after req_timeout cycles is an
+  // error, and the Adapter leaves anyway so the test goes on.
+  local task wait_linkerror_release();
     int unsigned n;
     aou_rule_log::check("FDI-R49", get_type_name());
-    while (!(lsm_vif.drv_cb.lp_state_req === req_code(LSM_REQ_ACTIVE, cfg.fdi_enc) &&
-             lsm_vif.drv_cb.lp_linkerror === 1'b0)) begin
+    while (lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
       @(lsm_vif.drv_cb);
       n++;
       if (cfg.req_timeout != 0 && n == cfg.req_timeout) begin
         aou_rule_log::fire("FDI-R49", get_type_name());
-        `uvm_error(get_type_name(), $sformatf({"FDI-R49: no lp_state_req=Active with ",
-                   "lp_linkerror=0 in a LinkError the DUT requested, after %0d cycles ",
-                   "(lp_state_req=0x%0h, lp_linkerror=%0b): UCIe r1.1 8.3.3.7 needs it to leave ",
-                   "LinkError and NOP is ignored (Table 8-3); leaving on an internal request"},
-                   n, lsm_vif.drv_cb.lp_state_req, lsm_vif.drv_cb.lp_linkerror))
+        `uvm_error(get_type_name(), $sformatf({"FDI-R49: lp_linkerror still 1 after %0d cycles in ",
+                   "a LinkError the DUT requested, with the Adapter reporting LinkError: the ",
+                   "Adapter cannot leave while it is held (UCIe r1.1 Table 8-2); leaving anyway"},
+                   n))
         return;
       end
     end
-    `uvm_info(get_type_name(), $sformatf("LinkError exit on Active, lp_linkerror=0 (+%0d cycles)",
-                                         n), UVM_MEDIUM)
+    `uvm_info(get_type_name(), $sformatf("lp_linkerror released (+%0d cycles)", n), UVM_MEDIUM)
   endtask
 
   // PM entry: stall the DUT TX at a flit boundary first (§8.3.2, FDI-R38).
@@ -556,8 +497,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   endtask
 
   task do_link_reset(int unsigned dwell);
-    bit spec = cfg.fdi_enc == AOU_FDI_ENC_SPEC;
-    link_down(spec ? LSM_LINKRESET : LSM_RESET, dwell, spec, spec);
+    link_down(cfg.fdi_enc == AOU_FDI_ENC_SPEC ? LSM_LINKRESET : LSM_RESET, dwell);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 
@@ -568,42 +508,20 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
       `uvm_error(get_type_name(), "Disabled event needs fdi_enc=SPEC; ignored")
       return;
     end
-    link_down(LSM_DISABLED, dwell, 1'b1, 1'b1);
+    link_down(LSM_DISABLED, dwell);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 
   // LinkReset/Disabled (or Reset in the RTL encoding) for `dwell` cycles,
-  // then Reset. on_req: the Adapter leaves on the DUT's Active request
-  // (§8.3.3.5 rule 1, §8.3.3.6). The Protocol Layer may hold the link down
-  // as long as it likes, so after req_timeout cycles the Adapter leaves on
-  // its own. That is no error when the DUT asked for the state; when the
-  // Adapter entered it on its own (by_pl) the interim expectation is an
-  // Active request at once (FDI-R50, BUGS/001 owner decision).
-  local task link_down(aou_lsm_state_e s, int unsigned dwell, bit on_req, bit by_pl = 1'b0);
-    int unsigned n;
+  // then Reset on the Adapter's internal request (software on the UCIe
+  // controller; §8.3.3.5 rule 1, §8.3.3.6). The DUT requests nothing
+  // meanwhile (the bringup model checks NOP in LINKDOWN).
+  local task link_down(aou_lsm_state_e s, int unsigned dwell);
     close_gates();
     rx_active(1'b0);
     set_state(s);
     set_inband(1'b0);
     wait_cycles(dwell);
-    if (on_req && by_pl) aou_rule_log::check("FDI-R50", get_type_name());
-    while (on_req && lsm_vif.drv_cb.lp_state_req !== req_code(LSM_REQ_ACTIVE, cfg.fdi_enc)) begin
-      @(lsm_vif.drv_cb);
-      n++;
-      if (cfg.req_timeout != 0 && n == cfg.req_timeout) begin
-        if (by_pl) begin
-          aou_rule_log::fire("FDI-R50", get_type_name());
-          `uvm_error(get_type_name(), $sformatf({"FDI-R50: no lp_state_req=Active in %s the ",
-                     "Adapter entered on its own, after %0d cycles (lp_state_req=0x%0h): Active ",
-                     "returns it to Reset (UCIe r1.1 8.3.3.5/8.3.3.6); leaving on an internal ",
-                     "request"}, s.name(), n, lsm_vif.drv_cb.lp_state_req))
-        end else begin
-          `uvm_info(get_type_name(), $sformatf("no Active request in %s after %0d cycles; Reset",
-                                               s.name(), n), UVM_LOW)
-        end
-        break;
-      end
-    end
     set_state(LSM_RESET);
   endtask
 

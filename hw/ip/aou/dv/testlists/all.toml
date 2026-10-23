@@ -86,7 +86,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 224
+expected_count = 227
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -113,7 +113,7 @@ tests = [
   "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40",
   "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
   "aou_link_event_test.event-disabled",
-  "aou_link_event_test.event-teardown_int",
+  "aou_link_event_test.event-sw_disable",
   "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
   "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
   "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
@@ -287,6 +287,9 @@ tests = [
   "aou_link_event_test.event-linkerror",
   "aou_link_event_test.event-link_reset",
   "aou_link_event_test.event-inband_drop",
+  "aou_link_event_test.event-link_reset.link_down_mask-1",
+  "aou_link_event_test.event-l1_act",
+  "aou_link_event_test.event-retrain_act",
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",
@@ -317,7 +320,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 438
+expected_count = 441
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -354,7 +357,7 @@ tests = [
   "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40",
   "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
   "aou_link_event_test.event-disabled",
-  "aou_link_event_test.event-teardown_int",
+  "aou_link_event_test.event-sw_disable",
   "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
   "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
   "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
@@ -583,6 +586,9 @@ tests = [
   "aou_link_event_test.event-linkerror",
   "aou_link_event_test.event-link_reset",
   "aou_link_event_test.event-inband_drop",
+  "aou_link_event_test.event-link_reset.link_down_mask-1",
+  "aou_link_event_test.event-l1_act",
+  "aou_link_event_test.event-retrain_act",
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",

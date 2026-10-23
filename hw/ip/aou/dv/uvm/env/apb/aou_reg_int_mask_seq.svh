@@ -12,6 +12,7 @@ class aou_reg_int_mask_seq extends aou_reg_base_seq;
   int invalid_actmsg = -1;
   int deact_ack = -1;
   int act_ack = -1;
+  int fdi_link_down = -1;
 
   function new(string name = "aou_reg_int_mask_seq");
     super.new(name);
@@ -26,6 +27,7 @@ class aou_reg_int_mask_seq extends aou_reg_base_seq;
     invalid_actmsg = m;
     deact_ack = m;
     act_ack = m;
+    fdi_link_down = m;
   endfunction
 
   task body();
@@ -36,6 +38,7 @@ class aou_reg_int_mask_seq extends aou_reg_base_seq;
     want(rm.aou_interrupt_mask.int_req_linkreset_invalid_actmsg_mask, invalid_actmsg);
     want(rm.aou_interrupt_mask.int_req_linkreset_deact_ack_mask, deact_ack);
     want(rm.aou_interrupt_mask.int_req_linkreset_act_ack_mask, act_ack);
+    want(rm.aou_interrupt_mask.int_fdi_link_down_mask, fdi_link_down);
     commit();
   endtask
 endclass

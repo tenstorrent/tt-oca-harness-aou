@@ -66,6 +66,7 @@ module AOU_CORE_SFR #(
     input                   I_AOU_INIT_SLV_TR_COMPLETE,
     input                   I_AOU_INIT_INT_ACTIVATE_START_SET,
     input                   I_AOU_INIT_INT_DEACTIVATE_START_SET,
+    input                   I_AOU_INIT_INT_FDI_LINK_DOWN_SET,
     output      [2:0]       O_AOU_INIT_DEACTIVATE_TIME_OUT_VALUE,
     input                   I_AOU_INIT_ACTIVATE_STATE_DISABLED,
     input                   I_AOU_INIT_ACTIVATE_STATE_ENABLED,
@@ -77,6 +78,7 @@ module AOU_CORE_SFR #(
     output                  O_AOU_INTERRUPT_MASK_INT_REQ_LINKRESET_MSGCREDIT_TIMEOUT_MASK,
     output                  O_AOU_INTERRUPT_MASK_INT_EARLY_RESP_MASK,
     output                  O_AOU_INTERRUPT_MASK_INT_EARLY_WDT_MASK,
+    output                  O_AOU_INTERRUPT_MASK_INT_FDI_LINK_DOWN_MASK,
     output                  O_AOU_INTERRUPT_MASK_INT_MI0_ID_MISMATCH_MASK,
     output                  O_AOU_INTERRUPT_MASK_INT_SI0_ID_MISMATCH_MASK,
     output      [2:0]       O_LP_LINKRESET_ACK_TIME_OUT_VALUE,
@@ -199,7 +201,8 @@ module AOU_CORE_SFR #(
     output                  ERR_EARLY_WDT_ERR,
  
     output                  INT_ACTIVATE_START,
-    output                  INT_DEACTIVATE_START
+    output                  INT_DEACTIVATE_START,
+    output                  INT_FDI_LINK_DOWN
 
 );
 
@@ -305,6 +308,7 @@ reg                 r_aou_con0_tx_lp_mode;
 reg                 r_aou_con0_aou_sw_reset;
 reg                 r_aou_con0_credit_manage;
 reg                 r_aou_con0_deactivate_force;
+reg                 r_aou_init_int_fdi_link_down;
 reg                 r_aou_init_int_activate_start;
 reg                 r_aou_init_int_deactivate_start;
 reg [2:0]           r_aou_init_deactivate_time_out_value;
@@ -316,6 +320,7 @@ reg                 r_aou_interrupt_mask_int_req_linkreset_invalid_actmsg_mask;
 reg                 r_aou_interrupt_mask_int_req_linkreset_msgcredit_timeout_mask;
 reg                 r_aou_interrupt_mask_int_early_resp_mask;
 reg                 r_aou_interrupt_mask_int_early_wdt_mask;
+reg                 r_aou_interrupt_mask_int_fdi_link_down_mask;
 reg                 r_aou_interrupt_mask_int_mi0_id_mismatch_mask;
 reg                 r_aou_interrupt_mask_int_si0_id_mismatch_mask;
 reg [2:0]           r_lp_linkreset_ack_time_out_value;
@@ -490,6 +495,16 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
+        r_aou_init_int_fdi_link_down <= 1'h0;
+    end else if (I_AOU_INIT_INT_FDI_LINK_DOWN_SET) begin
+        r_aou_init_int_fdi_link_down <= 1'b1;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_INIT_ADDR) & I_PWDATA[12]) begin
+        r_aou_init_int_fdi_link_down <= 1'b0;
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
         r_aou_init_int_activate_start <= 1'h0;
     end else if (I_AOU_INIT_INT_ACTIVATE_START_SET) begin
         r_aou_init_int_activate_start <= 1'b1;
@@ -541,6 +556,14 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         r_aou_interrupt_mask_int_early_wdt_mask <= 1'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_INTERRUPT_MASK_ADDR)) begin
         r_aou_interrupt_mask_int_early_wdt_mask <= I_PWDATA[9];
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+        r_aou_interrupt_mask_int_fdi_link_down_mask <= 1'h0;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_INTERRUPT_MASK_ADDR)) begin
+        r_aou_interrupt_mask_int_fdi_link_down_mask <= I_PWDATA[10];
     end
 end
 
@@ -1519,9 +1542,9 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         SFR_AOU_CON0_ADDR : 
             r_rdata <= { 4'd0, r_aou_con0_rp3_error_info_access_en, r_aou_con0_rp2_error_info_access_en, r_aou_con0_rp1_error_info_access_en, r_aou_con0_rp0_error_info_access_en, r_aou_con0_rp3_axi_aggregator_en, r_aou_con0_rp2_axi_aggregator_en, r_aou_con0_rp1_axi_aggregator_en, r_aou_con0_rp0_axi_aggregator_en, r_aou_con0_tx_lp_mode_threshold, r_aou_con0_tx_lp_mode,  6'd0, r_aou_con0_aou_sw_reset, r_aou_con0_credit_manage, 1'b0, 1'b0,  1'd0};
         SFR_AOU_INIT_ADDR : 
-            r_rdata <= { 20'd0, I_AOU_INIT_INT_DEACTIVATE_PROPERTY, I_AOU_INIT_MST_TR_COMPLETE, I_AOU_INIT_SLV_TR_COMPLETE, r_aou_init_int_activate_start, r_aou_init_int_deactivate_start, r_aou_init_deactivate_time_out_value, I_AOU_INIT_ACTIVATE_STATE_DISABLED, I_AOU_INIT_ACTIVATE_STATE_ENABLED, r_aou_init_deactivate_start, r_aou_init_activate_start};
+            r_rdata <= { 19'd0, r_aou_init_int_fdi_link_down, I_AOU_INIT_INT_DEACTIVATE_PROPERTY, I_AOU_INIT_MST_TR_COMPLETE, I_AOU_INIT_SLV_TR_COMPLETE, r_aou_init_int_activate_start, r_aou_init_int_deactivate_start, r_aou_init_deactivate_time_out_value, I_AOU_INIT_ACTIVATE_STATE_DISABLED, I_AOU_INIT_ACTIVATE_STATE_ENABLED, r_aou_init_deactivate_start, r_aou_init_activate_start};
         SFR_AOU_INTERRUPT_MASK_ADDR : 
-            r_rdata <= { 22'd0, r_aou_interrupt_mask_int_early_wdt_mask, r_aou_interrupt_mask_int_req_linkreset_act_ack_mask, r_aou_interrupt_mask_int_req_linkreset_deact_ack_mask, r_aou_interrupt_mask_int_req_linkreset_invalid_actmsg_mask, r_aou_interrupt_mask_int_req_linkreset_msgcredit_timeout_mask, r_aou_interrupt_mask_int_early_resp_mask, r_aou_interrupt_mask_int_mi0_id_mismatch_mask, r_aou_interrupt_mask_int_si0_id_mismatch_mask,  1'd0,  1'd0};
+            r_rdata <= { 21'd0, r_aou_interrupt_mask_int_fdi_link_down_mask, r_aou_interrupt_mask_int_early_wdt_mask, r_aou_interrupt_mask_int_req_linkreset_act_ack_mask, r_aou_interrupt_mask_int_req_linkreset_deact_ack_mask, r_aou_interrupt_mask_int_req_linkreset_invalid_actmsg_mask, r_aou_interrupt_mask_int_req_linkreset_msgcredit_timeout_mask, r_aou_interrupt_mask_int_early_resp_mask, r_aou_interrupt_mask_int_mi0_id_mismatch_mask, r_aou_interrupt_mask_int_si0_id_mismatch_mask,  1'd0,  1'd0};
         SFR_LP_LINKRESET_ADDR : 
             r_rdata <= { 18'd0, r_lp_linkreset_ack_time_out_value, r_lp_linkreset_msgcredit_time_out_value, r_lp_linkreset_act_ack_err, r_lp_linkreset_deact_ack_err, r_lp_linkreset_invalid_actmsg_info, r_lp_linkreset_invalid_actmsg_err, r_lp_linkreset_msgcredit_err};
         SFR_DEST_RP_ADDR : 
@@ -1608,6 +1631,7 @@ assign O_AOU_INTERRUPT_MASK_INT_REQ_LINKRESET_INVALID_ACTMSG_MASK = r_aou_interr
 assign O_AOU_INTERRUPT_MASK_INT_REQ_LINKRESET_MSGCREDIT_TIMEOUT_MASK = r_aou_interrupt_mask_int_req_linkreset_msgcredit_timeout_mask;
 assign O_AOU_INTERRUPT_MASK_INT_EARLY_RESP_MASK = r_aou_interrupt_mask_int_early_resp_mask;
 assign O_AOU_INTERRUPT_MASK_INT_EARLY_WDT_MASK = r_aou_interrupt_mask_int_early_wdt_mask;
+assign O_AOU_INTERRUPT_MASK_INT_FDI_LINK_DOWN_MASK = r_aou_interrupt_mask_int_fdi_link_down_mask;
 assign O_AOU_INTERRUPT_MASK_INT_MI0_ID_MISMATCH_MASK = r_aou_interrupt_mask_int_mi0_id_mismatch_mask;
 assign O_AOU_INTERRUPT_MASK_INT_SI0_ID_MISMATCH_MASK = r_aou_interrupt_mask_int_si0_id_mismatch_mask;
 assign O_LP_LINKRESET_ACK_TIME_OUT_VALUE = r_lp_linkreset_ack_time_out_value;
@@ -1671,5 +1695,6 @@ assign ERR_EARLY_RESP_ERR = r_write_early_response_rp0_write_resp_err | r_write_
 assign ERR_EARLY_WDT_ERR  = r_write_early_response_rp0_wdt_trans_timeout_err | r_write_early_response_rp1_wdt_trans_timeout_err | r_write_early_response_rp2_wdt_trans_timeout_err | r_write_early_response_rp3_wdt_trans_timeout_err;
 assign INT_ACTIVATE_START   = r_aou_init_int_activate_start;
 assign INT_DEACTIVATE_START = r_aou_init_int_deactivate_start;
+assign INT_FDI_LINK_DOWN    = r_aou_init_int_fdi_link_down;
 
 endmodule

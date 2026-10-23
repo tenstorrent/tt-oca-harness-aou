@@ -356,9 +356,10 @@ module tb_top;
   // AOU_TOP has no lp_linkerror output (BUGS/002).
   assign fdi_lsm.lp_linkerror      = 1'b0;
 `endif
-  assign fdi_lsm.act_st_disabled   = u_dut.w_aou_activate_st_disabled;
-  assign fdi_lsm.int_activate_start   = status.int_activate_start;
-  assign fdi_lsm.int_deactivate_start = status.int_deactivate_start;
+  assign fdi_lsm.act_st_disabled   = status.activate_st_disabled;
+  assign fdi_lsm.sw_reset          = u_dut.w_sw_reset;
+  assign fdi_lsm.int_activate_start = status.int_activate_start;
+  assign fdi_lsm.int_fdi_link_down  = status.int_fdi_link_down;
   assign status.activate_st_disabled = u_dut.w_aou_activate_st_disabled;
   assign status.activate_st_enabled  = u_dut.w_aou_activate_st_enabled;
   assign status.o_aou_req_linkreset  = u_dut.w_aou_req_linkreset;
@@ -371,6 +372,7 @@ module tb_top;
   assign irq.int_early_wdt_err    = status.int_early_wdt_err;
   assign irq.int_activate_start   = status.int_activate_start;
   assign irq.int_deactivate_start = status.int_deactivate_start;
+  assign irq.int_fdi_link_down    = status.int_fdi_link_down;
   assign irq.act_st_disabled      = status.activate_st_disabled;
   assign irq.act_st_enabled       = status.activate_st_enabled;
   assign irq.slv_rid_agg          = u_dut.u_aou_core_top.u_aou_core.O_AXI_SLV_RID_MISMATCH_ERROR;
@@ -508,8 +510,6 @@ module tb_top;
 `endif
 
       .I_SW_ACTIVATE_START   (fdi_lsm.sw_activate_start),
-      .I_SW_DEACTIVATE_START (fdi_lsm.sw_deactivate_start),
-      .I_SW_RETRAIN_REQ      (fdi_lsm.sw_retrain_req),
       .I_SW_LINKERROR_INJECT (fdi_lsm.sw_linkerror_inject),
       .O_FDI_FSM_STATE       (fdi_lsm.fdi_fsm_state),
       .O_FDI_LINK_UP         (fdi_lsm.fdi_link_up),
@@ -521,6 +521,7 @@ module tb_top;
       .INT_EARLY_WDT_ERR     (status.int_early_wdt_err),
       .INT_ACTIVATE_START    (status.int_activate_start),
       .INT_DEACTIVATE_START  (status.int_deactivate_start),
+      .INT_FDI_LINK_DOWN     (status.int_fdi_link_down),
 
       .TIEL_DFT_MODESCAN        (rst.dft_modescan)
   );

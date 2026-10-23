@@ -48,7 +48,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |AXI_SPLIT_TR_EN |[2] |RW |0x0
 | | |Rsvd |[1:0] |RO |0x0
 |AOU_INIT |0x0008 | | | |0x00004608
-| | |Rsvd |[31:11] |RO |0x0
+| | |Rsvd |[31:13] |RO |0x0
+| | |INT_FDI_LINK_DOWN |[12] |W1C |0x0
 | | |MST_TR_COMPLETE |[10] |RO |0x1
 | | |SLV_TR_COMPLETE |[9] |RO |0x1
 | | |INT_ACTIVATE_START |[8] |W1C |0x0
@@ -59,7 +60,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |DEACTIVATE_START |[1] |RW |0x0
 | | |ACTIVATE_START |[0] |RW |0x0
 |AOU_INTERRUPT_MASK |0x000C | | | |
-| | |Rsvd |[31:10] |RO |0x0
+| | |Rsvd |[31:11] |RO |0x0
+| | |INT_FDI_LINK_DOWN_MASK |[10] |RW |0x0
 | | |INT_EARLY_WDT_MASK |[9] |RW |0x0
 | | |INT_REQ_LINKRESET_ACT_ACK_MASK |[8] |RW |0x0
 | | |INT_REQ_LINKRESET_DEACT_ACK_MASK |[7] |RW |0x0
@@ -237,7 +239,7 @@ For details on the ACTIVATE and DEACTIVATE SFRs, please refer to xref:aou-73-act
 
 *AOU_INIT.ACTIVATE_START*
 
-* After link-up is completed, AOU_CORE can send or receive an ActivateReq message to complete the first activation handshake. A further ActivateReq once the FSM is ENABLED is an invalid activation message; see xref:aou-723-linkreset-error-reporting[Section 7.2.3].
+* After the link is established (I_INT_FSM_IN_ACTIVE asserted), AOU_CORE can send or receive an ActivateReq message to complete the first activation handshake. A further ActivateReq once the FSM is ENABLED is an invalid activation message; see xref:aou-723-linkreset-error-reporting[Section 7.2.3].
 
 * AoU Activation Request can only be triggered by AOU_INIT.ACTIVATE_START, and it is allowed to be set before and after the completion of the UCIe Link-up.
 
@@ -308,6 +310,7 @@ AOU_CORE provides several error-detection and debug features, each with a dedica
 [cols="<,<,<",options="header",]
 |===================================================
 |Mask Bit |Feature |Interrupt Signal
+|[10] |FDI link lost with AoU in use |INT_FDI_LINK_DOWN
 |[9] |Early-response write-transaction watchdog |INT_EARLY_WDT_ERR
 |[8] |Activate-ack timeout |INT_REQ_LINKRESET
 |[7] |Deactivate-ack timeout |INT_REQ_LINKRESET
@@ -336,7 +339,7 @@ AOU_CORE can detect AXI ID mismatches on both the manager and subordinate interf
 [[aou-723-linkreset-error-reporting]]
 ==== 7.2.3. LinkReset Error Reporting
 
-When AOU_CORE detects a protocol-level error during activation or deactivation, it asserts [.monospaced]#++O_AOU_REQ_LINKRESET++# (to FDI) and [.monospaced]#++INT_REQ_LINKRESET++# (to SW). Both signals share the same net and are the logical OR of the four sub-conditions below. After handling the interrupt, SW must perform a LinkReset sequence.
+When AOU_CORE detects a protocol-level error during activation or deactivation, it asserts [.monospaced]#++O_AOU_REQ_LINKRESET++# (to FDI) and [.monospaced]#++INT_REQ_LINKRESET++# (to SW). Both signals share the same net and are the logical OR of the four sub-conditions below, each gated by its mask bit in [.monospaced]#++AOU_INTERRUPT_MASK++#: a masked cause raises neither the interrupt nor the request to the D2D adapter. The request is a level, held while the sticky status bit is set. The bringup controller acts on it while the link is Active or in Retrain; a request raised while the link is in L1, or exiting it, is deferred until the link is next Active, so SW that meets [.monospaced]#++ACT_ACK_ERR++# after an [.monospaced]#++ACTIVATE_START++# written in L1 (xref:aou-732-activation-start[Section 7.3.2]) exits L1 on the UCIe controller first and clears the status only after the D2D adapter has reported LinkError; clearing it earlier (W1C or [.monospaced]#++AOU_SW_RESET++#) withdraws the request and leaves the link in L1 with AOU_CORE [.monospaced]#++DISABLED++#, which SW then recovers by re-activating. After handling the interrupt, SW must perform a LinkReset sequence.
 
 All LinkReset-related SFR fields reside in [.monospaced]#++LP_LINKRESET++# (0x0010).
 
@@ -351,7 +354,7 @@ All LinkReset-related SFR fields reside in [.monospaced]#++LP_LINKRESET++# (0x00
 |ENABLED, DEACTIVATE |DeactivateReq and DeactivateAck. ActivateReq and ActivateAck are invalid.
 |===
 
-An ActivateReq or ActivateAck received after the activate handshake has completed ([.monospaced]#++ENABLED++#), or while deactivation is in progress ([.monospaced]#++DEACTIVATE++#), means the remote die no longer agrees on link state: a bug, a local reset, or a similar loss of state. A late ActivateReq is not a new activation; the local die still sends ActivateAck to acknowledge receipt. A late ActivateAck instead triggers the invalid-message error without an acknowledgment response. In either case, the local die requests LinkReset. Software resets AOU_CORE ([.monospaced]#++AOU_CON0.AOU_SW_RESET++#) and both dies run activation again, as described in xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6].
+An ActivateReq or ActivateAck received after the activate handshake has completed ([.monospaced]#++ENABLED++#), or while deactivation is in progress ([.monospaced]#++DEACTIVATE++#), means the remote die no longer agrees on link state: a bug, a local reset, or a similar loss of state. A late ActivateReq is not a new activation. Neither message is answered: the out-of-step Req/Ack is an error (AoU specification v0.8 section 8.3.3), and an interface in error transmits nothing (section 8.4), so the local die sends no ActivateAck. In either case, the local die requests LinkReset. Software resets AOU_CORE ([.monospaced]#++AOU_CON0.AOU_SW_RESET++#) and both dies run activation again, as described in xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6].
 
 *MsgCredit Timeout.* After the local die receives ActivateAck, it expects a CreditGrant message from the remote die indicating the number of resource planes. If no CreditGrant arrives within 2^([.monospaced]#++MSGCREDIT_TIME_OUT_VALUE++# + 18) core clock cycles, [.monospaced]#++MSGCREDIT_ERR++# [0] is set. [.monospaced]#++MSGCREDIT_TIME_OUT_VALUE++# [10:8] defaults to 4. Clear via W1C.
 
@@ -416,7 +419,9 @@ On [.monospaced]#++INT_EARLY_WDT_ERR++#:
 [[aou-73-activation-deactivation-flow]]
 === 7.3. Activation & Deactivation Flow
 
-The Activation of AOU_CORE begins after the UCIe Link-up process has been successfully completed. The completion of UCIe link-up is indicated by the *I_INT_FSM_IN_ACTIVE* signal of the *AOU_CORE_TOP*.
+The Activation of AOU_CORE begins after the UCIe link has been established. This is indicated by the *I_INT_FSM_IN_ACTIVE* signal of the *AOU_CORE_TOP*: it rises once the link has first reached Active, stays asserted through Retrain and L1, and falls only when the link is lost (LinkError, LinkReset, Disabled or Reset).
+
+The activation FSM leaves any state for [.monospaced]#++DISABLED++# on an error (AoU specification v0.8 section 8.3.3). The errors are the four LinkReset causes of xref:aou-723-linkreset-error-reporting[Section 7.2.3] (Activate-ack timeout, Deactivate-ack timeout, MsgCredit timeout, invalid activation message) and the loss of the FDI link while the FSM is in [.monospaced]#++ACTIVATE++#, [.monospaced]#++ENABLED++# or [.monospaced]#++DEACTIVATE++#, which raises [.monospaced]#++INT_FDI_LINK_DOWN++# (xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6]). In both cases the handshake registers and the Ack and MsgCredit time-out waits are cleared, so no ActivateAck or DeactivateAck is sent afterwards, no second error is reported for the abandoned handshake, and [.monospaced]#++AOU_INIT.ACTIVATE_STATE_DISABLED++# reads 1.
 
 There is no dependency between the activation of the local die and the remote die. Each die may initiate the activation sequence independently, which means the timing of sending *ActivateReq* can differ. Both dies must exchange *ActivateReq* and *ActivateAck* messages to transition to the *ENABLED* state, at which point credited messages can be transmitted.
 
@@ -425,7 +430,7 @@ There is no dependency between the activation of the local die and the remote di
 [[figure-24]]
 image::image23.png[Figure 24. Independent Activation Flow]
 
-Regardless of its own activation state, a die must send an ActivateAck in response to an ActivateReq from the other die, to acknowledge receipt of the request. Acknowledging the request does not make it legal once the activate handshake has completed. If the local activation FSM is [.monospaced]#++ENABLED++#, or is in [.monospaced]#++DEACTIVATE++#, that ActivateReq is also [.monospaced]#++INVALID_ACTMSG++# (see xref:aou-723-linkreset-error-reporting[Section 7.2.3]). It means the remote die has lost the activation state, for example because of a bug or a local reset. The local die requests LinkReset. Software resets AOU_CORE and both dies run activation again so they share one state. Sending ActivateAck does not start a second handshake.
+A die sends an ActivateAck in response to an ActivateReq from the other die while its own activation FSM is [.monospaced]#++DISABLED++# or [.monospaced]#++ACTIVATE++#. If the local activation FSM is [.monospaced]#++ENABLED++#, or is in [.monospaced]#++DEACTIVATE++#, that ActivateReq is [.monospaced]#++INVALID_ACTMSG++# (see xref:aou-723-linkreset-error-reporting[Section 7.2.3]) and is not answered: AoU specification v0.8 treats it as an inconsistent Req/Ack that moves the interface to its error state, in which nothing is transmitted (sections 8.3.3 and 8.4). It means the remote die has lost the activation state, for example because of a bug or a local reset. The local die requests LinkReset. Software resets AOU_CORE and both dies run activation again so they share one state.
 
 [[aou-731-credit-management-type]]
 ==== 7.3.1. Credit Management Type
@@ -453,7 +458,7 @@ Activation can be initiated by setting ACTIVATE_START SFR: In the current implem
 Activation START(via SFR AOU_INIT.ACTIVATE_START SFR)
 
 * Activation can be triggered by setting ACTIVATE_START.
-* Activation does not proceed until I_INT_FSM_IN_ACTIVE is asserted, since no flits can be transmitted beforehand. Therefore, it is allowed to set the ACTIVATE_START SFR before I_INT_FSM_IN_ACTIVE is asserted. If it is set before the assertion, the activation process will automatically proceed after I_INT_FSM_IN_ACTIVE becomes asserted.
+* Activation does not proceed until I_INT_FSM_IN_ACTIVE is asserted (link established), since no flits can be transmitted beforehand. Therefore, it is allowed to set the ACTIVATE_START SFR before I_INT_FSM_IN_ACTIVE is asserted. If it is set before the assertion, the activation process will automatically proceed after I_INT_FSM_IN_ACTIVE becomes asserted. I_INT_FSM_IN_ACTIVE stays asserted through Retrain and L1, so an ACTIVATE_START written then starts the handshake at once; the ActivateReq waits in the TX path until the D2D adapter accepts flits again, and the Ack timer (2^(18 + ACK_TIME_OUT_VALUE) cycles, xref:aou-723-linkreset-error-reporting[Section 7.2.3]) runs from the write, not from the adapter's acceptance, so an L1 that outlasts it ends in ACT_ACK_ERR. That is intended: the time-out is an error host SW understands and handles like any other ACT_ACK_ERR (xref:aou-723-linkreset-error-reporting[Section 7.2.3]); no link-state qualifier delays the timer. The write does not wake a link in L1: the bringup controller wakes it on the D2D adapter's pl_clk_req, on I_SW_ACTIVATE_START, or on INT_ACTIVATE_START (a pending local AXI transaction or a received ActivateReq while ACTIVATE_START is 0), so SW that activates from L1 exits L1 on the UCIe controller as in xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6].
 * AOU_INIT.ACTIVATE_START SFR is automatically cleared to 0 once the activation is completed and AOU_ACTIVATE_STATE transitions to ENABLED.
 
 [[aou-733-deactivation-start]]
@@ -570,4 +575,45 @@ Same as PM entry, before doing UCIE state transition, AOU_CORE need to Disabled 
 If AOU_CORE faces uncorrectable error (ex. AOU SPEC violation), AOU_CORE sends LinkReset to CPU and D2D adapter. LinkReset indicates that an error has occurred which requires the Link to go down.
 
 While handling LinkReset, SW needs to do AOU_CORE SW reset by setting AOU_CON0.AOU_SW_RESET.
+If the link is in L1 when AOU_CORE raises the request (an Ack time-out on an [.monospaced]#++ACTIVATE_START++# written in L1), the request is held until the link is Active again (xref:aou-723-linkreset-error-reporting[Section 7.2.3]): SW exits L1 on the UCIe controller first, waits for the D2D adapter to report LinkError, and only then applies [.monospaced]#++AOU_SW_RESET++#.
+SW learns that the link went down (LinkReset, Disabled, or a LinkError the D2D adapter entered on its own) from [.monospaced]#++INT_FDI_LINK_DOWN++# (status [.monospaced]#++AOU_INIT.INT_FDI_LINK_DOWN++#, raised when [.monospaced]#++I_INT_FSM_IN_ACTIVE++# falls with the activation FSM in ACTIVATE, ENABLED or DEACTIVATE, or in DISABLED with an ActivateReq outstanding), or from the UCIe controller. The activation FSM is already [.monospaced]#++DISABLED++# when the handler runs; the sequence itself is unchanged: read [.monospaced]#++AOU_INIT++#, [.monospaced]#++AOU_SW_RESET++#, restart the link on the UCIe controller, reprogram the configuration registers, [.monospaced]#++ACTIVATE_START++#. The status bit is cleared with the other registers by [.monospaced]#++AOU_SW_RESET++# (write 1 clears it when the core is not reset; as for the other W1C bits of [.monospaced]#++AOU_INIT++#, the write also lands on the register's RW fields, so SW writes back the [.monospaced]#++ACTIVATE_START++#, [.monospaced]#++DEACTIVATE_START++# and [.monospaced]#++DEACTIVATE_TIME_OUT_VALUE++# values it wants to keep) and is not set again by the restart. A link lost with local AXI transactions pending also raises [.monospaced]#++INT_ACTIVATE_START++# in the same cycle, since the forced [.monospaced]#++DISABLED++# meets pending traffic; the handler above answers both. The sequences of xref:aou-737-fdi-link-lifecycle-sequences[Section 7.3.7] show each case.
+The same applies to any FDI LinkError, whether AOU_CORE requested it or the D2D adapter entered it on its own: a LinkError can interrupt a flit in either direction, and AOU_CORE's FDI data paths keep that flit's position until [.monospaced]#++AOU_SW_RESET++#. On [.monospaced]#++AOU_TOP++# the FDI bringup controller therefore holds the link down after a LinkError ([.monospaced]#++O_FDI_FSM_STATE++# reads LinkError, [.monospaced]#++O_FDI_LINK_UP++# is 0) until SW has written [.monospaced]#++AOU_SW_RESET++#; SW then reprograms the configuration registers, restarts the link on the UCIe controller, and re-activates AOU once [.monospaced]#++O_FDI_LINK_UP++# is back (xref:{aou-integration-xref}#aou-ig-supported-state-transitions[Integration guide Section 6.6.3]).
+Restarting the link after a LinkError, LinkReset or Disabled is SW's job on the UCIe controller (the D2D adapter's Start UCIe Link Training, or the remote die): the AOU bringup controller requests nothing in those states, drives NOP, follows the D2D adapter to Reset and waits for [.monospaced]#++pl_inband_pres++# as after a cold reset.
 Asserting [.monospaced]#++I_RESETN++# returns the configuration registers to the same reset values as [.monospaced]#++AOU_SW_RESET++#, and on [.monospaced]#++AOU_TOP++# it also returns the FDI bringup controller to Reset (xref:{aou-integration-xref}#aou-ig-reset-domains[Section 3.1.1]).
+
+[[aou-737-fdi-link-lifecycle-sequences]]
+==== 7.3.7. FDI link lifecycle sequences
+
+The sequences below show, for each way the FDI link comes up, goes down or pauses, what the FDI bringup controller of [.monospaced]#++AOU_TOP++# does on its own, what AOU_CORE does, and what is left to SW on the configuration registers or on the UCIe controller. Participants are SW, AOU_CORE, the bringup controller ([.monospaced]#++AOU_FDI_BRINGUP_CTRL++#), the D2D adapter and the remote die. UCIe state encodings are those of [.monospaced]#++pl_state_sts++# (UCIe r1.1 section 8.2.7); [.monospaced]#++O_FDI_FSM_STATE++# reports the same code (xref:{aou-integration-xref}#aou-ig-fdi-bringup-flow-aou_top-only[Integration guide Section 6.6]).
+
+*Bring-up.* The link comes up once the D2D adapter reports presence and either side asks for it. On the local side the bringup controller raises [.monospaced]#++lp_wake_req++# and requests Active on [.monospaced]#++I_SW_ACTIVATE_START++# (a top-level pulse) or on [.monospaced]#++INT_ACTIVATE_START++# (AOU_CORE has a pending local AXI transaction or a received ActivateReq and [.monospaced]#++ACTIVATE_START++# is 0); the D2D adapter asks with [.monospaced]#++pl_clk_req++#. Writing [.monospaced]#++ACTIVATE_START++# alone does not wake the link. [.monospaced]#++I_INT_FSM_IN_ACTIVE++# rises on Active and the activation handshake of xref:aou-732-activation-start[Section 7.3.2] follows; an [.monospaced]#++ACTIVATE_START++# written earlier proceeds then.
+
+image::fdi-seq-01-bringup-local.svg[Bring-up requested locally (I_SW_ACTIVATE_START or INT_ACTIVATE_START)]
+
+image::fdi-seq-02-bringup-clk-req.svg[Bring-up requested by the D2D adapter (pl_clk_req), remote die activates first]
+
+*Deactivation.* Deactivation is an AoU message exchange only: the link stays Active, the bringup controller does nothing, and SW does nothing on the UCIe controller. A remote DeactivateReq reaches SW as [.monospaced]#++INT_DEACTIVATE_START++#; SW answers by writing [.monospaced]#++DEACTIVATE_START++# (xref:aou-733-deactivation-start[Section 7.3.3]).
+
+image::fdi-seq-03-deactivate-local.svg[Deactivation started by SW]
+
+image::fdi-seq-04-deactivate-remote.svg[Deactivation started by the remote die]
+
+*Link down with AoU DISABLED.* The PM entry and LinkDisable sequences of xref:aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6] deactivate AoU first. The bringup controller follows the adapter to LINKDOWN and then RESET, drives NOP and requests nothing; [.monospaced]#++I_INT_FSM_IN_ACTIVE++# falls with the activation FSM already DISABLED and no ActivateReq outstanding, so no [.monospaced]#++INT_FDI_LINK_DOWN++# is raised. An [.monospaced]#++ACTIVATE_START++# written while the link is down waits in AOU_CORE until SW restarts the link on the UCIe controller.
+
+image::fdi-seq-05-sw-link-disable.svg[Link Disable by SW with AoU deactivated, then restart]
+
+*Link down with AoU in use.* When the adapter or the remote die takes the link down (LinkReset, Disabled, or a LinkError the adapter entered on its own) while the activation FSM is in ACTIVATE, ENABLED or DEACTIVATE (or in DISABLED with an ActivateReq already sent or received), [.monospaced]#++I_INT_FSM_IN_ACTIVE++# falls, the activation FSM returns to DISABLED, [.monospaced]#++AOU_INIT.INT_FDI_LINK_DOWN++# is set and [.monospaced]#++INT_FDI_LINK_DOWN++# is raised unless masked (xref:aou-4-interrupt[Section 4]). SW runs the LinkReset sequence of Section 7.3.6. After a LinkError the bringup controller also holds the link down until [.monospaced]#++AOU_SW_RESET++# has been written.
+
+image::fdi-seq-06-linkreset-in-use.svg[LinkReset by the D2D adapter or remote die with AoU ENABLED]
+
+image::fdi-seq-08-adapter-linkerror.svg[LinkError entered by the D2D adapter with AoU ENABLED]
+
+*LinkError requested by AOU_CORE.* An activation, deactivation or MsgCredit timeout, or an out-of-step activation message, returns the activation FSM to DISABLED, raises [.monospaced]#++INT_REQ_LINKRESET++# and asserts [.monospaced]#++O_AOU_REQ_LINKRESET++#; the bringup controller pulses [.monospaced]#++lp_linkerror++# (xref:aou-723-linkreset-error-reporting[Section 7.2.3]). The FSM is already DISABLED when the link goes down, so [.monospaced]#++INT_FDI_LINK_DOWN++# is not raised as well. The bringup controller takes the request in ACTIVE and RETRAIN only; raised in L1 or during the L1 exit (an Ack time-out on an [.monospaced]#++ACTIVATE_START++# written in L1), it is held on the sticky status bit and acted on once the link is Active, so SW exits L1 on the UCIe controller before clearing the status (xref:aou-723-linkreset-error-reporting[Section 7.2.3]).
+
+image::fdi-seq-07-aou-linkerror.svg[LinkError requested by AOU_CORE on an AoU error]
+
+*Retrain and L1.* Both are transparent to AOU_CORE: [.monospaced]#++I_INT_FSM_IN_ACTIVE++# stays asserted, the activation FSM keeps its state and no interrupt is raised; only [.monospaced]#++O_FDI_LINK_UP++# drops while the link is not in Active. The bringup controller re-requests Active after a Retrain. From L1 it wakes the link when the adapter raises [.monospaced]#++pl_clk_req++# (the PM exit SW requests on the UCIe controller, or the remote die's) or when AOU_CORE raises [.monospaced]#++INT_ACTIVATE_START++# (local traffic arrives while AoU is DISABLED). An [.monospaced]#++ACTIVATE_START++# written in L1 wakes nothing: the handshake starts at once, its ActivateReq waits in the TX path until the link is Active again, and the Ack timer runs meanwhile, so SW exits L1 on the UCIe controller within the Ack time-out or handles the resulting ACT_ACK_ERR as any other; the time-out is the intended report, not a hazard the hardware avoids.
+
+image::fdi-seq-09-retrain.svg[Retrain with AoU ENABLED and traffic in flight]
+
+image::fdi-seq-10-l1-and-wake.svg[L1 entry with AoU deactivated, and the ways out]

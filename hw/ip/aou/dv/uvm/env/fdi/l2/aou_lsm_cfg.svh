@@ -4,7 +4,7 @@
 class aou_lsm_cfg extends uvm_object;
   `uvm_object_utils(aou_lsm_cfg)
 
-  aou_fdi_enc_e fdi_enc = AOU_FDI_ENC_RTL;
+  aou_fdi_enc_e fdi_enc = AOU_FDI_ENC_SPEC;
   int unsigned  n_phy = 1;
   int unsigned  active_phy = 0;          // drives I_PHY_TYPE
   // Two-PHY builds: the PHY I_PHY_TYPE does not select stays in Reset with its
@@ -24,19 +24,13 @@ class aou_lsm_cfg extends uvm_object;
   bit           clk_req_hold_bringup = 1'b1; // keep pl_clk_req until the state leaves Reset
   bit           rebringup_after_down = 1'b1; // LinkError/LinkReset events end with a bringup
   int unsigned  req_timeout = 20000;     // cycles to wait for a DUT request; 0 waits forever
-  bit           react_en = 1'b1;         // fdi_enc=SPEC: answer the DUT's LinkReset/Disabled
-                                         // requests between events
-  bit           react_linkerror_en = 1'b1; // ... and its lp_linkerror
-  // fdi_enc=SPEC: after LinkError/LinkReset/Disabled the Adapter trains again
-  // only on a NOP->Active request (FDI-R51); after train_timeout cycles
-  // software starts the training instead.
-  bit           train_trigger_en = 1'b1;
-  int unsigned  train_timeout = 2000;
-  // After a deliberate teardown (the DUT's LinkReset request, or Disabled) the
-  // DUT waits for an activation request before that trigger;
-  // software gives one through I_SW_ACTIVATE_START after this many cycles in
-  // Reset if neither the test nor the DUT has; 0 never does. The agent
-  // randomises it in [50:1500] unless +sw_restart_delay=N sets it.
+  bit           react_en = 1'b1;         // fdi_enc=SPEC: answer the DUT's lp_linkerror
+  bit           react_linkerror_en = 1'b1; // between events (both must be set)
+  // After LinkError/LinkReset/Disabled -> Reset the link is restarted by
+  // software on the UCIe controller, never by the DUT: the Adapter stays in
+  // Reset this many cycles (software's Start UCIe Link Training) before it
+  // trains again; 0 trains at once. The agent randomises it in [50:1500]
+  // unless +sw_restart_delay=N sets it.
   int unsigned  sw_restart_delay = 300;
   // Chance an Adapter-initiated LinkError is entered mid-flit: without the flit
   // boundary, while a flit is in flight in either direction (UCIe r1.1

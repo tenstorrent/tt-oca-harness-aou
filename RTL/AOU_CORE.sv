@@ -363,6 +363,7 @@ import packet_def_pkg::*;
 
     output                                                  O_INT_ACTIVATE_START,
     output                                                  O_INT_DEACTIVATE_START,
+    output                                                  O_INT_FDI_LINK_DOWN,
 
     //Interface for UCIE_CORE
     input                                                   I_INT_FSM_IN_ACTIVE,
@@ -644,6 +645,8 @@ import packet_def_pkg::*;
     wire                                    w_deactivate_force              ;
     logic                                   w_int_activate_start            ;
     logic                                   w_int_deactivate_start          ;
+    logic                                   w_int_fdi_link_down_set         ;
+    logic                                   w_int_fdi_link_down             ;
 
     logic [2:0]                             w_ack_time_out_value            ;
     logic [2:0]                             w_msgcredit_time_out_value      ;
@@ -680,6 +683,7 @@ import packet_def_pkg::*;
     logic                       w_deact_timeout_mask;
     logic                       w_early_resp_mask;
     logic                       w_early_wdt_mask;
+    logic                       w_fdi_link_down_mask;
     logic                       w_mi0_id_mismatch_mask;
     logic                       w_si0_id_mismatch_mask;
 
@@ -758,6 +762,7 @@ import packet_def_pkg::*;
         .I_AOU_INIT_SLV_TR_COMPLETE                                     ( O_SLV_TR_COMPLETE                     ),
         .I_AOU_INIT_INT_ACTIVATE_START_SET                              ( w_int_activate_start                  ),
         .I_AOU_INIT_INT_DEACTIVATE_START_SET                            ( w_int_deactivate_start                ),
+        .I_AOU_INIT_INT_FDI_LINK_DOWN_SET                               ( w_int_fdi_link_down_set               ),
         .O_AOU_INIT_DEACTIVATE_TIME_OUT_VALUE                           ( w_deactivate_time_out_value           ),
         .I_AOU_INIT_ACTIVATE_STATE_DISABLED                             ( w_status_disabled                     ),
         .I_AOU_INIT_ACTIVATE_STATE_ENABLED                              ( O_AOU_ACTIVATE_ST_ENABLED             ),
@@ -802,6 +807,7 @@ import packet_def_pkg::*;
         .O_AOU_INTERRUPT_MASK_INT_REQ_LINKRESET_MSGCREDIT_TIMEOUT_MASK  ( w_msgcredit_timeout_mask              ),
         .O_AOU_INTERRUPT_MASK_INT_EARLY_RESP_MASK                       ( w_early_resp_mask                     ),
         .O_AOU_INTERRUPT_MASK_INT_EARLY_WDT_MASK                        ( w_early_wdt_mask                      ),
+        .O_AOU_INTERRUPT_MASK_INT_FDI_LINK_DOWN_MASK                    ( w_fdi_link_down_mask                  ),
         .O_AOU_INTERRUPT_MASK_INT_MI0_ID_MISMATCH_MASK                  ( w_mi0_id_mismatch_mask                ),
         .O_AOU_INTERRUPT_MASK_INT_SI0_ID_MISMATCH_MASK                  ( w_si0_id_mismatch_mask                ),
 
@@ -821,6 +827,7 @@ import packet_def_pkg::*;
 
         .INT_ACTIVATE_START                                             ( O_INT_ACTIVATE_START                  ),
         .INT_DEACTIVATE_START                                           ( O_INT_DEACTIVATE_START                ),
+        .INT_FDI_LINK_DOWN                                              ( w_int_fdi_link_down                   ),
 
         .O_AXI_SPLIT_TR_RP1_MAX_AWBURSTLEN                              ( w_axi_split_tr_max_awburstlen[1]      ),
         .O_AXI_SPLIT_TR_RP1_MAX_ARBURSTLEN                              ( w_axi_split_tr_max_arburstlen[1]      ),
@@ -915,6 +922,7 @@ import packet_def_pkg::*;
     assign O_AXI_SLV_BID_MISMATCH_ERROR         = w_si0_id_mismatch_mask ? 1'b0 : w_axi_slv_bid_mismatch_error;
     assign O_INT_EARLY_RESP_ERR                 = w_early_resp_mask ? 1'b0 : w_int_early_resp_err;
     assign O_INT_EARLY_WDT_ERR                  = w_early_wdt_mask ? 1'b0 : w_int_early_wdt_err;
+    assign O_INT_FDI_LINK_DOWN                  = w_fdi_link_down_mask ? 1'b0 : w_int_fdi_link_down;
 
     assign w_act_ack_err_b          = w_act_timeout_mask ? 1'b0 : w_act_ack_err;
     assign w_deact_ack_err_b        = w_deact_timeout_mask ? 1'b0 : w_deact_ack_err;
@@ -1147,6 +1155,7 @@ import packet_def_pkg::*;
 
         .O_INT_ACTIVATE_START              ( w_int_activate_start           ),
         .O_INT_DEACTIVATE_START            ( w_int_deactivate_start         ),
+        .O_INT_FDI_LINK_DOWN               ( w_int_fdi_link_down_set        ),
         .O_DEACTIVATE_PROPERTY             ( w_deactivate_property          )
 
     );

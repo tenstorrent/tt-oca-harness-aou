@@ -82,6 +82,7 @@ module AOU_ACTIVATION_CTRL
 
     output          O_INT_ACTIVATE_START            ,
     output          O_INT_DEACTIVATE_START          ,
+    output          O_INT_FDI_LINK_DOWN             ,
     output          O_DEACTIVATE_PROPERTY
 
 );
@@ -151,6 +152,12 @@ logic       w_activate_en;
 logic       w_deactivate_en;
 
 logic       w_lp_linkerror_start;
+
+logic       r_ucie_init_done_1d;
+logic       w_fdi_link_fell;
+logic       w_act_req_pending;
+logic       w_fdi_link_lost;
+logic       w_fsm_abort;
 
 assign      w_activate_en   = ((r_cur_st == DISABLED) | (r_cur_st == ACTIVATE  )) & ~(r_tx_activate_req | ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID));
 assign      w_deactivate_en = ((r_cur_st == ENABLED)  | (r_cur_st == DEACTIVATE)) & ~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID));
@@ -228,15 +235,42 @@ end
 
 assign  w_axi_mst_rsp_completed_falling_edge_detect  = r_axi_mst_rsp_completed_1d & ~I_MST_BUS_CLEANY_COMPLETE;
 
+always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+    if (~I_RESETN) begin
+        r_ucie_init_done_1d <= 1'b0;
+    end else begin
+        r_ucie_init_done_1d <= I_UCIE_INIT_DONE;
+    end
+end
+
+// FDI link lost: the falling edge of the link-established indication. In
+// every state it clears the handshake registers and time-out waits and holds
+// the FSM in DISABLED (w_fsm_abort), so a request latched, accepted by the
+// transmit path or arriving in that cycle cannot start a handshake on a link
+// that is already down. It is reported (O_INT_FDI_LINK_DOWN) when a session
+// or an activation handshake is outstanding: outside DISABLED, or in DISABLED
+// with such a request. AoU spec v0.8 8.3.3: the activation FSM leaves for
+// DISABLED on an error. A link that falls in DISABLED with nothing outstanding
+// is no event of this FSM. Not a LinkReset request: the link is already down.
+assign w_fdi_link_fell     = r_ucie_init_done_1d & ~I_UCIE_INIT_DONE;
+assign w_act_req_pending   = r_tx_activate_req | r_rx_activate_req
+                           | ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY)
+                           | ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID);
+assign w_fdi_link_lost     = w_fdi_link_fell & ((r_cur_st != DISABLED) | w_act_req_pending);
+assign w_fsm_abort         = w_lp_linkerror_start | w_fdi_link_fell;
+assign O_INT_FDI_LINK_DOWN = w_fdi_link_lost;
+
 //-------------------------------------------------------------
 //Deactivate Reqest, ack register 
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_tx_deactivate_req <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_tx_deactivate_req <= 1'b0;
     end else if((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY) begin
         r_tx_deactivate_req <= 1'b1;
-    end else if(w_deactivate_reg_clear | w_lp_linkerror_start) begin
+    end else if (w_deactivate_reg_clear) begin
         r_tx_deactivate_req <= 1'b0;
     end
 end
@@ -244,29 +278,35 @@ end
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_tx_deactivate_ack <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_tx_deactivate_ack <= 1'b0;
     end else if ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_ACK) & I_ACTMSG_VALID)begin
         r_tx_deactivate_ack <= 1'b1;
-    end else if(w_deactivate_reg_clear | w_lp_linkerror_start) begin
-        r_tx_deactivate_ack <= 1'b0;    
+    end else if (w_deactivate_reg_clear) begin
+        r_tx_deactivate_ack <= 1'b0;
     end
 end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_rx_deactivate_req <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_rx_deactivate_req <= 1'b0;
     end else if ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID)begin
         r_rx_deactivate_req <= 1'b1;
-    end else if(w_deactivate_reg_clear | w_lp_linkerror_start) begin
-        r_rx_deactivate_req <= 1'b0;    
+    end else if (w_deactivate_reg_clear) begin
+        r_rx_deactivate_req <= 1'b0;
     end
 end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
+        r_rx_deactivate_ack <= 1'b0;
+    end else if (w_fsm_abort) begin
         r_rx_deactivate_ack <= 1'b0;
     end else if ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_ACK) & O_ACTMSG_VALID & I_ACTMSG_READY)begin
         r_rx_deactivate_ack <= 1'b1;
-    end else if(w_deactivate_reg_clear | w_lp_linkerror_start) begin
+    end else if (w_deactivate_reg_clear) begin
         r_rx_deactivate_ack <= 1'b0;
     end
 end
@@ -274,9 +314,11 @@ end
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_tx_activate_req <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_tx_activate_req <= 1'b0;
     end else if ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY) begin
         r_tx_activate_req <= 1'b1;
-    end else if (w_activate_reg_clear | w_lp_linkerror_start) begin
+    end else if (w_activate_reg_clear) begin
         r_tx_activate_req <= 1'b0;
     end
 end
@@ -284,20 +326,33 @@ end
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_tx_activate_ack <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_tx_activate_ack <= 1'b0;
     end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID) begin
         r_tx_activate_ack <= 1'b1;
-    end else if (w_activate_reg_clear | w_lp_linkerror_start) begin
+    end else if (w_activate_reg_clear) begin
         r_tx_activate_ack <= 1'b0;
     end
 end
 
 
+//The abort has priority over every handshake register set: a request or Ack
+//in the abort cycle would otherwise survive into DISABLED and restart the
+//handshake (a request) or complete the next one early (an Ack). The one-cycle
+//abort comes with a LinkReset request or a lost link, so software resets the
+//core before the next session; a message accepted in that cycle is lost.
+//An ActivateReq in ENABLED or DEACTIVATE is the invalid message that requests
+//LinkReset (w_activate_related1 sends it no Ack); it must not be remembered
+//either, or the FSM, DISABLED by that error, would re-enter ACTIVATE on it.
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_rx_activate_req <= 1'b0;
-    end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID) begin
+    end else if (w_fsm_abort) begin
+        r_rx_activate_req <= 1'b0;
+    end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID
+                 & ~((r_cur_st == ENABLED) | (r_cur_st == DEACTIVATE))) begin
         r_rx_activate_req <= 1'b1;
-    end else if (w_activate_reg_clear | w_lp_linkerror_start) begin
+    end else if (w_activate_reg_clear) begin
         r_rx_activate_req <= 1'b0;
     end
 end
@@ -306,9 +361,11 @@ end
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_rx_activate_ack <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_rx_activate_ack <= 1'b0;
     end else if ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & O_ACTMSG_VALID & I_ACTMSG_READY) begin
         r_rx_activate_ack <= 1'b1;
-    end else if (w_activate_reg_clear | w_lp_linkerror_start) begin
+    end else if (w_activate_reg_clear) begin
         r_rx_activate_ack <= 1'b0;
     end
 end
@@ -316,10 +373,12 @@ end
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_rx_deactivate_propertyreq <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_rx_deactivate_propertyreq <= 1'b0;
     end else if ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID & I_ACTMSG_PROPERTYREQ)begin
         r_rx_deactivate_propertyreq <= 1'b1;
-    end else if(w_deactivate_reg_clear | w_lp_linkerror_start) begin
-        r_rx_deactivate_propertyreq <= 1'b0;    
+    end else if (w_deactivate_reg_clear) begin
+        r_rx_deactivate_propertyreq <= 1'b0;
     end
 end
 
@@ -334,39 +393,44 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     end
 end
 
+//The abort (an error that requests LinkReset, or the FDI link lost) is a
+//one-cycle pulse and has priority over a handshake step in the same cycle:
+//the handshake registers are cleared by it (and not set in that cycle), so
+//the state must not advance on them. In DISABLED it cancels a pending entry
+//to ACTIVATE: the request that asked for it is cleared in the same cycle.
 always_comb begin
     case(r_cur_st)
         DISABLED:begin
-            if(r_tx_activate_req | r_rx_activate_req)  begin
-                w_nxt_st = ACTIVATE;
-            end else if (w_lp_linkerror_start) begin
+            if (w_fsm_abort) begin
                 w_nxt_st = DISABLED;
+            end else if(r_tx_activate_req | r_rx_activate_req)  begin
+                w_nxt_st = ACTIVATE;
             end else begin
                 w_nxt_st = DISABLED;
             end
         end
         ACTIVATE:begin
-            if(r_tx_activate_req & r_tx_activate_ack & r_rx_activate_req & r_rx_activate_ack) begin
-                w_nxt_st = ENABLED;
-            end else if (w_lp_linkerror_start) begin
+            if (w_fsm_abort) begin
                 w_nxt_st = DISABLED;
+            end else if(r_tx_activate_req & r_tx_activate_ack & r_rx_activate_req & r_rx_activate_ack) begin
+                w_nxt_st = ENABLED;
             end else begin
                 w_nxt_st = ACTIVATE;
             end
         end
         ENABLED:begin
-            if(r_tx_deactivate_req | r_rx_deactivate_req) begin
-                w_nxt_st = DEACTIVATE;
-            end else if (w_lp_linkerror_start) begin
+            if (w_fsm_abort) begin
                 w_nxt_st = DISABLED;
+            end else if(r_tx_deactivate_req | r_rx_deactivate_req) begin
+                w_nxt_st = DEACTIVATE;
             end else begin
                 w_nxt_st = ENABLED;
             end
         end
         DEACTIVATE:begin
-            if(r_tx_deactivate_req & r_rx_deactivate_req & r_tx_deactivate_ack & r_rx_deactivate_ack) begin
+            if (w_fsm_abort) begin
                 w_nxt_st = DISABLED;
-            end else if (w_lp_linkerror_start) begin
+            end else if(r_tx_deactivate_req & r_rx_deactivate_req & r_tx_deactivate_ack & r_rx_deactivate_ack) begin
                 w_nxt_st = DISABLED;
             end else begin
                 w_nxt_st = DEACTIVATE;
@@ -382,7 +446,10 @@ assign w_deactivate_reg_clear = ((r_cur_st == DEACTIVATE) & (w_nxt_st == DISABLE
 assign  w_activate_related0      = w_activate_start_rising_edge_detect;
 assign  w_deactivate_related0    = w_deactivate_start_rising_edge_detect | w_deactivate_force_rising_edge_detect;
 
-assign  w_activate_related1      = (I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID;
+//An ActivateReq in ENABLED or DEACTIVATE is an invalid activation message (ERROR in
+//AoU v0.8 8.3.3, nothing transmitted, 8.4): no ActivateAck, only the LinkReset request
+assign  w_activate_related1      = (I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID
+                                 & ~((r_cur_st == ENABLED) | (r_cur_st == DEACTIVATE));
 assign  w_deactivate_related1    = (I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID;
 
 //svalid 0 is for ACTIVATE_REQ & DEACTIVATE_REQ
@@ -457,6 +524,15 @@ end
 
 
 //-- LP_LINKERROR --------
+// The three time-out waits below (Ack after a Req, MsgCredit after an Ack)
+// are abandoned by the abort, with priority over starting one in the same
+// cycle: the handshake they time is over, and a wait left running would
+// report a second error (and request LinkReset) after the FSM has been
+// DISABLED. The counters clear on the abort and on the awaited message as
+// well: a count one below the limit would otherwise still step onto it on
+// that edge (the enable is cleared on the same edge) and report a time-out
+// for a cancelled wait, or for a response that arrived one cycle inside the
+// deadline. Otherwise they clear themselves the cycle after their enable.
 // Activation Ack timeout
 logic [31:0]    r_act_req_to_ack_cnt;
 logic           r_act_req_send;
@@ -464,6 +540,8 @@ logic           w_act_req_to_ack_error;
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
+        r_act_req_send <= 1'b0;
+    end else if (w_fsm_abort) begin
         r_act_req_send <= 1'b0;
     end else if ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY) begin
         r_act_req_send <= 1'b1;
@@ -476,6 +554,8 @@ end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
+        r_act_req_to_ack_cnt <= 'b0;
+    end else if (w_fsm_abort | ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID)) begin
         r_act_req_to_ack_cnt <= 'b0;
     end else if (r_act_req_send) begin
         r_act_req_to_ack_cnt <= r_act_req_to_ack_cnt + 1;
@@ -496,6 +576,8 @@ logic           w_deact_req_to_ack_error;
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
         r_deact_req_send <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_deact_req_send <= 1'b0;
     end else if ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY) begin
         r_deact_req_send <= 1'b1;
     end else if ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_ACK) & I_ACTMSG_VALID) begin
@@ -507,6 +589,8 @@ end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
+        r_deact_req_to_ack_cnt <= 'b0;
+    end else if (w_fsm_abort | ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_ACK) & I_ACTMSG_VALID)) begin
         r_deact_req_to_ack_cnt <= 'b0;
     end else if (r_deact_req_send) begin
         r_deact_req_to_ack_cnt <= r_deact_req_to_ack_cnt + 1;
@@ -576,6 +660,8 @@ logic           w_msgcredit_receive_err;
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
         r_act_ack_receive <= 1'b0;
+    end else if (w_fsm_abort) begin
+        r_act_ack_receive <= 1'b0;
     end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID) begin
         r_act_ack_receive <= 1'b1;
     end else if (I_CRDTGRANT_VALID) begin
@@ -587,6 +673,8 @@ end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
+        r_act_act_to_msgcredit_cnt <= 'b0;
+    end else if (w_fsm_abort | I_CRDTGRANT_VALID) begin
         r_act_act_to_msgcredit_cnt <= 'b0;
     end else if (r_act_ack_receive) begin
         r_act_act_to_msgcredit_cnt <= r_act_act_to_msgcredit_cnt + 1;

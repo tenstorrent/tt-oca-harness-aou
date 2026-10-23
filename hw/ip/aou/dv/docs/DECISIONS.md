@@ -340,13 +340,13 @@ the inventory rather than forgotten.
   takes an explicit interim expectation, implements it, files a bug draft that
   records the choice (D7), and ties any failure it causes to that draft
   (D6).
-- **FDI state encodings.** The RTL uses private FDI state encodings on
-  `pl_state_sts` and `lp_state_req` instead of UCIe's (a known DUT bug). L2 can
-  model either through `fdi_enc` (`RTL` or `SPEC`). `SPEC` is the target;
-  `RTL` is the default only until the DUT is fixed, so that every other test can
-  run meanwhile. Specific tests (`*_spec_test`, testlist `g1b`) always use
-  `SPEC` and are expected failures until then. A run-wide override (make
-  `FDI_ENC`, plusarg `+FDI_ENC`) lets a whole regression run against a fixed DUT.
+- **FDI state encodings.** RTL from before the UCIe encoding fix uses private FDI
+  state encodings on `pl_state_sts` and `lp_state_req` instead of UCIe's. L2
+  can model either through `fdi_enc` (`RTL` or `SPEC`). `SPEC` is the default,
+  and no test forces `RTL`; the `*_spec_test` tests (testlist `g1b`) select
+  `SPEC` themselves because they check UCIe-only behaviour. A run-wide override
+  (make `FDI_ENC`, plusarg `+FDI_ENC`) runs a whole regression with `RTL`
+  against RTL from before the fix.
 
 **Why.** v0.7 is what the DUT claims, so checking it against v0.8 would report
 intended behaviour as bugs, while v0.8 support keeps the bench useful when the
@@ -677,8 +677,8 @@ twice.
   [COVERAGE_CLOSURE.md](COVERAGE_CLOSURE.md).
 - **Encoding coverpoint.** `l2.cg_link_state.cp_fdi_enc` records the run's FDI
   state encoding (`rtl` or `spec`). It is informational, showing that the merge
-  includes SPEC-encoded runs; the `rtl` bin exists only while BUGS/001 (the
-  private encodings) is open and is dropped when the fix makes SPEC the default.
+  includes SPEC-encoded runs; `rtl` (the private encodings of RTL from before the
+  UCIe encoding fix, `FDI_ENC=RTL`) is an ignored bin, not a target.
 
 **Why.**
 
@@ -1030,12 +1030,15 @@ have reached `hw/ip/aou`.
 **Decision.**
 
 - When the FDI link goes down (LinkReset, LinkError or Disabled, started by
-  the DUT, the Adapter or the remote die, including the DUT's own teardown
-  after a deactivation), the bench's software and system model resets both
+  the Adapter or the remote die, or the LinkError the DUT raises on
+  `lp_linkerror`; a deactivation never takes the link down, and the DUT
+  never restarts it), the bench's software and system model resets both
   dies while the link is down: AOU_SW_RESET on the DUT (the bring-up
   controller, outside AOU_CORE, keeps its state) and the remote die's reset
-  of its AoU state (`reset_flush()`). Software then reprograms the last
-  `program_cfg()` and the dies activate again from DISABLED.
+  of its AoU state (`reset_flush()`). Software then restarts the link on the
+  UCIe controller (the Adapter model's `sw_restart_delay` in Reset before it
+  trains again), reprograms the last `program_cfg()`, and the dies activate
+  again from DISABLED.
 - It applies unless both dies are cleanly DISABLED with no activation message
   pending or in flight in either direction (`aou_quiet()`: the DUT and the
   remote DISABLED, the remote's activation queue empty). A received
@@ -1080,8 +1083,13 @@ have reached `hw/ip/aou`.
 - *An RTL change that clears the activation FSM on link-down.* It is neither
   sufficient (the queued TX flit survives) nor documented.
 
-The owner question is open (038/011): who resets AOU_CORE after a link-down it
-did not request, and must a flit already in its TX path be dropped?
+The owner has since decided (BUGS/001, 2026-10-22) that a routine deactivation
+leaves the FDI link up, that only an error takes it down from the IP, and that
+restarting the link after a reset or error is software's job on the UCIe
+controller, never the IP's. This decision's "software resets both dies,
+restarts the link, reprograms and re-activates" is therefore the documented
+flow. Still open (011): who resets AOU_CORE after a link-down it did not
+request, and must a flit already in its TX path be dropped?
 
 ## Open items
 
@@ -1100,7 +1108,7 @@ did not request, and must a flit already in its TX path be dropped?
   than the testbench or RTL sources it was built from (D12).
 - **Xcelium coverage.** Xcelium builds and runs but has no coverage flow and no
   full-regression matching (D2). Questa's run and coverage are also untested.
-- **Run-wide FDI encoding.** The make knob `FDI_ENC` and the expected-fail entries
-  limited to `fdi_enc=SPEC` arrive with the FDI encoding fix work; when the DUT
-  uses UCIe encodings, `SPEC` becomes the default and the `RTL` encoding map
-  can be retired (D5).
+- **RTL FDI encoding map.** `SPEC` is the default since the DUT uses UCIe
+  encodings; the `RTL` map stays only for runs against RTL from before the
+  UCIe encoding fix (`FDI_ENC=RTL`) and can be retired when that RTL is no longer
+  run (D5).

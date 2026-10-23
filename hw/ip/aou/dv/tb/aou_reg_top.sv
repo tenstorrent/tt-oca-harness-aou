@@ -67,8 +67,8 @@ module aou_reg_top;
   wire [RP_COUNT-1:0][AXI_W/8-1:0] m_wstrb;
   wire [FDI_W-1:0]                lp_data;
   wire                            lp_valid, lp_irdy, lp_stallack;
-  wire [6:0]                      irq;
-  wire                            st_disabled, st_enabled, req_linkreset;
+  wire [7:0]                      irq;
+  wire                            st_disabled, st_enabled, req_linkreset, sw_reset;
 
   AOU_CORE_TOP #(
       .RP_COUNT       (RP_COUNT),
@@ -187,11 +187,13 @@ module aou_reg_top;
       .INT_EARLY_WDT_ERR   (irq[6]),
       .INT_ACTIVATE_START  (irq[4]),
       .INT_DEACTIVATE_START(irq[5]),
+      .INT_FDI_LINK_DOWN   (irq[7]),
 
       .I_INT_FSM_IN_ACTIVE      (1'b0),
       .O_AOU_ACTIVATE_ST_DISABLED(st_disabled),
       .O_AOU_ACTIVATE_ST_ENABLED (st_enabled),
       .O_AOU_REQ_LINKRESET       (req_linkreset),
+      .O_SW_RESET                (sw_reset),
 
       .TIEL_DFT_MODESCAN(1'b0)
   );

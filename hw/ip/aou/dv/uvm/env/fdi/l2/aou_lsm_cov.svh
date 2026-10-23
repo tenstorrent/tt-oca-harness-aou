@@ -23,8 +23,8 @@ class aou_lsm_cov extends uvm_object;
       `AOU_LSM_FC_REQ(AOU_FC_CG)
     }
     // Informational: which encoding the run used, so a merge shows it includes
-    // SPEC-encoded runs. The rtl bin (the DUT's private codes, BUGS/001) is to be
-    // dropped when the RTL fix lands and SPEC becomes the default.
+    // SPEC-encoded runs. rtl (the private codes of RTL from before the UCIe encoding
+    // fix, +FDI_ENC=RTL) is ignored: no target.
     cp_fdi_enc: coverpoint l_enc {
       `AOU_LSM_FC_ENC(AOU_FC_CG)
     }

@@ -148,8 +148,8 @@ run_modes = ["fdi"]
 args = ["+event=linkerror", "+le_mid_flit_pct=100"]
 
 # Disabled (18.18): Adapter-initiated entry and exit with AoU traffic (fdi_enc=SPEC; the
-# test selects it). The DUT requests Active to leave (FDI-R50), O_FDI_LINK_UP drops
-# (FDI-M06), and traffic resumes after recovery.
+# test selects it). O_FDI_LINK_UP drops (FDI-M06), the DUT requests nothing (FDI-M01), and
+# traffic resumes after recovery.
 [[tests]]
 name = "aou_link_event_test.event-disabled"
 module = { uvm = "aou_link_event_test" }
@@ -159,18 +159,19 @@ tags = ["fdi"]
 run_modes = ["fdi"]
 args = ["+event=disabled"]
 
-# A deliberate teardown (software deactivation, then I_SW_DEACTIVATE_START) released
-# only by I_INT_ACTIVATE_START: local AXI traffic queued while the link is down raises
-# it, and the Adapter's software pulse is off (sw_restart_delay=0). The DUT must give
-# the training trigger on the interrupt alone (FDI-R51).
+# A software deactivation leaves the FDI link Active (the bringup model holds BRG_ACTIVE,
+# FDI-M01/M05/M06), then software disables the link on the UCIe controller (Adapter
+# Disabled). Local AXI traffic queued while the link is down raises INT_ACTIVATE_START;
+# the DUT requests nothing of the link until software restarts it (FDI-M01 in LINKDOWN and
+# RESET), and the activation runs on the interrupt once the link is up.
 [[tests]]
-name = "aou_link_event_test.event-teardown_int"
+name = "aou_link_event_test.event-sw_disable"
 module = { uvm = "aou_link_event_test" }
 seed = 1
 reseed = 2
 tags = ["fdi"]
 run_modes = ["fdi"]
-args = ["+event=teardown_int"]
+args = ["+event=sw_disable"]
 
 # Two-PHY with PHY1 active (18.25): +park_idle_phy keeps PHY0 in Reset with its
 # mainband closed, so the DUT must follow PHY1's pl_state_sts (the bringup model,
@@ -269,7 +270,7 @@ tests = [
   "aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40",
   "aou_link_event_test.event-linkerror.le_mid_flit_pct-100",
   "aou_link_event_test.event-disabled",
-  "aou_link_event_test.event-teardown_int",
+  "aou_link_event_test.event-sw_disable",
   "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128",
   "aou_dp_random_test.dp_dir-both.active_phy-1.park_idle_phy-1.fdi_trdy-holes.fdi_stall_pct-5.fdi_stall_mid_pct-50.2xmix-tp64_128",
   "aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2xmix-tp64_128",

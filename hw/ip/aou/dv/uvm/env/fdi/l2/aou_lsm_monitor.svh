@@ -69,15 +69,13 @@ class aou_lsm_monitor extends uvm_monitor;
     o.rx_active_sts  = lsm_vif.mon_cb.lp_rx_active_sts === 1'b1;
     o.linkerror      = lsm_vif.mon_cb.lp_linkerror === 1'b1;
     o.sw_activate    = lsm_vif.mon_cb.sw_activate_start === 1'b1;
-    o.sw_deactivate  = lsm_vif.mon_cb.sw_deactivate_start === 1'b1;
-    o.sw_retrain     = lsm_vif.mon_cb.sw_retrain_req === 1'b1;
     o.sw_linkerror   = lsm_vif.mon_cb.sw_linkerror_inject === 1'b1;
     o.fsm_state      = lsm_vif.mon_cb.fdi_fsm_state;
     o.link_up        = lsm_vif.mon_cb.fdi_link_up === 1'b1;
     o.int_activate   = lsm_vif.mon_cb.int_activate_start === 1'b1;
-    o.int_deactivate = lsm_vif.mon_cb.int_deactivate_start === 1'b1;
     o.req_linkreset  = lsm_vif.mon_cb.int_req_linkreset === 1'b1;
     o.act_st_disabled = lsm_vif.mon_cb.act_st_disabled === 1'b1;
+    o.sw_reset       = lsm_vif.mon_cb.sw_reset === 1'b1;
     return o;
   endfunction
 

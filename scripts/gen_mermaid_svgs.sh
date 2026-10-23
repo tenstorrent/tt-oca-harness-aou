@@ -12,6 +12,9 @@
 # never depends on Mermaid/Node/a browser at build time. Requires mmdc
 # (@mermaid-js/mermaid-cli) on PATH -- install with:
 #   npm install -g @mermaid-js/mermaid-cli
+# DOC/mermaid-config.json pins the "classic" look (mermaid-cli 11+ defaults to
+# the hand-drawn "neo" look, which renders differently and several times
+# larger) and wraps sequence-diagram text so long notes are not clipped.
 
 set -euo pipefail
 
@@ -33,7 +36,7 @@ while IFS= read -r -d '' mermaid_dir; do
     name="$(basename "${src%.mmd}")"
     svg="$assets_dir/$name.svg"
     echo "  $src -> $svg"
-    if ! mmdc -i "$src" -o "$svg"; then
+    if ! mmdc -c DOC/mermaid-config.json -i "$src" -o "$svg"; then
       echo "error: failed to render $src" >&2
       status=1
     fi

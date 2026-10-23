@@ -27,6 +27,7 @@ endif::[]
 |INT_EARLY_RESP_ERR |W1C |Asserted when B response error occurs on early responded B response
 |INT_EARLY_WDT_ERR |W1C |Asserted when the write-transaction watchdog of an RP expires: with WDT_EN set, no AW or B handshake occurred for WDT_THRESHOLD cycles while writes were outstanding
 |INT_REQ_LINKRESET |W1C |Asserted when AOU_CORE encounters AOU SPEC protocol violation. Request link to go LinkReset.
+|INT_FDI_LINK_DOWN |W1C |Asserted when the FDI link is lost (LinkError, LinkReset, Disabled or Reset; not Retrain or L1) while the AoU activation FSM is in ACTIVATE, ENABLED or DEACTIVATE, or in DISABLED with an ActivateReq already sent or received (its entry to ACTIVATE is cancelled). The activation FSM returns to DISABLED.
 |=================================================================================================================================
 
 _Table 4. Interrupt Sources_
@@ -66,6 +67,12 @@ Software can find the RP by reading [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONS
 * *INT_REQ_LINKRESET*
 
 An interrupt that occurs when AOU_CORE receives an AoU protocol violation. Refer to xref:{aou-software-xref}#aou-723-linkreset-error-reporting[Section 7.2.3] LinkReset Error Reporting. When AOU_CORE receives a protocol violation, software must perform a software reset of AOU_CORE and re-enter the activation sequence.
+
+* *INT_FDI_LINK_DOWN*
+
+An interrupt that occurs when the FDI link is lost while AoU is in use: [.monospaced]#++I_INT_FSM_IN_ACTIVE++# falls (on [.monospaced]#++AOU_TOP++# the FDI bringup controller left Active for LinkError, LinkReset, Disabled or Reset; Retrain and L1 keep it asserted and do not raise this interrupt) while the activation FSM is in [.monospaced]#++ACTIVATE++#, [.monospaced]#++ENABLED++# or [.monospaced]#++DEACTIVATE++#, or in [.monospaced]#++DISABLED++# with an ActivateReq already sent or received. In the same cycle the activation FSM returns to (or stays in) [.monospaced]#++DISABLED++#, any Activate/Deactivate handshake in flight is dropped and a pending entry to [.monospaced]#++ACTIVATE++# is cancelled (AoU specification v0.8 section 8.3.3), so no Ack timeout follows and [.monospaced]#++AOU_INIT.ACTIVATE_STATE_DISABLED++# reads 1. A link that drops while the FSM is [.monospaced]#++DISABLED++# with no ActivateReq outstanding does not raise it.
+
+The status bit is [.monospaced]#++AOU_CORE.AOU_INIT.INT_FDI_LINK_DOWN++# [12] (sticky, write 1 to clear; like every other AOU_CORE register it is cleared by [.monospaced]#++AOU_SW_RESET++#, so the handler reads it first), and the pin can be masked with [.monospaced]#++AOU_CORE.AOU_INTERRUPT_MASK.INT_FDI_LINK_DOWN_MASK++# [10] (the mask gates the pin, not the status bit). The handler is the LinkReset sequence of xref:{aou-software-xref}#aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6]: read [.monospaced]#++AOU_INIT++#, [.monospaced]#++AOU_CON0.AOU_SW_RESET++#, restart the link on the UCIe controller, reprogram the configuration registers, [.monospaced]#++ACTIVATE_START++#.
 
 [[aou-5-error]]
 == 5. Error

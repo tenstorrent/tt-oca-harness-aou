@@ -125,7 +125,7 @@ package aou_t1_env_pkg;
   // Who starts activation or deactivation.
   typedef enum {
     AOU_T1_BY_APB,     // DUT: AOU_INIT.ACTIVATE_START / DEACTIVATE_START
-    AOU_T1_BY_PIN,     // DUT: I_SW_ACTIVATE_START / I_SW_DEACTIVATE_START
+    AOU_T1_BY_PIN,     // DUT: I_SW_ACTIVATE_START (deactivation: the register, as BY_APB)
     AOU_T1_BY_REMOTE,  // remote die: L3 ActivateReq / DeactivateReq
     AOU_T1_BY_BOTH,    // APB and L3, ordered by aou_t1_order_e
     AOU_T1_BY_RANDOM

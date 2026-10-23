@@ -31,6 +31,7 @@ class aou_t1_feature_cfg extends uvm_object;
   int mask_invalid_actmsg = -1;
   int mask_deact_ack = -1;
   int mask_act_ack = -1;
+  int mask_fdi_link_down = -1;
   // Time-outs
   int msgcredit_timeout = -1;
   int ack_timeout = -1;
@@ -53,7 +54,7 @@ class aou_t1_feature_cfg extends uvm_object;
   function bit any_mask();
     return mask_si0_id_mismatch >= 0 || mask_mi0_id_mismatch >= 0 || mask_early_resp >= 0 ||
            mask_msgcredit_timeout >= 0 || mask_invalid_actmsg >= 0 || mask_deact_ack >= 0 ||
-           mask_act_ack >= 0;
+           mask_act_ack >= 0 || mask_fdi_link_down >= 0;
   endfunction
 
   function bit any_timeout();

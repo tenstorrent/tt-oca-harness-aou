@@ -2619,7 +2619,7 @@
   section_title: UCIe FDI Interface Tests
   title: 'LinkReset: Adapter state and the DUT''s request, O_AOU_REQ_LINKRESET and its mask'
   priority: P2
-  added: 'UCIe r1.1 8.3.3.5; BUGS/014, BUGS/038'
+  added: 'UCIe r1.1 8.3.3.5; BUGS/014'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '18.18'
@@ -3011,7 +3011,7 @@
 - id: '22.7'
   section: '2.22'
   section_title: FDI Bringup Controller Tests
-  title: Restart after link-down needs NOP to Active on lp_state_req
+  title: 'Restart after link-down is software''s on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset'
   priority: P2
-  added: UCIe r1.1 8.3.3.8; BUGS/038
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  added: UCIe r1.1 8.3.3.8; BUGS/001 (owner decision 7)
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (BUGS/038, not a bug) when the owner assigned the restart to software.

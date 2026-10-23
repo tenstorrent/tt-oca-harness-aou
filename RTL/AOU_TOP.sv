@@ -22,8 +22,10 @@
 //               FDI state machine) with AOU_CORE_TOP (AXI-over-UCIe protocol
 //               engine). The bringup controller manages FDI handshakes
 //               (wake, clock, state, rx-active) and drives I_INT_FSM_IN_ACTIVE
-//               into the AOU core, replacing the former external UCIE_CORE
-//               connection.
+//               (link established: Active, Retrain or L1; falls only on a
+//               link loss, which raises INT_FDI_LINK_DOWN) into the AOU
+//               core, replacing the former external UCIE_CORE connection.
+//               O_FDI_LINK_UP is the narrower "FSM in Active".
 //
 //               FDI data-plane ports mirror AOU_CORE_TOP's _0/_1 naming and
 //               `+define+TWO_PHY gating: PHY0 is always present, PHY1 and
@@ -288,13 +290,12 @@ import packet_def_pkg::*;
     output logic                                        O_LP_WAKE_REQ,
     output logic                                        O_LP_CLK_ACK,
     output logic                                        O_LP_RX_ACTIVE_STS,
+    output logic                                        O_LP_LINKERROR,
 
     // ================================================================
     // FDI bringup software control
     // ================================================================
     input  logic                                        I_SW_ACTIVATE_START,
-    input  logic                                        I_SW_DEACTIVATE_START,
-    input  logic                                        I_SW_RETRAIN_REQ,
     input  logic                                        I_SW_LINKERROR_INJECT,
 
     // ================================================================
@@ -313,6 +314,7 @@ import packet_def_pkg::*;
     output logic                                        INT_EARLY_WDT_ERR,
     output logic                                        INT_ACTIVATE_START,
     output logic                                        INT_DEACTIVATE_START,
+    output logic                                        INT_FDI_LINK_DOWN,
 
     // ================================================================
     // DFT
@@ -324,11 +326,12 @@ import packet_def_pkg::*;
     // Internal wires between bringup ctrl and core
     // ================================================================
     logic        w_int_fsm_in_active;
-    logic        w_aou_activate_st_disabled;
+    logic        w_aou_activate_st_disabled;   // status only; the bringup FSM has no use for it
     logic        w_aou_activate_st_enabled;
     logic        w_aou_req_linkreset;
     logic        w_int_activate_start;
     logic        w_int_deactivate_start;
+    logic        w_sw_reset;
 
     // Mux pl_state_sts / stallreq based on active PHY. Under TWO_PHY both PHYs
     // are valid and I_PHY_TYPE selects which one drives the bringup
@@ -366,18 +369,16 @@ import packet_def_pkg::*;
         .O_LP_WAKE_REQ              ( O_LP_WAKE_REQ                 ),
         .O_LP_CLK_ACK               ( O_LP_CLK_ACK                  ),
         .O_LP_RX_ACTIVE_STS         ( O_LP_RX_ACTIVE_STS            ),
+        .O_LP_LINKERROR             ( O_LP_LINKERROR                ),
 
         .O_INT_FSM_IN_ACTIVE        ( w_int_fsm_in_active           ),
-        .I_AOU_ACTIVATE_ST_DISABLED ( w_aou_activate_st_disabled    ),
         .I_AOU_ACTIVATE_ST_ENABLED  ( w_aou_activate_st_enabled     ),
         .I_AOU_REQ_LINKRESET        ( w_aou_req_linkreset           ),
         .I_INT_ACTIVATE_START       ( w_int_activate_start          ),
-        .I_INT_DEACTIVATE_START     ( w_int_deactivate_start        ),
 
         .I_SW_ACTIVATE_START        ( I_SW_ACTIVATE_START           ),
-        .I_SW_DEACTIVATE_START      ( I_SW_DEACTIVATE_START         ),
-        .I_SW_RETRAIN_REQ           ( I_SW_RETRAIN_REQ              ),
         .I_SW_LINKERROR_INJECT      ( I_SW_LINKERROR_INJECT         ),
+        .I_SW_RESET                 ( w_sw_reset                    ),
 
         .O_FSM_STATE                ( O_FDI_FSM_STATE               ),
         .O_LINK_UP                  ( O_FDI_LINK_UP                 )
@@ -572,11 +573,13 @@ import packet_def_pkg::*;
         .INT_EARLY_WDT_ERR           ( INT_EARLY_WDT_ERR             ),
         .INT_ACTIVATE_START          ( w_int_activate_start          ),
         .INT_DEACTIVATE_START        ( w_int_deactivate_start        ),
+        .INT_FDI_LINK_DOWN           ( INT_FDI_LINK_DOWN             ),
 
         .I_INT_FSM_IN_ACTIVE         ( w_int_fsm_in_active           ),
         .O_AOU_ACTIVATE_ST_DISABLED  ( w_aou_activate_st_disabled    ),
         .O_AOU_ACTIVATE_ST_ENABLED   ( w_aou_activate_st_enabled     ),
         .O_AOU_REQ_LINKRESET         ( w_aou_req_linkreset           ),
+        .O_SW_RESET                  ( w_sw_reset                    ),
 
         .TIEL_DFT_MODESCAN           ( TIEL_DFT_MODESCAN             )
     );

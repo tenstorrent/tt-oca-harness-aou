@@ -390,10 +390,9 @@ run_modes = ["link"]
 args = ["+mode=property"]
 
 # The remote die re-activates in the flit after its DeactivateAck (AoU 8.4). The
-# DUT's own FDI teardown after the deactivation splits that exchange
-# across a link reset: the DUT must give the training trigger on the remote's
-# request alone (FDI-R51); the system then resets both dies while the
-# link is down (D18), and they activate again from DISABLED.
+# Req must find the DUT DISABLED, not DEACTIVATE (no INVALID_ACTMSG); the FDI
+# link stays Active across the deactivation (a deactivation never takes it
+# down, T1-L04), and software activates the DUT again on INT_ACTIVATE_START.
 [[tests]]
 name = "aou_remote_react_test"
 module = { uvm = "aou_remote_react_test" }
