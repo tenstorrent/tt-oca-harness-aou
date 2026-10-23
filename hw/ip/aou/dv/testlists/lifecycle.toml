@@ -86,35 +86,6 @@ reseed = 3
 tags = ["lifecycle"]
 run_modes = ["lifecycle"]
 
-# TX_LP_MODE written on the edge the lower half of a flit's first chunk goes
-# out on a half-width FDI path, with a message waiting for the next cycle
-# (BUGS/034). Only builds with a half-width path: SP_32B and PHY0 of the
-# two-PHY builds.
-[[tests]]
-name = "aou_lp_mode_align_test.1x256-sp32"
-module = { uvm = "aou_lp_mode_align_test" }
-target = "1x256-sp32"
-seed = 1
-reseed = 2
-tags = ["lifecycle"]
-run_modes = ["lifecycle"]
-
-[[tests]]
-name = "aou_lp_mode_align_test.2x512-tp32_64"
-module = { uvm = "aou_lp_mode_align_test" }
-target = "2x512-tp32_64"
-seed = 1
-tags = ["lifecycle"]
-run_modes = ["lifecycle"]
-
-[[tests]]
-name = "aou_lp_mode_align_test.2xmix-tp64_128"
-module = { uvm = "aou_lp_mode_align_test" }
-target = "2xmix-tp64_128"
-seed = 1
-tags = ["lifecycle"]
-run_modes = ["lifecycle"]
-
 [[tests]]
 name = "aou_reset_test.reset-sw"
 module = { uvm = "aou_reset_test" }
@@ -302,7 +273,7 @@ expect_fail_match = "T1-DFT01: the core reset was asserted for|T1-DFT02: aou_cor
 
 [[groups]]
 name = "lifecycle"
-expected_count = 34
+expected_count = 31
 tests = [
   "aou_link_event_test.event-retrain",
   "aou_link_event_test.event-clk_wake",
@@ -313,9 +284,6 @@ tests = [
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",
-  "aou_lp_mode_align_test.1x256-sp32",
-  "aou_lp_mode_align_test.2x512-tp32_64",
-  "aou_lp_mode_align_test.2xmix-tp64_128",
   "aou_reset_test.reset-sw",
   "aou_reset_test.reset-core.when-traffic",
   "aou_reset_test.reset-apb.when-traffic",

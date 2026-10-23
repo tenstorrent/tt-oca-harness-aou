@@ -238,116 +238,6 @@
     MAS documents (4xmix2144-sp64 +method=grant seed 60, where it is the only finding; seeds 2
     and 3 show it beside a credit underflow)
 
-# BUGS/039: a CrdtGrant that starts in the last granule of a 64-byte RX chunk is decoded
-# before its second granule arrives when pl_valid has a bubble there, so the DUT takes
-# garbage for the second-granule credit fields. Too much credit shows as the DUT sending
-# beyond what the remote die granted; lost credit shows as a stall. A stall has no
-# bug-specific signature, so the T1-C02 cases below, each limited (when_re) to the CONFIG
-# and credit class whose lost grant was traced in waves to this decode, still need a
-# bug-specific BUGS/039 match in the same run (requires:); otherwise they stay FAIL.
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'AOU-R16: AOU_FDI_CHECKER VIOL_CRD_UNDERFLOW LP(DUT->peer)'
-  seed_dependent: true
-  note: the DUT sends on credit it decoded from a stale second granule (4xmix2144-sp64 +method=grant seed 2)
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'AOU-R16: [l3] DUT'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the L3 model's view of the same send
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check_re: 'T1-C02: RP\d+ has credit \(\d+ granules\) and a queued WRESP,'
-  when_re: 'rp_bytes=\x27\{\x27h40, \x27h80\}  remote_bytes=64 [\s\S]*credit epoch: method=AOU_CRM_(?!HDR)'
-  requires: BUGS/039
-  seed_dependent: true
-  note: >-
-    2xmix-tp64_128 (PHY0 64-byte chunks): the RP0 WRESP grant (epoch depth 1, returned on
-    consume) is lost, so the DUT holds a WriteResp with no credit for good (seed 3, waves
-    aou_credit_return_test.rid.wvc.seed.3: last RP0 WRESP at 5864.5 ns, then at 5876.5 ns
-    O_CRDTGRANT_VALID with w_rx_chunk_data_valid 0, misc idx 11, others 0; the DUT's
-    generate_rp_b_credit[0] count stays 0 while the remote die has 1 granule out)
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check_re: 'T1-C02: RP\d+ has credit \(\d+ granules\) and a queued WREQ,'
-  when_re: 'rp_bytes=\x27\{\x27h40, \x27h20, \x27h80, \x27h80\}  remote_bytes=64 [\s\S]*credit epoch: method=AOU_CRM_(?!HDR)'
-  requires: BUGS/039
-  seed_dependent: true
-  note: >-
-    4xmix2144-sp64: RP3 WDATA credit is lost (the second granule's fields start at WDATA RP3),
-    and the shared AW/W path waits on RP3's WriteData (BUGS/045), so every RP's writes stop
-    (+method=grant seed 2, waves aou_credit_return_test.rid.wvd.seed.2: decodes without a
-    valid chunk at 5955.5-6534.5 ns; from 7391.5 ns RP3 holds 6 WDATA granules in the DUT,
-    w_aou_tx_w_credit_valid 0x7, aligner r_aw_arb_grt 3 with r_s_wbusy_tt 1, while the remote
-    die has the full 30 out and T1-C01 sees no RP starved)
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-V08: traffic did not complete'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the stalled class never drains
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-V06: not drained'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the stalled class never drains
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-T01: not drained'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the stalled class never drains
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-V04: remote (L3) not DISABLED'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the deactivation waits for the stalled messages (AoU 8.4)
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-V05: DUT not DISABLED'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the deactivation waits for the stalled messages (AoU 8.4)
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-L06: no INT_DEACTIVATE_START after a remote DeactivateReq'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the DUT still owes the stalled messages when the remote die asks to deactivate
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-V02: remote (L3) not ENABLED'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the next epoch cannot activate from the unfinished deactivation
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'T1-V03: DUT not ENABLED'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the next epoch cannot activate from the unfinished deactivation
-
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check: 'AXI-R17: at end of test'
-  requires: BUGS/039
-  seed_dependent: true
-  note: the stalled writes are still open at the end
-
 - test: aou_link_act_deact_test
   bug: BUGS/032
   check_re: 'AOU-R33: \[l3\] DeactivateReq: (\d+) write\(s\), (\d+) read\(s\) on RP\d unanswered \(\1 write\(s\), \2 read\(s\) received after our DeactivateReq\)'
@@ -861,39 +751,24 @@
     CREDIT_MANAGE=1: DeactivateAck at 2486.5 ns, then credit in LP flit 466 at 2495.5 ns
     (waves vcs-t1-4x512-sp64 aou_zero_credit_test.rid.allw2.seed.1, +credit=rreq)
 
-# BUGS/045: the TX per-RP arbiters park on an RP that has no credit for its head message, and
-# the shared AW/W path holds a credit-less RP's write, so an RP with credit and queued work is
-# held back (T1-C01) and the DUT stops using the credit it holds (T1-C02). aou_t1_crd_flow_chk
-# checks every test; multi-RP builds reach it wherever one RP runs out of credit while another
-# has work: the zero-credit starve and limit modes and withheld or slow credit returns. Seeds
-# and classes decide which RP runs dry first.
-- test: aou_zero_credit_test
-  bug: BUGS/045
-  check: 'T1-C01: '
-  seed_dependent: true
-  note: one RP starved of a class (or of its credit limit) blocks the others' messages of that class
-
-- test: aou_zero_credit_test
-  bug: BUGS/045
-  check: 'T1-C02: '
-  requires: BUGS/045
-  seed_dependent: true
-  note: the same block outlasts the work-conservation bound
-
-- test: aou_credit_return_test
-  bug: BUGS/045
-  check: 'T1-C01: '
+- test: aou_remote_react_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
   seed_dependent: true
   note: >-
-    withheld or delayed returns leave one RP short of WDATA credit for a full-width WriteData; the
-    AW/W path and the W arbiter stay on it and the other RPs' writes wait
+    CREDIT_MANAGE=1: a deactivation after the drain lands while the DUT still owes RDATA/WRESP
+    credit and it returns it after its DeactivateAck, as the MAS documents (4x512-sp64 VCS seed
+    2: DeactivateReq at 64054.5 ns, credit in LP flits 13338-13342 before DISABLED at 64087.5 ns)
 
-- test: aou_credit_return_test
-  bug: BUGS/045
-  check: 'T1-C02: '
-  requires: BUGS/045
+- test: aou_axi_err_resp_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
   seed_dependent: true
-  note: the same block outlasts the work-conservation bound
+  note: >-
+    CREDIT_MANAGE=1: the end-of-test deactivation lands while the DUT still owes RDATA/WRESP
+    credit and it returns it after its DeactivateAck, as the MAS documents (4x512-sp64 VCS seed
+    1, +T1_VSEQ=aou_dbg_off_vseq +dbg_on=5: DeactivateReq at 3041.5 ns, credit in LP flits 441
+    and 442 before DISABLED at 3069.5 ns)
 
 - test: aou_link_event_test
   bug: BUGS/024
@@ -1025,51 +900,6 @@
     the deactivation, so the L3 model reports it "in DISABLED" (4x512-sp64 VCS seeds 25 and
     52 on the current stimulus; first seen at seed 1 of an earlier one, waves rid.wp12tri,
     CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
-
-# BUGS/034: enabling TX_LP_MODE while a TX flit is in progress abandons the flit
-# after its first beat (FDI-R02); seen in 2xmix-tp64_128 and 1x256-sp32.
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/034
-  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
-  seed_dependent: true
-  note: the AOU_CON0.TX_LP_MODE write lands on beat 0 of an idle flit
-
-- test: aou_t1_lp_mode_test
-  bug: BUGS/034
-  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
-  seed_dependent: true
-  note: the AOU_CON0.TX_LP_MODE write lands on beat 0 of an idle flit
-
-# After the truncated flit AOU_FDI_CHECKER (single-PHY builds) counts beats from
-# the wrong flit start and decodes every later DUT flit as garbage.
-- test: aou_lp_mode_traffic_test
-  bug: BUGS/034
-  check: 'AOU_FDI_CHECKER'
-  requires: BUGS/034
-  seed_dependent: true
-  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
-
-- test: aou_t1_lp_mode_test
-  bug: BUGS/034
-  check: 'AOU_FDI_CHECKER'
-  requires: BUGS/034
-  seed_dependent: true
-  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
-
-# aou_lp_mode_align_test aims the TX_LP_MODE write at chunk 0's lower half on a
-# half-width path, so every such build hits BUGS/034 at one sweep offset.
-- test: aou_lp_mode_align_test
-  bug: BUGS/034
-  check: 'FDI-R02: phy0 bubble inside a TX flit at beat 1'
-  seed_dependent: true
-  note: LP mode engages on the edge chunk 0's lower half goes out; only half-width builds (SP_32B, PHY0 of two-PHY)
-
-- test: aou_lp_mode_align_test
-  bug: BUGS/034
-  check: 'AOU_FDI_CHECKER'
-  requires: BUGS/034
-  seed_dependent: true
-  note: AOU_FDI_CHECKER loses flit framing after the truncated flit
 
 # BUGS/035: the debug-window read of an RP narrower than the remote die is split
 # into a burst that AOU_ERROR_INFO answers with one beat, so it never completes.
@@ -1799,51 +1629,6 @@
     right on the gate (1x512 bw_rd l2r 0.9704 in the first gated run, passing); not
     seed-dependent on this deterministic bench, but borderline, so it may or may not fire
 
-# BUGS/048: with bursts the RP splits, the M port carries more than
-# M_RD_MO_CNT (32) reads outstanding (aou_t1_mo_chk counts M-port bursts). Unsplit traffic stops
-# at 32, so aou_dp_outstanding_test (plan 9.20) has no entry.
-- test: aou_split_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_dp_burst_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_perf_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: perf bw windows on the mixed-width configs split long bursts and go one read past M_RD_MO_CNT
-
-- test: aou_dp_random_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_stress_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: split sub-bursts take the M port past M_RD_MO_CNT (32) outstanding reads
-
-- test: aou_t1_link_event_test
-  bug: BUGS/048
-  check_re: 'FEAT-R22: RP\d+ M port has \d+ +(reads|writes) outstanding, limit \d+'
-  seed_dependent: true
-  note: a narrow RP (2xmix-sp64-rxf RP1, seed 2) splits the remote reads past M_RD_MO_CNT
-
 - test: aou_dft_scan_test
   bug: BUGS/052
   check: 'T1-DFT01: the core reset was asserted for'
@@ -2085,13 +1870,5 @@
   bug: BUGS/024
   check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
   requires: BUGS/024
-  seed_dependent: true
-  note: transactions open at the end of the test, as AXI-R17
-
-# BUGS/039: a write stalled for good by lost credit is still open at the end (AXI-R17).
-- test: aou_credit_return_test
-  bug: BUGS/039
-  check_re: '\[AXI4PC\] \S+: AXI4_ERRS_(BRESP|RLAST)_ALL_DONE_EOS:'
-  requires: BUGS/039
   seed_dependent: true
   note: transactions open at the end of the test, as AXI-R17

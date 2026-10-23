@@ -41,11 +41,16 @@ logic   [RP_CNT-1:0]    r_grant;
 logic   [RP_CNT-1:0]    r_prev_req;
 logic                   r_keep_prev_req;
 logic   [RP_CNT-1:0]    w_grant_next;
+logic   [RP_CNT-1:0]    w_rr_req;
+
+// I_REQ is gated by credit, which can be withdrawn without a send (credit clear on
+// disable). Fall back to the live request rather than hold a grant nobody can use.
+assign w_rr_req = (r_keep_prev_req & |(r_prev_req & I_REQ)) ? (r_prev_req & I_REQ) : I_REQ;
 
 AOU_TX_RR_ARBITER #(
     .RP_CNT         (RP_CNT         )
 ) u_tx_rr_arbiter(
-    .I_REQUEST      (r_keep_prev_req ? r_prev_req : I_REQ),
+    .I_REQUEST      (w_rr_req       ),
     .I_GRANT        (r_grant        ),
     .O_GRANT_NEXT   (w_grant_next   )
 );

@@ -294,6 +294,14 @@ import packet_def_pkg::*;
         end
     endfunction
 
+    function automatic logic [1:0] f_g_rp (input logic [3:0] gid,
+                                           input st_g_packet [11:0] chunk_g);
+        f_g_rp = '0;
+        for (int j = 0; j < 12; j++) begin
+            if (gid == j[3:0]) f_g_rp = chunk_g[j].rp;
+        end
+    endfunction
+
     generate
         if(PHY_TYPE < 2) begin :gen_32_64B
             always_ff @(posedge I_CLK or negedge I_RESETN) begin
@@ -860,6 +868,10 @@ import packet_def_pkg::*;
     // the Conformal LEC parser does not accept a bit-select directly on a
     // function call result (e.g. f_g_others(...)[0]).
     logic [1:0] w_wvc_misc_others;
+    // Misc opcode of the last Misc message in r_g[0]: misc_op is {rp, others[1]} of
+    // its first granule. Only a CrdtGrant (3'b100) has a second granule; others[0]
+    // is wreqcred0_1 there, so it cannot tell a two-granule message.
+    logic [2:0] w_wvc_misc_op;
 
     assign w_wvc_wridx_c2 = r_write_data_idx[2][w_valid_write_data_cnt[0][MAX_DATA_WD-1:0]];
     assign w_wvc_rdidx_c2 = r_read_data_idx [2][w_valid_read_data_cnt [0][MAX_DATA_WD-1:0]];
@@ -869,6 +881,7 @@ import packet_def_pkg::*;
     assign w_wvc_rdidx_c0 = r_read_data_idx [0][w_valid_read_data_cnt [2][MAX_DATA_WD-1:0]];
     assign w_wvc_misc_idx = r_misc_idx[w_misc_cnt_for_wait[MAX_MISC_WD-1:0]];
     assign w_wvc_misc_others = f_g_others(w_wvc_misc_idx, r_g[0]);
+    assign w_wvc_misc_op = {f_g_rp(w_wvc_misc_idx, r_g[0]), w_wvc_misc_others[1]};
 
     assign wait_valid_chunk[2] = ((r_write_data_valid[2][w_valid_write_data_cnt[0][MAX_DATA_WD-1:0]] && (f_g_others(w_wvc_wridx_c2, r_g[2]) == 2'b10) && (((f_g_msg_type(w_wvc_wridx_c2, r_g[2]) == MSG_WR_DATA) && (w_wvc_wridx_c2 + 30 > 36)) |
                                                                                                                                                           ((f_g_msg_type(w_wvc_wridx_c2, r_g[2]) == MSG_WRF_DATA) && (w_wvc_wridx_c2 + 27 > 36)))) ||
@@ -887,7 +900,7 @@ import packet_def_pkg::*;
                                                                                                                                                                             (f_g_msg_type(w_wvc_wridx_c0, r_g[0]) == MSG_WRF_DATA))) ||
                                                     (r_read_data_valid[0][w_valid_read_data_cnt[2][MAX_DATA_WD-1:0]] && (f_g_others(w_wvc_rdidx_c0, r_g[0]) == 2'b01))));
 
-    assign wait_valid_chunk[0] = ((|r_misc_valid && (w_wvc_misc_others[0] == 1'b1) && (w_wvc_misc_idx + 2 > 12)) |
+    assign wait_valid_chunk[0] = ((|r_misc_valid && (w_wvc_misc_op == 3'b100) && (w_wvc_misc_idx + 2 > 12)) |
                                   (|r_write_req_valid && (r_write_req_idx[w_write_req_cnt_for_wait[MAX_REQ_WD-1:0]] + 3 > 12)) |
                                   (|r_read_req_valid && (r_read_req_idx[w_read_req_cnt_for_wait[MAX_REQ_WD-1:0]] + 3 > 12)) |
                                   (|r_write_data_valid[0] && (f_g_others(w_wvc_wridx_c0, r_g[0]) == 2'b00) && (((f_g_msg_type(w_wvc_wridx_c0, r_g[0]) == MSG_WR_DATA) && (w_wvc_wridx_c0 + 8 > 12)) |

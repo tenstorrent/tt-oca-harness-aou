@@ -40,7 +40,7 @@
 // of the class on any RP:
 //   T1-C01 (independent per-RP progress): the stall reaches block_cycles
 //          while another RP is starved. One RP without credit must not hold
-//          back the others (BUGS/045).
+//          back the others (tenstorrent/tt-oca-harness-aou#97).
 //   T1-C02 (work conservation): the stall reaches idle_cycles.
 // Each is reported once per stall. The bounds come from the env config
 // (crd_block_cycles, crd_idle_cycles); report_phase prints the longest stall

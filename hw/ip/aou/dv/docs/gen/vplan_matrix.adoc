@@ -492,7 +492,7 @@
 | 21.4 | `tx_lp_mode_threshold = 0`; verify no idle flits | P1 | `aou_lp_mode_test.lp_mode-1.lp_thr-0`, `aou_lp_mode_traffic_test.threshold-0`, `aou_t1_lp_mode_test`
 | 21.5 | Test various `tx_lp_mode_threshold` values | P2 | `aou_lp_mode_test.lp_mode-1`, `aou_lp_mode_traffic_test`
 | 21.6 | Verify credit-only flits still sent in LP mode | P1 | `aou_lp_mode_test.lp_mode-1.lp_thr-0`, `aou_lp_mode_test.lp_mode-1.lp_thr-0.dp_dir-l2r.dp_wr_pct-0.dp_n-64`, `aou_lp_mode_traffic_test`, `aou_lp_mode_traffic_test.threshold-0`
-| 21.7 | Switch between LP mode enabled/disabled | P2 | `aou_lp_mode_align_test.1x256-sp32`, `aou_lp_mode_align_test.2x512-tp32_64`, `aou_lp_mode_align_test.2xmix-tp64_128`, `aou_lp_mode_traffic_test`, `aou_lp_mode_traffic_test.threshold-0`, `aou_t1_lp_mode_test`
+| 21.7 | Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED) | P2 | `aou_lp_mode_traffic_test`, `aou_lp_mode_traffic_test.threshold-0`, `aou_t1_lp_mode_test`
 |===
 ==== 2.22 FDI Bringup Controller Tests
 [cols="1,5,1,4",options="header"]

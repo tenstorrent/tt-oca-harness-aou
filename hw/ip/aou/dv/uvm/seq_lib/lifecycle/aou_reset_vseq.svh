@@ -39,6 +39,11 @@ class aou_reset_vseq extends aou_link_base_vseq;
     pick_config();
     link_up();
     program_cfg(f);
+    // TX_LP_MODE_THRESHOLD is static configuration, written only while the
+    // DUT is DISABLED (T1-LP03). It was programmed once, above; after a reset
+    // it keeps its reset value, because a queued or in-flight request wakes
+    // the link again right after the reset, before software could reprogram.
+    f.lp_threshold = -1;
     sw_activate();
     for (int unsigned i = 0; i < loops; i++) begin
       string rs = (r_arg == "rand") ? resets[$urandom_range(3)] : r_arg;
@@ -54,7 +59,10 @@ class aou_reset_vseq extends aou_link_base_vseq;
     sw_deactivate();
   endtask
 
-  // Register settings away from reset that leave traffic legal.
+  // Register settings away from reset that leave traffic legal. The TX
+  // low-power threshold is programmed before the first activation only and
+  // is not noted: it is not reprogrammed after a reset (see body), so an
+  // "apb" loop after a "sw" loop would read its reset value.
   function void pick_config();
     aou_core rm = p_sequencer.regs;
     int unsigned bl[5] = '{7, 15, 31, 63, 127};
@@ -66,7 +74,6 @@ class aou_reset_vseq extends aou_link_base_vseq;
     f.mask_mi0_id_mismatch = 1;
     f.split_ar[0] = bl[$urandom_range(4)];
     f.split_aw[0] = bl[$urandom_range(4)];
-    note(rm.aou_con0.tx_lp_mode_threshold, f.lp_threshold);
     note(rm.lp_linkreset.ack_time_out_value, f.ack_timeout);
     note(rm.lp_linkreset.msgcredit_time_out_value, f.msgcredit_timeout);
     note(rm.aou_interrupt_mask.int_early_resp_mask, 1);

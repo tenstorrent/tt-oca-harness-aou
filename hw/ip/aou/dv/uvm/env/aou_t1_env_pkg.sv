@@ -180,6 +180,7 @@ package aou_t1_env_pkg;
   `include "aou_t1_mo_fc_bins.svh"
   `include "aou_t1_mo_chk.svh"
   `include "aou_t1_sw_reset_chk.svh"
+  `include "aou_t1_lp_cfg_chk.svh"
   `include "aou_t1_dbg_fifo_chk.svh"
   `include "aou_t1_env_fc_bins.svh"
   `include "aou_t1_crd_flow_chk.svh"

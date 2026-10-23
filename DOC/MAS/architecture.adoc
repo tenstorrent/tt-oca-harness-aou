@@ -230,14 +230,16 @@ The [.monospaced]#++MAX_AxBURSTLEN++# value must be of the form 2^n - 1. Legal v
 |255 |256 (no split)
 |=======================================
 
-*ID width:* The splitter reserves 2 bits from the AXI ID for internal sub-burst tracking. Master-side IDs are therefore [.monospaced]#++ID_WD - 2++# bits wide. The 2 extra bits allow the splitter to correlate responses from up to 4 outstanding sub-bursts per original transaction.
+*ID width:* The 3:1 mux in front of the splitter appends 2 bits to the AXI ID that name the width path a request took (upsizer, direct or downsizer), so that its responses return to the right path. The splitter carries them and strips them from the manager-side ID, which is therefore [.monospaced]#++ID_WD - 2++# bits wide. The sub-bursts of one request share one manager-side ID; their responses return in order, as AXI requires for one ID, and the pending-ID table counts them. The sub-bursts of a request are issued back to back, and nothing limits how many of them are outstanding other than the manager port's readiness.
+
+*Outstanding requests:* The pending-ID tables ([.monospaced]#++AOU_SPLIT_RD_PENDING_INFO++#, [.monospaced]#++AOU_SPLIT_WR_PENDING_INFO++#) hold one entry per request, not per sub-burst, and are sized by [.monospaced]#++M_RD_MO_CNT++# / [.monospaced]#++M_WR_MO_CNT++# (default 32). An RP therefore keeps at most that many remote requests in service, while its manager port may have up to [.monospaced]#++M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts (and likewise writes) outstanding, with [.monospaced]#++beats++# the request's length at the manager port's data width. See xref:software-operation.adoc#aou-722-axi-id-mismatch-error[Section 7.2.2] for the back-pressure when a table is full.
 
 [[aou-363-response-reassembly]]
 ==== 3.6.3. Response Reassembly
 
 *Read path:* The [.monospaced]#++aou_split_tr_arch++# reorder buffer tracks the sub-burst sequence for each outstanding read. Slave-side [.monospaced]#++RLAST++# is asserted only when the final beat of the last sub-burst is received, reconstructing the original burst boundary. Intermediate [.monospaced]#++RLAST++# signals from the master side are consumed internally.
 
-*Write path:* B responses from sub-bursts are merged. The splitter tracks outstanding write sub-bursts with [.monospaced]#++r_wr_pending_cnt++# and returns a single B response to the slave side once all sub-bursts have completed. If any sub-burst returns an error ([.monospaced]#++|I_M_BRESP_RS++#), the merged [.monospaced]#++BRESP_ERR++# flag is set, propagating the error to the slave-side response.
+*Write path:* B responses from sub-bursts are merged. The request's pending-ID table entry ([.monospaced]#++AOU_SPLIT_WR_PENDING_INFO++#) counts the sub-bursts still to be answered, and the splitter returns a single B response to the slave side once all sub-bursts have completed. If any sub-burst returns an error ([.monospaced]#++|I_M_BRESP_RS++#), the merged [.monospaced]#++BRESP_ERR++# flag is set, propagating the error to the slave-side response.
 
 *ID mismatch detection:* The splitter exports [.monospaced]#++DEST_TABLE_RID_ERR++# and [.monospaced]#++DEST_TABLE_BID_ERR++# signals that flag responses with IDs not matching any outstanding transaction. These feed the xref:aou-4-interrupt[INT_MI0_ID_MISMATCH] interrupt source via [.monospaced]#++AOU_AXI4MUX_3X1_TOP++#.
 

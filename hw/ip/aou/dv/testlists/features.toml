@@ -288,8 +288,8 @@ tags = ["features"]
 run_modes = ["features"]
 args = ["+split_aw=per_rp", "+split_ar=per_rp", "+dp_len=15,31,63"]
 
-# One burst in flight per RP, so even MAX_AxBURSTLEN 0 stays within the M port's 32
-# outstanding (BUGS/048 hits the deeper entries above).
+# One request in flight per RP: the split runs with a single pending-ID table entry
+# held, however many sub-bursts MAX_AxBURSTLEN 0 makes of it (FEAT-R22).
 [[tests]]
 name = "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-7_15_31.dp_batch-1"
 module = { uvm = "aou_split_test" }
