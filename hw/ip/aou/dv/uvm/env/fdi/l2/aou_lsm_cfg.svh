@@ -51,12 +51,6 @@ class aou_lsm_cfg extends uvm_object;
   bit           model_en = 1'b1;
   bit           cov_en = 1'b1;
   int unsigned  ref_slack = 3;           // cycles a DUT output may lag the model
-  // The DUT drives lp_linkerror; without it the top ties it low (BUGS/002).
-`ifdef AOU_DUT_LP_LINKERROR
-  bit           dut_lp_linkerror = 1'b1;
-`else
-  bit           dut_lp_linkerror = 1'b0;
-`endif
 
   // L1 handles of each PHY, set by the environment.
   aou_fdi_gate         gate[$];

@@ -16,16 +16,13 @@
 // layer likes, so in Retrain the model accepts NOP, and Active once NOP has
 // been seen in this Retrain.
 //
-// lp_linkerror (FDI-M07) follows UCIe whenever the DUT has the port
-// (cfg.dut_lp_linkerror), in either encoding. A LinkError the protocol layer
-// raises itself (O_AOU_REQ_LINKRESET or I_SW_LINKERROR_INJECT) must reach the
-// Adapter on lp_linkerror (r1.1 Table 8-2), which moves to LinkError and
-// stays there while it is 1; it is "the quickest path for error
+// lp_linkerror (FDI-M07) follows UCIe in either encoding. A LinkError the
+// protocol layer raises itself (O_AOU_REQ_LINKRESET or I_SW_LINKERROR_INJECT)
+// must reach the Adapter on lp_linkerror (r1.1 Table 8-2), which moves to
+// LinkError and stays there while it is 1; it is "the quickest path for error
 // containment", so it must rise within ref_slack of LINKERROR entry and hold
 // until the Adapter reports LinkError (or the FSM leaves LINKERROR). After
 // that either value is accepted, and outside LINKERROR it must be low.
-// Without the port the bench ties it low: fdi_enc=SPEC still expects UCIe,
-// fdi_enc=RTL keeps the interim expectation of low.
 //
 // The link is taken down and restarted by software on the UCIe controller,
 // never by this IP (integrator guide §6.6.2 "After a link-down"):
@@ -136,14 +133,10 @@ class aou_bringup_model extends uvm_object;
                                             rule, what, st.name(), cfg.fdi_enc.name(), detail))
   endfunction
 
-  local function bit linkerror_per_spec();
-    return cfg.dut_lp_linkerror || cfg.fdi_enc == AOU_FDI_ENC_SPEC;
-  endfunction
-
   // A protocol-layer LinkError that ends (the Adapter reports LinkError, the
   // FSM leaves LINKERROR, or the test ends) without lp_linkerror ever high.
   local function void check_linkerror_raised();
-    if (!linkerror_per_spec() || st != BRG_LINKERROR || !le_by_req || le_seen) return;
+    if (st != BRG_LINKERROR || !le_by_req || le_seen) return;
     if (cfg.checks_en) n_cmp["FDI-M07"] = n_cmp.exists("FDI-M07") ? n_cmp["FDI-M07"] + 1 : 1;
     if (!le_raised)
       mismatch("FDI-M07", "lp_linkerror",
@@ -207,10 +200,7 @@ class aou_bringup_model extends uvm_object;
         $sformatf("DUT 0x%0h, expected 0x%0h (%s)", o.fsm_state, fsm_code, pred_fsm().name()));
     cmp(5, "FDI-M06", "O_FDI_LINK_UP", o.link_up == (st == BRG_ACTIVE),
         $sformatf("DUT %0b%s", o.link_up, why()));
-    if (!linkerror_per_spec()) begin
-      cmp(6, "FDI-M07", "lp_linkerror", (st == BRG_LINKERROR && le_seen) || !o.linkerror,
-          $sformatf("DUT %0b", o.linkerror));
-    end else if (st != BRG_LINKERROR) begin
+    if (st != BRG_LINKERROR) begin
       cmp(6, "FDI-M07", "lp_linkerror", !o.linkerror, $sformatf("DUT %0b", o.linkerror));
     end else if (le_by_req && !le_seen) begin
       // Rises within ref_slack of LINKERROR entry; once high it holds until

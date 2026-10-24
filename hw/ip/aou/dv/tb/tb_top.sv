@@ -352,10 +352,6 @@ module tb_top;
   // interface. AOU_TOP keeps the activation state and LinkReset request
   // internal, so they are read from its wires.
   assign fdi_lsm.int_req_linkreset = u_dut.w_aou_req_linkreset;
-`ifndef AOU_DUT_LP_LINKERROR
-  // AOU_TOP has no lp_linkerror output (BUGS/002).
-  assign fdi_lsm.lp_linkerror      = 1'b0;
-`endif
   assign fdi_lsm.act_st_disabled   = status.activate_st_disabled;
   assign fdi_lsm.sw_reset          = u_dut.w_sw_reset;
   assign fdi_lsm.int_activate_start = status.int_activate_start;
@@ -505,9 +501,7 @@ module tb_top;
       .O_LP_WAKE_REQ         (fdi_lsm.lp_wake_req),
       .O_LP_CLK_ACK          (fdi_lsm.lp_clk_ack),
       .O_LP_RX_ACTIVE_STS    (fdi_lsm.lp_rx_active_sts),
-`ifdef AOU_DUT_LP_LINKERROR
       .O_LP_LINKERROR        (fdi_lsm.lp_linkerror),
-`endif
 
       .I_SW_ACTIVATE_START   (fdi_lsm.sw_activate_start),
       .I_SW_LINKERROR_INJECT (fdi_lsm.sw_linkerror_inject),
