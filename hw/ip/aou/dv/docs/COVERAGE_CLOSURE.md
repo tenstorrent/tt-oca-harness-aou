@@ -368,7 +368,7 @@ The filter option name still needs confirming on X-2025.06. The choice is decisi
 | 025 | dn_1024_256 (empty), its RDATA_ORDER, AXI4MUX_3X1_256 CH2: ~6 lines, ~120 cond, ~37 branches and ~60k toggle bits per config | **Yes.** 025 needs AWSIZE=6, unaligned, in the upper 32 B. Run `aou_dw_test +remote_bytes=128 +dp_align=aligned` (and a size list without 6) on 1x256-sp32 and the 4xmix 256-bit RPs. **Done for the 4xmix builds (WP10):** the aligned entries on `4xmix4211-sp128` (RP2/RP3) and `4xmix2144-sp64` (RP1). |
 | 035 | ERROR_INFO debug FIFO on 4xmix and 1x256 | **Yes:** `err_resp` with the remote width equal to each RP's width. |
 | 021/024 | LinkReset, LinkError and inband drop in `link_event` with traffic | **Yes:** a quiet variant (no AXI traffic, no SW reset) gives the cg_link_state LinkReset/Disabled bins. |
-| 001/002/038 | linkerror and linkdown spec tests (bringup linkdown bins, SW-inject conds) | **Partly.** `+FDI_ENC=RTL` removes the 001 failure. 002/038 still fail where the test checks `lp_linkerror` or NOP→Active, so check which assertions remain. |
+| 001/002/038 | linkerror and linkdown spec tests (bringup linkdown bins, SW-inject conds) | **Landed (main #108).** 002 and 038 were merged into 001; the DUT follows the UCIe encodings, drives `lp_linkerror`, and software restarts the link after a link-down (038 was ruled not a bug). The spec tests pass in both FDI encodings and nothing is held back. |
 | 030, 031, 010, 034 | small | 030: none (it's the bug itself). 031: undefined behaviour. 010: spec decision. 034: none (LP mode is static configuration; the tests program it only while DISABLED). |
 
 The rerun gains when fixes land are in §6, WP13.
@@ -651,8 +651,8 @@ section only, in paraphrase.
 
 | | Signals |
 |---|---|
-| **Has** | `pl_valid`/`data`/`flit_cancel`/`trdy`/`stallreq`/`state_sts`; `lp_data`/`valid`/`irdy`/`stallack`, per PHY; `pl_inband_pres`, `pl_clk_req`, `pl_wake_ack`, `pl_rx_active_req`; `lp_state_req`, `lp_wake_req`, `lp_clk_ack`, `lp_rx_active_sts` |
-| **Lacks** | `lp_linkerror` (BUGS/002), `pl_error`/`cerror`/`nferror`/`trainerror`, `pl_protocol*`, `pl_phyinrecenter`, `pl_phyinl1/l2`, stream IDs, DLLP, sideband, `dm_*` |
+| **Has** | `pl_valid`/`data`/`flit_cancel`/`trdy`/`stallreq`/`state_sts`; `lp_data`/`valid`/`irdy`/`stallack`, per PHY; `pl_inband_pres`, `pl_clk_req`, `pl_wake_ack`, `pl_rx_active_req`; `lp_state_req`, `lp_wake_req`, `lp_clk_ack`, `lp_rx_active_sts`, `lp_linkerror` |
+| **Lacks** | `pl_error`/`cerror`/`nferror`/`trainerror`, `pl_protocol*`, `pl_phyinrecenter`, `pl_phyinl1/l2`, stream IDs, DLLP, sideband, `dm_*` |
 
 The DUT also ignores the flit header on RX.
 

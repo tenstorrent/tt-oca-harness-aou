@@ -4,10 +4,9 @@
 // The bringup test with UCIe state encodings and a LinkError the protocol
 // layer raises itself (I_SW_LINKERROR_INJECT). UCIe r1.1 Table 8-2: the
 // protocol layer signals it on lp_linkerror, and the Adapter takes the link
-// to LinkError, then Reset, once it sees it. AOU_TOP has no lp_linkerror
-// (BUGS/002), so the bringup model reports FDI-M07. The Adapter then takes
-// the link down anyway, which brings the DUT back. Expected to fail
-// (expected_fail.yaml).
+// to LinkError, then Reset, once it sees it. The bringup model checks the
+// raise and hold on the DUT's O_LP_LINKERROR (FDI-M07); the Adapter then
+// takes the link down, which brings the DUT back.
 class aou_fdi_t1_linkerror_spec_test extends aou_fdi_t1_bringup_test;
   `uvm_component_utils(aou_fdi_t1_linkerror_spec_test)
 

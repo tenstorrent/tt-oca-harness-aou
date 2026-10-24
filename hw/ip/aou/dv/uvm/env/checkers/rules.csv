@@ -201,7 +201,7 @@ T1-L25,aou_invalid_actmsg_vseq,,DUT,An invalid ActivateReq raises no INT_ACTIVAT
 T1-E16,aou_slv_id_mismatch_vseq,,DUT,An unsolicited B/R sets AXI_SLV_ID_MISMATCH_ERR_RPn of that kind with the ID in INFO; W1C clears it,MAS software-operation 7.2.2; BUGS/003
 T1-E17,aou_slv_id_mismatch_vseq,,DUT,INT_SI0_ID_MISMATCH rises on a subordinate ID mismatch and falls after the W1C,MAS software-operation 7.2.2
 T1-E18,aou_slv_id_mismatch_vseq,,DUT,White-box: AOU_CORE's RID/BID subordinate mismatch aggregate of that kind only (main #76),main b8b9060 commit message
-FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (any fdi_enc when the DUT has lp_linkerror; else fdi_enc=SPEC; L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7; BUGS/002
+FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (any fdi_enc; L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7
 FEAT-R12,aou_qos_order_chk,,DUT,Port/AXI QoS: a lower-tier request waiting longer than TIMER_THRESHOLD x TIMER_RESOLUTION is promoted to high,MAS 3.2.1; RDL PRIOR_TIMER
 FEAT-R13,aou_qos_order_chk,,DUT,QoS scenario: both tiers were waiting at the arbiter after release (else the order check proves nothing),MAS 3.2.1
 FEAT-R14,aou_qos_order_chk,,DUT,Round-robin (ARB_MODE 0 or equal priority): no RP granted twice in a row while another has a request waiting,MAS 3.2.1 Figure 5
