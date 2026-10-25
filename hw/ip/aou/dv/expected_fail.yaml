@@ -80,14 +80,6 @@
     AOU_FDI_CHECKER, so only the L3 model's entry above matches there
 
 - test: aou_invalid_actmsg_test
-  bug: BUGS/013
-  check: 'T1-L16: LinkReset after a act_ack in ST_DISABLED'
-  seed_dependent: true
-  note: >-
-    A stray ActivateAck in DISABLED is accepted silently (MAS) and makes the next
-    activation fail with LinkReset. Only runs that include +state=disabled.
-
-- test: aou_invalid_actmsg_test
   bug: BUGS/019
   check: 'T1-L15: 2 answers to an invalid DeactivateReq'
   seed_dependent: true
