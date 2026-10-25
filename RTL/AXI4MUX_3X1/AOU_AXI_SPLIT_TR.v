@@ -151,7 +151,12 @@ module AOU_AXI_SPLIT_TR #(
     output wire                         O_DEST_TABLE_BID_ERR,
 
     input       [ LEN_WD-1: 0]          I_MAX_AWBURSTLEN,
-    input       [ LEN_WD-1: 0]          I_MAX_ARBURSTLEN
+    input       [ LEN_WD-1: 0]          I_MAX_ARBURSTLEN,
+
+    input       [ 31: 0]                I_DEBUG_ERR_UPPER_ADDR,
+    input       [ 31: 0]                I_DEBUG_ERR_LOWER_ADDR,
+    input                               I_DEBUG_ERR_ACCESS_ENABLE,
+    output                              O_M_AW_DBG_HIT  // the write on O_M_AW* is a debug-address access
 );
 
 //----------------------------------------------------
@@ -160,7 +165,7 @@ localparam AXI_AWCH_PAYLOAD_WD = ID_WD + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4 + 3 + 
 localparam AXI_WCH_PAYLOAD_WD  = DATA_WD + STRB_WD + 1;
 
 localparam AXI_M_ARCH_PAYLOAD_WD = ID_WD -2 + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4 + 3 + QOS_WD;
-localparam AXI_M_AWCH_PAYLOAD_WD = ID_WD -2 + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4 + 3 + QOS_WD;
+localparam AXI_M_AWCH_PAYLOAD_WD = 1 + ID_WD -2 + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4 + 3 + QOS_WD; // + O_M_AW_DBG_HIT
 
 //----------------------------------------------------
 localparam PENDING_CNT_WD = $clog2(WR_MO_CNT+1);
@@ -298,8 +303,10 @@ wire [ 2: 0]                     O_M_AWPROT_RS;
 wire [ 3: 0]                     O_M_AWQOS_RS;
 wire                             O_M_AWVALID_RS;
 wire                             I_M_AWREADY_RS;      
+wire                             O_M_AW_DBG_HIT_RS;
 
-assign w_aou_split_tr_m_awch_rs_sdata = {O_M_AWID_RS[ID_WD-1:2],
+assign w_aou_split_tr_m_awch_rs_sdata = {O_M_AW_DBG_HIT_RS,
+                                       O_M_AWID_RS[ID_WD-1:2],
                                        O_M_AWADDR_RS,
                                        O_M_AWLEN_RS,
                                        O_M_AWSIZE_RS,
@@ -309,7 +316,8 @@ assign w_aou_split_tr_m_awch_rs_sdata = {O_M_AWID_RS[ID_WD-1:2],
                                        O_M_AWPROT_RS,
                                        O_M_AWQOS_RS};
 
-assign {O_M_AWID,
+assign {O_M_AW_DBG_HIT,
+       O_M_AWID,
        O_M_AWADDR,
        O_M_AWLEN,
        O_M_AWSIZE,
@@ -542,6 +550,36 @@ end
 endgenerate
 
 //--------------------------------------------------------------
+// Debug window: a transaction addressed to the AOU_ERROR_INFO debug address is
+// never split. AOU_AXIMUX_1XN_SS decodes each sub-burst by its own address, so a
+// later sub-burst would miss the window and reach the local memory, and the
+// debug FIFO must pop once per remote write. The whole burst goes to
+// AOU_ERROR_INFO, which answers any burst length.
+//----------------------------------------------------
+wire [63:0]         w_dbg_err_addr;
+wire                w_ar_dbg_hit;
+wire                w_aw_dbg_hit;
+wire [LEN_WD-1:0]   w_max_arlen_start;
+wire [LEN_WD-1:0]   w_max_awlen_start;
+wire [LEN_WD-1:0]   w_max_awlen_cur;
+reg                 r_aw_no_split;
+
+// Same exact-match decode as AOU_AXIMUX_1XN_SS, on the start address of the burst
+assign w_dbg_err_addr = {I_DEBUG_ERR_UPPER_ADDR, I_DEBUG_ERR_LOWER_ADDR};
+assign w_ar_dbg_hit   = I_DEBUG_ERR_ACCESS_ENABLE &
+                        (w_aou_split_tr_s_arch_rs_mdata_araddr == w_dbg_err_addr);
+assign w_aw_dbg_hit   = I_DEBUG_ERR_ACCESS_ENABLE & (w_awch_fwd_rs_mdata_awaddr == w_dbg_err_addr);
+
+assign w_max_arlen_start = w_ar_dbg_hit ? {LEN_WD{1'b1}} : I_MAX_ARBURSTLEN;
+assign w_max_awlen_start = w_aw_dbg_hit ? {LEN_WD{1'b1}} : I_MAX_AWBURSTLEN;
+// The write beat counters keep the limit of the burst in flight after its first beat.
+assign w_max_awlen_cur   = w_m_awch_start_valid ? w_max_awlen_start :
+                           r_aw_no_split        ? {LEN_WD{1'b1}}    : I_MAX_AWBURSTLEN;
+// Told to the aggregator, which leaves a debug-address write unmerged; travels
+// with the AW payload through the optional register slice.
+assign O_M_AW_DBG_HIT_RS = w_m_awch_start_valid ? w_aw_dbg_hit : r_aw_no_split;
+
+//--------------------------------------------------------------
 // MAX_SPLIT_BURST_CNT_WD
 //----------------------------------------------------
 wire [3:0] ar_shift_count;
@@ -551,7 +589,7 @@ reg  [LEN_WD-1:0] w_arch_split_tr_cnt;
 reg  [LEN_WD-1:0] w_awch_split_tr_cnt;
 
 always @ (*) begin
-    case (I_MAX_ARBURSTLEN)
+    case (w_max_arlen_start)
         0:   w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 0;
         1:   w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 1;
         3:   w_arch_split_tr_cnt = w_aou_split_tr_s_arch_rs_mdata_arlen >> 2;
@@ -567,7 +605,7 @@ always @ (*) begin
 end
 
 always @ (*) begin
-    case (I_MAX_AWBURSTLEN)
+    case (w_max_awlen_start)
         0:   w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 0;
         1:   w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 1;
         3:   w_awch_split_tr_cnt = w_awch_fwd_rs_mdata_awlen >> 2;
@@ -648,8 +686,8 @@ always @(posedge I_CLK or negedge I_RESETN) begin
 
     end else begin
         if (w_m_arch_start_valid & I_M_ARREADY_RS) begin
-            if(w_aou_split_tr_s_arch_rs_mdata_arlen > I_MAX_ARBURSTLEN)
-                r_arch_fwd_rs_mdata_arlen <= w_aou_split_tr_s_arch_rs_mdata_arlen - I_MAX_ARBURSTLEN ; // + 1 to actual left transaction count
+            if(w_aou_split_tr_s_arch_rs_mdata_arlen > w_max_arlen_start)
+                r_arch_fwd_rs_mdata_arlen <= w_aou_split_tr_s_arch_rs_mdata_arlen - w_max_arlen_start ; // + 1 to actual left transaction count
             else
                 r_arch_fwd_rs_mdata_arlen <= 0; 
             r_arch_fwd_rs_mdata_araddr  <= w_aou_split_tr_s_arch_rs_mdata_araddr ;
@@ -692,14 +730,14 @@ end
 assign O_M_ARADDR_RS[ADDR_WD-1:12] = (w_m_arch_start_valid) ? w_aou_split_tr_s_arch_rs_mdata_araddr[ADDR_WD-1:12] : r_arch_fwd_rs_mdata_araddr[ADDR_WD-1:12];
 assign O_M_ARADDR_RS[11:0]         = w_splitter_input_araddr;
 
-assign O_M_ARLEN_RS                = (w_m_arch_start_valid) ? ((w_aou_split_tr_s_arch_rs_mdata_arlen > I_MAX_ARBURSTLEN) ? I_MAX_ARBURSTLEN : w_aou_split_tr_s_arch_rs_mdata_arlen) :
+assign O_M_ARLEN_RS                = (w_m_arch_start_valid) ? ((w_aou_split_tr_s_arch_rs_mdata_arlen > w_max_arlen_start) ? w_max_arlen_start : w_aou_split_tr_s_arch_rs_mdata_arlen) :
                                   (r_arch_fwd_rs_mdata_arlen > I_MAX_ARBURSTLEN) ? I_MAX_ARBURSTLEN : (r_arch_fwd_rs_mdata_arlen - 1);
 
 assign w_m_arch_start_valid     = (w_aou_split_tr_s_arch_rs_mvalid & w_arch_no_stop) & (r_arch_fwd_rs_mdata_arlen == 0);
 assign w_m_arch_next_valid      = (r_arch_fwd_rs_mdata_arlen != 0);
 
 assign O_M_ARVALID_RS = w_m_arch_start_valid | w_m_arch_next_valid;
-assign w_m_arch_ready = I_M_ARREADY_RS & ((w_m_arch_start_valid & (w_aou_split_tr_s_arch_rs_mdata_arlen <= I_MAX_ARBURSTLEN)) | 
+assign w_m_arch_ready = I_M_ARREADY_RS & ((w_m_arch_start_valid & (w_aou_split_tr_s_arch_rs_mdata_arlen <= w_max_arlen_start)) | 
                                        (w_m_arch_next_valid & (r_arch_fwd_rs_mdata_arlen <= I_MAX_ARBURSTLEN + 1)));
 
 //----------------------------------------------------
@@ -867,11 +905,13 @@ always @(posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_awch_fwd_rs_mdata_awlen    <= 'd0;
         r_awch_fwd_rs_mdata_awaddr   <= 'd0;
+        r_aw_no_split                <= 1'b0;
 
     end else begin
         if (w_m_awch_start_valid & w_fc_m_awready & I_M_WREADY_RS) begin
             r_awch_fwd_rs_mdata_awlen   <= w_awch_fwd_rs_mdata_awlen  ;
             r_awch_fwd_rs_mdata_awaddr  <= w_awch_fwd_rs_mdata_awaddr ;
+            r_aw_no_split               <= w_aw_dbg_hit ;
 
         end else if(O_M_WVALID_RS & I_M_WREADY_RS & (|r_awch_fwd_rs_mdata_awlen)) begin
             r_awch_fwd_rs_mdata_awlen <= r_awch_fwd_rs_mdata_awlen - 1;
@@ -884,12 +924,12 @@ always @(posedge I_CLK or negedge I_RESETN) begin
         r_cur_wr_beatcnt <= 'd0;
     end else begin
         if (O_M_AWVALID_RS & w_fc_m_awready) begin
-            if(I_MAX_AWBURSTLEN == 0)
+            if(w_max_awlen_cur == 0)
                 r_cur_wr_beatcnt <= 'd0;
             else
                 r_cur_wr_beatcnt <= 'd1;
         end else if(O_M_WVALID_RS & I_M_WREADY_RS ) begin
-            if(r_cur_wr_beatcnt >= I_MAX_AWBURSTLEN)
+            if(r_cur_wr_beatcnt >= w_max_awlen_cur)
                 r_cur_wr_beatcnt <= 'd0;
             else
                 r_cur_wr_beatcnt <= r_cur_wr_beatcnt + 1;
@@ -901,14 +941,14 @@ end
 assign O_M_AWADDR_RS[ADDR_WD-1:12] =  (w_m_awch_start_valid) ? w_awch_fwd_rs_mdata_awaddr[ADDR_WD-1:12] : r_awch_fwd_rs_mdata_awaddr[ADDR_WD-1:12];
 assign O_M_AWADDR_RS[11:0] =  w_splitter_input_awaddr;
 
-assign O_M_AWLEN_RS        =  (w_m_awch_start_valid) ? ((w_awch_fwd_rs_mdata_awlen > I_MAX_AWBURSTLEN) ? I_MAX_AWBURSTLEN : w_awch_fwd_rs_mdata_awlen) :
+assign O_M_AWLEN_RS        =  (w_m_awch_start_valid) ? ((w_awch_fwd_rs_mdata_awlen > w_max_awlen_start) ? w_max_awlen_start : w_awch_fwd_rs_mdata_awlen) :
                            (r_awch_fwd_rs_mdata_awlen > I_MAX_AWBURSTLEN) ? I_MAX_AWBURSTLEN : 
                                                                     (r_awch_fwd_rs_mdata_awlen - 1) ;
 
 assign w_m_wch_ready    = w_m_awch_working & I_M_WREADY_RS & w_wch_fwd_rs_mvalid;
 assign O_M_WVALID_RS       = w_m_awch_working & w_wch_fwd_rs_mvalid;
 assign O_M_WLAST_RS        = (O_M_AWVALID_RS & w_fc_m_awready & (O_M_AWLEN_RS == 'd0)) |
-                          (~(O_M_AWVALID_RS & w_fc_m_awready) & ((r_awch_fwd_rs_mdata_awlen == 'd1) | (r_cur_wr_beatcnt == I_MAX_AWBURSTLEN)));
+                          (~(O_M_AWVALID_RS & w_fc_m_awready) & ((r_awch_fwd_rs_mdata_awlen == 'd1) | (r_cur_wr_beatcnt == w_max_awlen_cur)));
 
 wire [ADDR_WD-1:0] w_bresp_err_awaddr;
 

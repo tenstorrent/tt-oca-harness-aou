@@ -350,7 +350,7 @@ reg                 r_write_early_response_rp0_wdt_trans_timeout_err;
 reg                 r_write_early_response_rp0_write_resp_err;
 reg                 r_write_early_response_rp0_early_bresp_en;
 reg [31:0]          r_axi_error_info0_rp0_debug_upper_addr;
-reg [31:0]          r_axi_error_info1_rp0_debug_lower_addr;
+reg [31:7]          r_axi_error_info1_rp0_debug_lower_addr;
 reg                 r_axi_slv_id_mismatch_err_rp0_axi_slv_bid_mismatch_err;
 reg                 r_axi_slv_id_mismatch_err_rp0_axi_slv_rid_mismatch_err;
 reg [7:0]           r_axi_split_tr_rp1_max_awburstlen;
@@ -361,7 +361,7 @@ reg                 r_write_early_response_rp1_wdt_trans_timeout_err;
 reg                 r_write_early_response_rp1_write_resp_err;
 reg                 r_write_early_response_rp1_early_bresp_en;
 reg [31:0]          r_axi_error_info0_rp1_debug_upper_addr;
-reg [31:0]          r_axi_error_info1_rp1_debug_lower_addr;
+reg [31:7]          r_axi_error_info1_rp1_debug_lower_addr;
 reg                 r_axi_slv_id_mismatch_err_rp1_axi_slv_bid_mismatch_err;
 reg                 r_axi_slv_id_mismatch_err_rp1_axi_slv_rid_mismatch_err;
 reg [7:0]           r_axi_split_tr_rp2_max_awburstlen;
@@ -372,7 +372,7 @@ reg                 r_write_early_response_rp2_wdt_trans_timeout_err;
 reg                 r_write_early_response_rp2_write_resp_err;
 reg                 r_write_early_response_rp2_early_bresp_en;
 reg [31:0]          r_axi_error_info0_rp2_debug_upper_addr;
-reg [31:0]          r_axi_error_info1_rp2_debug_lower_addr;
+reg [31:7]          r_axi_error_info1_rp2_debug_lower_addr;
 reg                 r_axi_slv_id_mismatch_err_rp2_axi_slv_bid_mismatch_err;
 reg                 r_axi_slv_id_mismatch_err_rp2_axi_slv_rid_mismatch_err;
 reg [7:0]           r_axi_split_tr_rp3_max_awburstlen;
@@ -383,7 +383,7 @@ reg                 r_write_early_response_rp3_wdt_trans_timeout_err;
 reg                 r_write_early_response_rp3_write_resp_err;
 reg                 r_write_early_response_rp3_early_bresp_en;
 reg [31:0]          r_axi_error_info0_rp3_debug_upper_addr;
-reg [31:0]          r_axi_error_info1_rp3_debug_lower_addr;
+reg [31:7]          r_axi_error_info1_rp3_debug_lower_addr;
 reg                 r_axi_slv_id_mismatch_err_rp3_axi_slv_bid_mismatch_err;
 reg                 r_axi_slv_id_mismatch_err_rp3_axi_slv_rid_mismatch_err;
 
@@ -933,9 +933,9 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_axi_error_info1_rp0_debug_lower_addr <= 32'h0;
+        r_axi_error_info1_rp0_debug_lower_addr <= 25'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_ERROR_INFO1_RP0_ADDR)) begin
-        r_axi_error_info1_rp0_debug_lower_addr <= I_PWDATA[31:0];
+        r_axi_error_info1_rp0_debug_lower_addr <= I_PWDATA[31:7];
     end
 end
 
@@ -1110,9 +1110,9 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_axi_error_info1_rp1_debug_lower_addr <= 32'h0;
+        r_axi_error_info1_rp1_debug_lower_addr <= 25'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_ERROR_INFO1_RP1_ADDR)) begin
-        r_axi_error_info1_rp1_debug_lower_addr <= I_PWDATA[31:0];
+        r_axi_error_info1_rp1_debug_lower_addr <= I_PWDATA[31:7];
     end
 end
 
@@ -1287,9 +1287,9 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_axi_error_info1_rp2_debug_lower_addr <= 32'h0;
+        r_axi_error_info1_rp2_debug_lower_addr <= 25'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_ERROR_INFO1_RP2_ADDR)) begin
-        r_axi_error_info1_rp2_debug_lower_addr <= I_PWDATA[31:0];
+        r_axi_error_info1_rp2_debug_lower_addr <= I_PWDATA[31:7];
     end
 end
 
@@ -1464,9 +1464,9 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_axi_error_info1_rp3_debug_lower_addr <= 32'h0;
+        r_axi_error_info1_rp3_debug_lower_addr <= 25'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_ERROR_INFO1_RP3_ADDR)) begin
-        r_axi_error_info1_rp3_debug_lower_addr <= I_PWDATA[31:0];
+        r_axi_error_info1_rp3_debug_lower_addr <= I_PWDATA[31:7];
     end
 end
 
@@ -1562,7 +1562,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         SFR_AXI_ERROR_INFO0_RP0_ADDR : 
             r_rdata <= {r_axi_error_info0_rp0_debug_upper_addr};
         SFR_AXI_ERROR_INFO1_RP0_ADDR : 
-            r_rdata <= {r_axi_error_info1_rp0_debug_lower_addr};
+            r_rdata <= {r_axi_error_info1_rp0_debug_lower_addr, 7'd0};
         SFR_AXI_SLV_ID_MISMATCH_ERR_RP0_ADDR :
             r_rdata <= { 9'd0, r_axi_slv_id_mismatch_rp0_en, r_axi_slv_id_mismatch_err_rp0_bid, r_axi_slv_id_mismatch_err_rp0_rid, r_axi_slv_id_mismatch_err_rp0_axi_slv_bid_mismatch_err, r_axi_slv_id_mismatch_err_rp0_axi_slv_rid_mismatch_err}; 
         SFR_AXI_SPLIT_TR_RP1_ADDR : 
@@ -1574,7 +1574,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         SFR_AXI_ERROR_INFO0_RP1_ADDR : 
             r_rdata <= {r_axi_error_info0_rp1_debug_upper_addr};
         SFR_AXI_ERROR_INFO1_RP1_ADDR : 
-            r_rdata <= {r_axi_error_info1_rp1_debug_lower_addr};
+            r_rdata <= {r_axi_error_info1_rp1_debug_lower_addr, 7'd0};
         SFR_AXI_SLV_ID_MISMATCH_ERR_RP1_ADDR : 
             r_rdata <= { 9'd0, r_axi_slv_id_mismatch_rp1_en, r_axi_slv_id_mismatch_err_rp1_bid, r_axi_slv_id_mismatch_err_rp1_rid, r_axi_slv_id_mismatch_err_rp1_axi_slv_bid_mismatch_err, r_axi_slv_id_mismatch_err_rp1_axi_slv_rid_mismatch_err};
         SFR_AXI_SPLIT_TR_RP2_ADDR : 
@@ -1586,7 +1586,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         SFR_AXI_ERROR_INFO0_RP2_ADDR : 
             r_rdata <= {r_axi_error_info0_rp2_debug_upper_addr};
         SFR_AXI_ERROR_INFO1_RP2_ADDR : 
-            r_rdata <= {r_axi_error_info1_rp2_debug_lower_addr};
+            r_rdata <= {r_axi_error_info1_rp2_debug_lower_addr, 7'd0};
         SFR_AXI_SLV_ID_MISMATCH_ERR_RP2_ADDR :
             r_rdata <= { 9'd0, r_axi_slv_id_mismatch_rp2_en, r_axi_slv_id_mismatch_err_rp2_bid, r_axi_slv_id_mismatch_err_rp2_rid, r_axi_slv_id_mismatch_err_rp2_axi_slv_bid_mismatch_err, r_axi_slv_id_mismatch_err_rp2_axi_slv_rid_mismatch_err};
         SFR_AXI_SPLIT_TR_RP3_ADDR : 
@@ -1598,7 +1598,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         SFR_AXI_ERROR_INFO0_RP3_ADDR : 
             r_rdata <= {r_axi_error_info0_rp3_debug_upper_addr};
         SFR_AXI_ERROR_INFO1_RP3_ADDR : 
-            r_rdata <= {r_axi_error_info1_rp3_debug_lower_addr};
+            r_rdata <= {r_axi_error_info1_rp3_debug_lower_addr, 7'd0};
         SFR_AXI_SLV_ID_MISMATCH_ERR_RP3_ADDR : 
             r_rdata <= { 9'd0, r_axi_slv_id_mismatch_rp3_en, r_axi_slv_id_mismatch_err_rp3_bid, r_axi_slv_id_mismatch_err_rp3_rid, r_axi_slv_id_mismatch_err_rp3_axi_slv_bid_mismatch_err, r_axi_slv_id_mismatch_err_rp3_axi_slv_rid_mismatch_err};
         SFR_WRITE_EARLY_RESPONSE_WDT_CTL_ADDR :
@@ -1656,28 +1656,28 @@ assign O_WRITE_EARLY_RESPONSE_RP0_EARLY_BRESP_EN = r_write_early_response_rp0_ea
 assign O_WRITE_EARLY_RESPONSE_RP0_EARLY_ALWAYS_EN = r_write_early_response_rp0_write_resp_always_en;
 assign O_WRITE_EARLY_RESPONSE_RP0_WDT_EN = r_write_early_response_rp0_wdt_en;
 assign O_AXI_ERROR_INFO0_RP0_DEBUG_UPPER_ADDR = r_axi_error_info0_rp0_debug_upper_addr;
-assign O_AXI_ERROR_INFO1_RP0_DEBUG_LOWER_ADDR = r_axi_error_info1_rp0_debug_lower_addr;
+assign O_AXI_ERROR_INFO1_RP0_DEBUG_LOWER_ADDR = {r_axi_error_info1_rp0_debug_lower_addr, 7'd0};
 assign O_AXI_SPLIT_TR_RP1_MAX_AWBURSTLEN = r_axi_split_tr_rp1_max_awburstlen;
 assign O_AXI_SPLIT_TR_RP1_MAX_ARBURSTLEN = r_axi_split_tr_rp1_max_arburstlen;
 assign O_WRITE_EARLY_RESPONSE_RP1_EARLY_BRESP_EN = r_write_early_response_rp1_early_bresp_en;
 assign O_WRITE_EARLY_RESPONSE_RP1_EARLY_ALWAYS_EN = r_write_early_response_rp1_write_resp_always_en;
 assign O_WRITE_EARLY_RESPONSE_RP1_WDT_EN = r_write_early_response_rp1_wdt_en;
 assign O_AXI_ERROR_INFO0_RP1_DEBUG_UPPER_ADDR = r_axi_error_info0_rp1_debug_upper_addr;
-assign O_AXI_ERROR_INFO1_RP1_DEBUG_LOWER_ADDR = r_axi_error_info1_rp1_debug_lower_addr;
+assign O_AXI_ERROR_INFO1_RP1_DEBUG_LOWER_ADDR = {r_axi_error_info1_rp1_debug_lower_addr, 7'd0};
 assign O_AXI_SPLIT_TR_RP2_MAX_AWBURSTLEN = r_axi_split_tr_rp2_max_awburstlen;
 assign O_AXI_SPLIT_TR_RP2_MAX_ARBURSTLEN = r_axi_split_tr_rp2_max_arburstlen;
 assign O_WRITE_EARLY_RESPONSE_RP2_EARLY_BRESP_EN = r_write_early_response_rp2_early_bresp_en;
 assign O_WRITE_EARLY_RESPONSE_RP2_EARLY_ALWAYS_EN = r_write_early_response_rp2_write_resp_always_en;
 assign O_WRITE_EARLY_RESPONSE_RP2_WDT_EN = r_write_early_response_rp2_wdt_en;
 assign O_AXI_ERROR_INFO0_RP2_DEBUG_UPPER_ADDR = r_axi_error_info0_rp2_debug_upper_addr;
-assign O_AXI_ERROR_INFO1_RP2_DEBUG_LOWER_ADDR = r_axi_error_info1_rp2_debug_lower_addr;
+assign O_AXI_ERROR_INFO1_RP2_DEBUG_LOWER_ADDR = {r_axi_error_info1_rp2_debug_lower_addr, 7'd0};
 assign O_AXI_SPLIT_TR_RP3_MAX_AWBURSTLEN = r_axi_split_tr_rp3_max_awburstlen;
 assign O_AXI_SPLIT_TR_RP3_MAX_ARBURSTLEN = r_axi_split_tr_rp3_max_arburstlen;
 assign O_WRITE_EARLY_RESPONSE_RP3_EARLY_BRESP_EN = r_write_early_response_rp3_early_bresp_en;
 assign O_WRITE_EARLY_RESPONSE_RP3_EARLY_ALWAYS_EN = r_write_early_response_rp3_write_resp_always_en;
 assign O_WRITE_EARLY_RESPONSE_RP3_WDT_EN = r_write_early_response_rp3_wdt_en;
 assign O_AXI_ERROR_INFO0_RP3_DEBUG_UPPER_ADDR = r_axi_error_info0_rp3_debug_upper_addr;
-assign O_AXI_ERROR_INFO1_RP3_DEBUG_LOWER_ADDR = r_axi_error_info1_rp3_debug_lower_addr;
+assign O_AXI_ERROR_INFO1_RP3_DEBUG_LOWER_ADDR = {r_axi_error_info1_rp3_debug_lower_addr, 7'd0};
 assign O_AXI_SLV_ID_MISMATCH_RP0_EN = r_axi_slv_id_mismatch_rp0_en; 
 assign O_AXI_SLV_ID_MISMATCH_RP1_EN = r_axi_slv_id_mismatch_rp1_en;
 assign O_AXI_SLV_ID_MISMATCH_RP2_EN = r_axi_slv_id_mismatch_rp2_en;

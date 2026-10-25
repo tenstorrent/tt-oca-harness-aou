@@ -971,6 +971,10 @@ import packet_def_pkg::*;
        
         .I_MAX_AWBURSTLEN               ( I_AXI_SPLIT_TR_MAX_AWBURSTLEN     ),
         .I_MAX_ARBURSTLEN               ( I_AXI_SPLIT_TR_MAX_ARBURSTLEN     ),
+
+        .I_DEBUG_ERR_UPPER_ADDR         ( I_DEBUG_ERROR_INFO_UPPER_ADDR     ),
+        .I_DEBUG_ERR_LOWER_ADDR         ( I_DEBUG_ERROR_INFO_LOWER_ADDR     ),
+        .I_DEBUG_ERR_ACCESS_ENABLE      ( I_DEBUG_ERR_ACCESS_ENABLE         ),
     
         .I_AXI_AGGREGATOR_EN            ( I_AXI_AGGREGATOR_EN               ),
     

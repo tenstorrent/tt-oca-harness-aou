@@ -161,8 +161,23 @@ always_ff @(posedge I_CLK or negedge I_RESETN) begin
 end
 
 
+// A pop is one write burst. The burst completes once its AW and its WLAST beat
+// have both been accepted. AWREADY/WREADY are held low between that point and
+// the cycle the B register is free, so B never precedes WLAST and is never lost.
+logic w_aw_hs;
+logic w_w_hs;
+logic w_aw_seen;
+logic w_wlast_seen;
 logic w_fifo_pop;
-assign w_fifo_pop = O_S_AWREADY && I_S_AWVALID && O_S_WREADY && I_S_WVALID;
+logic r_aw_got;
+logic r_wlast_got;
+logic [AXI_ID_WD-1:0] r_awid;
+
+assign w_aw_hs      = O_S_AWREADY && I_S_AWVALID;
+assign w_w_hs       = O_S_WREADY && I_S_WVALID;
+assign w_aw_seen    = r_aw_got || w_aw_hs;
+assign w_wlast_seen = r_wlast_got || (w_w_hs && I_S_WLAST);
+assign w_fifo_pop   = w_aw_seen && w_wlast_seen && (!O_S_BVALID || I_S_BREADY);
 
 always_ff @(posedge I_CLK or negedge I_RESETN) begin
     if(!I_RESETN) begin
@@ -174,49 +189,120 @@ always_ff @(posedge I_CLK or negedge I_RESETN) begin
     end
 end 
 
+always_ff @(posedge I_CLK or negedge I_RESETN) begin
+    if(!I_RESETN) begin
+        r_aw_got <= 1'b0;
+        r_wlast_got <= 1'b0;
+        r_awid <= 'b0;
+    end else if (w_fifo_pop) begin
+        r_aw_got <= 1'b0;
+        r_wlast_got <= 1'b0;
+    end else begin
+        if (w_aw_hs) begin
+            r_aw_got <= 1'b1;
+            r_awid <= I_S_AWID;
+        end
+        if (w_w_hs && I_S_WLAST) begin
+            r_wlast_got <= 1'b1;
+        end
+    end
+end
+
 logic r_fifo_pop_state;
 logic [AXI_ID_WD-1:0] r_fifo_pop_id;
 always_ff @(posedge I_CLK or negedge I_RESETN) begin
     if(!I_RESETN) begin
         r_fifo_pop_state <= 1'b0;
         r_fifo_pop_id <= 'b0;
-    end else if (O_S_AWREADY && I_S_AWVALID && O_S_WREADY && I_S_WVALID) begin
+    end else if (w_fifo_pop) begin
         r_fifo_pop_state <= 1'b1;
-        r_fifo_pop_id <= I_S_AWID;
+        r_fifo_pop_id <= r_aw_got ? r_awid : I_S_AWID;
     end else if (O_S_BVALID && I_S_BREADY) begin
         r_fifo_pop_state <= 1'b0;
         r_fifo_pop_id <= 'b0;
     end
 end
 
+// A read burst returns I_S_ARLEN+1 beats, each carrying the FIFO head, so the
+// entry sits in every lane a width converter can map the requester's bytes to.
+// The head is sampled into r_fifo_read_data when the request becomes the active
+// read, so every beat of the burst carries the same entry and RDATA holds still
+// while RVALID waits for RREADY, whatever the FIFO does meanwhile (a pop from the
+// write channel, a push into an empty FIFO).
+// One AR can wait in r_ar_pend_* while a burst is in flight; it is loaded on the
+// last beat's handshake, keeping back-to-back single-beat reads gapless without
+// a combinational RREADY -> ARREADY path.
+logic w_ar_hs;
+logic w_r_hs;
+logic w_r_last;
+logic w_r_load;
 logic r_fifo_read_resp;
 logic [AXI_ID_WD-1:0] r_fifo_read_id;
+logic [AXI_LEN_WD-1:0] r_fifo_read_cnt;
+logic [ERROR_INFO_WD-1:0] r_fifo_read_data;
+logic r_ar_pend;
+logic [AXI_ID_WD-1:0] r_ar_pend_id;
+logic [AXI_LEN_WD-1:0] r_ar_pend_len;
+
+assign w_ar_hs  = O_S_ARREADY && I_S_ARVALID;
+assign w_r_hs   = O_S_RVALID && I_S_RREADY;
+assign w_r_last = (r_fifo_read_cnt == '0);
+assign w_r_load = !r_fifo_read_resp || (w_r_hs && w_r_last);
+
 always_ff @(posedge I_CLK or negedge I_RESETN) begin
     if(!I_RESETN) begin
         r_fifo_read_resp <= 1'b0;
-        r_fifo_read_id <= 1'b0;
-    end else if (O_S_ARREADY && I_S_ARVALID) begin
-        r_fifo_read_resp <= 1'b1;
-        r_fifo_read_id <= I_S_ARID;
-    end else if (O_S_RVALID && I_S_RREADY) begin
-        r_fifo_read_resp <= 1'b0;
         r_fifo_read_id <= 'b0;
+        r_fifo_read_cnt <= 'b0;
+        r_fifo_read_data <= 'b0;
+    end else if (w_r_load) begin
+        if (r_ar_pend) begin
+            r_fifo_read_resp <= 1'b1;
+            r_fifo_read_id <= r_ar_pend_id;
+            r_fifo_read_cnt <= r_ar_pend_len;
+            r_fifo_read_data <= r_error_info_fifo[ptr_idx'(r_ptr)];
+        end else if (w_ar_hs) begin
+            r_fifo_read_resp <= 1'b1;
+            r_fifo_read_id <= I_S_ARID;
+            r_fifo_read_cnt <= I_S_ARLEN;
+            r_fifo_read_data <= r_error_info_fifo[ptr_idx'(r_ptr)];
+        end else begin
+            r_fifo_read_resp <= 1'b0;
+            r_fifo_read_id <= 'b0;
+            r_fifo_read_cnt <= 'b0;
+        end
+    end else if (w_r_hs) begin
+        r_fifo_read_cnt <= r_fifo_read_cnt - 1'b1;
     end
 end
 
-assign O_S_AWREADY = 1;
-assign O_S_WREADY  = 1;
+always_ff @(posedge I_CLK or negedge I_RESETN) begin
+    if(!I_RESETN) begin
+        r_ar_pend <= 1'b0;
+        r_ar_pend_id <= 'b0;
+        r_ar_pend_len <= 'b0;
+    end else if (w_ar_hs && !w_r_load) begin
+        r_ar_pend <= 1'b1;
+        r_ar_pend_id <= I_S_ARID;
+        r_ar_pend_len <= I_S_ARLEN;
+    end else if (w_r_load) begin
+        r_ar_pend <= 1'b0;
+    end
+end
+
+assign O_S_AWREADY = !r_aw_got;
+assign O_S_WREADY  = !r_wlast_got;
 
 assign O_S_BID = r_fifo_pop_id;
 assign O_S_BRESP = 2'b00;
 assign O_S_BVALID  = r_fifo_pop_state;
 
-assign O_S_ARREADY = 1;
+assign O_S_ARREADY = !r_ar_pend;
 
 assign O_S_RID = r_fifo_read_id;
-assign O_S_RDATA = r_error_info_fifo[ptr_idx'(r_ptr)];
+assign O_S_RDATA = r_fifo_read_data;
 assign O_S_RRESP = 2'b00;
-assign O_S_RLAST = 1'b1;
+assign O_S_RLAST = w_r_last;
 assign O_S_RVALID  = r_fifo_read_resp;
 
 endmodule

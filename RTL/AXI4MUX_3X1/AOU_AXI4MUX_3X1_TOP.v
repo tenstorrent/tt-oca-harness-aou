@@ -203,6 +203,10 @@ module AOU_AXI4MUX_3X1_TOP #(
     input       [LEN_WD -1: 0]          I_MAX_AWBURSTLEN,
     input       [LEN_WD -1: 0]          I_MAX_ARBURSTLEN,
 
+    input       [31: 0]                 I_DEBUG_ERR_UPPER_ADDR,
+    input       [31: 0]                 I_DEBUG_ERR_LOWER_ADDR,
+    input                               I_DEBUG_ERR_ACCESS_ENABLE,
+
     input                               I_AXI_AGGREGATOR_EN,
 
     output      [ ID_WD-1:0]            O_BRESP_ERR_ID,
@@ -287,6 +291,7 @@ wire [ 3: 0]                 w_aggregator_awqos;
 wire                         w_aggregator_m_awvalid;
 wire                         w_aggregator_m_awready;
 wire                         w_aggregator_s_awvalid;
+wire                         w_split_aw_dbg_hit;
 wire                         w_aggregator_s_awready;
 
 wire [ DATA_WD-1: 0]         w_aggregator_wdata;
@@ -1177,7 +1182,12 @@ AOU_AXI_SPLIT_TR #(
     .O_DEST_TABLE_BID_ERR ( O_SPLIT_BID_MISMATCH_ERROR ),
 
     .I_MAX_AWBURSTLEN (I_MAX_AWBURSTLEN  ),
-    .I_MAX_ARBURSTLEN (I_MAX_ARBURSTLEN  )
+    .I_MAX_ARBURSTLEN (I_MAX_ARBURSTLEN  ),
+
+    .I_DEBUG_ERR_UPPER_ADDR    ( I_DEBUG_ERR_UPPER_ADDR    ),
+    .I_DEBUG_ERR_LOWER_ADDR    ( I_DEBUG_ERR_LOWER_ADDR    ),
+    .I_DEBUG_ERR_ACCESS_ENABLE ( I_DEBUG_ERR_ACCESS_ENABLE ),
+    .O_M_AW_DBG_HIT            ( w_split_aw_dbg_hit        )
 );
 
 AOU_AGGREGATOR # (
@@ -1205,6 +1215,7 @@ AOU_AGGREGATOR # (
     .I_S_AWQOS              ( o_m_awqos                 ),
     .I_S_AWVALID            ( w_aggregator_s_awvalid    ),
     .O_S_AWREADY            ( w_aggregator_s_awready    ),
+    .I_S_AW_NO_AGG          ( w_split_aw_dbg_hit        ),
              
              
     .I_S_WDATA              ( o_m_wdata                 ),

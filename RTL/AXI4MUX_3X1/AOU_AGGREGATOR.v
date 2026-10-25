@@ -52,6 +52,7 @@ module AOU_AGGREGATOR #(
     input [3:0]                     I_S_AWQOS,
     input                           I_S_AWVALID,
     output reg                      O_S_AWREADY,
+    input                           I_S_AW_NO_AGG, // pass this write through unmerged (a debug-address access)
 
 
     input [ DATA_WD-1: 0]           I_S_WDATA,
@@ -375,12 +376,15 @@ endgenerate
 //---------------------------------------------
 //signal for aggregator operation
 generate
+// A debug-address write (I_S_AW_NO_AGG) is never merged: it is not split either, so
+// its length is not bounded by MAX_AWBURSTLEN and the W FIFO could not hold it; the
+// debug window ignores the write data anyway.
 if(DATA_WD == 256) begin
-    assign w_en_aggregator_w = ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b101) & (|I_S_AWLEN);
+    assign w_en_aggregator_w = ~I_S_AW_NO_AGG && ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b101) & (|I_S_AWLEN);
 end else if (DATA_WD == 512) begin
-    assign w_en_aggregator_w = ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b110) & (|I_S_AWLEN);
+    assign w_en_aggregator_w = ~I_S_AW_NO_AGG && ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b110) & (|I_S_AWLEN);
 end else if (DATA_WD == 1024) begin
-    assign w_en_aggregator_w = ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b111) & (|I_S_AWLEN);
+    assign w_en_aggregator_w = ~I_S_AW_NO_AGG && ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b111) & (|I_S_AWLEN);
 end else begin
     assign w_en_aggregator_w = 0;
 end
