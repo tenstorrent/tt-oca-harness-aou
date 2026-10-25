@@ -209,14 +209,15 @@ addrmap aou_core {
         regwidth = 32;
         name = "AXI Error Info0 RP0";
         desc = "Debug address register (upper) for RP0.";
-        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP0. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read. Up to 4 error entries can be stored and popped by writing 1 to this address."; } debug_upper_addr[31:0] = 0;
+        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP0. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read. Up to 4 entries are held, one per failing manager-port B or R beat; the remote die reads the head entry with a single-beat read of this address and pops it with a single-beat write of any data to it."; } debug_upper_addr[31:0] = 0;
     } axi_error_info0_rp0 @ 0x002C;
 
     reg {
         regwidth = 32;
         name = "AXI Error Info1 RP0";
         desc = "Debug address register (lower) for RP0.";
-        field { sw = rw; desc = "Lower 32 bits of the dedicated AXI address used to access R/B response error debug information for RP0. Together with debug_upper_addr, defines the target address for error information access."; } debug_lower_addr[31:0] = 0;
+        field { sw = rw; desc = "Bits [31:7] of the dedicated AXI address used to access R/B response error debug information for RP0. Together with debug_upper_addr, defines the target address for error information access. Bits [6:0] of the address are reserved and read as zero, so the address is 128-byte aligned: an access to a debug address not aligned to its AxSIZE would miss the window, and one narrower than the RP not aligned to the RP's width would read zeros."; } debug_lower_addr[31:7] = 0;
+        field { sw = r; } reserved_6_0[6:0] = 0;
     } axi_error_info1_rp0 @ 0x0030;
 
     reg {
@@ -272,14 +273,15 @@ addrmap aou_core {
         regwidth = 32;
         name = "AXI Error Info0 RP1";
         desc = "Debug address register (upper) for RP1.";
-        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP1. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read."; } debug_upper_addr[31:0] = 0;
+        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP1. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read. Up to 4 entries are held, one per failing manager-port B or R beat; the remote die reads the head entry with a single-beat read of this address and pops it with a single-beat write of any data to it."; } debug_upper_addr[31:0] = 0;
     } axi_error_info0_rp1 @ 0x0044;
 
     reg {
         regwidth = 32;
         name = "AXI Error Info1 RP1";
         desc = "Debug address register (lower) for RP1.";
-        field { sw = rw; desc = "Lower 32 bits of the dedicated AXI address used to access R/B response error debug information for RP1. Together with debug_upper_addr, defines the target address for error information access."; } debug_lower_addr[31:0] = 0;
+        field { sw = rw; desc = "Bits [31:7] of the dedicated AXI address used to access R/B response error debug information for RP1. Together with debug_upper_addr, defines the target address for error information access. Bits [6:0] of the address are reserved and read as zero, so the address is 128-byte aligned: an access to a debug address not aligned to its AxSIZE would miss the window, and one narrower than the RP not aligned to the RP's width would read zeros."; } debug_lower_addr[31:7] = 0;
+        field { sw = r; } reserved_6_0[6:0] = 0;
     } axi_error_info1_rp1 @ 0x0048;
 
     reg {
@@ -335,14 +337,15 @@ addrmap aou_core {
         regwidth = 32;
         name = "AXI Error Info0 RP2";
         desc = "Debug address register (upper) for RP2.";
-        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP2. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read."; } debug_upper_addr[31:0] = 0;
+        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP2. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read. Up to 4 entries are held, one per failing manager-port B or R beat; the remote die reads the head entry with a single-beat read of this address and pops it with a single-beat write of any data to it."; } debug_upper_addr[31:0] = 0;
     } axi_error_info0_rp2 @ 0x005C;
 
     reg {
         regwidth = 32;
         name = "AXI Error Info1 RP2";
         desc = "Debug address register (lower) for RP2.";
-        field { sw = rw; desc = "Lower 32 bits of the dedicated AXI address used to access R/B response error debug information for RP2. Together with debug_upper_addr, defines the target address for error information access."; } debug_lower_addr[31:0] = 0;
+        field { sw = rw; desc = "Bits [31:7] of the dedicated AXI address used to access R/B response error debug information for RP2. Together with debug_upper_addr, defines the target address for error information access. Bits [6:0] of the address are reserved and read as zero, so the address is 128-byte aligned: an access to a debug address not aligned to its AxSIZE would miss the window, and one narrower than the RP not aligned to the RP's width would read zeros."; } debug_lower_addr[31:7] = 0;
+        field { sw = r; } reserved_6_0[6:0] = 0;
     } axi_error_info1_rp2 @ 0x0060;
 
     reg {
@@ -398,14 +401,15 @@ addrmap aou_core {
         regwidth = 32;
         name = "AXI Error Info0 RP3";
         desc = "Debug address register (upper) for RP3.";
-        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP3. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read."; } debug_upper_addr[31:0] = 0;
+        field { sw = rw; desc = "Upper 32 bits of the dedicated AXI address used to access R/B response error debug information for RP3. Set this address along with debug_lower_addr and error_info_access_en to enable error information readout by the remote die via AXI read. Up to 4 entries are held, one per failing manager-port B or R beat; the remote die reads the head entry with a single-beat read of this address and pops it with a single-beat write of any data to it."; } debug_upper_addr[31:0] = 0;
     } axi_error_info0_rp3 @ 0x0074;
 
     reg {
         regwidth = 32;
         name = "AXI Error Info1 RP3";
         desc = "Debug address register (lower) for RP3.";
-        field { sw = rw; desc = "Lower 32 bits of the dedicated AXI address used to access R/B response error debug information for RP3. Together with debug_upper_addr, defines the target address for error information access."; } debug_lower_addr[31:0] = 0;
+        field { sw = rw; desc = "Bits [31:7] of the dedicated AXI address used to access R/B response error debug information for RP3. Together with debug_upper_addr, defines the target address for error information access. Bits [6:0] of the address are reserved and read as zero, so the address is 128-byte aligned: an access to a debug address not aligned to its AxSIZE would miss the window, and one narrower than the RP not aligned to the RP's width would read zeros."; } debug_lower_addr[31:7] = 0;
+        field { sw = r; } reserved_6_0[6:0] = 0;
     } axi_error_info1_rp3 @ 0x0078;
 
     reg {

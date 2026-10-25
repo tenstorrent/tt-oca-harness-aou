@@ -421,6 +421,7 @@ Write aggregation is activated when *all* of the following conditions are met:
 1.  [.monospaced]#++AWSIZE++# is narrower than the full bus width ([.monospaced]#++AXSIZE < $clog2(DATA_WD/8)++#).
 2.  [.monospaced]#++AWLEN++# is non-zero (multi-beat burst).
 3.  The write is *modifiable* ([.monospaced]#++AWCACHE[1] = 1++#) and not exclusive ([.monospaced]#++AWLOCK = 0++#). Non-modifiable and exclusive writes must reach the manager port with their original size and length (AXI4 A4.3.1), so they bypass aggregation.
+4.  The write is not an access to the R/B response error debug address (xref:aou-724-rb-response-error-debug-fifo[7.2.4]). Such a write is not split either, so its length is not bounded by [.monospaced]#++MAX_AWBURSTLEN++# and the W FIFO could not be relied on to hold it; the debug window ignores the write data.
 
 When activated, the aggregator:
 
@@ -441,7 +442,7 @@ image::write-aggregation.svg[Figure 13. Write Aggregation -- Narrow-to-Wide Beat
 
 Read aggregation follows the same size-promotion logic as writes. [.monospaced]#++ARSIZE++# and [.monospaced]#++ARLEN++# are promoted to the full bus width, and [.monospaced]#++ARBURST++# is passed through (the aggregator does not restrict burst type to INCR). Unlike the write side, read aggregation is not gated on [.monospaced]#++ARCACHE[1]++# or [.monospaced]#++ARLOCK++#; non-modifiable and exclusive reads are promoted like any other read.
 
-The [.monospaced]#++AOU_AGGREGATOR_INFO++# submodule tracks outstanding AR transactions. For each issued AR, it records the original burst geometry (size, length) so that when wide R data returns from the manager side, the module can regenerate the correct slave-side [.monospaced]#++RLAST++# at the original burst boundaries. Wide R beats are presented to the slave side multiple times (once per original narrow beat) with the appropriate byte-lane selection.
+The [.monospaced]#++AOU_AGGREGATOR_INFO++# submodule tracks outstanding AR transactions. For each issued AR, it records the original burst geometry (size, length) so that when wide R data returns from the manager side, the module can regenerate the correct slave-side [.monospaced]#++RLAST++# at the original burst boundaries. Wide R beats are presented to the slave side multiple times (once per original narrow beat) with the appropriate byte-lane selection and the wide beat's RRESP on each; a failing wide beat therefore pushes one xref:aou-724-rb-response-error-debug-fifo[error debug FIFO] entry per narrow beat.
 
 [[aou-384-sfr-fields]]
 ==== 3.8.4. SFR Fields
