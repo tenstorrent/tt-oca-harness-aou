@@ -145,24 +145,33 @@ count, `+remote_rp_count`), `env.outstanding(why)`, and in the base vseq `inject
 originated, as this document defines it), not the remote model's responses.
 
 Reset contract as implemented: `env.reset_flush(which, bus_reset)`. I_PRESETN alone
-only cancels the software ISR (the core and link keep running). I_RESETN (bus_reset
-= 1): AXI managers drop queued and in-flight items and restart idle once the reset
-is over, subordinates drop requests, monitors forget in-flight transactions.
-AOU_SW_RESET (`sw_reset()`, bus_reset = 0): the AXI ports are not reset, so a burst
-already on the bus is still completed; only items that never reached the bus are
-dropped. In both cases the managers' outstanding transactions end with
-`aou_axi_txn.aborted = 1` (sequences continue) and `sb.abort()` counts them and
-marks the bytes an aborted write strobes unknown: each may hold its old value or the
-write's until a checked write defines it again. `sw_reset()` also brackets the APB
-write that requests AOU_SW_RESET with `env.sw_reset_window()`: the S-port monitors
-mark every transaction on the bus at the request `reset_outstanding`, and the
-scoreboard counts such a transaction that ends with SLVERR as aborted too (BUGS/015
-interim; any other response is checked as usual, and SLVERR on any later
-transaction is still an error). Whether the DUT
-still answers aborted requests is unspecified, so for `stale_window` (10 us) a
-response on an ID with an aborted request is taken as the stale one and new
-requests on that ID wait; later, a stale count only absorbs a response nothing else
-matches. The remote die (L3 `reset_flush()`: queues, credits, responder; L1 pump and
+only cancels the software ISR (the core and link keep running). I_RESETN and
+AOU_SW_RESET (`sw_reset()`; both bus_reset = 1): the local AXI agents are on the
+DUT's AXI-port reset (`tb_top.axi_port_rst_n`, the core reset read from the DUT), as
+the SoC's AXI peers must be (MAS 7.3.6, integration guide 3.1.1: either reset loses
+every AXI transaction in flight or queued in AOU_CORE, and the attached managers and
+subordinates are reset with it or recover on their own). AXI managers drop queued
+and in-flight items and restart idle once the reset is over, subordinates drop
+requests, monitors forget in-flight transactions. `abort_traffic()` (bus_reset = 0,
+no reset) only stops waiting: a burst already on the bus is still completed. The
+managers' outstanding transactions end with `aou_axi_txn.aborted = 1` (sequences
+continue) and `sb.abort()` counts them and marks the bytes an aborted write strobes
+unknown: each may hold its old value or the write's until a checked write defines
+it again. `sw_reset()` also brackets the request with `env.sw_reset_window()`, from
+the APB write that requests AOU_SW_RESET to the core reset: the S-port monitors
+mark every transaction on the bus in the window `reset_outstanding`; a write that
+completes in it is lost or landed whatever its response (the reset loses writes
+queued in the core, early-acknowledged ones included, 7.2.5), so the scoreboard
+treats it like an aborted write, and a read that ends with SLVERR counts as aborted
+too (BUGS/015 interim; any other response is checked as usual, and SLVERR on any
+later transaction is still an error). The DUT sends no response for a
+transaction the reset lost (its RX FIFOs reset with the core), but the managers
+tolerate one: for `stale_window` (10 us) a response on an ID with an aborted
+request is taken as the stale one and new requests on that ID wait; later, a stale
+count only absorbs a response nothing else matches. The subordinate agents'
+monitors use no window (the responder is the bench's own driver, reset with the
+port). The remote die (L3
+`reset_flush()`: queues, credits, responder; L1 pump and
 PL driver: flits built before the reset) always drops everything. `traffic()` and
 `wait_traffic()` are bounded by `cfg.drain_timeout` (T1-V08, then `stop_traffic()`).
 
@@ -374,7 +383,7 @@ Every test's virtual sequence extends this and composes these tasks:
 | `hold_tx()` / `release_tx()` | back-pressure on the DUT's TX: L1 holds pl_trdy low from the next flit boundary (`aou_fdi_cfg.tx_hold`), so requests back up behind the DUT's ring buffer and arbiters |
 | `hold_remote_tx()` / `release_remote_tx()` | the remote die's counterpart: L3 holds back credited messages (`pol.hold_credited`), then packs the backlog densely |
 | `inject(kind, args)` | L3 error injection (bad type, reserved bits, credit violations, out-of-state Activate/Deactivate, MsgStart, placement, over-grant, ...) and AXI error responses from memories |
-| `sw_reset()` | `AOU_SW_RESET`, then reprogram and re-activate (BUGS/007 interim expectation) |
+| `sw_reset()` | `AOU_SW_RESET` (every SFR, the activation state and the RX FIFOs reset, MAS 7.3.6), then reprogram and re-activate |
 | `hard_reset(which)` | assert `I_RESETN` and/or `I_PRESETN` mid-test, flush the environment, bring up again |
 | `expect_event(id, min, max)` | declare an error, interrupt or rule hit the scenario is supposed to cause |
 

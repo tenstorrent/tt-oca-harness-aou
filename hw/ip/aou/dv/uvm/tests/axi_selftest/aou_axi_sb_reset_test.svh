@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Directed check of the scoreboard's reset rule (BUGS/015 interim), with no
-// bus: transactions are fed to the scoreboard directly. A reset_outstanding
-// transaction may end with SLVERR, and the bytes such a write addresses may
-// then hold their old value or the write's, until a checked write; anything
-// else is still an error. Each step expects an exact set of errors.
+// Directed check of the scoreboard's reset rule, with no bus: transactions are
+// fed to the scoreboard directly. A reset_outstanding write is lost or landed
+// whatever its response, and the bytes it addresses may then hold their old
+// value or the write's, until a checked write; a reset_outstanding read may
+// end with SLVERR beats (BUGS/015 interim); anything else is still an error.
+// Each step expects an exact set of errors.
 class aou_axi_sb_reset_test extends uvm_test;
   `uvm_component_utils(aou_axi_sb_reset_test)
 
@@ -133,18 +134,21 @@ class aou_axi_sb_reset_test extends uvm_test;
     sb.write_local_mgr(r);
     expect_rules("DECERR read outstanding at the request", 1, 0, 2, 3, 0);
 
-    // Outstanding at the request but ended OKAY: checked as usual.
+    // Outstanding at the request and ended OKAY (an early response, 7.2.5):
+    // lost or landed, so the memory may hold either value.
     w = mk(AOU_AXI_WR, BASE + 64'h300);
     w.reset_outstanding = 1'b1;
     w.bresp = AOU_AXI_OKAY;
     rmem.write_txn(w);
     sb.write_local_mgr(w);
+    sb.write_local_mgr(mk(AOU_AXI_RD, BASE + 64'h300));
     w = mk(AOU_AXI_WR, BASE + 64'h340);
     w.reset_outstanding = 1'b1;
     w.bresp = AOU_AXI_OKAY;
     sb.write_local_mgr(w);
+    sb.write_local_mgr(mk(AOU_AXI_RD, BASE + 64'h340));
     rmem.write_txn(w);
-    expect_rules("OKAY write outstanding at the request", 1, 1, 2, 3, 0);
+    expect_rules("OKAY write outstanding at the request", 1, 0, 2, 3, 0);
 
     // End of test: one unknown byte holds a third value (AXI-S05 per byte and
     // a summary); its neighbour holds the new value.
@@ -167,9 +171,10 @@ class aou_axi_sb_reset_test extends uvm_test;
   endtask
 
   function void report_phase(uvm_phase phase);
-    expect_rules("end of test", 1, 1, 2, 3, 2);
-    if (sb.n_reset_err != 4 || sb.n_aborted != 1)
-      `uvm_error(get_type_name(), $sformatf("%0d ended with SLVERR, %0d aborted; expected 4, 1",
-                                            sb.n_reset_err, sb.n_aborted))
+    expect_rules("end of test", 1, 0, 2, 3, 2);
+    if (sb.n_reset_err != 6 || sb.n_aborted != 1)
+      `uvm_error(get_type_name(), $sformatf(
+          "%0d on the bus at AOU_SW_RESET, %0d aborted; expected 6, 1", sb.n_reset_err,
+          sb.n_aborted))
   endfunction
 endclass

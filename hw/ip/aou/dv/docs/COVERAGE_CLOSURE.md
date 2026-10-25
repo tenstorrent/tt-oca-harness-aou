@@ -324,8 +324,7 @@ Other holes in the same module:
 - **cond L228:** `pl_active && !rx_active_req` would need a non-compliant adapter. Class d/e.
 - **Lines 328, 350, 470:** one-hot `default` arms. Class d.
 
-**Proposal:** a new `aou_fdi_t1_bringup_corner_test`, quiet (no traffic, so BUGS/021/024 don't
-apply), that walks a table of (DUT state, injected event, offset). It needs three LSM
+**Proposal:** a new `aou_fdi_t1_bringup_corner_test`, quiet (no traffic), that walks a table of (DUT state, injected event, offset). It needs three LSM
 extensions: event-at-state injection, `wake_ack` delay, and LP-initiated L1 exit. Expected yield:
 bringup FSM 17→31/35 and **global FSM 34→48/58**.
 
@@ -489,7 +488,7 @@ can't mean what it says. They are listed for owner review because the denominato
 | **l1.cg_fdi_cancel** | `cp_half h1`, `cp_repeat second/more`, `x_half_kind h1,*` (5) | **a:** a flit cancel on the second 128 B half, and consecutive cancels (L1 driver knobs; `aou_t1_slice_test` only cancels the first half). r2.0 R20-04 adds a `nop` kind (§5). |
 | **l1.cg_fdi_stall** | `cp_hold h1/h2_4`; `x_where_lat boundary×{l3,l4_6,l7_up}`, `mid_flit,l2` (6) | **a:** short stall holds and stallreq at a flit boundary with a slow ack. 2-PHY builds hit 2 more, so the latency depends on the FDI width. Add R20-03 `cp_seq` and R20-02 `cp_state` (§5). |
 | **l2.cg_bringup_fsm** | `retrain_linkerr`, `l1_wake` (a); `active_linkdown`, `deact_linkdown`, `linkdown_unwake` (b) | `retrain_linkerr` and `l1_wake`: WP5 (LP-initiated L1 exit). The linkdown bins are the **bench model's** expected link-down path, so they are **b**: the linkdown and linkerror spec tests XFAIL on BUGS/001 and 038. With `+FDI_ENC=RTL` they still fail on 038 (the DUT has no LINKDOWN state). They close only with the 038 fix. |
-| **l2.cg_link_state cp_tr** | `retrain_linkerror`, `active_linkreset`, `linkreset_reset`, `active_disabled`, `disabled_reset`, `reset_linkerror`; `cp_sts linkreset/disabled` | **a/b.** Adapter-driven transitions. `link_event +event=link_reset/inband_drop` XFAIL on BUGS/021/024 because of traffic and SW reset. A **quiet** link-event variant closes them now. `reset_linkerror` and `retrain_linkerror` come with WP5. |
+| **l2.cg_link_state cp_tr** | `retrain_linkerror`, `active_linkreset`, `linkreset_reset`, `active_disabled`, `disabled_reset`, `reset_linkerror`; `cp_sts linkreset/disabled` | **a/b.** Adapter-driven transitions. `link_event +event=link_reset/inband_drop` used to XFAIL on the since-retired SW-reset sightings because of traffic and SW reset. A **quiet** link-event variant closes them now. `reset_linkerror` and `retrain_linkerror` come with WP5. |
 | **l2.cg_link_state cp_fdi_enc spec** | 1 | **b**, BUGS/001 (informational bin) |
 | **l3.cg_act_op** (after the fix) | `tx,illegal` × op0-3 and reserved (5) | **a:** sample the inject path. `aou_invalid_actmsg_test` covers every op×state, but those runs XFAIL on 019/013/023, so run the check-then-hard-reset variant (WP3). |
 | **l3.cg_credit** (after the fix) | `zero_stall,tx` for wreq/rreq/wresp; the new DUT-side bins | **a:** the model must exhaust the DUT's credit (`aou_zero_credit_test +credit=...` exists for model→DUT; the model-stalled direction needs bursts of remote-initiated requests beyond the DUT's advertised RX depth). |

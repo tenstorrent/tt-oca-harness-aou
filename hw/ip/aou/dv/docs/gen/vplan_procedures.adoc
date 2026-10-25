@@ -417,9 +417,9 @@ Class `aou_t1_sw_reset_test` extends `aou_base_test` (`uvm/tests/aou_t1_sw_reset
 
 *Procedure.* Virtual sequence `aou_t1_sw_reset_vseq` (`uvm/seq_lib/aou_t1_sw_reset_vseq.svh`):
 
-AOU_SW_RESET between traffic phases: BUGS/007 interim expectation (every
-SFR and the activation state reset); the remote side recovers, activation
-runs again and traffic passes.
+AOU_SW_RESET between traffic phases (MAS 7.3.6: every SFR, the activation
+state and the RX FIFOs reset); the remote side recovers, activation runs
+again and traffic passes.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2860,14 +2860,14 @@ Resets at awkward moments, then recovery and traffic (plan 11.10-11.12,
 picks a reset and a moment:
 
 ----
-+reset  sw    AOU_SW_RESET inside the MAS LinkReset sequence (BUGS/007
++reset  sw    AOU_SW_RESET inside the MAS LinkReset sequence (7.3.6:
 ----
 
-interim: every register returns to its reset value)
-core  I_RESETN only     } BUGS/016 interim: the registers are on
-apb   I_PRESETN only    } the core reset, so they return to their
-both  both resets       } reset values on I_RESETN and keep their
-} values on I_PRESETN alone
+every register returns to its reset value)
+core  I_RESETN only     } integration guide 3.1.1: the registers
+apb   I_PRESETN only    } are on the core reset, so they return to
+both  both resets       } their reset values on I_RESETN and keep
+} their values on I_PRESETN alone
 
 ----
 +when   idle, traffic (transactions in flight), activating (in the
@@ -3784,11 +3784,12 @@ errors are demoted to info and counted; the test fails if either count is 0.
 ===== 80. `aou_axi_sb_reset_test`
 Class `aou_axi_sb_reset_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_axi_sb_reset_test.svh`).
 
-*Purpose.* Directed check of the scoreboard's reset rule (BUGS/015 interim), with no
-bus: transactions are fed to the scoreboard directly. A reset_outstanding
-transaction may end with SLVERR, and the bytes such a write addresses may
-then hold their old value or the write's, until a checked write; anything
-else is still an error. Each step expects an exact set of errors.
+*Purpose.* Directed check of the scoreboard's reset rule, with no bus: transactions are
+fed to the scoreboard directly. A reset_outstanding write is lost or landed
+whatever its response, and the bytes it addresses may then hold their old
+value or the write's, until a checked write; a reset_outstanding read may
+end with SLVERR beats (BUGS/015 interim); anything else is still an error.
+Each step expects an exact set of errors.
 
 *Procedure.* The class's own `run_phase` (see the file).
 

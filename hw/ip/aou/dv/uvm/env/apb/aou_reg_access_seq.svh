@@ -5,8 +5,9 @@
 // compared field by field against the RDL access policy as predicted by the
 // register model (REG-R02 RW stores, REG-R03 RO ignores writes, REG-R04 W1C,
 // REG-R06 reserved). Self-clearing controls stay 0 here; REG-R05 checks the
-// write-only DEACTIVATE_FORCE reads back as 0, and REG-R11 that AOU_SW_RESET (RW
-// in the RDL and MAS) reads back as written.
+// write-only DEACTIVATE_FORCE reads back as 0, and REG-R11 that a write of 1 to
+// AOU_SW_RESET (write-only, self-clearing) reads back as 0 and returns every
+// register to its reset value (MAS 7.3.6).
 class aou_reg_access_seq extends aou_reg_base_seq;
   `uvm_object_utils(aou_reg_access_seq)
 
@@ -38,17 +39,12 @@ class aou_reg_access_seq extends aou_reg_base_seq;
     want(rm.aou_con0.aou_sw_reset, 1);
     commit();
     rd_field(rm.aou_con0.aou_sw_reset, got);
-    if (got != 1)
-      `uvm_error(get_type_name(), $sformatf("REG-R11: %s (RW) read 0x%0h after writing 1",
+    if (got != 0)
+      `uvm_error(get_type_name(), $sformatf("REG-R11: %s (WO) read 0x%0h after writing 1",
                                             rm.aou_con0.aou_sw_reset.get_full_name(), got))
-    // Which registers a software reset clears is not documented: report, and let
-    // the readbacks resynchronise the mirror.
-    foreach (regs[i]) begin
-      uvm_reg_data_t v;
-      rd_reg(regs[i], v);
-      `uvm_info(get_type_name(), $sformatf("after AOU_SW_RESET: %s = 0x%08h",
-                                           regs[i].get_name(), v), UVM_MEDIUM)
-    end
+    // The software reset returns every SFR to its reset value (MAS 7.3.6).
+    rm.reset();
+    foreach (regs[i]) check_reg(regs[i], "REG-R11", "after AOU_SW_RESET");
     want(rm.aou_con0.aou_sw_reset, 0);
     commit();
   endtask

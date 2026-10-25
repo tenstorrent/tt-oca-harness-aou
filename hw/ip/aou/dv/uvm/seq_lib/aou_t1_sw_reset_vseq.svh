@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// AOU_SW_RESET between traffic phases: BUGS/007 interim expectation (every
-// SFR and the activation state reset); the remote side recovers, activation
-// runs again and traffic passes.
+// AOU_SW_RESET between traffic phases (MAS 7.3.6: every SFR, the activation
+// state and the RX FIFOs reset); the remote side recovers, activation runs
+// again and traffic passes.
 class aou_t1_sw_reset_vseq extends aou_base_test_seq;
   `uvm_object_utils(aou_t1_sw_reset_vseq)
 

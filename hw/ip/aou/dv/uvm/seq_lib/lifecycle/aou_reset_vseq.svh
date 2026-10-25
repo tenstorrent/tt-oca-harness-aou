@@ -4,12 +4,12 @@
 // Resets at awkward moments, then recovery and traffic (plan 11.10-11.12,
 // 11.15). The DUT is first programmed away from its reset values; each loop
 // picks a reset and a moment:
-//   +reset  sw    AOU_SW_RESET inside the MAS LinkReset sequence (BUGS/007
-//                 interim: every register returns to its reset value)
-//           core  I_RESETN only     } BUGS/016 interim: the registers are on
-//           apb   I_PRESETN only    } the core reset, so they return to their
-//           both  both resets       } reset values on I_RESETN and keep their
-//                                   } values on I_PRESETN alone
+//   +reset  sw    AOU_SW_RESET inside the MAS LinkReset sequence (7.3.6:
+//                 every register returns to its reset value)
+//           core  I_RESETN only     } integration guide 3.1.1: the registers
+//           apb   I_PRESETN only    } are on the core reset, so they return to
+//           both  both resets       } their reset values on I_RESETN and keep
+//                                   } their values on I_PRESETN alone
 //   +when   idle, traffic (transactions in flight), activating (in the
 //           middle of the activation handshake), queued (DUT TX queue held
 //           non-empty by zero WREQ credit).
@@ -135,18 +135,18 @@ class aou_reset_vseq extends aou_link_base_vseq;
     case (rs)
       "sw": begin
         recover(null, 1'b0);
-        check_config(1'b0, "after AOU_SW_RESET (BUGS/007 interim)");
+        check_config(1'b0, "after AOU_SW_RESET");
         program_cfg(f);
       end
       "core": begin
         hard_reset(AOU_T1_RST_CORE, 1'b0);
-        check_config(1'b0, "I_RESETN resets the registers (BUGS/016 interim)");
+        check_config(1'b0, "I_RESETN resets the registers");
         program_cfg(f);
         link_up();
       end
       "apb": begin
         hard_reset(AOU_T1_RST_APB, 1'b0);
-        check_config(1'b1, "I_PRESETN alone keeps the registers (BUGS/016 interim)");
+        check_config(1'b1, "I_PRESETN alone keeps the registers");
       end
       "both": begin
         hard_reset(AOU_T1_RST_BOTH, 1'b0);
@@ -157,7 +157,7 @@ class aou_reset_vseq extends aou_link_base_vseq;
       default: `uvm_fatal(get_type_name(), {"unknown reset ", rs})
     endcase
     if (rs == "apb") begin
-      // I_PRESETN alone leaves the core and the AoU link running (BUGS/016);
+      // I_PRESETN alone leaves the core and the AoU link running (integration guide 3.1.1);
       // a handshake in progress completes and withheld credit is granted
       // here, since no new activation will advertise it.
       env.status.wait_act_state(1'b1, cfg.act_timeout);

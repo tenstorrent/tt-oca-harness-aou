@@ -148,6 +148,11 @@ module tb_top;
       !u_dut.u_aou_core_top.u_async_apb_bridge.u_async_apb_bridge_mi.r_mi_done_clkm &&
       !u_dut.u_aou_core_top.u_async_apb_bridge.u_async_apb_bridge_mi.w_si_req_clkm;
   assign rst.rx_w_pend = 8'(u_dut.u_aou_core_top.w_aou_rx_wlast_gen_wvalid);
+  assign rst.rx_pend = 8'(u_dut.u_aou_core_top.w_aou_rx_wlast_gen_awvalid) |
+                       8'(u_dut.u_aou_core_top.w_aou_rx_wlast_gen_wvalid) |
+                       8'(u_dut.u_aou_core_top.w_aou_rx_axi_mm_arvalid) |
+                       8'(u_dut.u_aou_core_top.w_aou_rx_axi_s_rvalid) |
+                       8'(u_dut.u_aou_core_top.w_early_bresp_ctrl_bvalid);
   assign rst.rx_msgcrdt_valid = u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_valid;
   assign rst.rx_msgcrdt = {u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_rp,
                            u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_wrespcred,
@@ -155,42 +160,21 @@ module tb_top;
                            u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_wdatacred,
                            u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_rreqcred,
                            u_dut.u_aou_core_top.u_aou_core.w_rxcore_msgcrdt_wreqcred};
-  // With the BUGS/021 guard the S-port pins belong to the guard, not the core,
-  // from the core reset to the end of the guard's drain.
-  for (genvar r = 0; r < 8; r++) begin : g_port_iso
-`ifdef AOU_DUT_SW_RESET_GUARD
-    if (r < RP_COUNT) begin : g_guard
-      assign rst.port_iso[r] =
-          u_dut.u_aou_core_top.gen_aou_fifo_rp[r].u_aou_axi_sw_reset_guard.w_iso;
-    end else begin : g_none
-      assign rst.port_iso[r] = 1'b0;
-    end
-`else
-    assign rst.port_iso[r] = 1'b0;
-`endif
-  end
-
-  // The reset of the DUT's AXI port logic (AOU_CORE: every S and M port pin except
-  // the S-port R payload, which AOU_FIFO_RP holds on I_RESETN): the core reset,
-  // I_RESETN and AOU_SW_RESET. With the BUGS/021 guard the pins see I_RESETN only.
-`ifdef AOU_DUT_SW_RESET_GUARD
-  wire axi_port_rst_n = rst_n;
-`else
+  // The reset of the DUT's AXI port logic (AOU_CORE and the RX FIFOs, every S and
+  // M port pin): the core reset, I_RESETN and AOU_SW_RESET. Either reset loses the AXI transactions in flight
+  // or queued in the core (MAS 7.3.6, integration guide 3.1.1), and the SoC must
+  // reset the AXI managers and subordinates on the AoU ports with it or let them
+  // recover. The bench models the reset: the local AXI agents and Arm's Axi4PC on
+  // the DUT's ports share this reset, so a software reset is a bus reset to them.
   wire axi_port_rst_n = rst.core_rst_n;
-`endif
   aou_axi4pc_ctl_if axi4pc_ctl (.clk(clk));
   initial axi4pc_ctl.chk_scope = $sformatf("%m.g_axi4pc");
-`ifdef AOU_DUT_SW_RESET_GUARD
-  assign axi4pc_ctl.guard = 1'b1;
-`else
-  assign axi4pc_ctl.guard = 1'b0;
-`endif
 
   // ---------------------------------------------------------------------------
   // Interfaces
   // ---------------------------------------------------------------------------
-  aou_axi_bus_if #(.DATA_W(AXI_W)) s_axi [RP_COUNT] (.clk(clk), .resetn(rst_n));
-  aou_axi_bus_if #(.DATA_W(AXI_W)) m_axi [RP_COUNT] (.clk(clk), .resetn(rst_n));
+  aou_axi_bus_if #(.DATA_W(AXI_W)) s_axi [RP_COUNT] (.clk(clk), .resetn(axi_port_rst_n));
+  aou_axi_bus_if #(.DATA_W(AXI_W)) m_axi [RP_COUNT] (.clk(clk), .resetn(axi_port_rst_n));
   aou_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb0 (.clk(clk), .rst_n(rst_n));
 `ifdef TWO_PHY
   aou_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));

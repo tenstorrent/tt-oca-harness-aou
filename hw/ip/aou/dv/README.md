@@ -420,10 +420,10 @@ errors in those cycles are still reported), so the waves of a `WAVES=1` rerun sh
 what followed. `check_run.py` judges the run by the errors before the fatal.
 
 Each checker's reset (`tb/aou_axi4pc_gate.sv`) is its port's reset: the DUT core
-reset (`I_RESETN` and `AOU_SW_RESET`), or `I_RESETN` alone with the BUGS/021 guard.
-After an `AOU_SW_RESET`, which the bench's agents don't see and which leaves the
-DUT's RX FIFOs alone, the checker leaves reset only once the port has no VALID up
-and nothing in flight. When the FDI
+reset (`I_RESETN` and `AOU_SW_RESET`), which the bench's AXI agents are on as well
+(the SoC resets the AXI peers with AOU_CORE, MAS 7.3.6). After an `AOU_SW_RESET`
+the checker leaves reset only once the port has no VALID up and nothing in
+flight, so a handshake the reset cut is never judged. When the FDI
 link is lost while AoU isn't DISABLED, the transactions in flight can't complete, so
 `uvm/env/aou_t1_axi4pc_ctl.svh` holds every checker in reset from that event until its
 port's next reset (then as above), or to the end of the test; each hold and release

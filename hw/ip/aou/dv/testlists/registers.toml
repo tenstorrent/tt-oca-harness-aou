@@ -37,8 +37,8 @@ seed = 1
 reseed = 2
 tags = ["registers"]
 run_modes = ["registers"]
-expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
-expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[tests]]
 name = "aou_reg_reserved_test"
@@ -109,8 +109,8 @@ seed = 1
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=40000"]
-expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
-expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[tests]]
 name = "aou_reg_access_test.pclk_ps-600"
@@ -119,8 +119,8 @@ seed = 1
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=600"]
-expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
-expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[tests]]
 name = "aou_reg_access_test.pclk_ps-1013"
@@ -129,8 +129,8 @@ seed = 1
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=1013"]
-expect_fail = "BUGS/003, BUGS/004, BUGS/007 (expected_fail.yaml)"
-expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en|REG-R11: aou_core\\.aou_con0\\.aou_sw_reset"
+expect_fail = "BUGS/003, BUGS/004 (expected_fail.yaml)"
+expect_fail_match = "REG-R06: aou_core\\.axi_slv_id_mismatch_err_rp|REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[groups]]
 name = "registers"

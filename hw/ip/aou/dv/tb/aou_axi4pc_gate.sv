@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// ARESETn for one Axi4PC instance (tb/tb_top.sv): the port's own reset, with two
+// ARESETn for one Axi4PC instance (tb/tb_top.sv): the port's own reset (port_rst_n:
+// I_RESETN and AOU_SW_RESET, which the bench's agents are on too), with two
 // additions.
-// - A port reset the bench's agents do not see (AOU_SW_RESET; bus_rst_n, I_RESETN,
-//   resets both sides) ends only at the first cycle with no VALID on the port and no
-//   transaction in flight on it. The bench legally finishes its side across the DUT's
-//   reset, and the DUT's port reset is partial: AOU_FIFO_RP (on I_RESETN) still
-//   delivers pre-reset R data and W bursts. Axi4PC would read those handshakes as
-//   *VALID_RESET violations and as traffic of transactions it never saw. A transaction
-//   that never ends (lost with the link) keeps the checker in reset.
+// - A port reset that is not I_RESETN (AOU_SW_RESET; bus_rst_n, I_RESETN, resets
+//   this gate as well) ends only at the first cycle with no VALID on the port and no
+//   transaction in flight on it, so Axi4PC never reads a handshake cut by the reset
+//   as a *VALID_RESET violation or as traffic of a transaction it never saw. The
+//   transaction counters clear with the port reset: every transaction in flight at
+//   AOU_SW_RESET is lost (MAS 7.3.6) and never completes, so counting it on would
+//   hold the checker off for the rest of the test.
 // - off_set (a link event, aou_t1_axi4pc_ctl) holds the checker in reset until the
 //   port's next reset, then as above. Without a port reset it stays held.
 // - resync (aou_t1_axi4pc_ctl, a one-cycle request) is kept pending (sync_wait) until a
@@ -58,7 +59,7 @@ module aou_axi4pc_gate (
   wire quiet = !any_valid && !busy;
 
   always_ff @(posedge clk or negedge bus_rst_n) begin
-    if (!bus_rst_n) begin
+    if (!bus_rst_n || !port_rst_n) begin
       n_aw <= 0;
       n_wl <= 0;
       n_b <= 0;

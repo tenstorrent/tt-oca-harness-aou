@@ -18,11 +18,15 @@
 // for OKAY/EXOKAY beats, every active lane against golden. At the end the real
 // and golden memories must agree on every written byte.
 //
-// Reset rule (BUGS/015 interim). A transaction a reset aborted (abort()), or
-// one on the bus when AOU_SW_RESET was requested (reset_outstanding) that ends
-// with SLVERR, counts as aborted. The bytes such a write addresses may then
-// hold their old value or the write's value until a checked write defines them
-// again. Every other response and every later transaction is checked as above.
+// Reset rule. A transaction a reset aborted (abort()) counts as aborted, and
+// so does a write on the bus when AOU_SW_RESET was requested (reset_outstanding),
+// whatever its response: the reset loses every write queued in AOU_CORE
+// (MAS 7.3.6), including one already acknowledged early (7.2.5), so the write
+// may have landed or not. The bytes such a write addresses may hold their old
+// value or the write's value until a checked write defines them again. A
+// reset_outstanding read's SLVERR beats are not checked (BUGS/015 interim); its
+// OKAY beats, every other response and every later transaction are checked as
+// above.
 class aou_scoreboard extends uvm_scoreboard;
   `uvm_component_utils(aou_scoreboard)
 
@@ -41,7 +45,7 @@ class aou_scoreboard extends uvm_scoreboard;
   int unsigned n_err_resp;    // error responses seen (and expected)
   int unsigned n_mismatch;
   int unsigned n_aborted;     // ended by a reset before their response (abort())
-  int unsigned n_reset_err;   // reset_outstanding, ended with SLVERR
+  int unsigned n_reset_err;   // reset_outstanding: writes (lost or landed), reads with SLVERR
   int unsigned n_unchecked;   // in an add_unchecked() window
 
   // Windows that are not memory (the DUT's error-information debug address):
@@ -177,7 +181,8 @@ class aou_scoreboard extends uvm_scoreboard;
            t, path);
       return;
     end
-    if (t.reset_outstanding && t.bresp == AOU_AXI_SLVERR) begin
+    // On the bus at the AOU_SW_RESET request: lost or landed, whatever the response.
+    if (t.reset_outstanding) begin
       n_reset_err++;
       make_unknown(gold, t);
       return;
@@ -292,7 +297,7 @@ class aou_scoreboard extends uvm_scoreboard;
   function void report_phase(uvm_phase phase);
     `uvm_info(get_type_name(), $sformatf({"local->remote %0d writes %0d reads; remote->local %0d ",
         "writes %0d reads; %0d at M ports; %0d error responses; %0d mismatches; ",
-        "%0d aborted by reset; %0d ended by AOU_SW_RESET with SLVERR; %0d unchecked"},
+        "%0d aborted by reset; %0d on the bus at AOU_SW_RESET; %0d unchecked"},
         n_l2r_wr, n_l2r_rd, n_r2l_wr, n_r2l_rd, n_local_sub, n_err_resp, n_mismatch,
         n_aborted, n_reset_err, n_unchecked), UVM_LOW)
   endfunction

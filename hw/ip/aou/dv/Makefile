@@ -234,10 +234,6 @@ DEFINES += AOU_WAVES_TOP=$(TOP)
 # overlay defines the same); this bench has no other framework.
 DEFINES += UVM
 DEFINES += $(if $(AXI4PC_ON),AOU_AXI4PC AOU_AXI4PC_MAXBURSTS=$(AXI4PC_MAXBURSTS))
-# AOU_AXI_SW_RESET_GUARD (BUGS/021 fix), in RTL/ or added by RTL_PATCH: T1-L28 then
-# follows the guard's port isolation instead of the raw core reset.
-DEFINES += $(if $(shell grep -ls '^module AOU_AXI_SW_RESET_GUARD' $(ROOT)/RTL/*.sv; \
-  $(if $(RTL_PATCH),grep -ls '^+module AOU_AXI_SW_RESET_GUARD' $(RTL_PATCH))),AOU_DUT_SW_RESET_GUARD)
 UVM_DPI_DIR := $(UVM_CORE_ROOT)/src/dpi
 
 # COV=1 also binds the AXI4 functional coverage monitors to the DUT, whose text

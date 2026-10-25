@@ -60,7 +60,7 @@ package aou_core_csr_uvm_pkg;
             this.credit_manage = new("credit_manage");
             this.credit_manage.configure(this, 1, 3, "RW", 1, 'h1, 1, 1, 0);
             this.aou_sw_reset = new("aou_sw_reset");
-            this.aou_sw_reset.configure(this, 1, 4, "RW", 1, 'h0, 1, 1, 0);
+            this.aou_sw_reset.configure(this, 1, 4, "WO", 1, 'h0, 1, 1, 0);
             this.reserved_10_5 = new("reserved_10_5");
             this.reserved_10_5.configure(this, 6, 5, "RO", 1, 'h0, 1, 1, 0);
             this.tx_lp_mode = new("tx_lp_mode");

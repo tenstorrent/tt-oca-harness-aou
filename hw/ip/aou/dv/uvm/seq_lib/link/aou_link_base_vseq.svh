@@ -202,7 +202,7 @@ class aou_link_base_vseq extends aou_base_test_seq;
   // down (`down`: LinkError, its answer to the DUT's LinkReset request, or
   // LinkReset; pl_inband_pres may also drop meanwhile); sw_reset() then
   // resets AOU_CORE while the link is in Reset, brings the link back and
-  // software reprograms (BUGS/007) and activates again. Passing through
+  // software reprograms (the reset cleared every SFR) and activates again. Passing through
   // Reset also starts a new epoch in AOU_FDI_CHECKER, which has no other way
   // to learn that both sides forgot their activation state.
   task recover(aou_t1_feature_cfg reprogram = null, bit reactivate = 1'b1,

@@ -1091,6 +1091,51 @@ restarts the link, reprograms and re-activates" is therefore the documented
 flow. Still open (011): who resets AOU_CORE after a link-down it did not
 request, and must a flit already in its TX path be dropped?
 
+## D19. The local AXI agents are reset with AOU_CORE
+
+**Decision.**
+
+- The bench's local AXI managers and subordinates on the DUT's S and M ports,
+  and the Axi4PC checkers on them, are on the DUT's AXI-port reset
+  (`tb_top.axi_port_rst_n`: the core reset read from the DUT, I_RESETN and
+  AOU_SW_RESET together). `sw_reset_core()` flushes the environment with
+  `bus_reset = 1` once the core reset is sampled, so the software reset is a
+  bus reset to the agents: queued and in-flight transactions end as aborted,
+  the drivers idle their outputs and restart once the reset is over.
+- The scoreboard treats a write on the bus at the AOU_SW_RESET request
+  (`reset_outstanding`) as lost or landed whatever its response; a read in the
+  same window may end with SLVERR (BUGS/015 interim).
+- No check judges the AXI protocol across the software reset on the DUT's
+  ports: T1-L28 (S-port handshakes inside the reset pulse) and T1-L26 (an M-port
+  response presented before the reset and not accepted after it) are retired,
+  with every expected-fail entry that rested on them, and so is the bench's
+  support for an RTL-side guard that would have kept the ports AXI-clean.
+
+**Why.** The owner's decision (2026-10-25): an error that needs AOU_SW_RESET or
+I_RESETN loses every AXI transaction in flight or queued in the block, and the
+rest of the AXI logic attached to it is reset as well or has its own recovery
+mechanism. That is now what the MAS (7.3.6) and the integration guide (3.1.1,
+6.5.3) say. A bench whose agents kept driving the ports across the reset, and
+checkers that expected the DUT to keep the AXI protocol through it, were testing
+a contract the IP does not offer; the stalls, shifted W-to-AW pairing and
+orphan responses they reported were the bench's own doing. Modelling the reset
+peers the integration guide requires makes those scenarios pass and leaves
+T1-L29 (the RX FIFOs are empty at the release of AOU_SW_RESET, and no beat held
+across it reaches an M port) as the one DUT-side check of the software reset.
+
+**Where.** `tb/tb_top.sv`, `tb/aou_axi4pc_gate.sv`, `uvm/env/aou_t1_env.svh`
+(`reset_flush`, `sw_reset_window`), `uvm/env/aou_base_test_seq.svh`
+(`sw_reset_core`), `uvm/env/axi/aou_axi_monitor.svh`, `uvm/env/aou_scoreboard.svh`,
+`uvm/env/aou_t1_sw_reset_chk.svh`, `expected_fail.yaml`, `checkers/rules.csv`;
+[ARCHITECTURE.md](ARCHITECTURE.md) "Reset contract as implemented".
+
+**Consequences.** A test that wants the DUT's ports to stay protocol-clean across
+AOU_SW_RESET has no such expectation to lean on. The RX FIFOs (AOU_FIFO_RP) are
+on the core reset together with AOU_CORE, so nothing the reset lost is presented
+on a port afterwards; the managers' stale window and the Axi4PC gate stay as
+defensive measures only, and `aou_sw_reset` is write-only and self-clearing in
+the RDL (a write of 1 resets the bit with every other SFR).
+
 ## Open items
 
 - **Functional coverage stages FC2 and FC3.** FC1 (the counting service, every

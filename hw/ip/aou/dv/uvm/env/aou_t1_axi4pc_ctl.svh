@@ -6,11 +6,10 @@
 // Retrain for Reset, LinkError, LinkReset or Disabled, outside I_RESETN) strands
 // every transaction then in flight, and any the S ports accept before software resets
 // the core: they never complete, so the DUT's AXI ports break AXI4 until their reset
-// (BUGS/015 interim, BUGS/021). On that event every port's checker is held in reset
-// (tb/aou_axi4pc_gate.sv) until its port's next reset and then until the bench side of
-// the port is idle; with no port reset it stays off to the end of the test. With the
-// BUGS/021 guard the ports stay protocol-clean through the event, so nothing is held.
-// Each hold and release is logged.
+// (BUGS/015 interim; the reset itself loses them, MAS 7.3.6). On that event every
+// port's checker is held in reset (tb/aou_axi4pc_gate.sv) until its port's next
+// reset and then until the bench side of the port is idle; with no port reset it
+// stays off to the end of the test. Each hold and release is logged.
 //
 // Test intent: an unmatched B or R the local subordinate presents on purpose
 // (aou_axi_sub_driver::inject_orphan, the ID-mismatch error injection) breaks the
@@ -22,9 +21,9 @@
 // read-CAM underflow seen before that reset.
 // At the end of the test, a resync still waiting for a quiet cycle is a UVM_ERROR (the
 // port never went idle: a transaction did not complete, and the checker ran on with
-// the stale entry), and so is a checker still held with no link event behind it (a
-// port reset left a transaction that never completed, so Axi4PC was off). Holds a
-// link event caused are logged as before (BUGS/015, BUGS/021).
+// the stale entry), and so is a checker still held with no link event behind it (the
+// bench side of the port never went idle after a port reset, so Axi4PC was off). Holds
+// a link event caused are logged as before (BUGS/015).
 class aou_t1_axi4pc_ctl extends uvm_component;
   `uvm_component_utils(aou_t1_axi4pc_ctl)
 
@@ -68,12 +67,12 @@ class aou_t1_axi4pc_ctl extends uvm_component;
     have_prev = 1'b1;
     prev_sts = o.sts;
     prev_rst_n = o.rst_n;
-    if (!lost || vif == null || vif.present !== 1'b1 || vif.guard === 1'b1) return;
+    if (!lost || vif == null || vif.present !== 1'b1) return;
     n_events++;
     pending = 1'b1;
     `uvm_info(get_type_name(), $sformatf({"Axi4PC held on every port: FDI link lost (%s) with ",
               "AoU not DISABLED; transactions in flight cannot complete until the ports' ",
-              "reset (BUGS/015, BUGS/021)"}, o.sts.name()), UVM_LOW)
+              "reset (BUGS/015)"}, o.sts.name()), UVM_LOW)
   endfunction
 
   task run_phase(uvm_phase phase);

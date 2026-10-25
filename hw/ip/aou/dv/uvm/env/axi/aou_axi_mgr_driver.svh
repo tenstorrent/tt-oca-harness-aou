@@ -20,17 +20,19 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
   protected semaphore rd_tok;
   protected bit [1023:0] data_mask;
   protected bit [127:0]  strb_mask;
-  // Responses still owed for transactions a reset aborted, per ID. Whether
-  // the DUT still answers them after a software reset is unspecified, so for
-  // stale_window after the flush a response on such an ID is taken to be the
-  // stale one (AXI keeps responses in order per ID) and dropped, and new
-  // transactions on that ID wait until it has come or the window has passed.
-  // An entry is null once its transaction has gone back to the sequence. A
-  // software reset's flush cannot take back a request that is presented but
-  // not yet handed over: it reaches the DUT after the reset and really
-  // executes. Such a transaction goes back only when its stale response is
-  // dropped (or the window passes), so its sequence keeps the addresses
-  // reserved meanwhile and cannot issue an overlapping transaction.
+  // Responses still owed for transactions a reset aborted, per ID. The reset
+  // loses them, and the DUT sends none for them (its RX FIFOs reset with the
+  // core); this manager's recovery still tolerates one: for stale_window
+  // after the flush a response on such an ID is taken to be the stale one
+  // (AXI keeps responses in order per ID) and dropped, and new transactions on
+  // that ID wait until it has come or the window has passed. An entry is null
+  // once its transaction has gone back to the sequence. Without a bus reset
+  // (abort_traffic) the flush cannot take
+  // back a request that is presented but not yet handed over: it reaches the
+  // DUT later and really executes. Such a transaction goes back only when its
+  // stale response is dropped (or the window passes), so its sequence keeps
+  // the addresses reserved meanwhile and cannot issue an overlapping
+  // transaction.
   time                   stale_window = 10us;
   protected aou_axi_mgr_item stale_b[bit [9:0]][$];
   protected aou_axi_mgr_item stale_r[bit [9:0]][$];
@@ -79,7 +81,8 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
           end
         join
         idle_outputs();
-        // A flush on I_RESETN comes at its assertion: restart once it is over.
+        // A flush on a bus reset (I_RESETN, AOU_SW_RESET) comes at its
+        // assertion: restart once it is over.
         @(vif.mgr_cb);
         while (vif.mgr_cb.resetn !== 1'b1) @(vif.mgr_cb);
       end
@@ -118,10 +121,11 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
   // aborted = 1 (returned through put_response so sequences continue and
   // appended to `aborted` for the scoreboard). Items that never reached the
   // bus are dropped; responses the DUT still sends for the others are dropped
-  // too (stale_window). bus_reset (the port's own reset, I_RESETN): the
+  // too (stale_window). bus_reset (the port's own reset: I_RESETN or
+  // AOU_SW_RESET, which the local agents share with the DUT's ports): the
   // channel threads also restart with idle outputs once the reset is over.
-  // Otherwise (AOU_SW_RESET: the bus itself is not reset) a burst whose AW or
-  // W has started is still driven to completion, as AXI requires.
+  // Otherwise (abort_traffic: no reset) a burst whose AW or W has started is
+  // still driven to completion, as AXI requires.
   function void reset_flush(ref aou_axi_txn aborted[$], input bit bus_reset = 1'b1);
     aou_axi_mgr_item it;
     aou_axi_mgr_item aw_l[$];

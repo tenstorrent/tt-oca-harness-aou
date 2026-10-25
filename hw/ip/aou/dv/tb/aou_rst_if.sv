@@ -4,10 +4,10 @@
 // Reset requests from the T1 reset agent (config_db key "rst"). The top ANDs
 // resetn/presetn with its power-on reset, so a bench without the agent still
 // comes out of reset; rst_n/prst_n are what the DUT actually sees. core_rst_n is
-// the reset the DUT core itself sees (I_RESETN and AOU_SW_RESET), read from the DUT.
-// port_iso[r] is 1 while the BUGS/021 guard isolates RP r's AXI ports from the
-// core (always 0 without the guard). rx_w_pend[r] is RP r's RX W FIFO output
-// valid towards the M port (BUGS/007). apb_psel is the APB master's PSEL and
+// the reset the DUT core itself sees (I_RESETN and AOU_SW_RESET), read from the DUT;
+// the bench's AXI agents are on it too. rx_pend[r] is 1 while any of RP r's RX
+// FIFOs (AOU_FIFO_RP: AW, W, AR, R, B) presents an entry, rx_w_pend[r] while its
+// W FIFO does (aou_t1_sw_reset_chk). apb_psel is the APB master's PSEL and
 // apb_bridge_idle is 1 when the async APB bridge's request/done handshake is
 // back at idle in both clock domains (both FSMs idle, req and done low, both
 // synchroniser outputs low); apb_quiet is the two together, the precondition
@@ -22,7 +22,7 @@ interface aou_rst_if (input logic clk, input logic pclk);
   logic rst_n;
   logic prst_n;
   logic core_rst_n;
-  logic [7:0] port_iso;
+  logic [7:0] rx_pend;
   logic [7:0] rx_w_pend;
   logic        rx_msgcrdt_valid;
   logic [15:0] rx_msgcrdt;
@@ -41,7 +41,7 @@ interface aou_rst_if (input logic clk, input logic pclk);
   endclocking
 
   clocking mon_cb @(posedge clk);
-    input rst_n, prst_n, core_rst_n, port_iso, rx_w_pend, apb_quiet, dft_modescan,
+    input rst_n, prst_n, core_rst_n, rx_pend, rx_w_pend, apb_quiet, dft_modescan,
           rx_msgcrdt_valid, rx_msgcrdt;
   endclocking
 

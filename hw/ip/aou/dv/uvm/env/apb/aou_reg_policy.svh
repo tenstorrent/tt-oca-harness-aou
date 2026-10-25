@@ -12,7 +12,8 @@
 //   - when traffic can run (quiet = 0), fields hardware sets on events: the W1C
 //     error/interrupt flags and invalid_actmsg_info.
 // Self-clearing controls start activation or deactivation, and AOU_SW_RESET
-// resets the core, so generic tests write them as 0 (side_effect_mask).
+// (write-only, self-clearing) resets the core, so generic tests write them as 0
+// (side_effect_mask).
 // MAX_AxBURSTLEN gets the MAS's legal-value rule (aou_reg_burstlen_cb).
 class aou_reg_policy extends uvm_object;
   `uvm_object_utils(aou_reg_policy)

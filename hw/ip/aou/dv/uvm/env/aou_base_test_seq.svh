@@ -708,8 +708,11 @@ class aou_base_test_seq extends ocah_sequence;
   endtask
 
   // AOU_SW_RESET and the environment's matching flush (both dies), the link
-  // already down. The flush follows the core reset, which the DUT may delay
-  // until its AXI handshakes complete; a core reset that never comes is T1-L31.
+  // already down. The flush follows the core reset: the local AXI agents are on
+  // the DUT's AXI-port reset (tb_top axi_port_rst_n), so to them the software
+  // reset is a bus reset (bus_reset = 1): every transaction in flight or queued
+  // is lost, as the MAS says (7.3.6), and the agents restart idle with the core.
+  // A core reset that never comes is T1-L31.
   task sw_reset_core();
     env.sw_reset_window(1'b1);
     fork
@@ -721,7 +724,7 @@ class aou_base_test_seq extends ocah_sequence;
                      {"T1-L31: AOU_SW_RESET did not put the DUT core in reset within %0d ",
                       "cycles; flushing anyway"}, SW_RESET_WAIT_CYCLES))
         env.sw_reset_window(1'b0);
-        env.reset_flush(AOU_T1_RST_BOTH, 1'b0);
+        env.reset_flush(AOU_T1_RST_BOTH, 1'b1);
       end
     join
     wait_cycles(20);
@@ -785,7 +788,7 @@ class aou_base_test_seq extends ocah_sequence;
   task hard_reset(aou_t1_rst_e which = AOU_T1_RST_BOTH, bit reactivate = 1'b1);
     // The reset agent's on_reset makes the env flush (reset_flush(which)).
     env.rst.do_reset(which);
-    // The SFRs are on the core reset (BUGS/016 interim): I_PRESETN alone keeps them.
+    // The SFRs are on the core reset (integration guide 3.1.1): I_PRESETN alone keeps them.
     if (which != AOU_T1_RST_APB) p_sequencer.regs.reset();
     // I_PRESETN alone leaves the core and the AoU link running.
     if (!reactivate || which == AOU_T1_RST_APB) return;
@@ -794,25 +797,31 @@ class aou_base_test_seq extends ocah_sequence;
   endtask
 
   // AOU_CON0.AOU_SW_RESET as the MAS uses it (7.3.6: while handling LinkReset):
-  // the Adapter takes the link to Reset, software resets AOU_CORE (BUGS/007
-  // interim: every SFR and the activation state reset, the bit clears itself),
+  // the Adapter takes the link to Reset, software resets AOU_CORE (every SFR,
+  // the bit itself included, the activation state and the RX FIFOs),
   // the remote die drops its activation state, the link comes back up,
   // software reprograms and both dies activate again.
-  // The env flushes on the first core clock that samples the core in reset. The
-  // request (with the RTL's AXI guard), then the reset and the guard's drain, let no
-  // new handshake start on the DUT's AXI ports, so every request handshaked before
-  // the flush went to the old core (reset_outstanding) and every one after it goes
-  // to the new core and is tracked normally. Flushing later would abort a request
-  // the new core had accepted; it still goes out on the next activation, and the
-  // far side pairs it with another request (DP-R05). The APB write can complete
-  // after the drain has ended, so it is not the boundary. The local managers keep
-  // issuing throughout, so requests do arrive during the reset and the drain.
+  // The env flushes on the first core clock that samples the core in reset, and
+  // the local AXI agents reset with it (sw_reset_core): every request handshaked
+  // before the flush went to the old core and is lost or, for a write acknowledged
+  // early, lost or landed (reset_outstanding; the scoreboard allows either), and
+  // every one after it goes to the new core and is tracked normally. The local
+  // managers issue until the reset and resume once it is over, so requests do
+  // arrive right up to the reset. The APB write can complete after the core reset
+  // has ended, so it is not the boundary.
   task sw_reset(aou_t1_feature_cfg reprogram = null, bit reactivate = 1'b1);
     bit rebringup = cfg.lsm_cfg.rebringup_after_down;
     cfg.lsm_cfg.rebringup_after_down = 1'b0;
     link_event(LSM_EV_LINK_RESET);
     cfg.lsm_cfg.rebringup_after_down = rebringup;
     check_link_down_status();
+    // Software is one thread: a service the ISR began before the link went
+    // down (its APB write may still be queued behind this sequence's) ends or
+    // is abandoned before software requests the reset, as in sys_reset().
+    // Otherwise that write lands on the reset core (ACTIVATE_START after the
+    // reset makes the DUT activate without INT_ACTIVATE_START, T1-L05).
+    env.sw_isr.cancel();
+    env.sw_isr.wait_idle();
     sw_reset_core();
     link_event(LSM_EV_BRINGUP);
     if (reprogram != null) program_cfg(reprogram);

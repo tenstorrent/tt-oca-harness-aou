@@ -30,6 +30,10 @@ class aou_axi_sub_agent extends uvm_agent;
     if (cfg.has_monitor) begin
       mon = aou_axi_monitor::type_id::create("mon", this);
       mon.cfg = cfg;
+      // The responder here is this agent's driver, reset with the port: no
+      // response to a request the reset cut off ever comes, so a response on
+      // an ID a reset left open belongs to the manager's next request.
+      mon.stale_window = 0;
     end
     if (cfg.is_active == UVM_ACTIVE) begin
       drv = aou_axi_sub_driver::type_id::create("drv", this);
