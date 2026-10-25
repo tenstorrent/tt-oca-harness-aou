@@ -84,7 +84,7 @@ Don't override. Generated from: aou_core
 |  1  |       reserved_1       |   r  | 0x0 |  — |
 |  2  |     axi_split_tr_en    |  rw  | 0x0 |  — |
 |  3  |      credit_manage     |  rw  | 0x1 |  — |
-|  4  |      aou_sw_reset      |  rw  | 0x0 |  — |
+|  4  |      aou_sw_reset      |   w  | 0x0 |  — |
 | 10:5|      reserved_10_5     |   r  | 0x0 |  — |
 |  11 |       tx_lp_mode       |  rw  | 0x0 |  — |
 |19:12|  tx_lp_mode_threshold  |  rw  | 0x4 |  — |
@@ -112,7 +112,7 @@ Don't override. Generated from: aou_core
 
 #### aou_sw_reset field
 
-<p>Software reset for AOU core logic.</p>
+<p>Software reset of AOU_CORE. Writing 1 resets AOU_CORE the way I_RESETN does: every SFR (this bit included) returns to its reset value, the activation FSM returns to DISABLED, the RX FIFOs of every RP are emptied and the AXI port logic is cleared; a transaction in flight or queued is lost and gets no response. Write-only; reads return 0 (the reset clears the bit itself, so the reset lasts one I_CLK cycle). Use it only as part of the LinkReset handling sequence (MAS 7.3.6), with the FDI link down: in LinkError (the AOU_TOP bringup controller holds the link there until this reset is written), LinkReset, Disabled or Reset, never Active.</p>
 
 #### tx_lp_mode field
 

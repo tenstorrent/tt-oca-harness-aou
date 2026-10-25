@@ -162,7 +162,9 @@ remote AOU bridge when configured via APB.
 * AOU_FIFO_RP This block buffers decoded messages from AOU_RX_CORE. It
 separates the messages based on resource plane (RP) indicator and writes
 them into dedicated FIFOs. These FIFOs feed the corresponding
-AOU_CORE_RP which manage a single AXI interface.
+AOU_CORE_RP which manage a single AXI interface. The FIFOs are on the
+core reset together with AOU_CORE (I_RESETN and AOU_CON0.AOU_SW_RESET,
+xref:aou-ig-reset-domains[Section 3.1.1]).
 * ASYNC_APB_BRIDGE This block synchronizes APB transactions to the local
 core clock.
 
@@ -420,8 +422,36 @@ configuration registers, brings the link up, and runs activation again.
 [.monospaced]#++AOU_SW_RESET++# is the software reset used in the LinkReset
 sequence
 (xref:../MAS/software-operation.adoc#aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6]).
-Scan muxing of that path is described in
+It resets AOU_CORE the same way, the AXI port logic and the RX FIFOs
+(AOU_FIFO_RP) of every RP included, with no quiesce or drain; every
+configuration register returns to its reset value, the
+[.monospaced]#++AOU_SW_RESET++# bit itself included, so the bit is
+write-only and self-clearing and the reset lasts one
+[.monospaced]#++I_CLK++# cycle. Scan muxing of that path is described in
 xref:aou-ig-tiel_dft_modescan-usage[Section 3.13.1].
+
+*AXI transactions across a reset.* Either reset loses every AXI
+transaction in flight or queued in AOU_CORE: requests accepted on the S
+ports and not yet sent, bursts in progress on the S or M ports, responses
+owed to the local managers (for reads and writes already sent to the
+remote die too), responses the local subordinates present on the M ports,
+and writes already acknowledged with an early write response whose data has
+not reached the remote die. Nothing is completed with an error response, and
+the ports do not keep the AXI protocol across the reset: VALID can drop
+without a handshake, a burst can end early, a response presented to an M
+port is never accepted and a response owed on an S port never comes. The
+integrator must therefore either reset the AXI managers and subordinates
+attached to the AoU ports together with AOU_CORE (the same reset event; on
+[.monospaced]#++AOU_CORE_TOP++#, [.monospaced]#++O_SW_RESET++# reports the
+software reset, xref:aou-ig-ucie-external-control-and-status[Section 3.12]),
+or give them a recovery mechanism that abandons the transactions
+outstanding towards AOU_CORE, withdraws what they present and ignores a late
+response. Nothing a reset lost is presented on a port after it: the RX
+FIFOs are emptied with the core, so no beat or response received before the
+reset is delivered later, and the activation that follows advertises the
+full FIFO depth as credit. Software restarts the lost traffic once AOU_CORE
+is activated again. Only the LinkReset sequence resets with traffic pending;
+the PM entry and LinkDisable sequences drain it first (Section 7.3.6).
 
 [.monospaced]#++I_PRESETN++# is the APB-clock reset. It resets only the
 APB-clock side of the asynchronous APB bridge. Configuration, activation
@@ -878,7 +908,8 @@ instance of [.monospaced]#++AOU_SOC_GFMUX_LVT++#) that selects the reset source 
                               I_SEL
                          +-------------+
   ~r_sw_reset & I_RESETN |  I_A        |
-  (functional SW reset)  |   GFMUX     |---> w_DFTED_sw_resetn ---> AOU_CORE.I_RESETN
+  (functional SW reset)  |   GFMUX     |---> w_DFTED_sw_resetn ---> AOU_CORE.I_RESETN,
+                         |             |                            AOU_FIFO_RP.I_RESETN
                          |  I_B        |
   AOU_SOC_BUF(1'b0)     |             |
   (scan bypass: low)     +-------------+
@@ -1414,6 +1445,17 @@ that an error has occurred which requires the Link to go down.
 
 While handling LinkReset, SW needs to do AOU_CORE SW reset by setting
 AOU_CON0.AOU_SW_RESET.
+
+Unlike the PM entry and Link Disable sequences, this one does not drain
+the AXI traffic first: with the link down, nothing AOU_CORE holds could
+complete. AOU_CON0.AOU_SW_RESET (like I_RESETN) loses every AXI
+transaction in flight or queued in AOU_CORE, on the S and M ports of every
+RP, without an error response, and the ports do not keep the AXI protocol
+across it. The RX FIFOs reset with the core, so nothing received before the
+reset is delivered after it. The AXI managers and subordinates attached to
+the AoU ports are reset with AOU_CORE or recover on their own, as
+xref:aou-ig-reset-domains[Section 3.1.1] requires; SW restarts the lost
+traffic after re-activation.
 
 SW learns of a LinkReset, Disabled or Adapter-reported LinkError that
 took the link down while AoU was in use from INT_FDI_LINK_DOWN
