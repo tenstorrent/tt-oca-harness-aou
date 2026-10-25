@@ -158,6 +158,7 @@ package aou_t1_env_pkg;
 
   `uvm_analysis_imp_decl(_dbg_mport)
   `uvm_analysis_imp_decl(_dbg_remote)
+  `uvm_analysis_imp_decl(_dbg_remote_req)
 
   `include "aou_t1_traffic_cfg.svh"
   `include "aou_t1_feature_cfg.svh"

@@ -26,7 +26,8 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   // AOU_RWREQ_DUT_LIKE: the WriteReq keeps AWSIZE and WriteData is at our bus
   //   width, as this DUT sends; legal, and it exercises a receiver's downsizers.
   aou_t1_rwreq_e wreq_mode = AOU_RWREQ_AWSIZE;
-  uvm_analysis_port #(aou_axi_txn) ap;
+  uvm_analysis_port #(aou_axi_txn) ap;      // each transaction once complete
+  uvm_analysis_port #(aou_axi_txn) req_ap;  // each transaction as its request is sent
 
   int unsigned n_wr;
   int unsigned n_rd;
@@ -50,6 +51,7 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   function new(string name, uvm_component parent);
     super.new(name, parent);
     ap = new("ap", this);
+    req_ap = new("req_ap", this);
     done_ev = new("done_ev");
   endfunction
 
@@ -79,6 +81,7 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
     t.local_side = 1'b0;
     while (is_stale(t.dir == AOU_AXI_RD, t.id)) @(clk_vif.mon_cb);
     t.t_addr = $time;
+    req_ap.write(t);
     if (t.dir == AOU_AXI_WR) begin
       while (n_wr_os >= cfg.max_wr_outstanding) done_ev.wait_trigger();
       send_write(t);

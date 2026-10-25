@@ -44,7 +44,7 @@ class aou_dbg_off_vseq extends aou_axi_err_resp_vseq;
     aou_core rm = p_sequencer.regs;
     write_field(rm.aou_con0.get_field_by_name($sformatf("rp%0d_error_info_access_en", rp)), 0);
     write_field(rpf("axi_error_info0", rp, "debug_upper_addr"), uvm_reg_data_t'(a[63:32]));
-    write_field(rpf("axi_error_info1", rp, "debug_lower_addr"), uvm_reg_data_t'(a[31:0]));
+    write_field(rpf("axi_error_info1", rp, "debug_lower_addr"), uvm_reg_data_t'(a[31:7]));
   endtask
 
   task mem_part(int unsigned rp);

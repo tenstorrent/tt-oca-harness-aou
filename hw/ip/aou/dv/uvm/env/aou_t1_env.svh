@@ -171,6 +171,7 @@ class aou_t1_env extends uvm_env;
     vseqr.regs = regs.model;
     foreach (m_sub[r]) m_sub[r].ap.connect(dbg_chk.mport_imp);
     rmgr.ap.connect(dbg_chk.remote_imp);
+    rmgr.req_ap.connect(dbg_chk.remote_req_imp);
     dbg_chk.rm = regs.model;
     dbg_chk.clk_vif = m_sub[0].cfg.vif;
     l3.ap_rx_msg.connect(crd_chk.rx_msg_imp);

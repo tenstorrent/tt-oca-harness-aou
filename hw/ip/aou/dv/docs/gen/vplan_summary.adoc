@@ -273,7 +273,7 @@
 | `aou_slv_id_mismatch_test.4x512-sp64` | `aou_slv_id_mismatch_test` |  | 1-2 | `4x512-sp64` | 9.11,9.12 | 
 | `aou_slv_id_mismatch_test.1x512-sp64` | `aou_slv_id_mismatch_test` |  | 1 | `1x512-sp64` | 9.11,9.12 | 
 |===
-===== `testlists/err_int.toml` (29 scenarios)
+===== `testlists/err_int.toml` (38 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -284,6 +284,15 @@
 | `aou_axi_err_resp_test.part-fifo.dbg_len-31` | `aou_axi_err_resp_test` | `+part=fifo +dbg_len=31` | 1-2 |  | 9.13,9.14 | 
 | `aou_axi_err_resp_test.part-fifo.dbg_len-max` | `aou_axi_err_resp_test` | `+part=fifo +dbg_len=max` | 1 |  | 9.13,9.14 | 
 | `aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0` | `aou_axi_err_resp_test` | `+part=fifo +dbg_len=3 +max_awburstlen=0 +max_arburstlen=0` | 1-2 |  | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.dbg_len-63.dbg_cache-2.agg_en-1.remote_bytes-32.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +dbg_len=63 +dbg_cache=2 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +err_len=1 +err_off=32 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +err_len=3 +err_off=32 +agg_en=1 +remote_bytes=32 +max_awburstlen=3 +max_arburstlen=1` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64 +pair_writes=3` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64` | `aou_axi_err_resp_test` | `+part=fifo +err_len=7 +agg_en=1 +remote_bytes=32 +pair_gap=64` | 1-2 | `4xmix2144-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64` | `aou_axi_err_resp_test` | `+part=fifo +take_overlap=4 +take_flood=15` | 1-2 | `4x512-sp64` | 9.13,9.14 | 
+| `aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32` | `aou_axi_err_resp_test` | `+part=fifo +err_off=32` | 1-2 | `1x256-sp32` | 9.13,9.14 | 
 | `aou_before_enable_test` | `aou_before_enable_test` |  | 1-2 |  | 9.6,1.12 | 
 | `aou_id_mismatch_test.side-mgr.kind-b` | `aou_id_mismatch_test` | `+side=mgr +kind=b` | 1 |  | 9.9 | 
 | `aou_id_mismatch_test.side-mgr.kind-r` | `aou_id_mismatch_test` | `+side=mgr +kind=r` | 1 |  | 9.10 | 

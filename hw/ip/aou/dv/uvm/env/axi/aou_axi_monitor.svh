@@ -348,6 +348,7 @@ class aou_axi_monitor extends uvm_monitor;
     it.txn.qos   = vif.mon_cb.arqos;
     it.txn.data  = new[it.txn.beats()];
     it.txn.rresp = new[it.txn.beats()];
+    it.txn.t_r   = new[it.txn.beats()];
     check_addr(it.txn, "AR");
     r_q.push_back(it);
   endfunction
@@ -482,6 +483,7 @@ class aou_axi_monitor extends uvm_monitor;
         if (it.beats < it.txn.beats()) begin
           it.txn.data[it.beats]  = vif.mon_cb.rdata & data_mask;
           it.txn.rresp[it.beats] = vif.mon_cb.rresp;
+          it.txn.t_r[it.beats]   = $time;
         end
         it.beats++;
         last = (it.beats >= it.txn.beats());

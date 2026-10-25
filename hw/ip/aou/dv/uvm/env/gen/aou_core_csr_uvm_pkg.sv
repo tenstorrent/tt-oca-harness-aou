@@ -416,6 +416,7 @@ package aou_core_csr_uvm_pkg;
 
     // reg - aou_core::axi_error_info1_rp0
     class aou_core__axi_error_info1_rp0 extends uvm_reg;
+        rand uvm_reg_field reserved_6_0;
         rand uvm_reg_field debug_lower_addr;
 
         function new(string name = "aou_core__axi_error_info1_rp0");
@@ -423,8 +424,10 @@ package aou_core_csr_uvm_pkg;
         endfunction : new
 
         virtual function void build();
+            this.reserved_6_0 = new("reserved_6_0");
+            this.reserved_6_0.configure(this, 7, 0, "RO", 1, 'h0, 1, 1, 0);
             this.debug_lower_addr = new("debug_lower_addr");
-            this.debug_lower_addr.configure(this, 32, 0, "RW", 1, 'h0, 1, 1, 0);
+            this.debug_lower_addr.configure(this, 25, 7, "RW", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_error_info1_rp0
 
@@ -554,6 +557,7 @@ package aou_core_csr_uvm_pkg;
 
     // reg - aou_core::axi_error_info1_rp1
     class aou_core__axi_error_info1_rp1 extends uvm_reg;
+        rand uvm_reg_field reserved_6_0;
         rand uvm_reg_field debug_lower_addr;
 
         function new(string name = "aou_core__axi_error_info1_rp1");
@@ -561,8 +565,10 @@ package aou_core_csr_uvm_pkg;
         endfunction : new
 
         virtual function void build();
+            this.reserved_6_0 = new("reserved_6_0");
+            this.reserved_6_0.configure(this, 7, 0, "RO", 1, 'h0, 1, 1, 0);
             this.debug_lower_addr = new("debug_lower_addr");
-            this.debug_lower_addr.configure(this, 32, 0, "RW", 1, 'h0, 1, 1, 0);
+            this.debug_lower_addr.configure(this, 25, 7, "RW", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_error_info1_rp1
 
@@ -692,6 +698,7 @@ package aou_core_csr_uvm_pkg;
 
     // reg - aou_core::axi_error_info1_rp2
     class aou_core__axi_error_info1_rp2 extends uvm_reg;
+        rand uvm_reg_field reserved_6_0;
         rand uvm_reg_field debug_lower_addr;
 
         function new(string name = "aou_core__axi_error_info1_rp2");
@@ -699,8 +706,10 @@ package aou_core_csr_uvm_pkg;
         endfunction : new
 
         virtual function void build();
+            this.reserved_6_0 = new("reserved_6_0");
+            this.reserved_6_0.configure(this, 7, 0, "RO", 1, 'h0, 1, 1, 0);
             this.debug_lower_addr = new("debug_lower_addr");
-            this.debug_lower_addr.configure(this, 32, 0, "RW", 1, 'h0, 1, 1, 0);
+            this.debug_lower_addr.configure(this, 25, 7, "RW", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_error_info1_rp2
 
@@ -830,6 +839,7 @@ package aou_core_csr_uvm_pkg;
 
     // reg - aou_core::axi_error_info1_rp3
     class aou_core__axi_error_info1_rp3 extends uvm_reg;
+        rand uvm_reg_field reserved_6_0;
         rand uvm_reg_field debug_lower_addr;
 
         function new(string name = "aou_core__axi_error_info1_rp3");
@@ -837,8 +847,10 @@ package aou_core_csr_uvm_pkg;
         endfunction : new
 
         virtual function void build();
+            this.reserved_6_0 = new("reserved_6_0");
+            this.reserved_6_0.configure(this, 7, 0, "RO", 1, 'h0, 1, 1, 0);
             this.debug_lower_addr = new("debug_lower_addr");
-            this.debug_lower_addr.configure(this, 32, 0, "RW", 1, 'h0, 1, 1, 0);
+            this.debug_lower_addr.configure(this, 25, 7, "RW", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_error_info1_rp3
 

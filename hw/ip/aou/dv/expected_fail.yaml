@@ -912,45 +912,6 @@
     52 on the current stimulus; first seen at seed 1 of an earlier one, waves rid.wp12tri,
     CREDIT_MANAGE=0, credit accepted 15489.5 ns, Ack queued 15490.5 ns)
 
-# BUGS/035: the debug-window read of an RP narrower than the remote die is split
-# into a burst that AOU_ERROR_INFO answers with one beat, so it never completes.
-# Only builds with a 256-bit RP (4xmix4211-sp128, 4xmix2144-sp64, 1x256-sp32) reach it.
-- test: aou_axi_err_resp_test
-  bug: BUGS/035
-  check: 'T1-E14: '
-  seed_dependent: true
-  note: the 64-byte remote read becomes ARLEN=1 ARSIZE=5; AOU_ERROR_INFO returns one beat with RLAST
-
-# Debug-window bursts (+dbg_len, +max_awburstlen/+max_arburstlen with +part=fifo; BUGS/035,
-# BUGS/041, BUGS/043). Only the err_int entries with those knobs reach them.
-- test: aou_axi_err_resp_test
-  bug: BUGS/035
-  check_re: 'T1-RM04: RLAST=1 on beat \d+ of \d+: RD rp\d remote id=3f[0-3] '
-  seed_dependent: true
-  note: a debug read the splitter cuts into sub-bursts; AOU_ERROR_INFO answers its sub-burst with one beat and RLAST
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/043
-  check: 'T1-E19: '
-  seed_dependent: true
-  note: a debug read longer than MAX_ARBURSTLEN+1 RP beats is split and the sub-bursts after the first read memory
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/043
-  check: 'AXI-S05: local memory'
-  requires: BUGS/043
-  seed_dependent: true
-  note: the split debug pop's sub-bursts after the first write local memory
-
-- test: aou_axi_err_resp_test
-  bug: BUGS/041
-  check: 'T1-E02: RP'
-  requires: BUGS/043
-  seed_dependent: true
-  note: >-
-    with +max_arburstlen=0 on a 256-bit RP the error read is split into narrow beats, each pushing its
-    own FIFO entry (BUGS/041); reached only with the BUGS/043 split knobs on unpatched RTL
-
 # BUGS/021 and BUGS/007 mechanisms that the BUGS/024/029 deadlock hid: with the 029 fix
 # the traffic after AOU_SW_RESET runs on, and these follow. T1-L28 is the bug-specific
 # check for the S-port case wherever a beat is accepted inside the reset; with the 021

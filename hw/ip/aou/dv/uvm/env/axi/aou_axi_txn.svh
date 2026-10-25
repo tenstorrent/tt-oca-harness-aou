@@ -26,6 +26,8 @@ class aou_axi_txn extends uvm_sequence_item;
   time               t_addr, t_done;
   // Write: WLAST handshake (set by aou_axi_mgr_driver; 0 until then).
   time               t_wlast;
+  // Read: handshake of each R beat (set by aou_axi_monitor; empty otherwise).
+  time               t_r[];
   // Set when a reset ended the transaction before its response (reset_flush);
   // response fields are then meaningless.
   bit                aborted;
@@ -210,6 +212,7 @@ class aou_axi_txn extends uvm_sequence_item;
     t_addr     = t.t_addr;
     t_done     = t.t_done;
     t_wlast    = t.t_wlast;
+    t_r        = t.t_r;
     aborted    = t.aborted;
     reset_outstanding = t.reset_outstanding;
   endfunction

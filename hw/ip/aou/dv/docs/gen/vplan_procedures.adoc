@@ -2485,12 +2485,13 @@ AXI error responses on both sides and the R/B response error debug FIFO
 fifo (every RP at once): software enables remote access to each RP's FIFO
 at its own debug address before activation. The remote die's writes and
 reads into local SLVERR/DECERR regions come back with that response
-(scoreboard) and each pushes {ID, ADDR, RESP}; the remote die reads the
-head entry at the debug address and pops it with a write there
-(aou_t1_dbg_fifo_chk checks every read and pop):
+(scoreboard) and each pushes {ID, ADDR, RESP} per M-port error response
+(one per R beat, so a remote beat wider than the RP pushes once per RP
+beat); the remote die reads the head entry at the debug address and pops
+it with a write there (aou_t1_dbg_fifo_chk checks every read and pop):
 - one B error, then one R error;
 - six errors in a row, four pops, one more error: the fifth and sixth
-meet a full FIFO;
+(earlier on an RP narrower than the remote die) meet a full FIFO;
 - a B error and an R error issued 0..7 cycles apart, so some land in the
 same cycle (two pushes at once).
 resp (every RP, both directions): single and burst writes and reads into
@@ -2512,14 +2513,75 @@ Knobs:
 ----
 
 programmed on every RP before activation; with +part=fifo
-debug accesses longer than N+1 RP beats meet the splitter
-(BUGS/043).
+debug accesses longer than N+1 RP beats meet the splitter,
+which must not cut them.
 
 ----
-+dbg_len=N|max  AxLEN of every debug-window read and pop (default 0, one
++dbg_len=N|max  AxLEN of every debug-window read and pop (default 0, the
 ----
 
-beat; max: the longest burst inside the 4 KB window).
+single beat software issues; max: the longest burst inside
+the 4 KB window; the window answers any length).
+
+----
++dbg_cache=N    AxCACHE of every debug-window read and pop (default 0).
++agg_en=0|1     RPn_AXI_AGGREGATOR_EN on every RP before activation. With
++dbg_cache=2, +dbg_len above 0 and a remote die narrower
+----
+
+than the RP (+remote_bytes), a debug pop is a write the
+aggregator would otherwise merge; the window must still
+answer it (MAS 3.8.2 condition 4).
+
+----
++err_len=N +err_cache=N +err_off=N  AxLEN, AxCACHE and an address offset
+----
+
+of the fifo part's failing transactions (default 0). With
+
+----
++agg_en=1, +err_len=1 and a remote die narrower than the
+----
+
+RP, each failing read is one aggregated M-port beat that
+pushes one entry per remote beat; +err_off=32 with a
+remote die wider than the RP is an unaligned write whose
+entry carries the address aligned down to AWSIZE. With
+
+----
++max_arburstlen below +err_len the failing reads are
+----
+
+split as well: each sub-burst is aggregated on its own.
+
+----
++rdata_crd=N +crd_delay=T +flood=F +flood_len=L +pair_gap=G  the remote
+----
+
+die grants N ReadData credits and returns each T ticks
+after use, F OKAY reads of L+1 beats are issued just
+ahead of each of the fifo part's B/R error pairs and the
+pair's write waits G cycles, so the read's data is
+accepted at the M port but backs up behind the flood on
+its way to the remote die while the later B flows: the R
+entries enter the FIFO after the B although the M port
+saw them first (a short flood; a long one holds the
+read's data back before the M port). +pair_writes=W
+issues W failing writes per pair (W B errors, default 1).
+With +err_len=7 and an RP four times the remote die's
+width, a failing read is two M-port error beats, each
+re-expanded into four entries.
+
+----
++take_overlap=G +take_flood=L  each debug pop is issued G cycles after
+----
+
+the debug read without waiting for the read's data
+(default: after it), and an OKAY read of L+1 beats just
+ahead of the debug read (default: none): the read's data
+queues behind the flood's, the pop completes first and the
+read returns the entry the pop removed, sampled when the
+read became active.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2535,6 +2597,15 @@ beat; max: the longest burst inside the 4 KB window).
 | `aou_axi_err_resp_test.part-fifo.dbg_len-31` | `+part=fifo +dbg_len=31` | 1-2 |  | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.dbg_len-max` | `+part=fifo +dbg_len=max` | 1 |  | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.dbg_len-3.max_awburstlen-0.max_arburstlen-0` | `+part=fifo +dbg_len=3 +max_awburstlen=0 +max_arburstlen=0` | 1-2 |  | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.dbg_len-63.dbg_cache-2.agg_en-1.remote_bytes-32.4x512-sp64` | `+part=fifo +dbg_len=63 +dbg_cache=2 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64` | `+part=fifo +err_len=1 +err_off=32 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64` | `+part=fifo +err_len=3 +err_off=32 +agg_en=1 +remote_bytes=32 +max_awburstlen=3 +max_arburstlen=1` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64 +pair_writes=3` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64` | `+part=fifo +err_len=7 +agg_en=1 +remote_bytes=32 +pair_gap=64` | 1-2 | `4xmix2144-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32` | `+part=fifo +err_off=32` | 1-2 | `1x256-sp32` | 9.13,9.14
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq` | `+T1_VSEQ=aou_dbg_off_vseq` | 1-2 | `1x512-sp64` | 9.18
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5` | `+T1_VSEQ=aou_dbg_off_vseq +dbg_on=5` | 1-2 | `4x512-sp64` | 9.18,9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.1x256-sp32` | `+part=fifo` | 1-3 | `1x256-sp32` | 9.19

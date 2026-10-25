@@ -13,12 +13,14 @@ class aou_t1_remote_mgr extends uvm_component;
   aou_axi_sequencer         sqr[];
   aou_t1_remote_mgr_driver  drv[];
   uvm_analysis_imp #(aou_msg, aou_t1_remote_mgr) rx_imp;
-  uvm_analysis_port #(aou_axi_txn)               ap;
+  uvm_analysis_port #(aou_axi_txn)               ap;      // each transaction once complete
+  uvm_analysis_port #(aou_axi_txn)               req_ap;  // each transaction as its request is sent
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     rx_imp = new("rx_imp", this);
     ap = new("ap", this);
+    req_ap = new("req_ap", this);
   endfunction
 
   function void build_phase(uvm_phase phase);
@@ -38,6 +40,7 @@ class aou_t1_remote_mgr extends uvm_component;
     foreach (drv[r]) begin
       drv[r].seq_item_port.connect(sqr[r].seq_item_export);
       drv[r].ap.connect(ap);
+      drv[r].req_ap.connect(req_ap);
       drv[r].l3 = l3;
       drv[r].wire_rp = l3.cfg.dest_rp[r];
     end

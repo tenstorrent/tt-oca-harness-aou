@@ -15,6 +15,7 @@ class aou_err_base_vseq extends aou_link_base_vseq;
   static const bit [63:0] DBG_BASE = 64'h0000_0071_0000_0000;
   int unsigned dbg_wait = 5000;   // cycles a debug-window access may take
   int unsigned dbg_len = 0;       // AxLEN of a debug-window read or pop, before dbg_len_of()
+  bit [3:0] dbg_cache = 4'd0;     // AxCACHE of a debug-window read or pop (bit 1: modifiable)
 
   function new(string name = "aou_err_base_vseq");
     super.new(name);
@@ -96,6 +97,7 @@ class aou_err_base_vseq extends aou_link_base_vseq;
   // ---------------------------------------------------------------------
   // R/B response error debug FIFO (MAS 7.2.4)
   // ---------------------------------------------------------------------
+  // Aligned to 4 KB: DEBUG_LOWER_ADDR holds bits [31:7] only (MAS 7.2.4).
   function bit [63:0] dbg_addr(int unsigned rp);
     return DBG_BASE + 64'(rp) * 64'h1000;
   endfunction
@@ -112,16 +114,19 @@ class aou_err_base_vseq extends aou_link_base_vseq;
   task program_dbg(int unsigned rp);
     bit [63:0] a = dbg_addr(rp);
     aou_core rm = p_sequencer.regs;
+    if (a[6:0] != 7'd0)
+      `uvm_fatal(get_type_name(), $sformatf(
+          "RP%0d debug address %0h is not 128-byte aligned: DEBUG_LOWER_ADDR cannot hold it", rp,
+          a))
     write_field(rm.aou_con0.get_field_by_name($sformatf("rp%0d_error_info_access_en", rp)), 1);
     write_field(rpf("axi_error_info0", rp, "debug_upper_addr"), uvm_reg_data_t'(a[63:32]));
-    write_field(rpf("axi_error_info1", rp, "debug_lower_addr"), uvm_reg_data_t'(a[31:0]));
+    write_field(rpf("axi_error_info1", rp, "debug_lower_addr"), uvm_reg_data_t'(a[31:7]));
     env.sb.add_unchecked(a, a + 64'(cfg.remote_bytes) - 64'd1);
   endtask
 
-  // Runs one debug-window access. The window answers a single beat with
-  // RLAST (MAS 7.2.4); a request the RP turns into a burst is never
-  // completed (BUGS/035), so a stuck access ends the test with its own ID
-  // instead of the phase timeout.
+  // Runs one debug-window access. The window must answer it however the RP
+  // converts or splits it (MAS 7.2.4); a stuck access ends the test with its
+  // own ID instead of the phase timeout.
   task run_dbg(aou_txn_list_seq s, int unsigned rp, string what);
     bit done = 1'b0;
     fork
@@ -145,18 +150,21 @@ class aou_err_base_vseq extends aou_link_base_vseq;
   // The remote die reads the head entry.
   task fifo_read(int unsigned rp);
     aou_txn_list_seq s = aou_txn_list_seq::type_id::create("dbg_rd");
-    s.items.push_back(mk(1'b1, rp, AOU_AXI_RD, 10'h3F0 + 10'(rp), dbg_addr(rp), dbg_len_of(rp)));
+    s.items.push_back(mk(1'b1, rp, AOU_AXI_RD, 10'h3F0 + 10'(rp), dbg_addr(rp), dbg_len_of(rp),
+                         dbg_cache));
     run_dbg(s, rp, "read");
   endtask
 
   // The remote die pops the head entry with a write to the window.
   task fifo_pop(int unsigned rp);
     aou_txn_list_seq s = aou_txn_list_seq::type_id::create("dbg_pop");
-    s.items.push_back(mk(1'b1, rp, AOU_AXI_WR, 10'h3F8 + 10'(rp), dbg_addr(rp), dbg_len_of(rp)));
+    s.items.push_back(mk(1'b1, rp, AOU_AXI_WR, 10'h3F8 + 10'(rp), dbg_addr(rp), dbg_len_of(rp),
+                         dbg_cache));
     run_dbg(s, rp, "pop");
   endtask
 
-  task fifo_take(int unsigned rp);
+  // Software reads the head, then pops it.
+  virtual task fifo_take(int unsigned rp);
     fifo_read(rp);
     fifo_pop(rp);
   endtask

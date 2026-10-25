@@ -1390,7 +1390,7 @@
   section_title: Error Handling Tests
   title: Debug FIFO holds four entries and drops the fifth; B and R pushed in one cycle
   priority: P2
-  added: MAS 7.2.4; BUGS/028
+  added: MAS 7.2.4
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '9.18'
@@ -1406,7 +1406,7 @@
   section_title: Error Handling Tests
   title: Debug FIFO read through an RP narrower than the remote die (two-beat read)
   priority: P2
-  added: BUGS/035
+  added: MAS 7.2.4
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '9.20'

@@ -4,20 +4,55 @@
 // R/B response error debug FIFO and its debug window (MAS software-operation
 // 7.2.4), checked in every test from what the env observes.
 //
-// Model: per RP a FIFO of `depth` entries. A remote-die transaction that
-// completes with an error the DUT got from its own M port (a B or R error on
-// that M port with the same ID inside the transaction's bytes) pushes one
-// entry {ID, ADDR aligned down to the request size, RESP} (BUGS/028 interim
-// layout; one entry per remote request, BUGS/041), at the time of its first
-// M-port error. A push into a full FIFO is dropped. Errors the DUT makes up
-// itself never reach the M port and push nothing. Errors whose M-port
-// responses are within order_cycles of each other may enter in either order:
-// the MAS orders nothing between B and R errors close together, and the DUT's
-// B and R capture paths differ in latency.
+// Model: per RP a FIFO of `depth` entries, fed by the RP's M port. Every
+// non-OKAY R beat pushes one entry {ID, address of that beat aligned down to
+// ARSIZE, RRESP}; every non-OKAY B pushes one entry {ID, AWADDR, BRESP}, where
+// AWADDR is the address of the write as the remote die issued it (aligned down
+// to AWSIZE when the write is wider than the RP, as the width converter
+// does), so the sub-bursts the splitter made of one write all record the same
+// address. The beat is the beat the RP's splitter sees, after width conversion
+// and before the aggregator: one remote beat wider than the RP pushes once per
+// RP beat, a long burst of errors once per beat, and a failing M-port beat the
+// read aggregator built from narrow remote beats once per narrow beat of the
+// splitter's sub-burst within it (the remote read is known from the rmgr's
+// request, same ID, in flight over the beat; the sub-burst starts at the
+// M-port ARADDR and holds MAX_ARBURSTLEN+1 remote beats, register mirror). A
+// push into a full FIFO is dropped: the first `depth`
+// errors are kept and later ones lost. Errors the DUT makes up itself never
+// reach the M port and push nothing. Errors whose M-port responses are within
+// order_cycles of each other may enter in either order: the MAS orders nothing
+// between B and R errors close together, and the DUT's B and R capture paths
+// differ in latency. The beats of one burst are in beat order.
+//
+// Entries are ordered by the handshake that pushed them: each R beat's own
+// handshake (aou_axi_txn::t_r, from the monitor) and the B handshake. The
+// monitor publishes a read when it completes, after any B that landed between
+// its beats, so the model inserts by time and, when that overfills it, drops
+// the latest entry, as the hardware did when that entry arrived. A pop that
+// lands between the beats of a read whose beats overfill the FIFO is applied
+// before them, not among them; the sequences pop only once their errors have
+// completed. The narrow beats re-expanded from one aggregated M-port beat are
+// pushed as the aggregator presents them to the splitter, one per cycle at
+// the earliest and later under backpressure on the read-data path, which the
+// env does not see: such an entry is timed at the earliest it can have been
+// pushed and marked `late`, and until the remote read has completed (an upper
+// bound on every beat's push) any entry of another transaction behind it may
+// have entered before it.
+//
+// A B entry's address is resolved from the remote write with the same ID that
+// was in flight over the sub-burst's address when the B returned (rmgr
+// transactions carry t_addr and t_done; the manager-side ID is the remote
+// ID). Until then, or when no remote write is found, the entry matches any
+// address at or below the sub-burst's address in the same 4 KB. Two
+// same-ID writes over the same bytes in flight together are told apart by
+// issue order, which is exact unless the earlier one's remote B lags the
+// later one's first manager-port B.
 //
 // A remote access is a debug-window access when its address equals RP r's
 // {DEBUG_UPPER_ADDR, DEBUG_LOWER_ADDR} and RPr_ERROR_INFO_ACCESS_EN is set
-// (register mirror). Reads and pops (writes) of any length within 4 KB:
+// (register mirror). Software issues them as single beats of any size; the
+// window also answers longer bursts (MAS 7.2.4). Reads and pops of any length
+// within 4 KB:
 //   T1-E03  every RRESP of a read and the BRESP of a pop is OKAY;
 //   T1-E19  every RP-wide lane of every read beat equals the head entry:
 //           remote beats at least as wide as the RP hold whole RP beats, so
@@ -25,14 +60,20 @@
 //           slices of RP beats, so beat k equals beat k mod (RP / remote);
 //   T1-E02  the head, {ID, ADDR, RESP} in the low 76 bits of beat 0, is the
 //           predicted head (any entry of a group pushed together). Not judged
-//           while an M-port error the model has not placed yet is older than
-//           the read, or after a drop the model could not order.
-// A pop removes the entry the last read returned, or the head.
+//           after a drop the model could not order, until the pops have
+//           drained the FIFO.
+// A pop removes the entry the last read returned, or the head. The window
+// samples the head when a read becomes active, so a read in flight together
+// with a pop (rmgr requests, as issued) returns the head before or after the
+// pop: an entry a pop removed while the read was in flight is kept as an
+// acceptable head until no read is in flight, and a pop still in flight when
+// the read completes may have taken the leading entry.
 class aou_t1_dbg_fifo_chk extends uvm_component;
   `uvm_component_utils(aou_t1_dbg_fifo_chk)
 
   uvm_analysis_imp_dbg_mport #(aou_axi_txn, aou_t1_dbg_fifo_chk)  mport_imp;
   uvm_analysis_imp_dbg_remote #(aou_axi_txn, aou_t1_dbg_fifo_chk) remote_imp;
+  uvm_analysis_imp_dbg_remote_req #(aou_axi_txn, aou_t1_dbg_fifo_chk) remote_req_imp;
 
   aou_t1_env_cfg cfg;
   aou_core       rm;
@@ -43,76 +84,76 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
   typedef struct packed {
     bit [9:0]  id;
     bit [63:0] addr;
-    bit [3:0]  resp_ok;   // RESP values the entry may hold
-    bit [63:0] cyc;
+    bit [1:0]  resp;
+    bit [63:0] tm;    // handshake that pushed it, ps
+    bit [31:0] src;   // M-port transaction the entry came from
+    bit        b_sub; // B entry still holding the sub-burst's address
+    bit        late;  // re-expanded beat: pushed at tm or later, by the remote read's end
   } ent_t;
-
-  // An M-port error not yet matched to its remote transaction.
-  typedef struct packed {
-    bit [9:0]  id;
-    bit [63:0] lo;
-    bit [63:0] hi;
-    bit [63:0] cyc;
-    bit [63:0] t;
-  } merr_t;
 
   int unsigned n_push;
   int unsigned n_drop;
   int unsigned n_read;
   int unsigned n_pop;
+  int unsigned n_unresolved;   // heads matched by a B entry whose write was not found
+  int unsigned max_hist = 256;
 
   protected ent_t            q[AOU_RP_MAX][$];
-  protected merr_t           merr[AOU_RP_MAX][$];
   protected bit              unsure[AOU_RP_MAX];
   protected int              read_idx[AOU_RP_MAX];
-  protected longint unsigned cycle;
+  protected longint unsigned period_ps;   // M-port clock period; order_cycles in time
+  protected bit [31:0]       n_src;
+  protected aou_axi_txn      wr_hist[AOU_RP_MAX][$];   // completed remote writes
+  protected aou_axi_txn      rd_req[AOU_RP_MAX][$];    // remote reads in flight, issue order
+  protected aou_axi_txn      late_rd[bit [31:0]];      // src of re-expanded entries -> remote read
+  protected int unsigned     rd_open[AOU_RP_MAX];      // debug reads issued, not completed
+  protected int unsigned     pop_open[AOU_RP_MAX];     // debug pops issued, not completed
+  protected ent_t            taken[AOU_RP_MAX][$];     // popped while a debug read was outstanding
+  int unsigned n_overlap;      // debug reads judged with a pop in flight
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     mport_imp = new("mport_imp", this);
     remote_imp = new("remote_imp", this);
+    remote_req_imp = new("remote_req_imp", this);
     foreach (read_idx[r]) read_idx[r] = -1;
   endfunction
 
   task run_phase(uvm_phase phase);
+    time t0;
     if (clk_vif == null) return;
-    forever begin
-      @(clk_vif.mon_cb);
-      cycle++;
-    end
+    @(clk_vif.mon_cb);
+    t0 = $time;
+    @(clk_vif.mon_cb);
+    period_ps = 64'($time - t0);
   endtask
+
+  // The ordering window in time; a cycle until the clock has been measured.
+  function bit [63:0] order_ps();
+    return 64'(order_cycles) * (period_ps == 0 ? 64'd1 : 64'(period_ps));
+  endfunction
 
   // Reset contract: a core or software reset empties every FIFO.
   function void reset_flush();
     foreach (q[r]) begin
       q[r].delete();
-      merr[r].delete();
+      wr_hist[r].delete();
+      rd_req[r].delete();
+      taken[r].delete();
       unsure[r] = 1'b0;
       read_idx[r] = -1;
+      rd_open[r] = 0;
+      pop_open[r] = 0;
     end
+    late_rd.delete();
   endfunction
 
   static function bit is_err(bit [1:0] resp);
     return resp inside {AOU_AXI_SLVERR, AOU_AXI_DECERR};
   endfunction
 
-  // Error RESP values of t's beats (bit v: some beat answered v).
-  static function bit [3:0] err_mask(aou_axi_txn t);
-    bit [3:0] m = '0;
-    if (t.dir == AOU_AXI_WR) begin
-      if (is_err(t.bresp)) m[t.bresp] = 1'b1;
-    end else begin
-      foreach (t.rresp[k]) if (is_err(t.rresp[k])) m[t.rresp[k]] = 1'b1;
-    end
-    return m;
-  endfunction
-
   static function bit [63:0] lo_of(aou_axi_txn t);
     return t.addr & ~((64'd1 << t.size) - 64'd1);
-  endfunction
-
-  static function bit [63:0] hi_of(aou_axi_txn t);
-    return lo_of(t) + (64'(t.len) + 64'd1) * (64'd1 << t.size) - 64'd1;
   endfunction
 
   function bit [63:0] window_of(int unsigned r, output bit en);
@@ -127,7 +168,31 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     if (f == null || up == null || lo == null) return '0;
     en = f.get_mirrored_value() != 0;
     return {32'(up.get_field_by_name("debug_upper_addr").get_mirrored_value()),
-            32'(lo.get_field_by_name("debug_lower_addr").get_mirrored_value())};
+            32'(lo.get_field_by_name("debug_lower_addr").get_mirrored_value()) << 7};
+  endfunction
+
+  // MAX_ARBURSTLEN of RP r (register mirror): the splitter cuts a read into
+  // sub-bursts of that many + 1 beats as it sees them.
+  function int unsigned split_arlen(int unsigned r);
+    uvm_reg g;
+    if (rm == null) return 255;
+    g = rm.get_reg_by_name($sformatf("axi_split_tr_rp%0d", r));
+    if (g == null) return 255;
+    return int'(g.get_field_by_name("max_arburstlen").get_mirrored_value());
+  endfunction
+
+  // The latest an entry can have been pushed: its handshake, or for a
+  // re-expanded beat the end of the remote read (unknown until then).
+  protected function bit [63:0] hi_of(ent_t e);
+    if (!e.late) return e.tm;
+    if (late_rd.exists(e.src) && late_rd[e.src].t_done != 0) return 64'(late_rd[e.src].t_done);
+    return '1;
+  endfunction
+
+  // Entry b, behind a in the model, may have entered the FIFO before a.
+  protected function bit may_precede(ent_t a, ent_t b);
+    bit [63:0] h = hi_of(a);
+    return h == '1 || b.tm <= h + order_ps();
   endfunction
 
   // The DUT RP a remote plane's requests land on (MAS 3.10.2).
@@ -135,65 +200,181 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     return (plane < AOU_RP_MAX) ? int'(cfg.l3_cfg.dest_rp[plane]) : plane;
   endfunction
 
+  // An M-port transaction completed: push one entry per error response.
   function void write_dbg_mport(aou_axi_txn t);
-    merr_t e;
-    if (t.aborted || err_mask(t) == '0 || t.rp >= AOU_RP_MAX) return;
-    e.id = t.id;
-    e.lo = lo_of(t);
-    e.hi = hi_of(t);
-    e.cyc = cycle;
-    e.t = 64'($time);
-    merr[t.rp].push_back(e);
+    bit [31:0] src;
+    bit [63:0] cyc = period_ps == 0 ? 64'd1 : 64'(period_ps);
+    bit [63:0] nxt = 0;  // earliest the next re-expanded beat of t can be presented
+    if (t.aborted || t.rp >= AOU_RP_MAX) return;
+    src = n_src++;
+    if (t.dir == AOU_AXI_WR) begin
+      if (is_err(t.bresp)) push(t.rp, t.id, t.addr, t.bresp, src, 1'b1, 1'b0, 64'(t.t_done));
+    end else begin
+      foreach (t.rresp[k]) begin
+        bit [63:0] a = lo_of(t) + (64'(k) << t.size);
+        bit [63:0] tm = k < t.t_r.size() ? 64'(t.t_r[k]) : 64'(t.t_done);
+        aou_axi_txn w;
+        if (!is_err(t.rresp[k])) continue;
+        // A beat the read aggregator built from narrow remote beats pushes once
+        // per narrow beat of the sub-burst within it (the splitter sees the
+        // re-expanded beats): t is the sub-burst, its ARADDR the sub-burst's
+        // start, MAX_ARBURSTLEN+1 remote beats long, bounded by the read's end.
+        // The aggregator presents the narrow beats of the whole burst one per
+        // cycle at the earliest, so a beat is not earlier than the one before
+        // it, even when the M port accepted the wide beats back to back.
+        w = agg_source(t.rp, t, a, tm);
+        if (w == null) push(t.rp, t.id, a, t.rresp[k], src, 1'b0, 1'b0, tm);
+        else begin
+          bit [63:0] nb = 64'd1 << w.size;
+          bit [63:0] lo = t.addr & ~(nb - 64'd1);
+          bit [63:0] hi = lo_of(w) + ((64'(w.len) + 64'd1) << w.size);
+          bit [63:0] sub_hi = lo + (64'(split_arlen(t.rp)) + 64'd1) * nb;
+          if (sub_hi < hi) hi = sub_hi;
+          late_rd[src] = w;
+          if (late_rd.size() > max_hist) begin
+            bit [31:0] oldest;
+            void'(late_rd.first(oldest));
+            late_rd.delete(oldest);
+          end
+          for (bit [63:0] n = lo; n < hi; n += nb)
+            if (n >= a && n < a + (64'd1 << t.size)) begin
+              if (nxt < tm) nxt = tm;
+              push(t.rp, t.id, n, t.rresp[k], src, 1'b0, 1'b1, nxt);
+              nxt += cyc;
+            end
+        end
+      end
+    end
+  endfunction
+
+  // The remote read, narrower than M-port read t, that t's beat at a was
+  // aggregated from: same ID, issued before the beat, covering it. Null when
+  // t is at the remote read's own size (or no request is known).
+  protected function aou_axi_txn agg_source(int unsigned r, aou_axi_txn t, bit [63:0] a,
+                                            bit [63:0] tm);
+    foreach (rd_req[r][j]) begin
+      aou_axi_txn w = rd_req[r][j];
+      if (w.id == t.id && 64'(w.t_addr) <= tm && covers(w, a, r)) return w.size < t.size ? w : null;
+    end
+    return null;
+  endfunction
+
+  // A remote request was sent: remember reads until they complete, and
+  // count the debug-window accesses in flight.
+  function void write_dbg_remote_req(aou_axi_txn t);
+    int unsigned r = dut_rp(t.rp);
+    bit en;
+    if (r >= cfg.n_rp) return;
+    if (t.addr == window_of(r, en) && en) begin
+      if (t.dir == AOU_AXI_RD) rd_open[r]++;
+      else pop_open[r]++;
+    end
+    if (t.dir != AOU_AXI_RD) return;
+    rd_req[r].push_back(t);
+    if (rd_req[r].size() > max_hist) void'(rd_req[r].pop_front());
   endfunction
 
   function void write_dbg_remote(aou_axi_txn t);
     int unsigned r;
     bit en;
     bit [63:0] w;
-    if (t.aborted) return;
+    if (t.dir == AOU_AXI_RD) begin
+      r = dut_rp(t.rp);
+      if (r < cfg.n_rp) foreach (rd_req[r][j]) if (rd_req[r][j] == t) begin
+        rd_req[r].delete(j);
+        break;
+      end
+    end
     r = dut_rp(t.rp);
     if (r >= cfg.n_rp) return;
     w = window_of(r, en);
     if (en && t.addr == w) begin
-      if (t.dir == AOU_AXI_RD) dbg_read(r, t);
-      else dbg_pop(r, t);
-    end else if (err_mask(t) != '0) begin
-      place(r, t);
+      if (t.dir == AOU_AXI_RD) begin
+        if (rd_open[r] != 0) rd_open[r]--;
+      end else if (pop_open[r] != 0) pop_open[r]--;
+    end
+    if (t.aborted) return;
+    if (!en || t.addr != w) begin
+      if (t.dir == AOU_AXI_WR) begin
+        wr_hist[r].push_back(t);
+        if (wr_hist[r].size() > max_hist) void'(wr_hist[r].pop_front());
+      end
+      return;
+    end
+    if (t.dir == AOU_AXI_RD) dbg_read(r, t);
+    else dbg_pop(r, t);
+  endfunction
+
+  // The remote transaction t covers the M-port address a: a is within t's
+  // bytes, or at most one RP-width beat below their start, since the width
+  // converter and the aggregator base a beat or sub-burst on the RP-width
+  // boundary at or below the transaction's start.
+  function bit covers(aou_axi_txn t, bit [63:0] a, int unsigned r);
+    bit [63:0] lo = lo_of(t) & ~(64'(cfg.rp_bytes[r]) - 64'd1);
+    return a >= lo && a < lo_of(t) + ((64'(t.len) + 64'd1) << t.size);
+  endfunction
+
+  // Give B entries the address of the remote write they belong to: the write
+  // with the same ID in flight over the sub-burst's address when the B
+  // returned, the earliest issued when several are (same-ID writes are served
+  // in order; wr_hist is in completion order, which for one ID is issue order).
+  protected function void resolve(int unsigned r);
+    foreach (q[r][i]) begin
+      if (!q[r][i].b_sub) continue;
+      foreach (wr_hist[r][j]) begin
+        aou_axi_txn w = wr_hist[r][j];
+        if (w.id == q[r][i].id && 64'(w.t_addr) <= q[r][i].tm && q[r][i].tm <= 64'(w.t_done) &&
+            covers(w, q[r][i].addr, r))
+        begin
+          // The width converter aligns a write wider than the RP down to its AWSIZE.
+          q[r][i].addr = (int'(w.size) > $clog2(cfg.rp_bytes[r])) ? lo_of(w) : w.addr;
+          q[r][i].b_sub = 1'b0;
+          break;
+        end
+      end
     end
   endfunction
 
-  // t completed with an error: push its entry if the error came from the M port.
-  protected function void place(int unsigned r, aou_axi_txn t);
-    bit [63:0] lo = lo_of(t);
-    bit [63:0] hi = hi_of(t);
-    bit        hit = 1'b0;
-    ent_t      e;
-    int        pos;
-    for (int i = 0; i < merr[r].size(); i++) begin
-      if (merr[r][i].id != t.id || merr[r][i].hi < lo || merr[r][i].lo > hi) continue;
-      if (!hit || merr[r][i].cyc < e.cyc) e.cyc = merr[r][i].cyc;
-      hit = 1'b1;
-      merr[r].delete(i);
-      i--;
-    end
-    if (!hit) return;
-    e.id = t.id;
-    e.addr = lo;
-    e.resp_ok = err_mask(t);
+  // Entry e's address matches the observed a.
+  static function bit addr_match(ent_t e, bit [63:0] a);
+    if (!e.b_sub) return e.addr == a;
+    return a <= e.addr && a[63:12] == e.addr[63:12];
+  endfunction
+
+  protected function void push(int unsigned r, bit [9:0] id, bit [63:0] addr, bit [1:0] resp,
+                               bit [31:0] src, bit b_sub, bit late, bit [63:0] tm);
+    ent_t e;
+    ent_t gone;
+    int   pos;
+    e.id = id;
+    e.addr = addr;
+    e.resp = resp;
+    e.tm = tm;
+    e.src = src;
+    e.b_sub = b_sub;
+    e.late = late;
     n_push++;
-    if (q[r].size() >= depth) begin
-      n_drop++;
-      // A drop at the order boundary leaves which entry was kept unknown.
-      if (e.cyc <= q[r][q[r].size() - 1].cyc + 64'(order_cycles)) unsure[r] = 1'b1;
-      `uvm_info(get_type_name(), $sformatf("RP%0d FIFO full: id=%0h addr=%0h dropped", r, e.id,
-                                           e.addr), UVM_MEDIUM)
-      return;
-    end
+    // In handshake order; a beat published late goes where its handshake was.
     pos = q[r].size();
-    while (pos > 0 && q[r][pos - 1].cyc > e.cyc) pos--;
+    while (pos > 0 && q[r][pos - 1].tm > e.tm) pos--;
     q[r].insert(pos, e);
-    `uvm_info(get_type_name(), $sformatf("RP%0d FIFO push: id=%0h addr=%0h resp=%b (%0d held)", r,
-                                         e.id, e.addr, e.resp_ok, q[r].size()), UVM_MEDIUM)
+    if (q[r].size() > depth) begin
+      // Full: the latest arrival is the one the hardware dropped. A drop leaves
+      // which entry was kept unknown when the dropped entry may have entered
+      // before any retained entry of another transaction (within the ordering
+      // window of the last one, or behind a re-expanded beat whose read has not
+      // ended); the beats of one burst are in order.
+      gone = q[r][depth];
+      q[r].delete(depth);
+      n_drop++;
+      foreach (q[r][i])
+        if (q[r][i].src != gone.src && may_precede(q[r][i], gone)) unsure[r] = 1'b1;
+      `uvm_info(get_type_name(), $sformatf("RP%0d FIFO full: id=%0h addr=%0h resp=%0d dropped", r,
+                                           gone.id, gone.addr, gone.resp), UVM_MEDIUM)
+      if (gone.tm == e.tm && gone.src == e.src && gone.addr == e.addr) return;
+    end
+    `uvm_info(get_type_name(), $sformatf("RP%0d FIFO push: id=%0h addr=%0h resp=%0d (%0d held)", r,
+                                         e.id, e.addr, e.resp, q[r].size()), UVM_MEDIUM)
   endfunction
 
   protected function void dbg_read(int unsigned r, aou_axi_txn t);
@@ -210,6 +391,7 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     end
     check_lanes(r, t);
     check_head(r, t);
+    if (rd_open[r] == 0) taken[r].delete();
   endfunction
 
   protected function void dbg_pop(int unsigned r, aou_axi_txn t);
@@ -219,9 +401,16 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
       aou_rule_log::fire("T1-E03", get_type_name());
       `uvm_error(get_type_name(), $sformatf("T1-E03: RP%0d debug FIFO pop BRESP %0d", r, t.bresp))
     end
-    if (q[r].size() != 0) q[r].delete((read_idx[r] >= 0 && read_idx[r] < q[r].size()) ?
-                                      read_idx[r] : 0);
+    if (q[r].size() != 0) begin
+      int i = (read_idx[r] >= 0 && read_idx[r] < q[r].size()) ? read_idx[r] : 0;
+      // A debug read in flight may have sampled this entry before the pop.
+      if (rd_open[r] != 0) taken[r].push_back(q[r][i]);
+      q[r].delete(i);
+    end
     read_idx[r] = -1;
+    // A drop the model could not order left the entry kept unknown, not the
+    // count: once the pops have drained the model, the FIFO is empty too.
+    if (q[r].size() == 0) unsure[r] = 1'b0;
   endfunction
 
   // T1-E19 on a debug read t of RP r.
@@ -269,25 +458,46 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     bit [9:0]    id;
     bit [63:0]   addr;
     bit [1:0]    resp;
-    int unsigned grp = 1;
     string       exp = "";
+    int unsigned gone = pop_open[r];  // leading entries a pop in flight may have taken
     read_idx[r] = -1;
-    if (t.data.size() == 0 || q[r].size() == 0 || unsure[r]) return;
-    for (int i = 0; i < merr[r].size(); i++) if (merr[r][i].t < 64'(t.t_addr)) return;
+    if (t.data.size() == 0 || unsure[r]) return;
+    // A read overlapping a pop returns the head sampled when the read became
+    // active, before or after the pop: an entry the pop removed while the read
+    // was in flight, or the entry behind the one a pop still in flight takes;
+    // the FIFO may have been empty by then, and nothing is predicted for that.
+    if (gone != 0 || taken[r].size() != 0) n_overlap++;
+    if (q[r].size() <= gone) return;
+    resolve(r);
     d = t.data[0];
     resp = d[1:0];
     addr = d[65:2];
     id = d[75:66];
-    while (grp < q[r].size() && q[r][grp].cyc <= q[r][grp - 1].cyc + 64'(order_cycles)) grp++;
     aou_rule_log::check("T1-E02", get_type_name());
-    for (int unsigned i = 0; i < grp; i++) begin
-      if (q[r][i].id == id && q[r][i].addr == addr && q[r][i].resp_ok[resp]) begin
+    foreach (taken[r][i])
+      if (taken[r][i].id == id && addr_match(taken[r][i], addr) && taken[r][i].resp == resp) return;
+    // Candidates for the head: the entries that may have entered before every
+    // entry ahead of them (pushed within order_cycles of each, or behind a
+    // re-expanded beat before its read ended); a beat whose burst has an
+    // earlier beat ahead of it is not one.
+    foreach (q[r][i]) begin
+      bit behind = 1'b0;
+      for (int unsigned j = gone; j < i; j++)
+        if (q[r][j].src == q[r][i].src || !may_precede(q[r][j], q[r][i])) behind = 1'b1;
+      if (behind) continue;
+      if (q[r][i].id == id && addr_match(q[r][i], addr) && q[r][i].resp == resp) begin
+        if (q[r][i].b_sub) n_unresolved++;
         read_idx[r] = i;
         return;
       end
-      exp = {exp, i == 0 ? "" : " or ", $sformatf("id=%0h addr=%0h resp %b", q[r][i].id,
-                                                    q[r][i].addr, q[r][i].resp_ok)};
+      exp = {exp, exp == "" ? "" : " or ",
+             $sformatf("id=%0h addr=%0h%s resp=%0d", q[r][i].id, q[r][i].addr,
+                       q[r][i].b_sub ? " (sub-burst)" : "", q[r][i].resp)};
     end
+    foreach (taken[r][i])
+      exp = {exp, exp == "" ? "" : " or ",
+             $sformatf("id=%0h addr=%0h resp=%0d (popped)", taken[r][i].id, taken[r][i].addr,
+                       taken[r][i].resp)};
     aou_rule_log::fire("T1-E02", get_type_name());
     `uvm_error(get_type_name(), $sformatf(
         "T1-E02: RP%0d FIFO head id=%0h addr=%0h resp=%0d, expected %s (%0d entries held)", r, id,
@@ -295,11 +505,10 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
   endfunction
 
   function void report_phase(uvm_phase phase);
-    int unsigned left = 0;
-    foreach (merr[r]) left += merr[r].size();
     if (n_push + n_read + n_pop != 0)
       `uvm_info(get_type_name(), $sformatf(
-          "debug FIFO: %0d pushes (%0d dropped), %0d reads, %0d pops; %0d M-port errors unplaced",
-          n_push, n_drop, n_read, n_pop, left), UVM_LOW)
+          {"debug FIFO: %0d pushes (%0d dropped), %0d reads (%0d overlapping a pop), %0d pops, ",
+           "%0d B heads unresolved"},
+          n_push, n_drop, n_read, n_overlap, n_pop, n_unresolved), UVM_LOW)
   endfunction
 endclass

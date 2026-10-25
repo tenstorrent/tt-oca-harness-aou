@@ -299,7 +299,7 @@
   title: 'Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.17'
-  added: 'MAS 7.2.4; BUGS/028'
+  added: 'MAS 7.2.4'
   priority: P2
   title: 'Debug FIFO holds four entries and drops the fifth; B and R pushed in one cycle'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
@@ -309,7 +309,7 @@
   title: 'Debug FIFO access disabled: with RPn_ERROR_INFO_ACCESS_EN=0 the debug address is ordinary memory'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.19'
-  added: 'BUGS/035'
+  added: 'MAS 7.2.4'
   priority: P2
   title: 'Debug FIFO read through an RP narrower than the remote die (two-beat read)'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
