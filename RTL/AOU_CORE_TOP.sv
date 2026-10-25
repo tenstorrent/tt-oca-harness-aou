@@ -774,6 +774,12 @@ import packet_def_pkg::*;
         .O_AOU_RX_AXI_S_RVALID_BLOCKED      ( O_AOU_RX_AXI_S_RVALID             )
     );
 //----------------------------------------------------------------------------
+    // The RX FIFOs share the core reset (I_RESETN and AOU_SW_RESET). Every
+    // message they hold belongs to a transaction the core tracks, so a reset
+    // that clears the core must clear them too: an entry kept across
+    // AOU_SW_RESET would hold I_AOU_RX_FIFO_PENDING and block the next
+    // activation, be presented on an AXI port as part of the wrong
+    // transaction, and return credit on top of the full re-advertisement.
     genvar i;
     generate
         for(i = 0; i < RP_COUNT; i++) begin : gen_aou_fifo_rp
@@ -802,7 +808,7 @@ import packet_def_pkg::*;
             ) u_aou_fifo_rp
             (
                 .I_CLK                              ( I_CLK                                 ),
-                .I_RESETN                           ( I_RESETN                              ),
+                .I_RESETN                           ( w_DFTED_sw_resetn                     ),
 
                 .I_WR_REQ_FIFO_SVALID               ( w_wr_req_fifo_svalid[i]               ),
                 .I_WR_REQ_FIFO_SDATA                ( w_wr_req_fifo_sdata[i]                ),
