@@ -179,6 +179,7 @@ plan_ids:
   aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0: '1.2,2.1'
   aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1: '1.1,2.2,2.3,2.9,19.1,19.2,2.13,2.14'
   aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1: '2.2,2.3,2.8,2.13,2.14'
+  aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64: '2.2,2.3,2.8,2.13'
   aou_link_force_deact_test: '2.7'
   aou_act_after_deact_test: '1.6,6.20'
   aou_act_after_deact_test.credit_manage-1.busy-1: '1.6,6.20'

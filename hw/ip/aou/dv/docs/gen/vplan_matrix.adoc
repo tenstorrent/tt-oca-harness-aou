@@ -27,18 +27,18 @@
 |===
 | Item | Requirement | Priority | Scenarios
 | 2.1 | Verify DeactivateReq → DeactivateAck handshake and state transitions ENABLED → DEACTIVATE → DISABLED | P0 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0`, `aou_t1_deact_test`, `aou_t1_remote_act_test`
-| 2.2 | Attempt deactivation while write transactions are pending; verify `mst_tr_complete` gating | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
-| 2.3 | Attempt deactivation while read transactions are pending; verify `slv_tr_complete` gating | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
+| 2.2 | Attempt deactivation while write transactions are pending; verify `mst_tr_complete` gating | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
+| 2.3 | Attempt deactivation while read transactions are pending; verify `slv_tr_complete` gating | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 | 2.4 | Complete deactivate then re-activate; verify clean restart and credit re-initialization | P1 | merged into 1.6
 | 2.5 | Deactivate when TX queue has pending messages due to no credits | P2 | `aou_zero_credit_test.credit-rdata.deact-1`, `aou_zero_credit_test.credit-rreq.deact-1`, `aou_zero_credit_test.credit-wdata.deact-1`, `aou_zero_credit_test.credit-wreq.deact-1`, `aou_zero_credit_test.credit-wresp.deact-1`, `aou_zero_credit_test.credit-wresp.deact-1.grant-2`
 | 2.6 | Verify behavior when DeactivateAck not received within timeout; verify `deact_ack_err` | P2 | `aou_linkreset_timeout_test.src-deact_ack`
 | 2.7 | Test `deactivate_force` CSR field; verify immediate deactivation | P2 | `aou_link_force_deact_test` (expected failure only)
-| 2.8 | Test AoU v0.5 mode where req/resp credits managed together during deactivation | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`
+| 2.8 | Test AoU v0.5 mode where req/resp credits managed together during deactivation | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64`
 | 2.9 | Test separate req/resp credit management during deactivation; verify response messages allowed | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 | 2.10 | Verify `int_deactivate_property` status bit during deactivation | P2 | `aou_deact_ctrl_test.mode-property`
 | 2.11 | No credit message in DISABLED; no response credit after the sender's DeactivateAck (request credits after it are permitted, v0.8 8.4) | P2 | `aou_link_act_deact_test`
 | 2.12 | DEACTIVATE_TIME_OUT_VALUE sweep: the DeactivateReq gate delay is 2^(v+3) cycles | P2 | `aou_deact_ctrl_test.mode-tov`
-| 2.13 | No DeactivateReq while the DUT's own requests are outstanding | P2 | `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
+| 2.13 | No DeactivateReq while the DUT's own requests are outstanding | P2 | `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 | 2.14 | Requests received after DeactivateReq are still answered in DEACTIVATE | P2 | `aou_act_flit_test.mode-deact_rsp.v0p8`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 |===
 ==== 2.3 Credit Management Tests

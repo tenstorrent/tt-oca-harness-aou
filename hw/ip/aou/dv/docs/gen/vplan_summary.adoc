@@ -210,7 +210,7 @@
 | `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote.4xmix4211-sp128` | `aou_qos_order_test` | `+arb_mode=2 +qos_tiers=2 +qos_timer=promote` | 1-2 | `4xmix4211-sp128` | 13.15 | 
 | `aou_stress_test.st_bp-all.small_size_pct-5` | `aou_stress_test` | `+st_bp=all +small_size_pct=5` | 1-2 |  | 4.1,5.1,14.10,14.11 | 
 |===
-===== `testlists/link.toml` (43 scenarios)
+===== `testlists/link.toml` (44 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -218,6 +218,7 @@
 | `aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0` | `aou_link_act_deact_test` | `+who=both +order=simul +deact_who=both +busy=0` | 1-2 |  | 1.2,2.1 | 
 | `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1` | `aou_link_act_deact_test` | `+who=remote +deact_who=remote +credit_manage=1 +busy=1` | 1-2 |  | 1.1,2.2,2.3,2.9,19.1,19.2,2.13,2.14 | 
 | `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +credit_manage=0 +busy=1` | 1-2 |  | 2.2,2.3,2.8,2.13,2.14 | 
+| `aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64` | `aou_link_act_deact_test` | `+who=both +order=simul +deact_who=both +credit_manage=0 +busy=1 +fdi_trdy=random` | 1-13 | `4x512-sp64` | 2.2,2.3,2.8,2.13 | 
 | `aou_link_force_deact_test` | `aou_link_force_deact_test` |  | 1-2 |  | 2.7 | BUGS/010 (expected_fail.yaml)
 | `aou_act_after_deact_test` | `aou_act_after_deact_test` |  | 1-4 |  | 1.6,6.20 | 
 | `aou_act_after_deact_test.credit_manage-1.busy-1` | `aou_act_after_deact_test` | `+credit_manage=1 +busy=1` | 1-2 |  | 1.6,6.20 | 

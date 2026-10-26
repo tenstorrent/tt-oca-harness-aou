@@ -213,9 +213,9 @@
     still in the DUT's TX backlog, crosses it on the link, and is open when the DUT sends
     DeactivateReq (MAS 7.3.5/7.3.6 re-activation vs AoU v0.8 8.4). Matches only when every
     unanswered request on that RP arrived after L3's DeactivateReq; any other AOU-R33 fails.
-    4x512-sp64 VCS +who=both +order=simul +deact_who=both +credit_manage=0 +busy=1 seed 3 on an earlier stimulus stream; not reached since, with
-    those args on seeds 1-60 nor with the scenarios' own args (none, and +who=both +order=simul
-    +deact_who=both +busy=0) on seeds 1-20
+    4x512-sp64 VCS +who=both +order=simul +deact_who=both +credit_manage=0 +busy=1: seeds 11 and
+    45 of 1-100; FDI backpressure widens the window, and the link list's 4x512-sp64 scenario with
+    +fdi_trdy=random reaches it (seeds 5 and 13 of 1-13)
 
 - test: aou_link_act_deact_test
   bug: BUGS/033
