@@ -30,7 +30,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |IP_VERSION |0x0000 | | | |0x00010000
 | |　 |MAJOR_VERSION |[31:16] |RO |0x0001
 | |　 |MINOR_VERSION |[15:0] |RO |0x0000
-|AOU_CON0 |0x0004 | | | |0x00000000
+|AOU_CON0 |0x0004 | | | |0x00004008
 | | |Rsvd |[31:28] |RO |0x0
 | | |RP3_ERROR_INFO_ACCESS_EN |[27] |RW |0x0
 | | |RP2_ERROR_INFO_ACCESS_EN |[26] |RW |0x0
@@ -44,12 +44,14 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |TX_LP_MODE |[11] |RW |0x0
 | | |Rsvd |[10:5] |RO |0x0
 | | |AOU_SW_RESET |[4] |WO |0x0
-| | |CREDIT_MANAGE |[3] |RW |0x0
+| | |CREDIT_MANAGE |[3] |RW |0x1
 | | |AXI_SPLIT_TR_EN |[2] |RW |0x0
-| | |Rsvd |[1:0] |RO |0x0
-|AOU_INIT |0x0008 | | | |0x00004608
+| | |Rsvd |[1] |RO |0x0
+| | |DEACTIVATE_FORCE |[0] |WO |0x0
+|AOU_INIT |0x0008 | | | |0x00000608
 | | |Rsvd |[31:13] |RO |0x0
 | | |INT_FDI_LINK_DOWN |[12] |W1C |0x0
+| | |INT_DEACTIVATE_PROPERTY |[11] |RO |0x0
 | | |MST_TR_COMPLETE |[10] |RO |0x1
 | | |SLV_TR_COMPLETE |[9] |RO |0x1
 | | |INT_ACTIVATE_START |[8] |W1C |0x0
@@ -59,7 +61,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |ACTIVATE_STATE_ENABLED |[2] |RO |0x0
 | | |DEACTIVATE_START |[1] |RW |0x0
 | | |ACTIVATE_START |[0] |RW |0x0
-|AOU_INTERRUPT_MASK |0x000C | | | |
+|AOU_INTERRUPT_MASK |0x000C | | | |0x00000000
 | | |Rsvd |[31:11] |RO |0x0
 | | |INT_FDI_LINK_DOWN_MASK |[10] |RW |0x0
 | | |INT_EARLY_WDT_MASK |[9] |RW |0x0
@@ -72,7 +74,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |INT_SI0_ID_MISMATCH_MASK |[2] |RW |0x0
 | | |Rsvd |[1] |RO |0x0
 | | |Rsvd |[0] |RO |0x0
-|LP_LINKRESET |0x0010 | | | |
+|LP_LINKRESET |0x0010 | | | |0x00002400
 | | |Rsvd |[31:14] |RO |0x0
 | | |ACK_TIME_OUT_VALUE |[13:11] |RW |0x4
 | | |MSGCREDIT_TIME_OUT_VALUE |[10:8] |RW |0x4
@@ -81,7 +83,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |INVALID_ACTMSG_INFO |[5:2] |RO |0x0
 | | |INVALID_ACTMSG_ERR |[1] |W1C |0x0
 | | |MSGCREDIT_ERR |[0] |W1C |0x0
-|DEST_RP |0x0014 | | | |0x00000000
+|DEST_RP |0x0014 | | | |0x00003210
 | | |Rsvd |[31:14] |RO |0x0
 | | |RP3_DEST |[13:12] |RW |0x3
 | | |Rsvd |[11:10] |RO |0x0
@@ -117,12 +119,12 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |SPLIT_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
-|WRITE_EARLY_RESPONSE_RP0 |0x0028 | | | |0x0
+|WRITE_EARLY_RESPONSE_RP0 |0x0028 | | | |0x00004000
 | | |Rsvd |[31:18] |RO |0x0
 | | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
 | | |WDT_EN |[16] |RW |0x0
 | | |EARLY_ALWAYS_EN |[15] |RW |0x0
-| | |WRITE_RESP_DONE |[14] |RO |0x0
+| | |WRITE_RESP_DONE |[14] |RO |0x1
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
 | | |WRITE_RESP_ERR_ID_INFO |[10:1] |RO |0x0
@@ -132,7 +134,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |AXI_ERROR_INFO1_RP0 |0x0030 | | | |0x0
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
-|AXI_SLV_ID_MISMATCH_ERR_RP0 |0x0034 | | | |
+|AXI_SLV_ID_MISMATCH_ERR_RP0 |0x0034 | | | |0x00000000
 | | |Rsvd |[31:23] |RO |0x0
 | | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
@@ -149,12 +151,12 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |SPLIT_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
-|WRITE_EARLY_RESPONSE_RP1 |0x0040 | | | |0x0
+|WRITE_EARLY_RESPONSE_RP1 |0x0040 | | | |0x00004000
 | | |Rsvd |[31:18] |RO |0x0
 | | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
 | | |WDT_EN |[16] |RW |0x0
 | | |EARLY_ALWAYS_EN |[15] |RW |0x0
-| | |WRITE_RESP_DONE |[14] |RO |0x0
+| | |WRITE_RESP_DONE |[14] |RO |0x1
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
 | | |WRITE_RESP_ERR_ID_INFO |[10:1] |RO |0x0
@@ -164,7 +166,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |AXI_ERROR_INFO1_RP1 |0x0048 | | | |0x0
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
-|AXI_SLV_ID_MISMATCH_ERR_RP1 |0x004C | | | |
+|AXI_SLV_ID_MISMATCH_ERR_RP1 |0x004C | | | |0x00000000
 | | |Rsvd |[31:23] |RO |0x0
 | | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
@@ -181,12 +183,12 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |SPLIT_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
-|WRITE_EARLY_RESPONSE_RP2 |0x0058 | | | |0x0
+|WRITE_EARLY_RESPONSE_RP2 |0x0058 | | | |0x00004000
 | | |Rsvd |[31:18] |RO |0x0
 | | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
 | | |WDT_EN |[16] |RW |0x0
 | | |EARLY_ALWAYS_EN |[15] |RW |0x0
-| | |WRITE_RESP_DONE |[14] |RO |0x0
+| | |WRITE_RESP_DONE |[14] |RO |0x1
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
 | | |WRITE_RESP_ERR_ID_INFO |[10:1] |RO |0x0
@@ -196,7 +198,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |AXI_ERROR_INFO1_RP2 |0x0060 | | | |0x0
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
-|AXI_SLV_ID_MISMATCH_ERR_RP2 |0x0064 | | | |
+|AXI_SLV_ID_MISMATCH_ERR_RP2 |0x0064 | | | |0x00000000
 | | |Rsvd |[31:23] |RO |0x0
 | | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
@@ -213,12 +215,12 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |SPLIT_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |SPLIT_BID_MISMATCH_ERR |[1] |W1C |0x0
 | | |SPLIT_RID_MISMATCH_ERR |[0] |W1C |0x0
-|WRITE_EARLY_RESPONSE_RP3 |0x0070 | | | |0x0
+|WRITE_EARLY_RESPONSE_RP3 |0x0070 | | | |0x00004000
 | | |Rsvd |[31:18] |RO |0x0
 | | |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |0x0
 | | |WDT_EN |[16] |RW |0x0
 | | |EARLY_ALWAYS_EN |[15] |RW |0x0
-| | |WRITE_RESP_DONE |[14] |RO |0x0
+| | |WRITE_RESP_DONE |[14] |RO |0x1
 | | |WRITE_RESP_ERR |[13] |W1C |0x0
 | | |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |0x0
 | | |WRITE_RESP_ERR_ID_INFO |[10:1] |RO |0x0
@@ -228,7 +230,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |AXI_ERROR_INFO1_RP3 |0x0078 | | | |0x0
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
-|AXI_SLV_ID_MISMATCH_ERR_RP3 |0x007C | | | |
+|AXI_SLV_ID_MISMATCH_ERR_RP3 |0x007C | | | |0x00000000
 | | |Rsvd |[31:23] |RO |0x0
 | | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
@@ -240,6 +242,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |==========================================================================
 
 _Table 7. Register Map_
+
+The reset values of the read-only status fields MST_TR_COMPLETE, SLV_TR_COMPLETE, ACTIVATE_STATE_DISABLED, ACTIVATE_STATE_ENABLED, INT_DEACTIVATE_PROPERTY and WRITE_RESP_DONE are the values they read after reset with no traffic outstanding. They are not stored: they follow the state of the hardware. On an RP the build does not have (index RP_COUNT or above), WRITE_RESP_DONE reads 0, so that RP's WRITE_EARLY_RESPONSE_RPn reads 0x00000000.
 
 *ERR SET is restricted to change the value while the system is running*
 
@@ -259,6 +263,12 @@ For details on the ACTIVATE and DEACTIVATE SFRs, please refer to xref:aou-73-act
 2.  The TX path has had nothing to transmit for a window of *2^(DEACTIVATE_TIME_OUT_VALUE + 3)* core clock cycles.
 * *AOU_INIT.DEACTIVATE_TIME_OUT_VALUE* [6:4] is the length of that window. The field is 3 bits wide. A value v encodes *2^(v + 3)* cycles: 8, 16, 32, 64, 128, 256, 512 or 1024. The reset value 0 selects 8 cycles.
 * The window runs while the activation FSM is ENABLED or DEACTIVATE, and it restarts from zero whenever the TX path has a message to send: a message waiting in a TX FIFO, a flit granule still being packed, or an AXI beat accepted into the TX path. The counter is held at zero while the FSM is DISABLED or ACTIVATE, so the window starts when the FSM enters ENABLED. The window is already running before software writes DEACTIVATE_START, and it may already have elapsed. When the TX path has been quiet for the whole window, this condition is already satisfied and the DeactivateReq follows the write at once, still subject to condition 1. A message still in the TX path, or one accepted after the write, holds the DeactivateReq until that traffic has been gone for the full window.
+
+*AOU_CON0.DEACTIVATE_FORCE and AOU_INIT.INT_DEACTIVATE_PROPERTY*
+
+* Writing 1 to DEACTIVATE_FORCE while the activation FSM is ENABLED or DEACTIVATE, before the local die has sent its DeactivateReq, sends a DeactivateReq with PropertyReq = 1 at once. It does not wait for the two DEACTIVATE_START conditions above. The field is write-only and reads 0; it clears itself when ACTIVATE_STATE_DISABLED becomes 1.
+* INT_DEACTIVATE_PROPERTY is set when the local die receives a DeactivateReq with PropertyReq = 1. It clears when the deactivation completes, or when the activation FSM returns to DISABLED on an error (xref:aou-73-activation-deactivation-flow[Section 7.3]). While it is set, the condition that raises INT_DEACTIVATE_START looks at DEACTIVATE_FORCE instead of DEACTIVATE_START: it holds until DEACTIVATE_FORCE is written or the local DeactivateReq has been sent.
+* AoU specification v0.8 defines no PropertyReq bit in a DeactivateReq; the bit DEACTIVATE_FORCE sets is RsvdZero there. A DeactivateReq sent through DEACTIVATE_FORCE therefore does not comply with v0.8, and a remote die that follows v0.8 never sets INT_DEACTIVATE_PROPERTY.
 
 *MAX BURSTLEN*
 
@@ -460,16 +470,16 @@ A die sends an ActivateAck in response to an ActivateReq from the other die whil
 [[aou-731-credit-management-type]]
 ==== 7.3.1. Credit Management Type
 
-There are two types of Credit Management Type. Since current AOU_SPEC cannot resolve pending AXI response without Activate again. When Credit Management type is set to 1, During Deactivate state, AOU_CORE can resolve pending AXI response itself. It can be configured through AOU_CON0.CREDIT_MANAGE, and the default value is 0.
+There are two types of Credit Management Type. Since current AOU_SPEC cannot resolve pending AXI response without Activate again. When Credit Management type is set to 1, During Deactivate state, AOU_CORE can resolve pending AXI response itself. It can be configured through AOU_CON0.CREDIT_MANAGE, and the default value is 1.
 
-* 0 (default) Based on AoU v0.5
+* 0 Based on AoU v0.5
 ** After deactivation, if a new request is received from the remote die, no response message can be sent.
 ** To deliver the corresponding response, the system must go through activation again after deactivation.
 ** Credit management and transmission availability for both Request-related messages and Response-related message are controlled together.
 ** Credited messages must not be sent, after the DeactivateReq message is sent.
 ** Credits must not be sent after the DeactivateAck message is sent.
 ** The Activate Interrupt and Deactivate Interrupt that occur in the process of resuming the exchange of response messages impose mandatory requirement to set Activate and Deactivate SFR.
-* 1 Proposal by BOS.
+* 1 (default) Proposal by BOS.
 ** When the AoU Activity state is DEACTIVATE, manage Request-related messages(WERQ, RREQ, WDATA) and Response-related messages(RDATA, WRESP) separately.
 ** RDATA, WRESP Credited messages can be sent, after the DeactivateReq message is sent.
 ** Credits for RDATA, WRESP messages must be sent after the DeactivateAck message is sent.
