@@ -223,8 +223,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AXI Slave ID Mismatch Error RP0";
-        desc = "AXI slave BID/RID mismatch info and error flags for RP0.";
-        field { sw = r; } reserved_31_22[31:22] = 0;
+        desc = "AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP0. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.";
+        field { sw = r; } reserved_31_23[31:23] = 0;
+        field { sw = rw; desc = "Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set."; } axi_slv_id_mismatch_en[22:22] = 0;
         field { sw = r; hw = rw; desc = "Captured BID when an AXI slave BID mismatch occurs. Clears when error clears."; } axi_slv_bid_mismatch_info[21:12];
         field { sw = r; hw = rw; desc = "Captured RID when an AXI slave RID mismatch occurs. Clears when error clears."; } axi_slv_rid_mismatch_info[11:2];
         field { sw = rw; hw = w; onwrite = woclr; desc = "AXI slave BID mismatch error. Set by HW, write 1 to clear."; } axi_slv_bid_mismatch_err[1:1] = 0;
@@ -287,8 +288,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AXI Slave ID Mismatch Error RP1";
-        desc = "AXI slave BID/RID mismatch info and error flags for RP1.";
-        field { sw = r; } reserved_31_22[31:22] = 0;
+        desc = "AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP1. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.";
+        field { sw = r; } reserved_31_23[31:23] = 0;
+        field { sw = rw; desc = "Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set."; } axi_slv_id_mismatch_en[22:22] = 0;
         field { sw = r; hw = rw; desc = "Captured BID when an AXI slave BID mismatch occurs. Clears when error clears."; } axi_slv_bid_mismatch_info[21:12];
         field { sw = r; hw = rw; desc = "Captured RID when an AXI slave RID mismatch occurs. Clears when error clears."; } axi_slv_rid_mismatch_info[11:2];
         field { sw = rw; hw = w; onwrite = woclr; desc = "AXI slave BID mismatch error. Set by HW, write 1 to clear."; } axi_slv_bid_mismatch_err[1:1] = 0;
@@ -351,8 +353,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AXI Slave ID Mismatch Error RP2";
-        desc = "AXI slave BID/RID mismatch info and error flags for RP2.";
-        field { sw = r; } reserved_31_22[31:22] = 0;
+        desc = "AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP2. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.";
+        field { sw = r; } reserved_31_23[31:23] = 0;
+        field { sw = rw; desc = "Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set."; } axi_slv_id_mismatch_en[22:22] = 0;
         field { sw = r; hw = rw; desc = "Captured BID when an AXI slave BID mismatch occurs. Clears when error clears."; } axi_slv_bid_mismatch_info[21:12];
         field { sw = r; hw = rw; desc = "Captured RID when an AXI slave RID mismatch occurs. Clears when error clears."; } axi_slv_rid_mismatch_info[11:2];
         field { sw = rw; hw = w; onwrite = woclr; desc = "AXI slave BID mismatch error. Set by HW, write 1 to clear."; } axi_slv_bid_mismatch_err[1:1] = 0;
@@ -415,8 +418,9 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AXI Slave ID Mismatch Error RP3";
-        desc = "AXI slave BID/RID mismatch info and error flags for RP3.";
-        field { sw = r; } reserved_31_22[31:22] = 0;
+        desc = "AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP3. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.";
+        field { sw = r; } reserved_31_23[31:23] = 0;
+        field { sw = rw; desc = "Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set."; } axi_slv_id_mismatch_en[22:22] = 0;
         field { sw = r; hw = rw; desc = "Captured BID when an AXI slave BID mismatch occurs. Clears when error clears."; } axi_slv_bid_mismatch_info[21:12];
         field { sw = r; hw = rw; desc = "Captured RID when an AXI slave RID mismatch occurs. Clears when error clears."; } axi_slv_rid_mismatch_info[11:2];
         field { sw = rw; hw = w; onwrite = woclr; desc = "AXI slave BID mismatch error. Set by HW, write 1 to clear."; } axi_slv_bid_mismatch_err[1:1] = 0;

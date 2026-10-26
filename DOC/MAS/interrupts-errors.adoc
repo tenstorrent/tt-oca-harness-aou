@@ -42,9 +42,9 @@ An interrupt that occurs when deactivation of the AoU Protocol layer is required
 
 * *INT_SI0_ID_MISMATCH*
 
-An interrupt that occurs on the AXI Subordinate Interface when a B or R channel response is received with an ID that was not previously issued as a request. For details on ID mismatch detection, see xref:aou-374-id-ordering[Section 3.7.4].
+An interrupt that occurs on the AXI Subordinate Interface when a B or R channel response is received with an ID that was not previously issued as a request. Each RP's checker is enabled by [.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN++#. With that bit clear, the RP does not raise this interrupt. Program the enable only while the activation FSM is DISABLED and no AXI traffic is outstanding on that RP. For details, see xref:{aou-software-xref}#aou-722-axi-id-mismatch-error[Section 7.2.2].
 
-Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.AXI_SLV_ID_MISMATCH_ERR++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.AXI_SLV_ID_MISMATCH_ERR.SLV_BRESP_ERR++# / [.monospaced]#++SLV_RRESP_ERR++#.
+Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.AXI_SLV_ID_MISMATCH_ERR_RPn++#. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AXI_SLV_BID_MISMATCH_ERR++# or [.monospaced]#++AXI_SLV_RID_MISMATCH_ERR++#.
 
 * *INT_MI0_ID_MISMATCH*
 

@@ -437,7 +437,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field axi_slv_bid_mismatch_err;
         rand uvm_reg_field axi_slv_rid_mismatch_info;
         rand uvm_reg_field axi_slv_bid_mismatch_info;
-        rand uvm_reg_field reserved_31_22;
+        rand uvm_reg_field axi_slv_id_mismatch_en;
+        rand uvm_reg_field reserved_31_23;
 
         function new(string name = "aou_core__axi_slv_id_mismatch_err_rp0");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -452,8 +453,10 @@ package aou_core_csr_uvm_pkg;
             this.axi_slv_rid_mismatch_info.configure(this, 10, 2, "RO", 1, 'h0, 0, 1, 0);
             this.axi_slv_bid_mismatch_info = new("axi_slv_bid_mismatch_info");
             this.axi_slv_bid_mismatch_info.configure(this, 10, 12, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_22 = new("reserved_31_22");
-            this.reserved_31_22.configure(this, 10, 22, "RO", 1, 'h0, 1, 1, 0);
+            this.axi_slv_id_mismatch_en = new("axi_slv_id_mismatch_en");
+            this.axi_slv_id_mismatch_en.configure(this, 1, 22, "RW", 1, 'h0, 1, 1, 0);
+            this.reserved_31_23 = new("reserved_31_23");
+            this.reserved_31_23.configure(this, 9, 23, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_slv_id_mismatch_err_rp0
 
@@ -578,7 +581,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field axi_slv_bid_mismatch_err;
         rand uvm_reg_field axi_slv_rid_mismatch_info;
         rand uvm_reg_field axi_slv_bid_mismatch_info;
-        rand uvm_reg_field reserved_31_22;
+        rand uvm_reg_field axi_slv_id_mismatch_en;
+        rand uvm_reg_field reserved_31_23;
 
         function new(string name = "aou_core__axi_slv_id_mismatch_err_rp1");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -593,8 +597,10 @@ package aou_core_csr_uvm_pkg;
             this.axi_slv_rid_mismatch_info.configure(this, 10, 2, "RO", 1, 'h0, 0, 1, 0);
             this.axi_slv_bid_mismatch_info = new("axi_slv_bid_mismatch_info");
             this.axi_slv_bid_mismatch_info.configure(this, 10, 12, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_22 = new("reserved_31_22");
-            this.reserved_31_22.configure(this, 10, 22, "RO", 1, 'h0, 1, 1, 0);
+            this.axi_slv_id_mismatch_en = new("axi_slv_id_mismatch_en");
+            this.axi_slv_id_mismatch_en.configure(this, 1, 22, "RW", 1, 'h0, 1, 1, 0);
+            this.reserved_31_23 = new("reserved_31_23");
+            this.reserved_31_23.configure(this, 9, 23, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_slv_id_mismatch_err_rp1
 
@@ -719,7 +725,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field axi_slv_bid_mismatch_err;
         rand uvm_reg_field axi_slv_rid_mismatch_info;
         rand uvm_reg_field axi_slv_bid_mismatch_info;
-        rand uvm_reg_field reserved_31_22;
+        rand uvm_reg_field axi_slv_id_mismatch_en;
+        rand uvm_reg_field reserved_31_23;
 
         function new(string name = "aou_core__axi_slv_id_mismatch_err_rp2");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -734,8 +741,10 @@ package aou_core_csr_uvm_pkg;
             this.axi_slv_rid_mismatch_info.configure(this, 10, 2, "RO", 1, 'h0, 0, 1, 0);
             this.axi_slv_bid_mismatch_info = new("axi_slv_bid_mismatch_info");
             this.axi_slv_bid_mismatch_info.configure(this, 10, 12, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_22 = new("reserved_31_22");
-            this.reserved_31_22.configure(this, 10, 22, "RO", 1, 'h0, 1, 1, 0);
+            this.axi_slv_id_mismatch_en = new("axi_slv_id_mismatch_en");
+            this.axi_slv_id_mismatch_en.configure(this, 1, 22, "RW", 1, 'h0, 1, 1, 0);
+            this.reserved_31_23 = new("reserved_31_23");
+            this.reserved_31_23.configure(this, 9, 23, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_slv_id_mismatch_err_rp2
 
@@ -860,7 +869,8 @@ package aou_core_csr_uvm_pkg;
         rand uvm_reg_field axi_slv_bid_mismatch_err;
         rand uvm_reg_field axi_slv_rid_mismatch_info;
         rand uvm_reg_field axi_slv_bid_mismatch_info;
-        rand uvm_reg_field reserved_31_22;
+        rand uvm_reg_field axi_slv_id_mismatch_en;
+        rand uvm_reg_field reserved_31_23;
 
         function new(string name = "aou_core__axi_slv_id_mismatch_err_rp3");
             super.new(name, 32, UVM_NO_COVERAGE);
@@ -875,8 +885,10 @@ package aou_core_csr_uvm_pkg;
             this.axi_slv_rid_mismatch_info.configure(this, 10, 2, "RO", 1, 'h0, 0, 1, 0);
             this.axi_slv_bid_mismatch_info = new("axi_slv_bid_mismatch_info");
             this.axi_slv_bid_mismatch_info.configure(this, 10, 12, "RO", 1, 'h0, 0, 1, 0);
-            this.reserved_31_22 = new("reserved_31_22");
-            this.reserved_31_22.configure(this, 10, 22, "RO", 1, 'h0, 1, 1, 0);
+            this.axi_slv_id_mismatch_en = new("axi_slv_id_mismatch_en");
+            this.axi_slv_id_mismatch_en.configure(this, 1, 22, "RW", 1, 'h0, 1, 1, 0);
+            this.reserved_31_23 = new("reserved_31_23");
+            this.reserved_31_23.configure(this, 9, 23, "RO", 1, 'h0, 1, 1, 0);
         endfunction : build
     endclass : aou_core__axi_slv_id_mismatch_err_rp3
 

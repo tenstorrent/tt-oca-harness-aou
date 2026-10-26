@@ -133,7 +133,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
 |AXI_SLV_ID_MISMATCH_ERR_RP0 |0x0034 | | | |
-| | |Rsvd |[31:22] |RO |0x0
+| | |Rsvd |[31:23] |RO |0x0
+| | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
 | | |AXI_SLV_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |AXI_SLV_BID_MISMATCH_ERR |[1] |W1C |0x0
@@ -164,7 +165,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
 |AXI_SLV_ID_MISMATCH_ERR_RP1 |0x004C | | | |
-| | |Rsvd |[31:22] |RO |0x0
+| | |Rsvd |[31:23] |RO |0x0
+| | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
 | | |AXI_SLV_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |AXI_SLV_BID_MISMATCH_ERR |[1] |W1C |0x0
@@ -195,7 +197,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
 |AXI_SLV_ID_MISMATCH_ERR_RP2 |0x0064 | | | |
-| | |Rsvd |[31:22] |RO |0x0
+| | |Rsvd |[31:23] |RO |0x0
+| | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
 | | |AXI_SLV_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |AXI_SLV_BID_MISMATCH_ERR |[1] |W1C |0x0
@@ -226,7 +229,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |DEBUG_LOWER_ADDR |[31:7] |RW |0x0
 | | |Rsvd |[6:0] |RO |0x0
 |AXI_SLV_ID_MISMATCH_ERR_RP3 |0x007C | | | |
-| | |Rsvd |[31:22] |RO |0x0
+| | |Rsvd |[31:23] |RO |0x0
+| | |AXI_SLV_ID_MISMATCH_EN |[22] |RW |0x0
 | | |AXI_SLV_BID_MISMATCH_INFO |[21:12] |RO |0x0
 | | |AXI_SLV_RID_MISMATCH_INFO |[11:2] |RO |0x0
 | | |AXI_SLV_BID_MISMATCH_ERR |[1] |W1C |0x0
@@ -338,9 +342,15 @@ AOU_CORE can detect AXI ID mismatches on both the manager and subordinate interf
 
 *Table depth and backpressure.* Each pending-ID table is sized by [.monospaced]#++M_RD_MO_CNT++# / [.monospaced]#++M_WR_MO_CNT++# (default 32): the number of remote requests the RP keeps in service at its manager port. An entry is allocated on the handshake of the first split-AR or split-AW issued for a request and freed when the R (with RLAST) or B response of its last sub-burst completes; the entry counts the sub-bursts still to complete. A request the splitter divides therefore holds one entry for all of its sub-bursts, and the manager port may carry more AXI bursts than the table depth: up to [.monospaced]#++M_RD_MO_CNT++# (or [.monospaced]#++M_WR_MO_CNT++#) times the sub-bursts per request (xref:{aou-architecture-xref}#aou-362-burst-splitting[Section 3.6.2]). When all entries are occupied, the [.monospaced]#++O_AR_Slot_Available_Flag++# / [.monospaced]#++O_AW_Slot_Available_Flag++# signal goes low, which suppresses the first sub-burst of any new request and effectively deasserts ARREADY / AWREADY toward the upstream path; the remaining sub-bursts of requests already in the table continue to issue. This is backpressure, not an error \-- no entries are overwritten or dropped, and the table cannot overflow during correct operation.
 
-*No disable mechanism.* There is no RTL parameter or SFR to disable the pending-ID tables or the mismatch check. The interrupt can be masked via [.monospaced]#++AOU_INTERRUPT_MASK.INT_MI0_ID_MISMATCH_MASK++# [3], but this only suppresses the interrupt signal. The tables continue to operate, backpressure still applies when full, and the sticky error bits in [.monospaced]#++ERROR_INFO_RPn++# are still set on a mismatch.
+*No disable mechanism on the manager side.* There is no RTL parameter or SFR to disable the manager pending-ID tables or the mismatch check. The interrupt can be masked via [.monospaced]#++AOU_INTERRUPT_MASK.INT_MI0_ID_MISMATCH_MASK++# [3], but this only suppresses the interrupt signal. The tables continue to operate, backpressure still applies when full, and the sticky error bits in [.monospaced]#++ERROR_INFO_RPn++# are still set on a mismatch.
 
-*Subordinate side.* An analogous pending-ID table exists in [.monospaced]#++AOU_SLV_AXI_INFO++#, with SFR fields in [.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn++# (RP0 at 0x0034, RP1 at 0x004C, RP2 at 0x0064, RP3 at 0x007C). However, the subordinate-side mismatch outputs are currently tied to 0 in RTL; the SFR fields are allocated but will always read 0. The aggregate interrupt [.monospaced]#++INT_SI0_ID_MISMATCH++# will therefore never fire in the current implementation.
+*Subordinate side.* [.monospaced]#++AOU_SLV_AXI_INFO++# keeps a pending-ID table for the subordinate port of each RP. The SFR fields are in [.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn++# (RP0 at 0x0034, RP1 at 0x004C, RP2 at 0x0064, RP3 at 0x007C). [.monospaced]#++AXI_SLV_ID_MISMATCH_EN++# [22] enables the checker for that RP. Its reset value is 0.
+
+With the enable clear, the checker sees no AXI handshakes on that port. The error bits stay 0, and this RP does not contribute to [.monospaced]#++INT_SI0_ID_MISMATCH++#.
+
+With the enable set, a B or R whose ID matches no outstanding request on that subordinate port sets [.monospaced]#++AXI_SLV_BID_MISMATCH_ERR++# or [.monospaced]#++AXI_SLV_RID_MISMATCH_ERR++#, captures the ID, and raises [.monospaced]#++INT_SI0_ID_MISMATCH++# unless [.monospaced]#++AOU_INTERRUPT_MASK.INT_SI0_ID_MISMATCH_MASK++# is set. Software clears each error by writing 1 to the W1C bit. While the checker is enabled it holds a new AW, W or AR on that port once the outstanding requests on that channel reach [.monospaced]#++S_WR_MO_CNT++# or [.monospaced]#++S_RD_MO_CNT++# (default 32).
+
+[.monospaced]#++AXI_SLV_ID_MISMATCH_EN++# is static configuration. Program it only while the activation FSM is DISABLED ([.monospaced]#++ACTIVATE_STATE_DISABLED++# = 1) and no AXI traffic is outstanding on that RP: before [.monospaced]#++AOU_INIT.ACTIVATE_START++#, or after a deactivation has completed. Do not change it while AXI transactions are in flight. The checker records handshakes only while the enable is set, so a change during traffic leaves its pending-ID tables inconsistent with the transactions still on the bus.
 
 [[aou-723-linkreset-error-reporting]]
 ==== 7.2.3. LinkReset Error Reporting

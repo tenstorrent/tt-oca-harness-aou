@@ -1132,10 +1132,13 @@ the AoU Protocol layer is required. The interrupt can be cleared by
 writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_DEACTIVATE_START SFR.
 * *INT_SI0_ID_MISMATCH* An interrupt that occurs on the AXI Slave
 Interface when a B or R channel response is received with an ID that was
-not previously issued as a request. SW can check the mismatched AXI ID
-by reading AOU_CORE.AXI_SLV_ID_MISMATCH_ERR SFR. The interrupt can be
-cleared by writing pass:[']1pass:['] to the
-AOU_CORE.AXI_SLV_ID_MISMATCH_ERR.SLV_B/RRESP_ERR SFR.
+not previously issued as a request. Each RP's checker is enabled by
+AOU_CORE.AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN. Program that
+bit only while the activation FSM is DISABLED and no AXI traffic is
+outstanding on that RP. SW can check the mismatched AXI ID by reading
+AOU_CORE.AXI_SLV_ID_MISMATCH_ERR_RPn. The interrupt can be cleared by
+writing pass:[']1pass:['] to AXI_SLV_BID_MISMATCH_ERR or
+AXI_SLV_RID_MISMATCH_ERR.
 * *INT_MI0_ID_MISMATCH* An interrupt that occurs on the AXI Master
 Interface when a B or R channel response is received with an ID that was
 not previously issued as a request. SW can check the mismatched AXI ID

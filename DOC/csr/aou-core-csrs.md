@@ -579,7 +579,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x34
 - Size: 0x4
 
-<p>AXI slave BID/RID mismatch info and error flags for RP0.</p>
+<p>AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP0. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.</p>
 
 | Bits|        Identifier       |  Access |Reset|Name|
 |-----|-------------------------|---------|-----|----|
@@ -587,7 +587,8 @@ Don't override. Generated from: aou_core
 |  1  | axi_slv_bid_mismatch_err|rw, woclr| 0x0 |  — |
 | 11:2|axi_slv_rid_mismatch_info|    r    |  —  |  — |
 |21:12|axi_slv_bid_mismatch_info|    r    |  —  |  — |
-|31:22|      reserved_31_22     |    r    | 0x0 |  — |
+|  22 |  axi_slv_id_mismatch_en |    rw   | 0x0 |  — |
+|31:23|      reserved_31_23     |    r    | 0x0 |  — |
 
 #### axi_slv_rid_mismatch_err field
 
@@ -604,6 +605,10 @@ Don't override. Generated from: aou_core
 #### axi_slv_bid_mismatch_info field
 
 <p>Captured BID when an AXI slave BID mismatch occurs. Clears when error clears.</p>
+
+#### axi_slv_id_mismatch_en field
+
+<p>Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set.</p>
 
 ### axi_split_tr_rp1 register
 
@@ -750,7 +755,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x4C
 - Size: 0x4
 
-<p>AXI slave BID/RID mismatch info and error flags for RP1.</p>
+<p>AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP1. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.</p>
 
 | Bits|        Identifier       |  Access |Reset|Name|
 |-----|-------------------------|---------|-----|----|
@@ -758,7 +763,8 @@ Don't override. Generated from: aou_core
 |  1  | axi_slv_bid_mismatch_err|rw, woclr| 0x0 |  — |
 | 11:2|axi_slv_rid_mismatch_info|    r    |  —  |  — |
 |21:12|axi_slv_bid_mismatch_info|    r    |  —  |  — |
-|31:22|      reserved_31_22     |    r    | 0x0 |  — |
+|  22 |  axi_slv_id_mismatch_en |    rw   | 0x0 |  — |
+|31:23|      reserved_31_23     |    r    | 0x0 |  — |
 
 #### axi_slv_rid_mismatch_err field
 
@@ -775,6 +781,10 @@ Don't override. Generated from: aou_core
 #### axi_slv_bid_mismatch_info field
 
 <p>Captured BID when an AXI slave BID mismatch occurs. Clears when error clears.</p>
+
+#### axi_slv_id_mismatch_en field
+
+<p>Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set.</p>
 
 ### axi_split_tr_rp2 register
 
@@ -921,7 +931,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x64
 - Size: 0x4
 
-<p>AXI slave BID/RID mismatch info and error flags for RP2.</p>
+<p>AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP2. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.</p>
 
 | Bits|        Identifier       |  Access |Reset|Name|
 |-----|-------------------------|---------|-----|----|
@@ -929,7 +939,8 @@ Don't override. Generated from: aou_core
 |  1  | axi_slv_bid_mismatch_err|rw, woclr| 0x0 |  — |
 | 11:2|axi_slv_rid_mismatch_info|    r    |  —  |  — |
 |21:12|axi_slv_bid_mismatch_info|    r    |  —  |  — |
-|31:22|      reserved_31_22     |    r    | 0x0 |  — |
+|  22 |  axi_slv_id_mismatch_en |    rw   | 0x0 |  — |
+|31:23|      reserved_31_23     |    r    | 0x0 |  — |
 
 #### axi_slv_rid_mismatch_err field
 
@@ -946,6 +957,10 @@ Don't override. Generated from: aou_core
 #### axi_slv_bid_mismatch_info field
 
 <p>Captured BID when an AXI slave BID mismatch occurs. Clears when error clears.</p>
+
+#### axi_slv_id_mismatch_en field
+
+<p>Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set.</p>
 
 ### axi_split_tr_rp3 register
 
@@ -1092,7 +1107,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x7C
 - Size: 0x4
 
-<p>AXI slave BID/RID mismatch info and error flags for RP3.</p>
+<p>AXI slave BID/RID mismatch checker enable, captured ID and error flags for RP3. AXI_SLV_ID_MISMATCH_EN is static configuration: program it only while the activation FSM is DISABLED and this RP has no AXI traffic outstanding.</p>
 
 | Bits|        Identifier       |  Access |Reset|Name|
 |-----|-------------------------|---------|-----|----|
@@ -1100,7 +1115,8 @@ Don't override. Generated from: aou_core
 |  1  | axi_slv_bid_mismatch_err|rw, woclr| 0x0 |  — |
 | 11:2|axi_slv_rid_mismatch_info|    r    |  —  |  — |
 |21:12|axi_slv_bid_mismatch_info|    r    |  —  |  — |
-|31:22|      reserved_31_22     |    r    | 0x0 |  — |
+|  22 |  axi_slv_id_mismatch_en |    rw   | 0x0 |  — |
+|31:23|      reserved_31_23     |    r    | 0x0 |  — |
 
 #### axi_slv_rid_mismatch_err field
 
@@ -1117,6 +1133,10 @@ Don't override. Generated from: aou_core
 #### axi_slv_bid_mismatch_info field
 
 <p>Captured BID when an AXI slave BID mismatch occurs. Clears when error clears.</p>
+
+#### axi_slv_id_mismatch_en field
+
+<p>Enable the subordinate-port AXI ID-mismatch checker on this RP. Reset 0: the checker sees no handshakes, the error bits stay 0 and this RP does not raise INT_SI0_ID_MISMATCH. Set to 1 to report a B or R whose ID matches no outstanding request on this subordinate port. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding on this RP. Do not change it while AXI transactions are in flight: the checker records handshakes only while the enable is set.</p>
 
 ### write_early_response_wdt_ctl register
 
