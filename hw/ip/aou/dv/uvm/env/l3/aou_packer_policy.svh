@@ -3,8 +3,10 @@
 
 // How the packer lays messages into flits. The default is DUT-like: messages
 // in submission order, packed back to back from the first free granule,
-// spanning freely into the next flit, credits returned through the header.
-// Every other setting is still legal unless a field says "injection".
+// spanning freely into the next flit, credits returned through the header,
+// except that a few writes send WriteData ahead of their WriteReq
+// (wdata_first_pct). Every other setting is still legal unless a field says
+// "injection".
 class aou_packer_policy extends uvm_object;
   `uvm_object_utils(aou_packer_policy)
 
@@ -46,6 +48,17 @@ class aou_packer_policy extends uvm_object;
   // Zero-credit CrdtGrant messages added to a flit, up to misc_per_half_max
   // per half (legal Misc no DUT sends).
   int unsigned      zero_grants;
+  // Percent of WriteReqs held back until wdata_first_beats of their own
+  // WriteData messages have gone first. AoU v0.8 5.7 does not order a
+  // WriteReq against its WriteData, and another die may send the data first;
+  // the DUT's RX has to take either order. 0 sends every WriteReq in
+  // submission order. A WriteReq is held only while the RP's next WriteData
+  // can go (it has WDATA credit and the link allows it), so the order never
+  // waits on credit the DUT returns only once the WriteReq has arrived.
+  int unsigned      wdata_first_pct = 5;
+  // WriteData messages sent ahead of the held WriteReq: 0 picks 1 to the
+  // whole burst per write; N sends N, or the whole burst when shorter.
+  int unsigned      wdata_first_beats;
 
   function new(string name = "aou_packer_policy");
     super.new(name);
@@ -64,6 +77,8 @@ class aou_packer_policy extends uvm_object;
     prof_pct = 0;
     zero_grants = 0;
     best_fit = 1'b0;
+    wdata_first_pct = 5;
+    wdata_first_beats = 0;
   endfunction
 
   function void set_sparse();
@@ -93,15 +108,17 @@ class aou_packer_policy extends uvm_object;
     random_order = 1'($urandom_range(0, 1));
     empty_flit_pct = $urandom_range(0, 1) * 5;
     cred_method = aou_cred_method_e'($urandom_range(0, 3));
+    wdata_first_pct = $urandom_range(0, 2) * 25;
+    wdata_first_beats = ($urandom_range(0, 1) == 0) ? 0 : 256;
   endfunction
 
   virtual function string convert2string();
     return $sformatf({"max_msgs=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
                       "cred_only=%0d empty=%0d%% cred=%0d misc_half=%0d hold=%0d ",
-                      "prof=%0d%% zero_grants=%0d best_fit=%0d"},
+                      "prof=%0d%% zero_grants=%0d best_fit=%0d wdata_first=%0d%%/%0d"},
                      max_msgs_per_flit, hole_pct, max_hole, start_granule, split_at,
                      allow_span, random_order, credit_only_flits, empty_flit_pct,
                      cred_method, misc_per_half_max, hold_credited, prof_pct,
-                     zero_grants, best_fit);
+                     zero_grants, best_fit, wdata_first_pct, wdata_first_beats);
   endfunction
 endclass

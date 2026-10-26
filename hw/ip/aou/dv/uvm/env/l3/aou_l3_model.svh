@@ -135,6 +135,7 @@ class aou_l3_model extends uvm_object;
   // tracking and credits are all dropped.
   function void recover();
     pk.flush();
+    if (cov != null) cov.reset_wr_order();
     pk.carry_g.delete();
     tx_sent_q.delete();
     tx_flit_q.delete();
@@ -208,6 +209,7 @@ class aou_l3_model extends uvm_object;
       track_tx(m);
       if (cov != null) begin
         cov.sample_msg(m);
+        cov.sample_tx_write(m);
         if (m.cred_class() != AOU_CC_NONE)
           cov.sample_credit(aou_l3_cov::EV_CONSUME, m.cred_class(), AOU_L3_TX);
         if (m.cred_class() != AOU_CC_NONE && m.ignore_credits)

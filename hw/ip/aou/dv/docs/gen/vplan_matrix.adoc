@@ -87,9 +87,9 @@
 | 4.10 | 4-beat incrementing burst write | P0 | `aou_dp_burst_test.dp_len-1_3_7_15`, `aou_t1_slice_test`
 | 4.11 | 8-beat incrementing burst write | P1 | `aou_dp_burst_test.dp_len-1_3_7_15`, `aou_t1_slice_test`
 | 4.12 | 16-beat incrementing burst write | P1 | `aou_dp_burst_test.dp_len-1_3_7_15`, `aou_t1_slice_test`
-| 4.13 | 32-beat incrementing burst write | P1 | `aou_dp_burst_test.dp_len-31_63_255`, `aou_t1_slice_test`
-| 4.14 | 64-beat incrementing burst write | P1 | `aou_dp_burst_test.dp_len-31_63_255`, `aou_t1_slice_test`
-| 4.15 | Write burst with AWLEN=255 (256 beats) | P1 | `aou_dp_burst_test.dp_len-31_63_255`
+| 4.13 | 32-beat incrementing burst write | P1 | `aou_dp_burst_test.dp_len-31_63_255`, `aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256`, `aou_t1_slice_test`
+| 4.14 | 64-beat incrementing burst write | P1 | `aou_dp_burst_test.dp_len-31_63_255`, `aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256`, `aou_t1_slice_test`
+| 4.15 | Write burst with AWLEN=255 (256 beats) | P1 | `aou_dp_burst_test.dp_len-31_63_255`, `aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256`
 | 4.16 | [NEG] Verify WRAP burst type is rejected/not supported | P1 | dropped: The DUT supports INCR bursts only; AoU carries no AxBURST, so WRAP is out of scope (AXI-R19 flags it as a stimulus error).
 | 4.17 | [NEG] Verify FIXED burst type is rejected/not supported | P1 | dropped: The DUT supports INCR bursts only; AoU carries no AxBURST, so FIXED is out of scope (AXI-R19 flags it as a stimulus error).
 | 4.18 | All byte enables asserted | P0 | `aou_dp_wstrb_test.dp_strb-full`, `aou_t1_slice_test`
@@ -106,6 +106,7 @@
 | 4.29 | Test WriteDataFull (no WSTRB) vs WriteData | P1 | `aou_dp_wstrb_test.dp_strb-full`, `aou_dp_wstrb_test.dp_strb-partial`
 | 4.30 | AxUSER/FLEX carriage: the DUT has no USER ports, sends FLEX as 0 and ignores it on receive | P2 | `aou_attr_test`, `aou_attr_test.attr_excl-1`
 | 4.31 | W data presented before its AW on the S port is accepted once the AW arrives | P2 | `aou_chan_test.chan-wfirst`
+| 4.32 | Remote WriteData sent ahead of its WriteReq (one message to the whole burst, on several RPs at once) is held and written once the WriteReq arrives | P1 | `aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256`, `aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100`, `aou_stress_test.st_pol-sparse.wdata_first_pct-100`
 |===
 ==== 2.5 Read Transaction Tests
 [cols="1,5,1,4",options="header"]
@@ -183,7 +184,7 @@
 | 7.13 | Access at address 0x0. AOU has no memory map | P1 | `aou_addr_test.dp_addr-zero`
 | 7.14 | Access at maximum address (configured range - 1). AOU has no memory map | P1 | `aou_addr_test.dp_addr-top`
 | 7.15 | Sequential access across entire configured address space. AOU has no memory map | P2 | `aou_addr_test.dp_addr-sweep`
-| 7.16 | Random data with random addresses | P1 | `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_dp_random_test.dp_dir-both.dp_profile-stall`, `aou_dp_random_test.dp_dir-r2l`, `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-all.1x512-sp64-nxt`, `aou_stress_test.st_bp-ar`, `aou_stress_test.st_bp-aw`, `aou_stress_test.st_bp-b`, `aou_stress_test.st_bp-fdi`, `aou_stress_test.st_bp-r`, `aou_stress_test.st_bp-w`, `aou_stress_test.st_pol-max.st_bp-none`, `aou_stress_test.st_pol-min.st_crd-hdr`, `aou_stress_test.st_pol-random.st_crd-slow`, `aou_stress_test.st_pol-sparse.st_crd-mixed`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_deact_test`, `aou_t1_slice_test`
+| 7.16 | Random data with random addresses | P1 | `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_dp_random_test.dp_dir-both.dp_profile-stall`, `aou_dp_random_test.dp_dir-r2l`, `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-all.1x512-sp64-nxt`, `aou_stress_test.st_bp-ar`, `aou_stress_test.st_bp-aw`, `aou_stress_test.st_bp-b`, `aou_stress_test.st_bp-fdi`, `aou_stress_test.st_bp-r`, `aou_stress_test.st_bp-w`, `aou_stress_test.st_pol-max.st_bp-none`, `aou_stress_test.st_pol-min.st_crd-hdr`, `aou_stress_test.st_pol-random.st_crd-slow`, `aou_stress_test.st_pol-sparse.st_crd-mixed`, `aou_stress_test.st_pol-sparse.wdata_first_pct-100`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_deact_test`, `aou_t1_slice_test`
 |===
 ==== 2.8 Outstanding Transaction Tests
 [cols="1,5,1,4",options="header"]

@@ -23,8 +23,12 @@ class aou_l3_cov extends uvm_object;
 
   // Sampled values; each covergroup samples the members it names.
   int unsigned s_prev, s_cur, s_op, s_dir, s_kind, s_rp, s_start, s_size, s_nmsgs;
-  int unsigned s_misc0, s_misc1, s_carry, s_ev, s_cls, s_nwresp;
-  bit          s_legal, s_span, s_credit_only;
+  int unsigned s_misc0, s_misc1, s_carry, s_ev, s_cls, s_nwresp, s_wf_ahead, s_wf_others;
+  bit          s_legal, s_span, s_credit_only, s_wf_whole;
+  // cg_wr_order, from the messages the model sends: per RP, the WriteData
+  // messages sent and the ones the sent WriteReqs account for.
+  int unsigned wf_sent[AOU_RP_MAX];
+  int unsigned wf_owed[AOU_RP_MAX];
 
   covergroup cg_act_fsm;
     cp_trans: coverpoint (s_prev * 8 + s_cur) {
@@ -138,6 +142,27 @@ class aou_l3_cov extends uvm_object;
     x_ev_cls_dir: cross cp_ev, cp_cls, cp_dir;
   endgroup
 
+  // A WriteReq the model sent, by its own WriteData messages sent before it,
+  // whether that was the whole burst, and the other RPs with WriteData ahead
+  // of their WriteReq at the time. Stimulus quality for the WriteData-first
+  // order (aou_packer_policy::wdata_first_pct), never an error.
+  covergroup cg_wr_order;
+    cp_ahead: coverpoint s_wf_ahead {
+      `AOU_L3_FC_WF_AHEAD(AOU_FC_CG)
+    }
+    cp_whole: coverpoint s_wf_whole {
+      `AOU_L3_FC_WF_WHOLE(AOU_FC_CG)
+    }
+    cp_rp: coverpoint s_rp {
+      `AOU_L3_FC_RP(AOU_FC_CG)
+    }
+    cp_others: coverpoint s_wf_others {
+      `AOU_L3_FC_WF_OTHERS(AOU_FC_CG)
+    }
+    x_ahead_whole_others: cross cp_ahead, cp_whole, cp_others;
+    x_ahead_rp: cross cp_ahead, cp_rp;
+  endgroup
+
   // The service's copies of the covergroups above.
   aou_fc_group fc_act_fsm;
   aou_fc_group fc_act_op;
@@ -147,6 +172,7 @@ class aou_l3_cov extends uvm_object;
   aou_fc_group fc_flit_occ;
   aou_fc_group fc_wresp_flit;
   aou_fc_group fc_credit;
+  aou_fc_group fc_wr_order;
 
   function new(string name = "aou_l3_cov");
     super.new(name);
@@ -158,6 +184,7 @@ class aou_l3_cov extends uvm_object;
     cg_flit_occ = new();
     cg_wresp_flit = new();
     cg_credit = new();
+    cg_wr_order = new();
     fc_declare();
   endfunction
 
@@ -225,6 +252,16 @@ class aou_l3_cov extends uvm_object;
       p = fc_credit.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       p = fc_credit.add_cross("x_ev_cls_dir", "cp_ev cp_cls cp_dir");
       `AOU_L3_FC_X_CREDIT(AOU_FC_REG)
+    end
+    fc_wr_order = db.group("l3.cg_wr_order", fresh);
+    if (fresh) begin
+      p = fc_wr_order.cp("cp_ahead"); `AOU_L3_FC_WF_AHEAD(AOU_FC_REG)
+      p = fc_wr_order.cp("cp_whole"); `AOU_L3_FC_WF_WHOLE(AOU_FC_REG)
+      p = fc_wr_order.cp("cp_rp"); `AOU_L3_FC_RP(AOU_FC_REG)
+      p = fc_wr_order.cp("cp_others"); `AOU_L3_FC_WF_OTHERS(AOU_FC_REG)
+      p = fc_wr_order.add_cross("x_ahead_whole_others", "cp_ahead cp_whole cp_others");
+      `AOU_L3_FC_X_WF(AOU_FC_REG)
+      void'(fc_wr_order.add_cross("x_ahead_rp", "cp_ahead cp_rp"));
     end
   endfunction
 
@@ -299,6 +336,39 @@ class aou_l3_cov extends uvm_object;
     if (s_nwresp != 0) begin
       cg_wresp_flit.sample();
       fc_wresp_flit.sample(int'(s_nwresp), int'(s_dir));
+    end
+  endfunction
+
+  // Every credited message the model sent, in order: a WriteReq samples
+  // cg_wr_order with the WriteData of its RP sent beyond what the earlier
+  // WriteReqs account for (AXI4 has no write interleaving, so that data is its
+  // own).
+  function void sample_tx_write(aou_msg m);
+    aou_msg_req r;
+    int unsigned beats;
+    if (m.msg_type inside {AOU_MT_WDATA, AOU_MT_WDATAF}) begin
+      wf_sent[m.rp]++;
+      return;
+    end
+    if (m.msg_type != AOU_MT_WREQ || !$cast(r, m)) return;
+    beats = int'(r.len) + 1;
+    s_wf_ahead = (wf_sent[m.rp] > wf_owed[m.rp]) ? wf_sent[m.rp] - wf_owed[m.rp] : 0;
+    if (s_wf_ahead > beats) s_wf_ahead = beats;
+    s_wf_whole = s_wf_ahead == beats;
+    s_wf_others = 0;
+    foreach (wf_sent[o])
+      if (s_wf_ahead != 0 && o != int'(m.rp) && wf_sent[o] > wf_owed[o]) s_wf_others++;
+    s_rp = int'(m.rp);
+    wf_owed[m.rp] += beats;
+    cg_wr_order.sample();
+    fc_wr_order.sample(int'(s_wf_ahead), int'(s_wf_whole), int'(s_rp), int'(s_wf_others));
+  endfunction
+
+  // The link was lost under the model: what was in flight is gone.
+  function void reset_wr_order();
+    foreach (wf_sent[r]) begin
+      wf_sent[r] = 0;
+      wf_owed[r] = 0;
     end
   endfunction
 

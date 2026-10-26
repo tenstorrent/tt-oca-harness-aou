@@ -662,6 +662,14 @@
   added: AXI4 A3.3.1
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
+- id: '4.32'
+  section: '2.4'
+  section_title: Write Transaction Tests
+  title: 'Remote WriteData sent ahead of its WriteReq (one message to the whole burst, on several RPs at once) is held and written once the WriteReq arrives'
+  priority: P1
+  added: AoU v0.8 5.7
+  note: 'The specification leaves the order open; the DUT TX sends the WriteReq first, another die may not. Coverage: l3.cg_wr_order.'
+
 - id: '5.1'
   section: '2.5'
   section_title: Read Transaction Tests

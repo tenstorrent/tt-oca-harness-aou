@@ -30,7 +30,10 @@
 // DUT that sends requests after its own DeactivateReq gets the credit to do so);
 // +v0p8 holds the DUT to the expectations only AoU v0.8 adds (aou_t1_env_cfg::v0p8;
 // today AOU-R6/AOU-R7, the 4.4 Misc placement);
-// +rx_fifo_slack=N messages aou_t1_rx_fifo_chk allows past an RX FIFO.
+// +rx_fifo_slack=N messages aou_t1_rx_fifo_chk allows past an RX FIFO;
+// +wdata_first_pct=N, +wdata_first_beats=N the share of the remote die's writes
+// that send WriteData ahead of their WriteReq, and how much of it
+// (aou_packer_policy; default 5% and 1 to the whole burst), over what the test sets.
 class aou_base_test extends ocah_test;
   `uvm_component_utils(aou_base_test)
 
@@ -107,6 +110,11 @@ class aou_base_test extends ocah_test;
       void'($value$plusargs("active_phy=%d", cfg.lsm_cfg.active_phy));
     end
     configure();
+    void'($value$plusargs("wdata_first_pct=%d", cfg.l3_cfg.pol.wdata_first_pct));
+    void'($value$plusargs("wdata_first_beats=%d", cfg.l3_cfg.pol.wdata_first_beats));
+    `uvm_info(get_type_name(), $sformatf("remote wdata_first=%0d%% beats=%0d",
+                                         cfg.l3_cfg.pol.wdata_first_pct,
+                                         cfg.l3_cfg.pol.wdata_first_beats), UVM_LOW)
     trdy_knobs();
     env = aou_t1_env::type_id::create("env", this);
     env.cfg = cfg;

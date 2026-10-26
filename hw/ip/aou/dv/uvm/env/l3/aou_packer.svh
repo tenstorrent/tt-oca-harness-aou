@@ -8,7 +8,9 @@
 //      header MsgCredit and/or CrdtGrant per the policy;
 //   4. credited messages whose class has credit for every granule (consumed
 //      at the start) and whose class the link state allows, oldest first or
-//      in random order across (RP, class) queues, never reordered within one.
+//      in random order across (RP, class) queues, never reordered within one;
+//      a WriteReq the policy picked for wdata_first waits while its own
+//      WriteData goes ahead of it (held()).
 // The policy object shapes the layout; injection fields corrupt one flit.
 class aou_packer extends uvm_object;
   `uvm_object_utils(aou_packer)
@@ -24,6 +26,13 @@ class aou_packer extends uvm_object;
   aou_msg        misc_q[$];
   int unsigned   misc_s[$];
   int unsigned   submit_cnt;
+  // WriteData first (pol.wdata_first_pct): per q[] entry, how many of a
+  // WriteReq's own WriteData messages go before it (0: none). Per RP, the
+  // WriteData messages placed and the ones the placed WriteReqs account for;
+  // AXI4 has no write interleaving, so the excess is the head WriteReq's own.
+  int unsigned   wf_tgt[NQ][$];
+  int unsigned   wd_placed[AOU_RP_MAX];
+  int unsigned   wd_owed[AOU_RP_MAX];
 
   aou_granule_t  carry_g[$];
   aou_msg        carry_msg;
@@ -54,7 +63,37 @@ class aou_packer extends uvm_object;
       int unsigned i = int'(m.rp) * AOU_CC_NUM + m.cred_class();
       q[i].push_back(m);
       qs[i].push_back(submit_cnt++);
+      wf_tgt[i].push_back(wdata_first_tgt(m));
     end
+  endfunction
+
+  // How many of WriteReq m's WriteData messages the policy sends before it.
+  function int unsigned wdata_first_tgt(aou_msg m);
+    aou_msg_req r;
+    int unsigned beats;
+    if (m.msg_type != AOU_MT_WREQ || cfg.pol.wdata_first_pct == 0 || m.ignore_state ||
+        m.ignore_credits || !$cast(r, m))
+      return 0;
+    if ($urandom_range(99) >= cfg.pol.wdata_first_pct) return 0;
+    beats = int'(r.len) + 1;
+    if (cfg.pol.wdata_first_beats == 0) return $urandom_range(1, beats);
+    return (cfg.pol.wdata_first_beats < beats) ? cfg.pol.wdata_first_beats : beats;
+  endfunction
+
+  // q[i]'s head is a WriteReq waiting for its own WriteData to go first:
+  // fewer than its target have been placed and the RP's next WriteData can go
+  // now. Once that data can't go (no WDATA credit, nothing queued) the
+  // WriteReq goes, so the order never waits on credit the DUT returns only
+  // after the WriteReq has arrived (its RX W FIFO holds the early data).
+  function bit held(int i);
+    int unsigned rp;
+    int unsigned d;
+    int unsigned own;
+    if (wf_tgt[i].size() == 0 || wf_tgt[i][0] == 0) return 1'b0;
+    rp = i / AOU_CC_NUM;
+    d = rp * AOU_CC_NUM + int'(AOU_CC_WDATA);
+    own = (wd_placed[rp] > wd_owed[rp]) ? wd_placed[rp] - wd_owed[rp] : 0;
+    return own < wf_tgt[i][0] && q[d].size() > 0 && eligible(q[d][0]);
   endfunction
 
   function int unsigned queued_msgs();
@@ -67,6 +106,11 @@ class aou_packer extends uvm_object;
     foreach (q[i]) begin
       q[i].delete();
       qs[i].delete();
+      wf_tgt[i].delete();
+    end
+    foreach (wd_placed[r]) begin
+      wd_placed[r] = 0;
+      wd_owed[r] = 0;
     end
     misc_q.delete();
     misc_s.delete();
@@ -106,7 +150,7 @@ class aou_packer extends uvm_object;
     int best = -1;
     int unsigned best_len;
     foreach (q[i]) begin
-      if (q[i].size() > 0 && eligible(q[i][0]) && q[i][0].num_granules() <= room &&
+      if (q[i].size() > 0 && eligible(q[i][0]) && !held(i) && q[i][0].num_granules() <= room &&
           (best < 0 || q[i][0].num_granules() > best_len)) begin
         best = i;
         best_len = q[i][0].num_granules();
@@ -125,8 +169,9 @@ class aou_packer extends uvm_object;
     int best = -1;
     foreach (q[i]) begin
       if (q[i].size() > 0) begin
-        if (eligible(q[i][0])) cand.push_back(i);
-        else if (lnk.can_send(q[i][0].cred_class()) && !cfg.pol.hold_credited) credit_stalls++;
+        if (eligible(q[i][0])) begin
+          if (!held(i)) cand.push_back(i);
+        end else if (lnk.can_send(q[i][0].cred_class()) && !cfg.pol.hold_credited) credit_stalls++;
       end
     end
     if (misc_q.size() > 0 && eligible(misc_q[0]) && misc_half_cnt < cfg.pol.misc_per_half_max)
@@ -161,7 +206,14 @@ class aou_packer extends uvm_object;
     m.span_flits = (carry_g.size() > 0) ? 2 : 1;
     if (carry_g.size() > 0) carry_msg = m;
     if (c != AOU_CC_NONE) crd.tx_consume(int'(m.rp), c, g.size());
+    count_write(m);
     f.msgs.push_back(m);
+  endfunction
+
+  function void count_write(aou_msg m);
+    aou_msg_req r;
+    if (m.msg_type inside {AOU_MT_WDATA, AOU_MT_WDATAF}) wd_placed[m.rp]++;
+    else if (m.msg_type == AOU_MT_WREQ && $cast(r, m)) wd_owed[m.rp] += int'(r.len) + 1;
   endfunction
 
   function aou_msg_crdtgrant mk_grant();
@@ -272,6 +324,7 @@ class aou_packer extends uvm_object;
       end else begin
         void'(q[idx].pop_front());
         void'(qs[idx].pop_front());
+        void'(wf_tgt[idx].pop_front());
       end
       place(f, m, sg);
       gp = sg + len;

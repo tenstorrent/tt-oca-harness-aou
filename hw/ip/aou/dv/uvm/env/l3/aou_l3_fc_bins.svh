@@ -92,3 +92,17 @@
   `B``_XIGN("dut_saturate,*,rx") \
   `B``_XIGN("inj_overflow,*,rx")
 `define AOU_L3_FC_CLS(B) `B``_VALS(c, 0, 4)
+// A WriteReq the model sent (cg_wr_order), by how many of its own WriteData
+// messages went before it (AoU v0.8 5.7 leaves the order open; the DUT's RX
+// holds the early data in its RX W FIFO), whether that was the whole burst,
+// and how many other RPs had WriteData ahead of their WriteReq at the time.
+`define AOU_L3_FC_WF_AHEAD(B) \
+  `B``_BIN(none, 0, 0) `B``_BIN(one, 1, 1) `B``_BIN(few, 2, 3) `B``_BIN(many, 4, 15) \
+  `B``_BIN(deep, 16, 256)
+`define AOU_L3_FC_WF_WHOLE(B) `B``_BIN(part, 0, 0) `B``_BIN(whole, 1, 1)
+`define AOU_L3_FC_WF_OTHERS(B) `B``_BIN(alone, 0, 0) `B``_BIN(one, 1, 1) `B``_BIN(more, 2, 3)
+// Nothing ahead is never the whole burst; other RPs count only when this RP's
+// data went first too.
+`define AOU_L3_FC_X_WF(B) \
+  `B``_XIGN("none,whole,*") \
+  `B``_XIGN("none,*,one|more")

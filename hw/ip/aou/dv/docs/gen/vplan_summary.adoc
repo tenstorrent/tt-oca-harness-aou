@@ -59,7 +59,7 @@
 | `aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2x512-tp32_64` | `aou_link_event_test` | `+event=l1 +active_phy=1 +park_idle_phy=1` | 1 | `2x512-tp32_64` | 18.25 | 
 | `aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2x512-tp32_64` | `aou_link_event_test` | `+event=retrain +active_phy=1 +park_idle_phy=1` | 1 | `2x512-tp32_64` | 18.25 | 
 |===
-===== `testlists/datapath.toml` (35 scenarios)
+===== `testlists/datapath.toml` (37 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -68,6 +68,7 @@
 | `aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r` | `aou_dp_size_test` | `+dp_size=6 +dp_len=1 +dp_dir=l2r` | 1-2 |  | 4.8,5.8,7.3 | 
 | `aou_dp_burst_test.dp_len-1_3_7_15` | `aou_dp_burst_test` | `+dp_len=1,3,7,15` | 1-3 |  | 4.9,4.10,4.11,4.12,5.9,5.10,5.11,5.12,5.19 | 
 | `aou_dp_burst_test.dp_len-31_63_255` | `aou_dp_burst_test` | `+dp_len=31,63,255` | 1-2 |  | 4.13,4.14,4.15,5.13,5.14,5.15 | 
+| `aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256` | `aou_dp_burst_test` | `+dp_len=31,63,255 +wdata_first_pct=100 +wdata_first_beats=256` | 1-2 |  | 4.13,4.14,4.15,4.32 | 
 | `aou_dp_wstrb_test.dp_strb-full` | `aou_dp_wstrb_test` | `+dp_strb=full` | 1-2 |  | 4.18,4.29 | 
 | `aou_dp_wstrb_test.dp_strb-partial` | `aou_dp_wstrb_test` | `+dp_strb=partial` | 1-3 |  | 4.20,4.21,4.29 | 
 | `aou_dp_wstrb_test.dp_strb-sparse` | `aou_dp_wstrb_test` | `+dp_strb=sparse` | 1-2 |  | 4.20 | 
@@ -84,6 +85,7 @@
 | `aou_dp_packing_test.dp_pack-crossflit` | `aou_dp_packing_test` | `+dp_pack=crossflit` | 1-3 |  | 6.9 | 
 | `aou_dp_packing_test.dp_pack-granule` | `aou_dp_packing_test` | `+dp_pack=granule` | 1-2 |  | 11.6,11.7 | 
 | `aou_dp_random_test.dp_dir-r2l` | `aou_dp_random_test` | `+dp_dir=r2l` | 1-5 |  | 6.10,6.11,6.12,6.13,6.15,7.16,8.9,8.10,12.1,12.16,18.2 | 
+| `aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100` | `aou_dp_random_test` | `+dp_dir=r2l +wdata_first_pct=100` | 1-3 |  | 4.32 | 
 | `aou_dp_random_test.dp_dir-both` | `aou_dp_random_test` | `+dp_dir=both` | 1-5 |  | 10.3,7.16,8.9,8.10 | 
 | `aou_dp_random_test.dp_dir-both.dp_profile-stall` | `aou_dp_random_test` | `+dp_dir=both +dp_profile=stall` | 1-3 |  | 7.16 | 
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64` | `aou_dp_outstanding_test` | `+dp_mfull=600 +dp_wr_pct=0` | 1-2 | `1x512-sp64` | 9.20 | 
@@ -149,7 +151,7 @@
 | `aou_wdt_test.wdt_case-multi_rp.4x512-sp64` | `aou_wdt_test` | `+wdt_case=multi_rp` | 1-2 | `4x512-sp64` | 16.18,16.22,16.23 | 
 | `aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128` | `aou_wdt_test` | `+wdt_case=multi_rp` | 1-2 | `4xmix4211-sp128` | 16.18,16.22,16.23 | 
 |===
-===== `testlists/stress.toml` (56 scenarios)
+===== `testlists/stress.toml` (57 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -176,6 +178,7 @@
 | `aou_addr_test.dp_addr-top` | `aou_addr_test` | `+dp_addr=top` | 1 |  | 7.14 | 
 | `aou_addr_test.dp_addr-sweep` | `aou_addr_test` | `+dp_addr=sweep` | 1 |  | 7.15 | 
 | `aou_stress_test.st_pol-sparse.st_crd-mixed` | `aou_stress_test` | `+st_pol=sparse +st_crd=mixed` | 1-2 |  | 6.3,7.16 | 
+| `aou_stress_test.st_pol-sparse.wdata_first_pct-100` | `aou_stress_test` | `+st_pol=sparse +wdata_first_pct=100` | 1-3 |  | 4.32,7.16 | 
 | `aou_stress_test.st_pol-random.st_crd-slow` | `aou_stress_test` | `+st_pol=random +st_crd=slow` | 1-3 |  | 7.16 | 
 | `aou_stress_test.st_pol-split.st_crd-grant` | `aou_stress_test` | `+st_pol=split +st_crd=grant` | 1-2 |  | 6.9,7.16 | 
 | `aou_stress_test.st_pol-min.st_crd-hdr` | `aou_stress_test` | `+st_pol=min +st_crd=hdr` | 1-2 |  | 7.16 | 

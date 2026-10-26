@@ -35,6 +35,7 @@
 | `cg_flit_occ` |  | `uvm/env/l3/aou_l3_cov.svh` | `cp_nmsgs`, `cp_misc_half0`, `cp_misc_half1`, `cp_carry`, `cp_credit_only`, `cp_dir` | `x_nmsgs_dir`
 | `cg_wresp_flit` |  | `uvm/env/l3/aou_l3_cov.svh` | `cp_nwresp`, `cp_dir` | `x_nwresp_dir`
 | `cg_credit` |  | `uvm/env/l3/aou_l3_cov.svh` | `cp_ev`, `cp_cls`, `cp_dir` | `x_ev_cls_dir`
+| `cg_wr_order` |  | `uvm/env/l3/aou_l3_cov.svh` | `cp_ahead`, `cp_whole`, `cp_rp`, `cp_others` | `x_ahead_whole_others`, `x_ahead_rp`
 | `cg_aw_channel` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_aw_size`, `cp_aw_len`, `cp_aw_burst`, `cp_aw_cache`, `cp_aw_prot`, `cp_aw_qos`, `cp_aw_lock`, `cp_aw_id`, `cp_aw_addr_align`, `cp_aw_addr_range`, `cp_aw_4k_boundary` | `boundary`, `cx_aw_size_x_len`, `cx_aw_size_x_align`
 | `cg_ar_channel` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_ar_size`, `cp_ar_len`, `cp_ar_burst`, `cp_ar_cache`, `cp_ar_prot`, `cp_ar_qos`, `cp_ar_lock`, `cp_ar_id`, `cp_ar_addr_align`, `cp_ar_addr_range`, `cp_ar_4k_boundary` | `cx_ar_size_x_len`, `cx_ar_size_x_align`
 | `cg_w_channel` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_w_strb_pattern`, `cp_w_last`, `cp_w_first_lead_mask` | -

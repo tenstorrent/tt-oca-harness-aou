@@ -57,6 +57,17 @@ tags = ["datapath"]
 run_modes = ["datapath"]
 args = ["+dp_len=31,63,255"]
 
+# Long remote bursts that send their whole WriteData ahead of the WriteReq, as far
+# as the DUT's WDATA credit (its RX W FIFO) allows.
+[[tests]]
+name = "aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256"
+module = { uvm = "aou_dp_burst_test" }
+seed = 1
+reseed = 2
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+dp_len=31,63,255", "+wdata_first_pct=100", "+wdata_first_beats=256"]
+
 [[tests]]
 name = "aou_dp_wstrb_test.dp_strb-full"
 module = { uvm = "aou_dp_wstrb_test" }
@@ -198,6 +209,17 @@ reseed = 5
 tags = ["datapath"]
 run_modes = ["datapath"]
 args = ["+dp_dir=r2l"]
+
+# Every remote write sends 1 to all of its WriteData ahead of its WriteReq (AoU
+# v0.8 5.7 does not order them); l3.cg_wr_order counts what was sent.
+[[tests]]
+name = "aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100"
+module = { uvm = "aou_dp_random_test" }
+seed = 1
+reseed = 3
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+dp_dir=r2l", "+wdata_first_pct=100"]
 
 [[tests]]
 name = "aou_dp_random_test.dp_dir-both"
@@ -344,7 +366,7 @@ args = ["+dp_dir=both", "+small_size_pct=5"]
 
 [[groups]]
 name = "datapath"
-expected_count = 35
+expected_count = 37
 tests = [
   "aou_small_size_test",
   "aou_small_size_test.remote_bytes-32_128_64_128",
@@ -354,6 +376,7 @@ tests = [
   "aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r",
   "aou_dp_burst_test.dp_len-1_3_7_15",
   "aou_dp_burst_test.dp_len-31_63_255",
+  "aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256",
   "aou_dp_wstrb_test.dp_strb-full",
   "aou_dp_wstrb_test.dp_strb-partial",
   "aou_dp_wstrb_test.dp_strb-sparse",
@@ -370,6 +393,7 @@ tests = [
   "aou_dp_packing_test.dp_pack-crossflit",
   "aou_dp_packing_test.dp_pack-granule",
   "aou_dp_random_test.dp_dir-r2l",
+  "aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100",
   "aou_dp_random_test.dp_dir-both",
   "aou_dp_random_test.dp_dir-both.dp_profile-stall",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64",

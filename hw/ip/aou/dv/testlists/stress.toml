@@ -219,6 +219,18 @@ tags = ["stress"]
 run_modes = ["stress"]
 args = ["+st_pol=sparse", "+st_crd=mixed"]
 
+# Every remote write sends WriteData ahead of its WriteReq while the packer picks
+# queues in random order, so several RPs have early data in the DUT at once
+# (l3.cg_wr_order cp_others).
+[[tests]]
+name = "aou_stress_test.st_pol-sparse.wdata_first_pct-100"
+module = { uvm = "aou_stress_test" }
+seed = 1
+reseed = 3
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_pol=sparse", "+wdata_first_pct=100"]
+
 [[tests]]
 name = "aou_stress_test.st_pol-random.st_crd-slow"
 module = { uvm = "aou_stress_test" }
@@ -548,7 +560,7 @@ args = ["+st_bp=all", "+small_size_pct=5"]
 
 [[groups]]
 name = "stress"
-expected_count = 56
+expected_count = 57
 tests = [
   "aou_stress_test.st_bp-all.small_size_pct-5",
   "aou_pack_test.pk-crossflit.remote_bytes-32",
@@ -574,6 +586,7 @@ tests = [
   "aou_addr_test.dp_addr-top",
   "aou_addr_test.dp_addr-sweep",
   "aou_stress_test.st_pol-sparse.st_crd-mixed",
+  "aou_stress_test.st_pol-sparse.wdata_first_pct-100",
   "aou_stress_test.st_pol-random.st_crd-slow",
   "aou_stress_test.st_pol-split.st_crd-grant",
   "aou_stress_test.st_pol-min.st_crd-hdr",

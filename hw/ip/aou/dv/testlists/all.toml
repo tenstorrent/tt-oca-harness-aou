@@ -36,7 +36,7 @@ tests = [
 # Sized for a GitHub-hosted runner on Verilator (the workflow runs every configured seed).
 [[groups]]
 name = "ci"
-expected_count = 43
+expected_count = 45
 tests = [
   "aou_sanity_test",
   "aou_t1_slice_test",
@@ -56,6 +56,7 @@ tests = [
   "aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r",
   "aou_dp_burst_test.dp_len-1_3_7_15",
   "aou_dp_burst_test.dp_len-31_63_255",
+  "aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256",
   "aou_dp_wstrb_test.dp_strb-full",
   "aou_dp_wstrb_test.dp_strb-partial",
   "aou_dp_wstrb_test.dp_strb-sparse",
@@ -72,6 +73,7 @@ tests = [
   "aou_dp_packing_test.dp_pack-crossflit",
   "aou_dp_packing_test.dp_pack-granule",
   "aou_dp_random_test.dp_dir-r2l",
+  "aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100",
   "aou_dp_random_test.dp_dir-both",
   "aou_dp_random_test.dp_dir-both.dp_profile-stall",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64",
@@ -86,7 +88,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 243
+expected_count = 245
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -127,6 +129,7 @@ tests = [
   "aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r",
   "aou_dp_burst_test.dp_len-1_3_7_15",
   "aou_dp_burst_test.dp_len-31_63_255",
+  "aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256",
   "aou_dp_wstrb_test.dp_strb-full",
   "aou_dp_wstrb_test.dp_strb-partial",
   "aou_dp_wstrb_test.dp_strb-sparse",
@@ -143,6 +146,7 @@ tests = [
   "aou_dp_packing_test.dp_pack-crossflit",
   "aou_dp_packing_test.dp_pack-granule",
   "aou_dp_random_test.dp_dir-r2l",
+  "aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100",
   "aou_dp_random_test.dp_dir-both",
   "aou_dp_random_test.dp_dir-both.dp_profile-stall",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64",
@@ -336,7 +340,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 457
+expected_count = 460
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -387,6 +391,7 @@ tests = [
   "aou_dp_size_test.dp_size-6.dp_len-1.dp_dir-l2r",
   "aou_dp_burst_test.dp_len-1_3_7_15",
   "aou_dp_burst_test.dp_len-31_63_255",
+  "aou_dp_burst_test.dp_len-31_63_255.wdata_first_pct-100.wdata_first_beats-256",
   "aou_dp_wstrb_test.dp_strb-full",
   "aou_dp_wstrb_test.dp_strb-partial",
   "aou_dp_wstrb_test.dp_strb-sparse",
@@ -403,6 +408,7 @@ tests = [
   "aou_dp_packing_test.dp_pack-crossflit",
   "aou_dp_packing_test.dp_pack-granule",
   "aou_dp_random_test.dp_dir-r2l",
+  "aou_dp_random_test.dp_dir-r2l.wdata_first_pct-100",
   "aou_dp_random_test.dp_dir-both",
   "aou_dp_random_test.dp_dir-both.dp_profile-stall",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.1x512-sp64",
@@ -476,6 +482,7 @@ tests = [
   "aou_addr_test.dp_addr-top",
   "aou_addr_test.dp_addr-sweep",
   "aou_stress_test.st_pol-sparse.st_crd-mixed",
+  "aou_stress_test.st_pol-sparse.wdata_first_pct-100",
   "aou_stress_test.st_pol-random.st_crd-slow",
   "aou_stress_test.st_pol-split.st_crd-grant",
   "aou_stress_test.st_pol-min.st_crd-hdr",
