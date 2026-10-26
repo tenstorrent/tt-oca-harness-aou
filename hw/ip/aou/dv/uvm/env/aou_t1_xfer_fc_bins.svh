@@ -23,6 +23,8 @@
 `define AOU_XFER_FC_SIZE(B) \
   `B``_BIN(sub256, 0, 4) `B``_BIN(s256, 5, 5) `B``_BIN(s512, 6, 6) `B``_BIN(s1024, 7, 7)
 `define AOU_XFER_FC_REQ(B) `B``_BIN(native, 0, 0) `B``_BIN(narrower, 1, 1)
+// An M-port write burst of one beat or of several (aou_t1_xfer_cov::mwr_cg).
+`define AOU_XFER_FC_BEATS(B) `B``_BIN(single, 0, 0) `B``_BIN(multi, 1, 1)
 // A request is never wider than its requester's bus: the DUT's RP on l2r, the
 // remote die's on r2l. Cells: path, direction, DUT width, remote width, size.
 `define AOU_XFER_FC_X_SIZE(B) \

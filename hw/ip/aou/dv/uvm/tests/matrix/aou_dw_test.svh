@@ -7,8 +7,8 @@
 // directions, every size up to each side's width, 1-16 beats, each batch
 // read back (+dp_loopback): the scoreboard checks bytes end to end, the AXI
 // monitors WLAST at the M port, L3 the ReadData DLENGTH per ARSIZE (AOU-R13),
-// and aou_dw_chk replication of narrow read data, the DUT's WriteData
-// DLENGTH and that every targeted conversion happened.
+// and aou_dw_chk replication of narrow read data; aou_dw_chk also reports
+// any targeted conversion the run never produced (coverage, not an error).
 class aou_dw_test extends aou_dp_base_test;
   `uvm_component_utils(aou_dw_test)
 
@@ -77,7 +77,7 @@ class aou_dw_down1024_test extends aou_dw_test;
   function void set_knobs();
     super.set_knobs();
     // Seven sizes against six lengths: every pairing recurs, single-beat
-    // narrow writes included (DP-R04).
+    // narrow writes included.
     k.sizes = '{6, 7, 6, 5, 6, 3, 5};
     k.lens = '{0, 1, 3, 7, 15, 0};
     k.align = aou_dp_knobs::DP_ALIGN_UNALIGNED;

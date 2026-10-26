@@ -20,6 +20,10 @@
 //   the DUT's part does not depend on the remote width: those cells cover the
 //   remote model's converter (the DUT's part is DUT width x ARSIZE). On r2l
 //   they cover the DUT's upsizers and downsizers, per direction.
+// - mwr_cg: every write burst at an M port by the DUT RP's width, the remote
+//   die's width on that RP and whether it is one beat or several: what the
+//   DUT's upsizers and downsizers made of the remote die's writes (plan 2.14).
+//   Fed by the M-port subordinates.
 // - split_cg: the remote model's splitter, by its maximum burst length and
 //   whether the request was split (sampled by aou_t1_l4a_adapter).
 // - small_cg: requests below 32 bytes (AxSIZE 0..4) by path and direction,
@@ -33,6 +37,7 @@ class aou_t1_xfer_cov extends uvm_component;
 
   uvm_tlm_analysis_fifo #(aou_msg) tb_fifo;   // remote die -> DUT
   uvm_tlm_analysis_fifo #(aou_axi_txn) req_fifo;  // completed requests, both paths
+  uvm_tlm_analysis_fifo #(aou_axi_txn) sub_fifo;  // M-port subordinates
   int unsigned dut_bytes[4] = '{default: 64};     // DUT RP widths
   int unsigned rem_bytes[4] = '{default: 64};     // remote die's native width per RP
   aou_axi_vif_t s_vif[];
@@ -51,6 +56,7 @@ class aou_t1_xfer_cov extends uvm_component;
   protected int       cv_req;
   protected int       cv_max;
   protected int       cv_split;
+  protected int       cv_beats;
 
   protected bit [9:0] msg_id[4];
   protected bit       msg_open[4];
@@ -133,6 +139,19 @@ class aou_t1_xfer_cov extends uvm_component;
     x_small: cross cp_path, cp_dir, cp_small;
   endgroup
 
+  covergroup mwr_cg;
+    cp_dut: coverpoint cv_dut {
+      `AOU_XFER_FC_WIDTH(AOU_FC_CG)
+    }
+    cp_rem: coverpoint cv_rem {
+      `AOU_XFER_FC_WIDTH(AOU_FC_CG)
+    }
+    cp_beats: coverpoint cv_beats {
+      `AOU_XFER_FC_BEATS(AOU_FC_CG)
+    }
+    x_mwr: cross cp_dut, cp_rem, cp_beats;
+  endgroup
+
   covergroup split_cg;
     cp_max: coverpoint cv_max {
       `AOU_XFER_FC_MAX_BURST(AOU_FC_CG)
@@ -148,17 +167,20 @@ class aou_t1_xfer_cov extends uvm_component;
   protected aou_fc_group fc_chan;
   protected aou_fc_group fc_width;
   protected aou_fc_group fc_split;
+  protected aou_fc_group fc_mwr;
   protected aou_fc_group fc_small;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     tb_fifo = new("tb_fifo", this);
     req_fifo = new("req_fifo", this);
+    sub_fifo = new("sub_fifo", this);
     attr_cg = new();
     excl_cg = new();
     chan_cg = new();
     width_cg = new();
     split_cg = new();
+    mwr_cg = new();
     small_cg = new();
     fc_declare();
   endfunction
@@ -202,6 +224,13 @@ class aou_t1_xfer_cov extends uvm_component;
       void'(fc_width.add_cross("x_pair_req", "cp_path cp_dut cp_rem cp_req"));
       p = fc_width.add_cross("x_pair_size", "cp_path cp_dir cp_dut cp_rem cp_size");
       `AOU_XFER_FC_X_SIZE(AOU_FC_REG)
+    end
+    fc_mwr = db.group("xfer.mwr_cg", fresh);
+    if (fresh) begin
+      p = fc_mwr.cp("cp_dut"); `AOU_XFER_FC_WIDTH(AOU_FC_REG)
+      p = fc_mwr.cp("cp_rem"); `AOU_XFER_FC_WIDTH(AOU_FC_REG)
+      p = fc_mwr.cp("cp_beats"); `AOU_XFER_FC_BEATS(AOU_FC_REG)
+      void'(fc_mwr.add_cross("x_mwr", "cp_dut cp_rem cp_beats"));
     end
     fc_small = db.group("xfer.small_cg", fresh);
     if (fresh) begin
@@ -272,6 +301,16 @@ class aou_t1_xfer_cov extends uvm_component;
       small_cg.sample();
       fc_small.sample(cv_path, cv_dir, cv_size);
     end
+  endfunction
+
+  // A write burst a local subordinate took at an M port.
+  function void take_sub(aou_axi_txn t);
+    if (t.dir != AOU_AXI_WR || t.aborted || t.rp > 3) return;
+    cv_dut = int'(dut_bytes[t.rp]);
+    cv_rem = int'(rem_bytes[t.rp]);
+    cv_beats = (t.len == 0) ? 0 : 1;
+    mwr_cg.sample();
+    fc_mwr.sample(cv_dut, cv_rem, cv_beats);
   endfunction
 
   function void take_tb(aou_msg m);
@@ -360,6 +399,11 @@ class aou_t1_xfer_cov extends uvm_component;
         aou_axi_txn t;
         req_fifo.get(t);
         take_req(t);
+      end
+      forever begin
+        aou_axi_txn t;
+        sub_fifo.get(t);
+        take_sub(t);
       end
     join_none
     forever begin

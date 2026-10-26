@@ -215,6 +215,7 @@ class aou_t1_env extends uvm_env;
       xfer_cov.rem_bytes[r] = cfg.remote_bytes_of(r);
     end
     foreach (s_mgr[r]) s_mgr[r].ap.connect(xfer_cov.req_fifo.analysis_export);
+    foreach (m_sub[r]) m_sub[r].ap.connect(xfer_cov.sub_fifo.analysis_export);
     rmgr.ap.connect(xfer_cov.req_fifo.analysis_export);
     l4a.cov = xfer_cov;
     if (attr_chk != null) begin

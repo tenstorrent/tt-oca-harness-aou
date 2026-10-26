@@ -228,7 +228,6 @@ T1-E12,aou_int_vseq,,DUT,Simultaneous interrupt sources are all captured and cle
 T1-E13,n/a,,N/A,Retired (spec v0.8): reads beyond the advertised credit are a sender violation with no defined receiver reaction; aou_credit_violation_test removed,AoU v0.8 6.1
 T1-E14,aou_before_enable_vseq,,DUT,A request before activation waits and raises INT_ACTIVATE_START,AoU 8.4; MAS software-operation 7.3.5
 DP-R02,aou_dw_chk,,DUT,An S-port read beat whose ReadData is narrower than the RP carries that ReadData replicated across the bus,MAS 3.3 (R 4M1S FIFO); plan 14.16
-DP-R04,aou_dw_chk,,DUT,A width-conversion run produced every conversion it targets (remote writes; remote-width reads; single- and multi-beat M-port writes; narrow S-port reads),test self-check; plan 14.x
 DP-R05,aou_t1_attr_chk,,DUT,"Each WriteReq/ReadReq the DUT sends carries the AxLOCK, AxCACHE, AxPROT and AxQOS of the S-port AW/AR it came from",AoU 5.3; Basic Profile Table 31; plan 4.25-4.28/5.23-5.26
 DP-R06,aou_t1_attr_chk,,DUT,"Each M-port AW/AR carries the AxLOCK, AxCACHE, AxPROT and AxQOS of the WriteReq/ReadReq it came from",AoU 5.3; Basic Profile Table 31; plan 4.25-4.28/5.23-5.26
 DP-R07,aou_t1_attr_chk,,DUT,"An exclusive transaction's BRESP/RRESP at the requester is the far subordinate's (EXOKAY or OKAY), when the DUT neither split nor merged it",AXI4 A7.2; AoU 5.5/5.6; plan 4.25/5.23

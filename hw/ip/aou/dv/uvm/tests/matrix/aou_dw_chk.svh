@@ -5,16 +5,19 @@
 // byte checks, per RP (identity DEST_RP: wire RP = local RP).
 // DP-R02: an S-port read beat whose ReadData is narrower than the RP (DLENGTH
 //   from ARSIZE) carries that ReadData replicated across the bus (MAS 3.3).
-// DP-R04: the run produced the conversions it targets, per RP: remote writes
-//   (the remote model packs WriteData at AWSIZE by default, the minimal legal
-//   choice, so its width is the size the run drew; xfer.width_cg counts
-//   full-width ones), remote reads with ARSIZE at the
-//   remote width,
-//   single- and multi-beat writes at the M port (single-beat not required
-//   under +remote_wreq=upsize on an RP narrower than the remote die: its
-//   modifiable writes arrive as bus-wide WriteReqs, which the DUT downsizes
-//   to several beats), and (RP wider than 256 bits)
-//   narrow S-port reads; otherwise the test proves nothing.
+// Targets, per RP: remote writes (the remote model packs WriteData at AWSIZE
+//   by default, the minimal legal choice, so its width is the size the run
+//   drew), remote reads with ARSIZE at the remote width, single- and
+//   multi-beat writes at the M port (single-beat not aimed for under
+//   +remote_wreq=upsize on an RP narrower than the remote die: its modifiable
+//   writes arrive as bus-wide WriteReqs, which the DUT downsizes to several
+//   beats), WriteData from the DUT and (RP wider than 256 bits) narrow S-port
+//   reads. report_phase lists those the run never produced. That is stimulus
+//   quality, not a DUT check: a missed target is a coverage hole, never an
+//   error. The always-on aou_t1_xfer_cov counts them for every test, per
+//   width pairing: remote and DUT writes and reads by size in xfer.width_cg
+//   (x_pair_dir, x_pair_size; cp_req narrower for narrow reads), M-port write
+//   bursts of one or more beats in xfer.mwr_cg.
 // The DLENGTH of the DUT's WriteData against its WriteReq's size is T1-L4A02
 // (aou_t1_l4a_adapter), the WriteReq's size against the S-port AWSIZE DP-R09
 // (aou_t1_attr_chk); the report counts the S-port write beats narrower than
@@ -123,32 +126,32 @@ class aou_dw_chk extends uvm_component;
     join
   endtask
 
-  function void need(bit ok, int unsigned r, string what);
+  function void aim(bit ok, int unsigned r, string what);
     if (!ok)
-      `uvm_error(get_type_name(), $sformatf(
-                 "DP-R04: RP%0d (%0d-bit, remote %0d-bit): no %s", r, 8 * rp_bytes[r],
-                 8 * remote_bytes[r], what))
+      `uvm_info(get_type_name(), $sformatf(
+                "not reached: RP%0d (%0d-bit, remote %0d-bit): no %s", r, 8 * rp_bytes[r],
+                8 * remote_bytes[r], what), UVM_LOW)
   endfunction
 
   function void check_phase(uvm_phase phase);
     flush();
-    for (int unsigned r = 0; r < n_rp; r++) begin
-      int unsigned d = dl_idx(remote_bytes[r]);
-      if (req_r2l) begin
-        need(n_rem_wdata[r].sum() > 0, r, "remote WriteData");
-        need(n_rem_rreq[r][d] > 0, r, "remote ReadReq with ARSIZE at the remote width");
-        if (!(upsize && rp_bytes[r] < remote_bytes[r]))
-          need(n_m_single[r] > 0, r, "single-beat write at the M port");
-        need(n_m_multi[r] > 0, r, "multi-beat write at the M port");
-      end
-      if (req_l2r) begin
-        need(n_dut_wdata[r] > 0, r, "WriteData from the DUT");
-        if (rp_bytes[r] > 32) need(n_narrow_rd[r] > 0, r, "narrow S-port read");
-      end
-    end
   endfunction
 
   function void report_phase(uvm_phase phase);
+    for (int unsigned r = 0; r < n_rp; r++) begin
+      int unsigned d = dl_idx(remote_bytes[r]);
+      if (req_r2l) begin
+        aim(n_rem_wdata[r].sum() > 0, r, "remote WriteData");
+        aim(n_rem_rreq[r][d] > 0, r, "remote ReadReq with ARSIZE at the remote width");
+        if (!(upsize && rp_bytes[r] < remote_bytes[r]))
+          aim(n_m_single[r] > 0, r, "single-beat write at the M port");
+        aim(n_m_multi[r] > 0, r, "multi-beat write at the M port");
+      end
+      if (req_l2r) begin
+        aim(n_dut_wdata[r] > 0, r, "WriteData from the DUT");
+        if (rp_bytes[r] > 32) aim(n_narrow_rd[r] > 0, r, "narrow S-port read");
+      end
+    end
     for (int unsigned r = 0; r < n_rp; r++)
       `uvm_info(get_type_name(), $sformatf(
                 {"RP%0d %0d-bit, remote %0d-bit: remote WriteData by DLENGTH 256/512/1024 %p, ",

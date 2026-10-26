@@ -3157,8 +3157,8 @@ and 1024 bits covers every upsize, downsize and bypass pairing. Both
 directions, every size up to each side's width, 1-16 beats, each batch
 read back (+dp_loopback): the scoreboard checks bytes end to end, the AXI
 monitors WLAST at the M port, L3 the ReadData DLENGTH per ARSIZE (AOU-R13),
-and aou_dw_chk replication of narrow read data, the DUT's WriteData
-DLENGTH and that every targeted conversion happened.
+and aou_dw_chk replication of narrow read data; aou_dw_chk also reports
+any targeted conversion the run never produced (coverage, not an error).
 
 *Procedure.* The base class's virtual sequence `aou_dp_vseq`, configured by this class and its arguments.
 
