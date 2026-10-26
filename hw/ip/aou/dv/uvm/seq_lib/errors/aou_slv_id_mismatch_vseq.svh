@@ -11,10 +11,9 @@
 //           into INT_SI0_ID_MISMATCH, only the one of that kind is set. At
 //           the DUT's ports the two are indistinguishable, so this is the
 //           only place #76 (RP1-RP3 crossed) shows.
-// The checker is enabled through bit 22 of AXI_SLV_ID_MISMATCH_ERR_RPn, which
-// the RDL calls reserved and the MAS says is tied off (BUGS/003 interim:
-// the bit enables the checker; the #76 commit describes the per-RP bits and
-// aggregates).
+// The checker is enabled by AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN
+// while the activation FSM is still DISABLED, before any AXI traffic
+// (MAS 7.2.2).
 // Knobs: +kind=b|r|both (default both) +id=<hex>.
 class aou_slv_id_mismatch_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_slv_id_mismatch_vseq)
@@ -53,9 +52,13 @@ class aou_slv_id_mismatch_vseq extends aou_link_base_vseq;
     int unsigned n = cfg.n_rp * ((kind == "both") ? 2 : 1);
     expect_event("INT_SI0_ID_MISMATCH", n, n);
     link_up();
+    // MAS 7.2.2: program the checker while DISABLED, before any AXI traffic.
+    for (int unsigned r = 0; r < cfg.n_rp; r++) begin
+      uvm_reg_field en = slv_reg(r).get_field_by_name("axi_slv_id_mismatch_en");
+      if (en == null) `uvm_fatal(get_type_name(), "no AXI_SLV_ID_MISMATCH_EN")
+      wr(en, 1);
+    end
     sw_activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
-    for (int unsigned r = 0; r < cfg.n_rp; r++)
-      raw_wr(32'(slv_reg(r).get_address()), ENABLE);
     for (int unsigned r = 0; r < cfg.n_rp; r++) begin
       if (kind != "r") inject_one(r, 1'b1, id);
       if (kind != "b") inject_one(r, 1'b0, id);

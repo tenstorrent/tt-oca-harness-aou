@@ -2518,10 +2518,9 @@ T1-E18  white-box: of AOU_CORE's two aggregates that AOU_CORE_TOP ORs
 into INT_SI0_ID_MISMATCH, only the one of that kind is set. At
 the DUT's ports the two are indistinguishable, so this is the
 only place #76 (RP1-RP3 crossed) shows.
-The checker is enabled through bit 22 of AXI_SLV_ID_MISMATCH_ERR_RPn, which
-the RDL calls reserved and the MAS says is tied off (BUGS/003 interim:
-the bit enables the checker; the #76 commit describes the per-RP bits and
-aggregates).
+The checker is enabled by AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN
+while the activation FSM is still DISABLED, before any AXI traffic
+(MAS 7.2.2).
 Knobs: +kind=b|r|both (default both) +id=<hex>.
 
 *Rules named.* `T1-E16`, `T1-E17`, `T1-E18`
@@ -2766,11 +2765,11 @@ cleared and traffic goes on; when it doesn't, the error would re-set after
 every clear, so the status is checked without the clear and the scenario
 ends with I_RESETN/I_PRESETN, the only legal way to end it.
 sub: the remote die sends a WriteResp, then a ReadData, for no request of
-RP r. With the subordinate checker enabled (AXI_SLV_ID_MISMATCH_ERR_RPr bit
-22, which the RDL calls reserved: BUGS/003 interim) the DUT keeps it off the
-S port, sets AXI_SLV_BID/RID_MISMATCH_ERR with the ID and raises
-INT_SI0_ID_MISMATCH. With the checker disabled nothing is detected, so
-there is nothing in scope to check (no +slv_en=0 scenario in the lists).
+RP r. AXI_SLV_ID_MISMATCH_EN is set while the activation FSM is still
+DISABLED (MAS 7.2.2). With the checker enabled the DUT keeps the stray
+response off the S port, sets AXI_SLV_BID/RID_MISMATCH_ERR with the ID and
+raises INT_SI0_ID_MISMATCH. With the checker disabled nothing is detected,
+so there is nothing in scope to check (no +slv_en=0 scenario in the lists).
 With +mask=1 the interrupt mask is set first: the status bit is still set
 but the interrupt stays low until the mask is cleared (interim, BUGS/029:
 interrupt = status & ~mask). Write 1 clears the error, its INFO and the
@@ -2835,7 +2834,7 @@ type, and INT_EARLY_RESP_ERR until the last RP is cleared. +mask=1
 sets INT_EARLY_RESP_MASK: status still set, interrupt low until the
 mask is cleared (interim, BUGS/029).
 multi on every RP at once an early-response error and a WriteResp
-nobody asked for (subordinate checker on, BUGS/003), then an
+nobody asked for (AXI_SLV_ID_MISMATCH_EN set on a drained bus), then an
 ActivateAck in ENABLED (LinkReset). All three interrupts and every
 status bit are set; clearing one source leaves the others; the link
 is recovered. (An M-port ID mismatch cannot join: BUGS/029.)

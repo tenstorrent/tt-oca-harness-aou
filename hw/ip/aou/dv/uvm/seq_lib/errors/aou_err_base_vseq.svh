@@ -83,15 +83,12 @@ class aou_err_base_vseq extends aou_link_base_vseq;
                                             exp, why == "" ? "" : {" (", why, ")"}))
   endtask
 
-  // Raw APB write: for AXI_SLV_ID_MISMATCH_ERR_RPn bit 22, which the register
-  // model treats as reserved (BUGS/003).
-  task raw_write(uvm_reg rg, bit [31:0] data);
-    aou_reg_base_seq s = aou_reg_base_seq::type_id::create("raw");
-    bit slverr;
-    prep_reg(s);
-    s.raw(aou_apb_pkg::AOU_APB_WRITE, 32'(rg.get_address()), data, slverr);
-    if (slverr) `uvm_error(get_type_name(), $sformatf("REG-R10: raw write of %s: PSLVERR",
-                                                      rg.get_name()))
+  // AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN (MAS 7.2.2). Software
+  // writes it only while the activation FSM is DISABLED and no AXI traffic
+  // is outstanding on that RP.
+  task enable_slv_id_check();
+    for (int unsigned r = 0; r < cfg.n_rp; r++)
+      wr(rpf("axi_slv_id_mismatch_err", r, "axi_slv_id_mismatch_en"), 1);
   endtask
 
   // ---------------------------------------------------------------------

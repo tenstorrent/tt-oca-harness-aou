@@ -485,7 +485,7 @@
 | 20.12 | Read/write debug addresses | P1 | `aou_axi_err_resp_test`, `aou_axi_err_resp_test.4x512-sp64`, `aou_reg_access_test`, `aou_reg_bit_bash_test`
 | 20.13 | Read/W1C slave ID errors | P1 | `aou_id_mismatch_test.side-sub.kind-b`, `aou_reg_access_test`, `aou_reg_bit_bash_test`
 | 20.14 | Verify all registers reset to documented values | P0 | `aou_reg_hw_reset_test`, `aou_t1_hard_reset_test`
-| 20.15 | Write to reserved fields; verify no effect | P2 | `aou_reg_reserved_test` (expected failure only)
+| 20.15 | Write to reserved fields; verify no effect | P2 | `aou_reg_reserved_test`
 | 20.16 | Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers | P2 | `aou_reg_alias_test`, `aou_reg_reserved_test`
 |===
 ==== 2.21 Low Power Mode Tests

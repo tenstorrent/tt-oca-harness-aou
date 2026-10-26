@@ -328,7 +328,7 @@
   dropped: 'AoU v0.8 5.7 makes ReadData wider than ARSIZE a peer violation with no defined reaction.'
   note: Coverage-closure gap analysis 4.3 (decision D9). Spec v0.8 decision (2026-10-20) removed aou_rdata_wide_test.
 - id: '9.22'
-  added: 'MAS 7.2.2; BUGS/003'
+  added: 'MAS 7.2.2'
   priority: P2
   title: 'Subordinate ID-check enable bit (AXI_SLV_ID_MISMATCH_ERR_RPn[22]) off and on'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.

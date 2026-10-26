@@ -15,7 +15,7 @@
 //         sets INT_EARLY_RESP_MASK: status still set, interrupt low until the
 //         mask is cleared (interim, BUGS/029).
 //   multi on every RP at once an early-response error and a WriteResp
-//         nobody asked for (subordinate checker on, BUGS/003), then an
+//         nobody asked for (AXI_SLV_ID_MISMATCH_EN set on a drained bus), then an
 //         ActivateAck in ENABLED (LinkReset). All three interrupts and every
 //         status bit are set; clearing one source leaves the others; the link
 //         is recovered. (An M-port ID mismatch cannot join: BUGS/029.)
@@ -266,8 +266,9 @@ class aou_int_vseq extends aou_err_base_vseq;
     ids = new[cfg.n_rp];
     bogus = new[cfg.n_rp];
     drain();
-    for (int unsigned r = 0; r < cfg.n_rp; r++)
-      raw_write(rm.get_reg_by_name($sformatf("axi_slv_id_mismatch_err_rp%0d", r)), 32'h0040_0000);
+    // This part runs after activation, on a drained bus. MAS 7.2.2 programs
+    // AXI_SLV_ID_MISMATCH_EN while the activation FSM is DISABLED.
+    enable_slv_id_check();
     foreach (ids[r]) begin
       ids[r] = 10'($urandom_range(10'h1FF));
       bogus[r] = 10'($urandom_range(10'h3FF, 10'h200));

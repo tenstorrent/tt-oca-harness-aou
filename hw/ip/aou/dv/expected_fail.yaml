@@ -39,26 +39,13 @@
 # fails the run.
 
 - test: aou_reg_bit_bash_test
-  bug: BUGS/003
-  check: 'in bit #22 of register "aou_core.axi_slv_id_mismatch_err_rp'
-  note: reserved bit 22 is a read/write checker enable in RTL (all four RPs)
-
-- test: aou_reg_bit_bash_test
   bug: BUGS/004
   check: 'Writing a 1 in bit #2 of register "aou_core.aou_con0"'
   note: AXI_SPLIT_TR_EN has no storage and reads 0
 
 - test: aou_reg_access_test
-  bug: BUGS/003
-  check: 'REG-R06: aou_core.axi_slv_id_mismatch_err_rp'
-
-- test: aou_reg_access_test
   bug: BUGS/004
   check: 'REG-R02: aou_core.aou_con0.axi_split_tr_en'
-
-- test: aou_reg_reserved_test
-  bug: BUGS/003
-  check: 'REG-R06: aou_core.axi_slv_id_mismatch_err_rp'
 
 - test: aou_reg_alias_test
   bug: BUGS/004

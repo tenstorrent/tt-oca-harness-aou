@@ -1431,7 +1431,7 @@
   section_title: Error Handling Tests
   title: 'Subordinate ID-check enable bit (AXI_SLV_ID_MISMATCH_ERR_RPn[22]) off and on'
   priority: P2
-  added: MAS 7.2.2; BUGS/003
+  added: MAS 7.2.2
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '10.1'
