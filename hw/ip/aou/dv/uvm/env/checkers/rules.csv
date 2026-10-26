@@ -197,7 +197,7 @@ T1-L22,aou_lp_mode_traffic_vseq,,DUT,TX_LP_MODE=1 with threshold T sends a bound
 T1-L23,aou_reset_vseq,,DUT,"Registers are in the core reset domain (I_RESETN, the SFRs' reset behind the APB bridge): AOU_SW_RESET or I_RESETN (alone or with I_PRESETN) returns every programmed register to its reset value; I_PRESETN alone leaves them programmed",MAS software-operation 7.3.6; integration guide 3.1.1
 T1-L24,aou_reset_vseq,,DUT,I_PRESETN alone leaves AoU ENABLED,integration guide 3.1.1
 T1-L25,aou_invalid_actmsg_vseq,,DUT,An invalid ActivateReq raises no INT_ACTIVATE_START,MAS software-operation 7.2.3/7.3.5
-T1-E16,aou_slv_id_mismatch_vseq,,DUT,An unsolicited B/R sets AXI_SLV_ID_MISMATCH_ERR_RPn of that kind with the ID in INFO; W1C clears it,MAS software-operation 7.2.2; BUGS/003
+T1-E16,aou_slv_id_mismatch_vseq,,DUT,An unsolicited B/R sets AXI_SLV_ID_MISMATCH_ERR_RPn of that kind with the ID in INFO; W1C clears it,MAS software-operation 7.2.2
 T1-E17,aou_slv_id_mismatch_vseq,,DUT,INT_SI0_ID_MISMATCH rises on a subordinate ID mismatch and falls after the W1C,MAS software-operation 7.2.2
 T1-E18,aou_slv_id_mismatch_vseq,,DUT,White-box: AOU_CORE's RID/BID subordinate mismatch aggregate of that kind only (main #76),main b8b9060 commit message
 FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (any fdi_enc; L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7

@@ -15,7 +15,8 @@
 //         sets INT_EARLY_RESP_MASK: status still set, interrupt low until the
 //         mask is cleared (interim, BUGS/029).
 //   multi on every RP at once an early-response error and a WriteResp
-//         nobody asked for (AXI_SLV_ID_MISMATCH_EN set on a drained bus), then an
+//         nobody asked for (AXI_SLV_ID_MISMATCH_EN programmed while the
+//         activation FSM is DISABLED, MAS 7.2.2), then an
 //         ActivateAck in ENABLED (LinkReset). All three interrupts and every
 //         status bit are set; clearing one source leaves the others; the link
 //         is recovered. (An M-port ID mismatch cannot join: BUGS/029.)
@@ -68,8 +69,13 @@ class aou_int_vseq extends aou_err_base_vseq;
       expect_event("AOU-R40", 0, 0);
     end
     link_up();
+    // w1c ends with a software reset, which clears every SFR, and leaves the
+    // activation FSM DISABLED.
     if (mode inside {"all", "w1c"}) w1c_part();
-    else sw_activate();
+    // MAS 7.2.2: AXI_SLV_ID_MISMATCH_EN is programmed while DISABLED, before
+    // any AXI traffic.
+    if (mode inside {"all", "multi"}) enable_slv_id_check();
+    sw_activate();
     check_traffic(num_txns);
     // Early response only around the parts that need it: the scoreboard
     // checks memory when B arrives, which an early B precedes.
@@ -182,7 +188,7 @@ class aou_int_vseq extends aou_err_base_vseq;
     wait_cycles(1000);
     w1c_check(rm.lp_linkreset.invalid_actmsg_err, "", "LP_LINKRESET.INVALID_ACTMSG_ERR",
               rm.lp_linkreset.invalid_actmsg_info, int'(AOU_ACT_ACK));
-    recover();
+    recover(null, 1'b0);   // body() reprograms and activates
   endtask
 
   // ---------------------------------------------------------------------
@@ -266,9 +272,6 @@ class aou_int_vseq extends aou_err_base_vseq;
     ids = new[cfg.n_rp];
     bogus = new[cfg.n_rp];
     drain();
-    // This part runs after activation, on a drained bus. MAS 7.2.2 programs
-    // AXI_SLV_ID_MISMATCH_EN while the activation FSM is DISABLED.
-    enable_slv_id_check();
     foreach (ids[r]) begin
       ids[r] = 10'($urandom_range(10'h1FF));
       bogus[r] = 10'($urandom_range(10'h3FF, 10'h200));

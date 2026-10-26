@@ -24,8 +24,11 @@
 // RP r. AXI_SLV_ID_MISMATCH_EN is set while the activation FSM is still
 // DISABLED (MAS 7.2.2). With the checker enabled the DUT keeps the stray
 // response off the S port, sets AXI_SLV_BID/RID_MISMATCH_ERR with the ID and
-// raises INT_SI0_ID_MISMATCH. With the checker disabled nothing is detected,
-// so there is nothing in scope to check (no +slv_en=0 scenario in the lists).
+// raises INT_SI0_ID_MISMATCH. With the checker disabled nothing is detected:
+// the stray response goes out on the S port, where the bench's manager
+// rejects it as a response with nothing outstanding, and SLV_TR_COMPLETE
+// stays low afterwards. That handling is undefined (BUGS/029), so there is
+// no +slv_en=0 scenario in the lists.
 // With +mask=1 the interrupt mask is set first: the status bit is still set
 // but the interrupt stays low until the mask is cleared (interim, BUGS/029:
 // interrupt = status & ~mask). Write 1 clears the error, its INFO and the
