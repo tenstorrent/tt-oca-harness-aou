@@ -48,7 +48,7 @@ make run TEST=aou_dp_random_test SEED=3 PLUSARGS='+dp_dir=both'
 python3 scripts/run_list.py --items smoke    # the bring-up gate (4 scenarios)
 python3 scripts/run_list.py --items functional -j 16 --rid nightly
 python3 scripts/run_list.py --target 4x512-sp64 -j 16   # every scenario on one target
-make check-config                            # sim configs, testlists, rules, RAL and docs freshness (what CI runs before building)
+make check-config                            # sim configs, testlists, rules, RAL, plan items and docs freshness (what CI runs before building)
 make lint                                    # check-config, Verible and Verilator lint, FDI checker guards
 ```
 
@@ -548,8 +548,12 @@ still X after reset is released.
 verification branch's `dv/doc/AOU_RTL_TEST_PLAN.md`, sections 2.1-2.22) with the
 corrections in `docs/test_plan_corrections.yaml` applied: reworded items,
 duplicates merged into one surviving ID, and items dropped as untestable on this
-RTL. `scripts/gen_plan_items.py <old plan>` regenerates it; change the
-corrections, never the output.
+RTL. Change the corrections, never the output, and run
+`scripts/gen_plan_items.py` to regenerate it: the file keeps what it took from
+the old plan with a digest, so the old plan itself is needed only when that
+changes (`scripts/gen_plan_items.py <old plan>`). `make check-config` runs
+`gen_plan_items.py --check`, which fails when the file is stale or was edited by
+hand.
 
 `testlists/plan_ids.yaml` names the items each scenario covers. `make plan_status`
 matches every run under `out/` to its scenario by test class, plusargs (from

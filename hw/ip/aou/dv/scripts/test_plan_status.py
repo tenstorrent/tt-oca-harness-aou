@@ -15,6 +15,7 @@ import sys
 import tempfile
 import time
 import unittest
+import unittest.mock
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check_run  # noqa: E402
@@ -197,6 +198,40 @@ class GenPlanItems(unittest.TestCase):
                 {"id": "5.1", "added": "x", "title": "t", "priority": "P1", "note": "no section"},
             ])
             self.assertEqual(len(errs), 3)
+
+    def test_check_without_plan(self):
+        """--check rebuilds the old plan from the output: in step with the
+        corrections it passes, a changed correction makes it stale, a hand edit
+        of an old-plan field breaks the digest."""
+        with tempfile.TemporaryDirectory() as tmp:
+            plan, corr, out = (os.path.join(tmp, n) for n in ("plan.md", "corr.yaml", "items.yaml"))
+            with open(plan, "w") as fh:
+                fh.write(PLAN)
+            with open(corr, "w") as fh:
+                fh.write("- id: '10.1'\n  title: new words\n  priority: P0\n  note: fixed\n"
+                         "- id: '1.3'\n  added: AoU 8.2\n  title: new\n  priority: P2\n  note: gap\n")
+
+            def gen(*args):
+                argv = ["gen_plan_items.py", *args, "--corrections", corr, "-o", out]
+                with contextlib.redirect_stdout(io.StringIO()), unittest.mock.patch.object(sys, "argv", argv):
+                    try:
+                        return gen_plan_items.main()
+                    except SystemExit as e:
+                        return e.code
+
+            self.assertEqual(gen(plan), 0)
+            text = open(out).read()
+            self.assertIn("old_priority: P1", text)
+            self.assertEqual(gen("--check"), 0)
+            self.assertEqual(gen(plan, "--check"), 0)
+            with open(corr, "a") as fh:
+                fh.write("- id: '1.2'\n  merged_into: '1.1'\n  note: dup\n")
+            self.assertEqual(gen("--check"), 1)
+            self.assertEqual(gen(), 0)               # regenerated without the plan
+            self.assertEqual(gen(plan, "--check"), 0)
+            with open(out, "w") as fh:
+                fh.write(text.replace("old_test: tput_test", "old_test: edited"))
+            self.assertIn("edited by hand", str(gen("--check")))
 
 
 class PlanStatus(unittest.TestCase):

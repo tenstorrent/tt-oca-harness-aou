@@ -13,12 +13,22 @@ file and status columns. docs/test_plan_corrections.yaml then rewords items
 `title` and `priority`; either joins section 2.N after its last item. Edit the
 corrections, never the output.
 
+The old plan is not in this repository. The output keeps everything taken from
+it (a reworded title as `old_title`, a changed priority as `old_priority`) and
+records a digest of the old plan's items, so without a plan argument the
+script rebuilds those items from the output itself, checks them against the
+digest (an output edited by hand fails) and applies the corrections again.
+That is what `make check-config` runs.
+
+  scripts/gen_plan_items.py --check                # exit 1 if the file is stale
+  scripts/gen_plan_items.py                        # regenerate after changing the corrections
   git show verification:dv/doc/AOU_RTL_TEST_PLAN.md > old_plan.md
-  scripts/gen_plan_items.py old_plan.md            # rewrites docs/test_plan_items.yaml
-  scripts/gen_plan_items.py old_plan.md --check    # exit 1 if the file is stale
+  scripts/gen_plan_items.py old_plan.md            # regenerate from the old plan itself
 """
 
 import argparse
+import hashlib
+import json
 import os
 import re
 import sys
@@ -28,7 +38,10 @@ import listyaml  # noqa: E402
 
 UVM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 KEYS = ["id", "section", "section_title", "title", "priority", "old_test", "old_status",
-        "added", "merged_into", "dropped", "old_title", "note"]
+        "added", "merged_into", "dropped", "old_title", "old_priority", "note"]
+# The fields an old-plan item has before any correction (parse_plan).
+PLAN_KEYS = ["id", "section", "section_title", "title", "priority", "old_test", "old_status"]
+DIGEST_RE = re.compile(r"^# Old plan: (\d+) items, sha256 ([0-9a-f]{64})$", re.M)
 HEADER = """\
 # SPDX-License-Identifier: Apache-2.0
 # SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
@@ -147,6 +160,8 @@ def apply_corrections(items, corrections):
             errors.append(f"correction for {c['id']} has no note")
         if "title" in c:
             item["old_title"], item["title"] = item["title"], c["title"]
+        if "priority" in c and c["priority"] != item["priority"]:
+            item["old_priority"] = item["priority"]
         for k in ("merged_into", "dropped", "priority", "note"):
             if k in c:
                 item[k] = c[k]
@@ -157,21 +172,56 @@ def apply_corrections(items, corrections):
     return errors
 
 
+def plan_digest(items):
+    """The digest the output records of the old plan's items (PLAN_KEYS only)."""
+    rows = [[i.get(k) for k in PLAN_KEYS] for i in items]
+    return hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def items_from_output(path, corrections):
+    """Rebuild the old plan's items from a generated file: drop the items the
+    corrections added and undo every correction. Exits when the file has no
+    digest or the rebuilt items don't match it (the file was edited by hand)."""
+    with open(path, encoding="utf-8") as fh:
+        m = DIGEST_RE.search(fh.read())
+    if not m:
+        sys.exit(f"{path}: no old-plan digest; regenerate from the old plan")
+    added = {c.get("id") for c in corrections if c.get("add") == "yes" or "added" in c}
+    items = []
+    for e in listyaml.load(path):
+        if e.get("id") in added:
+            continue
+        item = {k: e.get(k) for k in PLAN_KEYS}
+        item["title"] = e.get("old_title", item["title"])
+        item["priority"] = e.get("old_priority", item["priority"])
+        items.append(item)
+    if len(items) != int(m.group(1)) or plan_digest(items) != m.group(2):
+        sys.exit(f"{path}: its old-plan items don't match the digest it records: the file was "
+                 "edited by hand; change the corrections and regenerate from the old plan")
+    return items
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("plan", help="old AOU_RTL_TEST_PLAN.md")
+    ap.add_argument("plan", nargs="?",
+                    help="old AOU_RTL_TEST_PLAN.md (default: rebuild its items from the output)")
     ap.add_argument("--corrections", default=os.path.join(UVM_ROOT, "docs", "test_plan_corrections.yaml"))
     ap.add_argument("-o", "--output", default=os.path.join(UVM_ROOT, "docs", "test_plan_items.yaml"))
     ap.add_argument("--check", action="store_true", help="compare with the output instead of writing it")
     args = ap.parse_args()
 
-    items = parse_plan(args.plan)
-    if not items:
-        sys.exit(f"{args.plan}: no test-plan items found")
-    errors = apply_corrections(items, listyaml.load(args.corrections))
+    corrections = listyaml.load(args.corrections)
+    if args.plan:
+        items = parse_plan(args.plan)
+        if not items:
+            sys.exit(f"{args.plan}: no test-plan items found")
+    else:
+        items = items_from_output(args.output, corrections)
+    header = f"{HEADER}\n#\n# Old plan: {len(items)} items, sha256 {plan_digest(items)}"
+    errors = apply_corrections(items, corrections)
     if errors:
         sys.exit("\n".join(errors))
-    text = listyaml.dump(items, KEYS, HEADER)
+    text = listyaml.dump(items, KEYS, header)
     if args.check:
         with open(args.output, encoding="utf-8") as fh:
             same = fh.read() == text

@@ -8,6 +8,8 @@
 # and reports through that ID. dropped: not testable on this RTL. added: an item
 # the old plan lacked, with its source. old_test and old_status are the old
 # plan's Test File and Status columns.
+#
+# Old plan: 337 items, sha256 3fe78db1b0bd8c34ec458d1f5399d7bb2bc389f631fcd066716c6ec167aa402f
 
 - id: '1.1'
   section: '2.1'
