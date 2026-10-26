@@ -28,9 +28,10 @@ Trieu and Quang Le (VNCHIPLabs); see [Acknowledgements](#acknowledgements).
 
 | Need | Why | Notes |
 | --- | --- | --- |
-| Python 3.9 or later | every script | `tomllib` (3.11) is used when present; a subset TOML reader covers older interpreters |
+| Python 3.9 or later | every script | `tomllib` (3.11) is used when present; a subset TOML reader covers older interpreters; `scripts/bugs/*` also need PyYAML (`pip install -r requirements.txt` at the repository root) |
 | GNU Make, Git, a C++ compiler | the standalone flow | |
 | Verilator 5.052 | `SIM=verilator` | What CI builds (`.github/workflows/uvm-smoke.yml`); `--timing` and `randomize()` through z3 |
+| Verible (`verible-verilog-lint`) | `make lint` | The version CI pins in `.github/tool-versions.env` (`VERIBLE_VERSION`) |
 | VCS | `SIM=vcs` | The default when `vcs` is on `PATH`; the full regressions and coverage run here |
 | LSF (`bsub`) | builds and runs at scale | Optional: `LSF=0` runs on the current host; site options in the git-ignored `site/site.mk` |
 | `make setup` | fetches the pinned uvm-core, the OCAH library, z3, PeakRDL and pywellen into the git-ignored `.deps/` | No network after it; the pins are in `scripts/get_*.sh` |
