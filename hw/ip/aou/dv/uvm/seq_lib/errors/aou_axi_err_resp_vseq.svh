@@ -72,6 +72,15 @@
 //                   queues behind the flood's, the pop completes first and the
 //                   read returns the entry the pop removed, sampled when the
 //                   read became active.
+//   +pop_lead=G +wresp_crd=N  each take is an OKAY write on the RP, then the
+//                   debug pop and, G cycles after it, the debug read, then a
+//                   second debug read once both have completed. The remote
+//                   die grants N WriteResp credits and returns each crd_delay
+//                   ticks after use: with N = 1 the write's B uses the credit,
+//                   so the pop's B waits for its return while the read, which
+//                   became active after the pop, completes first with the
+//                   entry behind the popped one. The second read, with nothing
+//                   in flight, returns the same entry.
 class aou_axi_err_resp_vseq extends aou_err_base_vseq;
   `uvm_object_utils(aou_axi_err_resp_vseq)
 
@@ -82,6 +91,7 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
   int unsigned flood_len = 15;    // fifo part: AxLEN of the flood's reads
   int          take_overlap = -1; // fifo part: cycles from debug read to pop (-1: after the data)
   int          take_flood = -1;   // fifo part: AxLEN of an OKAY read before a debug read (-1: none)
+  int          pop_lead = -1;     // fifo part: cycles from debug pop to read (-1: read first)
   int unsigned err_len = 0;       // fifo part: AxLEN of the failing transactions
   bit [3:0]    err_cache = 4'd0;  // fifo part: their AxCACHE
   bit [63:0]   err_off = 64'd0;   // fifo part: added to their addresses
@@ -167,6 +177,7 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
     pair_writes = arg_int("pair_writes", 1);
     take_overlap = arg_int("take_overlap", -1);
     take_flood = arg_int("take_flood", -1);
+    pop_lead = arg_int("pop_lead", -1);
     if (pair_writes < 1 || pair_writes > 8)
       `uvm_fatal(get_type_name(), $sformatf("+pair_writes=%0d: 1 to 8", pair_writes))
     flood_len = arg_int("flood_len", 15);
@@ -177,9 +188,15 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
     end
     program_feat();
     link_up();
-    if (arg_int("rdata_crd", -1) >= 0) begin
-      cfg.l3_cfg.rx_depth[AOU_CC_RDATA] = arg_int("rdata_crd", 0);
-      cfg.l3_cfg.ret_policy[AOU_CC_RDATA] = AOU_RET_DELAYED;
+    if (arg_int("rdata_crd", -1) >= 0 || arg_int("wresp_crd", -1) >= 0) begin
+      if (arg_int("rdata_crd", -1) >= 0) begin
+        cfg.l3_cfg.rx_depth[AOU_CC_RDATA] = arg_int("rdata_crd", 0);
+        cfg.l3_cfg.ret_policy[AOU_CC_RDATA] = AOU_RET_DELAYED;
+      end
+      if (arg_int("wresp_crd", -1) >= 0) begin
+        cfg.l3_cfg.rx_depth[AOU_CC_WRESP] = arg_int("wresp_crd", 0);
+        cfg.l3_cfg.ret_policy[AOU_CC_WRESP] = AOU_RET_DELAYED;
+      end
       cfg.l3_cfg.ret_delay = arg_int("crd_delay", 64);
       env.l3.model.crd.reset_link();
     end
@@ -258,6 +275,10 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
   // holds the debug read's data back behind its own while the pop's B flows,
   // so the pop completes first.
   virtual task fifo_take(int unsigned rp);
+    if (pop_lead >= 0) begin
+      pop_then_read(rp);
+      return;
+    end
     if (take_overlap < 0) begin
       super.fifo_take(rp);
       return;
@@ -279,6 +300,23 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
       end
     join
     wait fork;
+  endtask
+
+  // The pop first, the read pop_lead cycles later, behind an OKAY write
+  // whose B holds the WriteResp credit (+wresp_crd=1): the pop takes the head
+  // before the read becomes active, and its B completes after the read's
+  // data. Then the head is read again with nothing in flight.
+  task pop_then_read(int unsigned rp);
+    run_one(1'b1, rp, mk(1'b1, rp, AOU_AXI_WR, 10'h3E8 + 10'(rp),
+                         err_base(1'b0, rp) + 64'h3_0000));
+    fork
+      fifo_pop(rp);
+      begin
+        wait_cycles(pop_lead);
+        fifo_read(rp);
+      end
+    join
+    fifo_read(rp);
   endtask
 
   // ---------------------------------------------------------------------

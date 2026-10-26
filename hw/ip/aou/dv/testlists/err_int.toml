@@ -193,6 +193,21 @@ tags = ["err_int"]
 run_modes = ["err_int"]
 args = ["+part=fifo", "+take_overlap=4", "+take_flood=15"]
 
+# Each debug pop issued first and the debug read 16 cycles later, behind an
+# OKAY write whose B holds the RP's only WriteResp credit: the pop takes the
+# head before the read becomes active, and the read's data completes before
+# the pop's B, returning the entry behind the popped one. A second read with
+# nothing in flight must return the same entry.
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo", "+pop_lead=16", "+wresp_crd=1", "+crd_delay=256"]
+
 # Failing 64-byte writes at a 32-byte offset into a 256-bit RP: the width
 # converter aligns the address down to AWSIZE and the B entry carries that
 # address (MAS 7.2.4).
@@ -412,7 +427,7 @@ args = ["+part=fifo"]
 
 [[groups]]
 name = "err_int"
-expected_count = 38
+expected_count = 39
 tests = [
   "aou_axi_err_resp_test",
   "aou_axi_err_resp_test.4x512-sp64",
@@ -427,6 +442,7 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64",
   "aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64",
+  "aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32",

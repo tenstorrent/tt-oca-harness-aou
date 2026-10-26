@@ -60,14 +60,22 @@
 //           slices of RP beats, so beat k equals beat k mod (RP / remote);
 //   T1-E02  the head, {ID, ADDR, RESP} in the low 76 bits of beat 0, is the
 //           predicted head (any entry of a group pushed together). Not judged
-//           after a drop the model could not order, until the pops have
-//           drained the FIFO.
-// A pop removes the entry the last read returned, or the head. The window
-// samples the head when a read becomes active, so a read in flight together
-// with a pop (rmgr requests, as issued) returns the head before or after the
-// pop: an entry a pop removed while the read was in flight is kept as an
-// acceptable head until no read is in flight, and a pop still in flight when
-// the read completes may have taken the leading entry.
+//           after a drop the model could not order, or after pops whose
+//           entries it could not tell, until the pops have drained the FIFO.
+// A pop removes the head (MAS 7.2.4). Entries pushed close together may have
+// entered in either order, so the model knows the head only when a single
+// entry can be it, or when a read that no pop overlapped has returned it (the
+// model then moves that entry to the front). A pop of a head the model does
+// not know is pending: it took one of the entries that may lead, and they all
+// stay acceptable heads until the pending pops cover every such entry, or a
+// read that no pop overlapped shows which one the hardware still holds; the
+// entries that may have been ahead of it are the ones the pops took. The
+// window samples the head when a read becomes active, so a read in flight
+// together with a pop (rmgr requests, as issued) returns the head before or
+// after the pop: an entry a pop removed while the read was in flight is kept
+// as an acceptable head until no read is in flight, a pop still in flight when
+// the read completes may have taken the leading entry, and such a read teaches
+// the model nothing about the order.
 class aou_t1_dbg_fifo_chk extends uvm_component;
   `uvm_component_utils(aou_t1_dbg_fifo_chk)
 
@@ -100,7 +108,6 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
 
   protected ent_t            q[AOU_RP_MAX][$];
   protected bit              unsure[AOU_RP_MAX];
-  protected int              read_idx[AOU_RP_MAX];
   protected longint unsigned period_ps;   // M-port clock period; order_cycles in time
   protected bit [31:0]       n_src;
   protected aou_axi_txn      wr_hist[AOU_RP_MAX][$];   // completed remote writes
@@ -109,6 +116,9 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
   protected int unsigned     rd_open[AOU_RP_MAX];      // debug reads issued, not completed
   protected int unsigned     pop_open[AOU_RP_MAX];     // debug pops issued, not completed
   protected ent_t            taken[AOU_RP_MAX][$];     // popped while a debug read was outstanding
+  protected bit              popped[AOU_RP_MAX];       // a pop completed during a debug read
+  protected bit              head_known[AOU_RP_MAX];   // q[r][0] is the hardware's head
+  protected int unsigned     pend[AOU_RP_MAX];         // pops whose entries are still in q[r]
   int unsigned n_overlap;      // debug reads judged with a pop in flight
 
   function new(string name, uvm_component parent);
@@ -116,7 +126,6 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     mport_imp = new("mport_imp", this);
     remote_imp = new("remote_imp", this);
     remote_req_imp = new("remote_req_imp", this);
-    foreach (read_idx[r]) read_idx[r] = -1;
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -140,8 +149,10 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
       wr_hist[r].delete();
       rd_req[r].delete();
       taken[r].delete();
+      popped[r] = 1'b0;
+      head_known[r] = 1'b0;
+      pend[r] = 0;
       unsure[r] = 1'b0;
-      read_idx[r] = -1;
       rd_open[r] = 0;
       pop_open[r] = 0;
     end
@@ -193,6 +204,15 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
   protected function bit may_precede(ent_t a, ent_t b);
     bit [63:0] h = hi_of(a);
     return h == '1 || b.tm <= h + order_ps();
+  endfunction
+
+  // Entry i may be the hardware's head when the first `skip` entries may be
+  // gone: it may have entered before every entry ahead of it from skip on, and
+  // no earlier beat of its own burst is among them.
+  protected function bit may_lead(int unsigned r, int unsigned i, int unsigned skip);
+    for (int unsigned j = skip; j < i; j++)
+      if (q[r][j].src == q[r][i].src || !may_precede(q[r][j], q[r][i])) return 1'b0;
+    return 1'b1;
   endfunction
 
   // The DUT RP a remote plane's requests land on (MAS 3.10.2).
@@ -356,16 +376,16 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     n_push++;
     // In handshake order; a beat published late goes where its handshake was.
     pos = q[r].size();
-    while (pos > 0 && q[r][pos - 1].tm > e.tm) pos--;
+    while (pos > (head_known[r] ? 1 : 0) && q[r][pos - 1].tm > e.tm) pos--;
     q[r].insert(pos, e);
-    if (q[r].size() > depth) begin
+    if (q[r].size() > depth + pend[r]) begin
       // Full: the latest arrival is the one the hardware dropped. A drop leaves
       // which entry was kept unknown when the dropped entry may have entered
       // before any retained entry of another transaction (within the ordering
       // window of the last one, or behind a re-expanded beat whose read has not
       // ended); the beats of one burst are in order.
-      gone = q[r][depth];
-      q[r].delete(depth);
+      gone = q[r][depth + pend[r]];
+      q[r].delete(depth + pend[r]);
       n_drop++;
       foreach (q[r][i])
         if (q[r][i].src != gone.src && may_precede(q[r][i], gone)) unsure[r] = 1'b1;
@@ -391,7 +411,10 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     end
     check_lanes(r, t);
     check_head(r, t);
-    if (rd_open[r] == 0) taken[r].delete();
+    if (rd_open[r] == 0) begin
+      taken[r].delete();
+      popped[r] = 1'b0;
+    end
   endfunction
 
   protected function void dbg_pop(int unsigned r, aou_axi_txn t);
@@ -401,16 +424,59 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
       aou_rule_log::fire("T1-E03", get_type_name());
       `uvm_error(get_type_name(), $sformatf("T1-E03: RP%0d debug FIFO pop BRESP %0d", r, t.bresp))
     end
-    if (q[r].size() != 0) begin
-      int i = (read_idx[r] >= 0 && read_idx[r] < q[r].size()) ? read_idx[r] : 0;
-      // A debug read in flight may have sampled this entry before the pop.
-      if (rd_open[r] != 0) taken[r].push_back(q[r][i]);
-      q[r].delete(i);
+    if (rd_open[r] != 0) popped[r] = 1'b1;
+    if (head_known[r]) begin
+      take_front(r, 1);
+      head_known[r] = 1'b0;
+    end else if (q[r].size() != 0) begin
+      pend[r]++;
+      settle(r);
     end
-    read_idx[r] = -1;
     // A drop the model could not order left the entry kept unknown, not the
     // count: once the pops have drained the model, the FIFO is empty too.
     if (q[r].size() == 0) unsure[r] = 1'b0;
+  endfunction
+
+  // Remove the first n entries. A debug read in flight may have sampled them
+  // before the pop.
+  protected function void take_front(int unsigned r, int unsigned n);
+    repeat (n) begin
+      if (q[r].size() == 0) return;
+      if (rd_open[r] != 0) taken[r].push_back(q[r][0]);
+      void'(q[r].pop_front());
+    end
+  endfunction
+
+  // The pending pops took the hardware's first pend[r] entries: when no entry
+  // beyond those may be among them, they took exactly those.
+  protected function void settle(int unsigned r);
+    int unsigned n = 0;
+    foreach (q[r][i]) if (may_lead(r, i, pend[r] - 1)) n++;
+    if (n > pend[r]) return;
+    take_front(r, n);
+    pend[r] = 0;
+  endfunction
+
+  // A read that no pop overlapped returned entry i: it is the head. The
+  // pending pops took the entries that may have been ahead of it, when there
+  // are exactly as many as pops; otherwise the model cannot tell which.
+  protected function void learn_head(int unsigned r, int unsigned i);
+    ent_t h = q[r][i];
+    ent_t rest[$];
+    int unsigned n = 0;
+    foreach (q[r][j]) begin
+      if (j == i) continue;
+      if (pend[r] != 0 && may_lead(r, j, pend[r] - 1)) n++;
+      else rest.push_back(q[r][j]);
+    end
+    if (n != pend[r]) begin
+      unsure[r] = 1'b1;
+      return;
+    end
+    q[r] = rest;
+    q[r].push_front(h);
+    pend[r] = 0;
+    head_known[r] = 1'b1;
   endfunction
 
   // T1-E19 on a debug read t of RP r.
@@ -459,14 +525,14 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     bit [63:0]   addr;
     bit [1:0]    resp;
     string       exp = "";
-    int unsigned gone = pop_open[r];  // leading entries a pop in flight may have taken
-    read_idx[r] = -1;
+    int unsigned gone = pop_open[r] + pend[r];  // leading entries the pops may have taken
+    bit          overlap = pop_open[r] != 0 || popped[r];
     if (t.data.size() == 0 || unsure[r]) return;
     // A read overlapping a pop returns the head sampled when the read became
     // active, before or after the pop: an entry the pop removed while the read
     // was in flight, or the entry behind the one a pop still in flight takes;
     // the FIFO may have been empty by then, and nothing is predicted for that.
-    if (gone != 0 || taken[r].size() != 0) n_overlap++;
+    if (overlap) n_overlap++;
     if (q[r].size() <= gone) return;
     resolve(r);
     d = t.data[0];
@@ -481,13 +547,10 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     // re-expanded beat before its read ended); a beat whose burst has an
     // earlier beat ahead of it is not one.
     foreach (q[r][i]) begin
-      bit behind = 1'b0;
-      for (int unsigned j = gone; j < i; j++)
-        if (q[r][j].src == q[r][i].src || !may_precede(q[r][j], q[r][i])) behind = 1'b1;
-      if (behind) continue;
+      if (!may_lead(r, i, gone)) continue;
       if (q[r][i].id == id && addr_match(q[r][i], addr) && q[r][i].resp == resp) begin
         if (q[r][i].b_sub) n_unresolved++;
-        read_idx[r] = i;
+        if (!overlap) learn_head(r, i);
         return;
       end
       exp = {exp, exp == "" ? "" : " or ",

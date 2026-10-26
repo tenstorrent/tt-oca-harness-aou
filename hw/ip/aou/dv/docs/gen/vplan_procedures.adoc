@@ -2658,6 +2658,19 @@ queues behind the flood's, the pop completes first and the
 read returns the entry the pop removed, sampled when the
 read became active.
 
+----
++pop_lead=G +wresp_crd=N  each take is an OKAY write on the RP, then the
+----
+
+debug pop and, G cycles after it, the debug read, then a
+second debug read once both have completed. The remote
+die grants N WriteResp credits and returns each crd_delay
+ticks after use: with N = 1 the write's B uses the credit,
+so the pop's B waits for its return while the read, which
+became active after the pop, completes first with the
+entry behind the popped one. The second read, with nothing
+in flight, returns the same entry.
+
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
 *Scenarios.*
@@ -2680,6 +2693,7 @@ read became active.
 | `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64 +pair_writes=3` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64` | `+part=fifo +err_len=7 +agg_en=1 +remote_bytes=32 +pair_gap=64` | 1-2 | `4xmix2144-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64` | `+part=fifo +pop_lead=16 +wresp_crd=1 +crd_delay=256` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32` | `+part=fifo +err_off=32` | 1-2 | `1x256-sp32` | 9.13,9.14
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq` | `+T1_VSEQ=aou_dbg_off_vseq` | 1-2 | `1x512-sp64` | 9.18
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq.dbg_on-5` | `+T1_VSEQ=aou_dbg_off_vseq +dbg_on=5` | 1-2 | `4x512-sp64` | 9.18,9.13,9.14
