@@ -13,16 +13,20 @@
 //         error at the same time: early OKAY, then WRITE_RESP_ERR with ID and
 //         type, and INT_EARLY_RESP_ERR until the last RP is cleared. +mask=1
 //         sets INT_EARLY_RESP_MASK: status still set, interrupt low until the
-//         mask is cleared (interim, BUGS/029).
+//         mask is cleared (the mask gates the pin, not the status: MAS 7.2.2
+//         and interrupts-errors 4).
 //   multi on every RP at once an early-response error and a WriteResp
 //         nobody asked for (AXI_SLV_ID_MISMATCH_EN programmed while the
 //         activation FSM is DISABLED, MAS 7.2.2), then an
 //         ActivateAck in ENABLED (LinkReset). All three interrupts and every
 //         status bit are set; clearing one source leaves the others; the link
-//         is recovered. (An M-port ID mismatch cannot join: BUGS/029.)
+//         is recovered. (An M-port ID mismatch cannot join: the unrequested
+//         response it needs is illegal AXI, and a DUT that never takes it ends
+//         the scenario with a hard reset; aou_id_mismatch_vseq covers it.)
 //   race  a write-1-to-clear of WRITE_RESP_ERR swept across the cycle a new
 //         early-response error sets it: the new error must never be lost
-//         (interim, BUGS/029: a set in the clearing cycle wins).
+//         (interim expectation: no document says whether a set or a clear in
+//         the same cycle wins; the bench requires the set to win).
 // Knobs: +mode=all|w1c|early|multi|race +mask=0|1 +race_span=<cycles>.
 class aou_int_vseq extends aou_err_base_vseq;
   `uvm_object_utils(aou_int_vseq)
@@ -247,7 +251,7 @@ class aou_int_vseq extends aou_err_base_vseq;
     if (masked) begin
       wr(rm.aou_interrupt_mask.int_early_resp_mask, 0);
       check_pin("INT_EARLY_RESP_ERR", 1'b1, "T1-E07",
-                "mask cleared with errors pending (BUGS/029)");
+                "mask cleared with errors pending");
     end
     for (int unsigned r = 0; r < cfg.n_rp; r++) begin
       string what = $sformatf("RP%0d early-response error", r);
@@ -376,7 +380,7 @@ class aou_int_vseq extends aou_err_base_vseq;
       if (irq_rises("INT_EARLY_RESP_ERR") == rises0) begin
         lost++;
         `uvm_error(get_type_name(), $sformatf({"T1-E08: race offset %0d: the early-response error ",
-                   "never raised INT_EARLY_RESP_ERR; the W1C cleared it (BUGS/029)"}, k))
+                   "never raised INT_EARLY_RESP_ERR; the W1C cleared it"}, k))
       end
       if (pin("INT_EARLY_RESP_ERR")) begin
         check_field(rpf("write_early_response", 0, "write_resp_err_id_info"),

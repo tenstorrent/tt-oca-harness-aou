@@ -237,7 +237,7 @@
   title: 'Each INT_ACTIVATE_START source: a pending TX request, the slave side not clean, a remote ActivateReq in DISABLED or ACTIVATE'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '1.13'
-  added: 'AoU Table 27; BUGS/012'
+  added: 'AoU Table 27; v0.8 8.3.3'
   priority: P2
   title: 'Reserved ACTIVATIONOP (4-15) received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
@@ -292,12 +292,12 @@
   title: 'W data presented before its AW on the S port is accepted once the AW arrives'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.15'
-  added: 'AoU 6.4.1; BUGS/012'
+  added: 'AoU 6.4.1; v0.8 8.3.3'
   priority: P2
   title: 'A received message naming an RP at or above RP_COUNT (WriteResp, header MsgCredit, CrdtGrant): the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '9.16'
-  added: 'AoU Table 15, 4.4; BUGS/012'
+  added: 'AoU Table 15, 4.4; v0.8 8.3.3'
   priority: P2
   title: 'Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.

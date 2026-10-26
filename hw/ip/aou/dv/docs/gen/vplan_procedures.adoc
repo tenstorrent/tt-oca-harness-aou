@@ -389,8 +389,8 @@ Class `aou_t1_inject_test` extends `aou_base_test` (`uvm/tests/aou_t1_inject_tes
 
 L3 error injection through the expectation registry: after traffic, the
 remote die sends a CrdtGrant with RsvdZero bits set (AOU-R11) and then a
-message with a reserved MSGTYPE (AOU-R3); the checkers must flag both. The DUT's reaction is unspecified (BUGS/012):
-INT_REQ_LINKRESET is allowed, nothing else.
+message with a reserved MSGTYPE (AOU-R3); the checkers must flag both. The DUT's reaction is left to the
+implementation (AoU v0.8 8.3.3): INT_REQ_LINKRESET is allowed, nothing else.
 
 *Rules named.* `AOU-R11`, `AOU-R3`
 
@@ -2769,12 +2769,12 @@ response off the S port, sets AXI_SLV_BID/RID_MISMATCH_ERR with the ID and
 raises INT_SI0_ID_MISMATCH. With the checker disabled nothing is detected:
 the stray response goes out on the S port, where the bench's manager
 rejects it as a response with nothing outstanding, and SLV_TR_COMPLETE
-stays low afterwards. That handling is undefined (BUGS/029), so there is
-no +slv_en=0 scenario in the lists.
+stays low afterwards. The owners have not defined that handling, so there
+is no +slv_en=0 scenario in the lists.
 With +mask=1 the interrupt mask is set first: the status bit is still set
-but the interrupt stays low until the mask is cleared (interim, BUGS/029:
-interrupt = status & ~mask). Write 1 clears the error, its INFO and the
-interrupt.
+but the interrupt stays low until the mask is cleared (interrupt = status &
+~mask: the mask only suppresses the interrupt signal, MAS 7.2.2). Write 1
+clears the error, its INFO and the interrupt.
 
 ----
 +detect_only=1 (M port only): after the orphan it checks the status, INFO,
@@ -2833,16 +2833,20 @@ early every RP gets a bufferable write whose remote completion is an
 error at the same time: early OKAY, then WRITE_RESP_ERR with ID and
 type, and INT_EARLY_RESP_ERR until the last RP is cleared. +mask=1
 sets INT_EARLY_RESP_MASK: status still set, interrupt low until the
-mask is cleared (interim, BUGS/029).
+mask is cleared (the mask gates the pin, not the status: MAS 7.2.2
+and interrupts-errors 4).
 multi on every RP at once an early-response error and a WriteResp
 nobody asked for (AXI_SLV_ID_MISMATCH_EN programmed while the
 activation FSM is DISABLED, MAS 7.2.2), then an
 ActivateAck in ENABLED (LinkReset). All three interrupts and every
 status bit are set; clearing one source leaves the others; the link
-is recovered. (An M-port ID mismatch cannot join: BUGS/029.)
+is recovered. (An M-port ID mismatch cannot join: the unrequested
+response it needs is illegal AXI, and a DUT that never takes it ends
+the scenario with a hard reset; aou_id_mismatch_vseq covers it.)
 race  a write-1-to-clear of WRITE_RESP_ERR swept across the cycle a new
 early-response error sets it: the new error must never be lost
-(interim, BUGS/029: a set in the clearing cycle wins).
+(interim expectation: no document says whether a set or a clear in
+the same cycle wins; the bench requires the set to win).
 Knobs: +mode=all|w1c|early|multi|race +mask=0|1 +race_span=<cycles>.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.

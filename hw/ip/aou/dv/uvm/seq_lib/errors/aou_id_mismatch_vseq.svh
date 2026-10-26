@@ -27,12 +27,12 @@
 // raises INT_SI0_ID_MISMATCH. With the checker disabled nothing is detected:
 // the stray response goes out on the S port, where the bench's manager
 // rejects it as a response with nothing outstanding, and SLV_TR_COMPLETE
-// stays low afterwards. That handling is undefined (BUGS/029), so there is
-// no +slv_en=0 scenario in the lists.
+// stays low afterwards. The owners have not defined that handling, so there
+// is no +slv_en=0 scenario in the lists.
 // With +mask=1 the interrupt mask is set first: the status bit is still set
-// but the interrupt stays low until the mask is cleared (interim, BUGS/029:
-// interrupt = status & ~mask). Write 1 clears the error, its INFO and the
-// interrupt.
+// but the interrupt stays low until the mask is cleared (interrupt = status &
+// ~mask: the mask only suppresses the interrupt signal, MAS 7.2.2). Write 1
+// clears the error, its INFO and the interrupt.
 // +detect_only=1 (M port only): after the orphan it checks the status, INFO,
 // interrupt and mask, then always ends the scenario with a hard reset instead
 // of the write-1 clear and more traffic.
@@ -120,7 +120,7 @@ class aou_id_mismatch_vseq extends aou_err_base_vseq;
     if (!expect_set) return;
     if (masked) begin
       wr(mask, 0);
-      check_pin(irq, 1'b1, "T1-E07", {what, ": mask cleared with the error pending (BUGS/029)"});
+      check_pin(irq, 1'b1, "T1-E07", {what, ": mask cleared with the error pending"});
       wr(mask, 1);
       check_pin(irq, 1'b0, "T1-E06", {what, ": masked again"});
     end

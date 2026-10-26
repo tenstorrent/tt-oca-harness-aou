@@ -219,8 +219,8 @@ T1-E03,aou_t1_dbg_fifo_chk,,DUT,A debug FIFO read and pop at the configured addr
 T1-E19,aou_t1_dbg_fifo_chk,,DUT,"Every RP-wide lane of every beat of a debug FIFO read equals the head entry, for reads and pops of any length within 4 KB: the window answers each beat and the RP sends no part of the access to memory or splits it by MAX_AxBURSTLEN",MAS software-operation 7.2.4; AXI4 A3.4.1
 T1-E04,aou_id_mismatch_vseq,,DUT,An ID mismatch sets its per-RP error bit and captures the ID; INFO clears with the error,MAS software-operation 7.2.2; interrupts-errors 4
 T1-E06,aou_id_mismatch_vseq / aou_int_vseq,,DUT,An interrupt is high exactly while its status bit is set and unmasked,MAS software-operation 7.2.1
-T1-E07,aou_id_mismatch_vseq / aou_int_vseq,,DUT,Clearing a mask with the status pending raises the interrupt (BUGS/029 interim),MAS software-operation 7.2.1; BUGS/029
-T1-E08,aou_int_vseq,,DUT,A write-1-to-clear in the cycle a new error sets the bit never loses the error (BUGS/029 interim),BUGS/029
+T1-E07,aou_id_mismatch_vseq / aou_int_vseq,,DUT,Clearing a mask with the status pending raises the interrupt (the mask gates the pin, not the status bit),MAS software-operation 7.2.1 and 7.2.2; interrupts-errors 4
+T1-E08,aou_int_vseq,,DUT,A write-1-to-clear in the cycle a new error sets the bit never loses the error,"interim expectation: no document orders a set and a W1C in the same cycle; MAS interrupts-errors 4 (W1C)"
 T1-E09,aou_int_vseq,,DUT,Every provoked early-response error got an early OKAY,MAS architecture 3.7.3
 T1-E10,aou_int_vseq,,DUT,Reading or writing 0 leaves a W1C status bit and its interrupt set; writing 1 clears both,MAS interrupts-errors 4; csr/aou-core.rdl
 T1-E11,aou_int_vseq,,DUT,WRITE_EARLY_RESPONSE_RPn captures the failing ID and type and clears them with WRITE_RESP_ERR,MAS architecture 3.7.3/3.7.9
