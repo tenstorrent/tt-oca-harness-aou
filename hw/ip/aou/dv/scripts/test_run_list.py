@@ -232,7 +232,7 @@ class RunListControl(unittest.TestCase):
         proc, base = self.start([lst], "-j", "3", sleep=0.1)
         rc, _ = self.finish(proc)
         self.assertEqual(rc, 0)
-        baseline = self.rows(os.path.join(base, "results.csv"), base)
+        baseline = self.rows(os.path.join(base, "results_rid.t.csv"), base)
 
         proc, out = self.start([lst], "-j", "1", gated=True)
         self.wait_starts(1)
@@ -247,7 +247,7 @@ class RunListControl(unittest.TestCase):
         self.assertEqual(self.concurrency(), 4)
         self.assertRegex(text, r"\[\d{4}-\d\d-\d\d \d\d:\d\d:\d\d\] ctl: jobs 1 -> 4 \(control file\)")
         self.assertIn("ctl: jobs 1 -> 4", self.log_text())
-        self.assertEqual(self.rows(os.path.join(out, "results.csv"), out), baseline)
+        self.assertEqual(self.rows(os.path.join(out, "results_rid.t.csv"), out), baseline)
         self.assertEqual(len(baseline), 9)
 
     def test_pause_and_resume(self):
@@ -268,7 +268,7 @@ class RunListControl(unittest.TestCase):
         self.assertEqual(rc, 0, text)
         self.assertIn("ctl: pause 0 -> 1", text)
         self.assertIn("ctl: pause 1 -> 0", text)
-        self.assertEqual(len(self.rows(os.path.join(out, "results.csv"), out)), 7)
+        self.assertEqual(len(self.rows(os.path.join(out, "results_rid.t.csv"), out)), 7)
 
     def test_drain(self):
         lst = self.runlist("a", [("t_a", 6)])
@@ -283,7 +283,7 @@ class RunListControl(unittest.TestCase):
         self.assertEqual(len(self.read_events("end")), 2)
         self.assertIn("drained; 4 run(s) not launched", text)
         self.assertEqual(text.count("\nnotrun "), 4)
-        self.assertEqual([r[:2] for r in self.rows(os.path.join(out, "results.csv"), out)[1:]],
+        self.assertEqual([r[:2] for r in self.rows(os.path.join(out, "results_rid.t.csv"), out)[1:]],
                          [["t_a", "1"], ["t_a", "2"]])
 
     def test_ctl_removed_at_exit(self):
@@ -342,11 +342,25 @@ class RunListControl(unittest.TestCase):
         rc, text = self.finish(proc)
         self.assertEqual(rc, 1, text)
         self.assertEqual(self.concurrency(), 2)
-        self.assertEqual(len(self.rows(os.path.join(out, "results_la.csv"), out)), 4)
-        self.assertEqual(len(self.rows(os.path.join(out, "results_lb.csv"), out)), 4)
+        self.assertEqual(len(self.rows(os.path.join(out, "results_la.rid.t.csv"), out)), 4)
+        self.assertEqual(len(self.rows(os.path.join(out, "results_lb.rid.t.csv"), out)), 4)
         self.assertIn("3/3 PASS/XFAIL; results in", text)
         self.assertIn("2/3 PASS/XFAIL; results in", text)
-        self.assertFalse(os.path.exists(os.path.join(out, "results.csv")))
+        self.assertFalse(os.path.exists(os.path.join(out, "results_rid.t.csv")))
+
+    def test_results_kept_per_rid(self):
+        # A second regression of the same list (another RID) leaves the first one's results.
+        lst = self.runlist("a", [("t_a", 2)])
+        out = os.path.join(self.dir, f"out{self.n + 1}")
+        os.makedirs(out)
+        with open(os.path.join(out, "results_rid.old.csv"), "w", encoding="utf-8") as fh:
+            fh.write("test,seed,plusargs,status,plan_ids,run_dir\nt_a,1,,FAIL,1.1,x\n")
+        proc, out = self.start([lst], "-j", "2", sleep=0.2)
+        rc, text = self.finish(proc)
+        self.assertEqual(rc, 0, text)
+        self.assertEqual(len(self.rows(os.path.join(out, "results_rid.t.csv"), out)), 3)
+        self.assertEqual(len(self.rows(os.path.join(out, "results_rid.old.csv"), out)), 2)
+        self.assertEqual(run_list.results_name("datapath", "g1"), "results_datapath.rid.g1.csv")
 
     def test_priority_and_queue(self):
         lst = self.runlist("a", [("t_a", 4)])
@@ -388,7 +402,7 @@ class RunListControl(unittest.TestCase):
         rc, text = self.finish(proc)
         self.assertEqual(rc, 0, text)
         self.assertNotIn("XPASS+XPASS", text)
-        self.assertEqual([r[3] for r in self.rows(os.path.join(out, "results.csv"), out)[1:]],
+        self.assertEqual([r[3] for r in self.rows(os.path.join(out, "results_rid.t.csv"), out)[1:]],
                          ["PASS+XPASS", "PASS+XPASS"])
 
     def make_args(self):

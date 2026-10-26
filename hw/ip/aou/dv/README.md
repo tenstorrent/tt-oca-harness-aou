@@ -312,8 +312,9 @@ are tuned from.
 `scripts/run_list.py` runs every scenario and seed of a testlist
 (`testlists/*.toml`; default: the bench's aggregate, `testlists/all.toml` for
 T1) through `make run`, at most `-j` at a time, and writes
-`out/<build>/results.csv` (one `results_<list>.csv` per included list with
-`--per-list`). `--items <group|scenario>...` picks groups (`smoke`, `ci`, `g1a`,
+`out/<build>/results_rid.<rid>.csv` (one `results_<list>.rid.<rid>.csv` per
+included list with `--per-list`); the RID in the name means a later regression
+of the same lists never overwrites an earlier one's results. `--items <group|scenario>...` picks groups (`smoke`, `ci`, `g1a`,
 `functional`, ...) or scenario names; `--target <CONFIG>` picks the build and
 skips scenarios pinned to another target; `--reseed N` caps the seeds per
 scenario. `python3 scripts/check_testlists.py` validates the lists against the
@@ -447,7 +448,10 @@ make cov_report COV=1
 
 Only runs whose verdict is PASS count: `make run` writes each verdict to
 `<run>/verdict.txt`, and `cov_report` skips FAIL, XFAIL and unjudged runs,
-printing how many it merged and excluded.
+printing how many it merged and excluded. It merges every passing run under
+`out/<build>/`; `COV_RID=<rid>` (`make cov_report COV=1 COV_RID=cov4`) takes only
+the runs of that RID, for the T1 and the folded-in register runs alike, so a
+report never mixes two regressions.
 
 The register bench takes the same `CONFIG` as T1, so it builds the same DUT
 parameters, and `make cov_report TB=t1` folds in its passing runs from the same
@@ -564,7 +568,11 @@ runs, with their bugs), failing, blocked (only `blocked:` entries list it) or no
 covered, followed by per-section and total counts. As for coverage, only PASS
 counts. `make compare BASELINE=<dir>` compares the `results*.csv` under `out/`
 with a kept baseline and reports every run whose verdict got worse
-(`scripts/compare_results.py`). It reads files only, so it needs no LSF. `PLAN_OUT=<dir>` reads another
+(`scripts/compare_results.py`). A run is matched by build (a `-cov` in the build
+name is ignored, so a coverage build compares with a plain one), test, plusargs
+and seed; a run that occurs twice on a side (two lists running the same test and
+seed) is a separate run, paired by occurrence. `COMPARE_OPTS='--base-rid <b>
+--after-rid <a>'` (or `--rid` for both) compares only those regressions' runs. It reads files only, so it needs no LSF. `PLAN_OUT=<dir>` reads another
 `out/`, and `PLAN_STATUS_OPTS=--judge` also judges runs that have no
 `verdict.txt` (`scripts/plan_status.py --format csv` gives CSV).
 

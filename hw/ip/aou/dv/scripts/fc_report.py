@@ -9,7 +9,7 @@ monitors bound to the DUT, cov/aou_axi4_coverage_mod.sv), which is read as
 groups axi4.<interface>.<covergroup>. A bin counts as covered when any passing
 run hit it; bins are counted here, not by a simulator's covergroup engine, so
 VCS and Verilator reports compare bin for bin. Only PASS runs count
-(passing_runs.py).
+(passing_runs.py); --rid RID takes only that regression's runs.
 
   fc_report.py out/vcs-t1-1x512-sp64-cov -o out/vcs-t1-1x512-sp64-cov/merged/fc
 
@@ -127,8 +127,8 @@ def pct(hit, total):
     return 100.0 * hit / total if total else 0.0
 
 
-def merge(out_dir):
-    runs, counts = passing_runs.scan(out_dir)
+def merge(out_dir, rid=None):
+    runs, counts = passing_runs.scan(out_dir, rid)
     db = new_db()
     no_data = []
     for run in runs:
@@ -289,10 +289,11 @@ def main():
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("out_dir", help="out/<build>, holding the run directories")
     ap.add_argument("-o", "--report-dir", required=True)
+    ap.add_argument("--rid", help="only the runs of this RID (default: every run)")
     args = ap.parse_args()
 
     build = os.path.basename(os.path.normpath(args.out_dir))
-    db, counts = merge(args.out_dir)
+    db, counts = merge(args.out_dir, args.rid)
     print(passing_runs.summary(counts))
     if not db["groups"]:
         sys.exit("fc_report: no fc.json in the passing runs; run them with COV=1")

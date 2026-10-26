@@ -10,6 +10,11 @@ run` writes each run's check_run.py verdict to <run>/verdict.txt.
   passing_runs.py out/vcs-cov                          # run directories
   passing_runs.py out/vcs-cov --file coverage.dat      # <run>/coverage.dat that exist
   passing_runs.py out/vcs-cov --names --prefix DB/     # DB/<run name>, for urg -tests
+  passing_runs.py out/vcs-cov --rid cov4               # only the runs of RID cov4
+
+Without --rid every run under out/<build>/ counts, whichever regression made
+it; with --rid only <test>.rid.<RID>.seed.* directories do, so one merge never
+mixes the runs of two regressions.
 """
 
 import argparse
@@ -18,11 +23,13 @@ import os
 import sys
 
 
-def scan(out_dir):
-    """(passing run directories, run count per verdict) for the runs under out_dir."""
+def scan(out_dir, rid=None):
+    """(passing run directories, run count per verdict) for the runs under out_dir,
+    only those of RID rid when it is given."""
     counts = {"PASS": 0, "XFAIL": 0, "FAIL": 0, "XPASS": 0, "unjudged": 0}
     passing = []
-    for run in sorted(glob.glob(os.path.join(out_dir, "*.rid.*"))):
+    pattern = f"*.rid.{glob.escape(rid)}.seed.*" if rid else "*.rid.*"
+    for run in sorted(glob.glob(os.path.join(out_dir, pattern))):
         if not os.path.isdir(run):
             continue
         verdict = "unjudged"
@@ -53,9 +60,10 @@ def main():
     ap.add_argument("--file", help="print <run>/<FILE> (glob allowed) instead of the run directory")
     ap.add_argument("--names", action="store_true", help="print run names instead of paths")
     ap.add_argument("--prefix", default="", help="prefix for each printed name")
+    ap.add_argument("--rid", help="only the runs of this RID (default: every run)")
     args = ap.parse_args()
 
-    passing, counts = scan(args.out_dir)
+    passing, counts = scan(args.out_dir, args.rid)
     for run in passing:
         if args.file:
             for f in sorted(glob.glob(os.path.join(run, args.file))):
@@ -64,7 +72,7 @@ def main():
             print(args.prefix + os.path.basename(run))
         else:
             print(run)
-    print(summary(counts), file=sys.stderr)
+    print(summary(counts) + (f" [rid {args.rid}]" if args.rid else ""), file=sys.stderr)
 
 
 if __name__ == "__main__":

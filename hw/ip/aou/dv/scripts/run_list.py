@@ -14,13 +14,16 @@ lists define). A scenario carries seeds seed..seed+reseed-1 (--reseed N caps
 that at N). A scenario whose target differs from --target is skipped (TB=t1 and
 reg), as is one tagged `blocked` (its reason is in testlists/plan_ids.yaml).
 Each run is judged by scripts/check_run.py (make run calls it); results go to
-out/<build>/results.csv with the scenario name, its test class and plan IDs.
+out/<build>/results_rid.<rid>.csv with the scenario name, its test class and
+plan IDs. The RID in the name keeps a later regression of the same lists from
+overwriting them; the results*.csv readers (compare_results.py, --order
+failed-first, the CI artifacts) take every such file.
 The build must exist (make build ... first); it is never rebuilt here, but a
 build older than its sources or compile defines is reported once, loudly, at
 the start (make stale-check).
 Several testlists share one pool of -j runs; with --per-list each list a
 scenario is defined in (an area of all.toml, say) gets its own
-results_<list>.csv and summary line.
+results_<list>.rid.<rid>.csv and summary line.
 Exit status 0 when every run is PASS or XFAIL and drain left none out.
 """
 
@@ -351,9 +354,15 @@ def modify_pending(ctl, hooks, running, key, value):
         ctl.log(f"ctl: {' '.join(cmd)}: {msg}")
 
 
-def write_results(log, out_dir, name, group):
+def results_name(name, rid):
+    """results_<list>.rid.<rid>.csv, or results_rid.<rid>.csv for all lists in one: one
+    file per RID, never overwritten by another regression's run of the same list."""
+    return f"results_{name}.rid.{rid}.csv" if name else f"results_rid.{rid}.csv"
+
+
+def write_results(log, out_dir, name, rid, group):
     rows = sorted((r.result() for r in group), key=lambda r: (r[0], r[2], int(r[1]) if r[1].isdigit() else r[1]))
-    csv_path = os.path.join(out_dir, f"results_{name}.csv" if name else "results.csv")
+    csv_path = os.path.join(out_dir, results_name(name, rid))
     with open(csv_path, "w", newline="", encoding="utf-8") as fh:
         w = csv.writer(fh)
         w.writerow(["test", "seed", "plusargs", "status", "plan_ids", "run_dir", "name"])
@@ -536,9 +545,9 @@ def main():
     bad = bool(notrun)
     if args.per_list:
         for i, name in enumerate(names):
-            bad |= write_results(log, out_dir, name, [r for r in results if r.lst == i])
+            bad |= write_results(log, out_dir, name, args.rid, [r for r in results if r.lst == i])
     else:
-        bad |= write_results(log, out_dir, None, results)
+        bad |= write_results(log, out_dir, None, args.rid, results)
     return 1 if bad else 0
 
 

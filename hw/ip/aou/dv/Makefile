@@ -425,7 +425,7 @@ help:
 	  'TB=t1|reg [CONFIG=<name>]  T1 / register bench build configuration, a [targets.<name>]' \
 	  '                           of aou_sim_cfg.toml (default $(shell $(SIM_CFG) default-target))' \
 	  'make configs               List the build configurations (CONFIG names and parameters)' \
-	  'make cov_report            Merge and summarise coverage from COV=1 runs (runs fc_report)' \
+	  'make cov_report            Merge and summarise coverage from COV=1 runs (runs fc_report; COV_RID=<rid>: one regression)' \
 	  'make fc_report             Functional coverage of the passing COV=1 runs (merged/fc/)' \
 	  'make plan_status           Test-plan status from the testlists and out/ (out/plan_status.md)' \
 	  'make compare BASELINE=<d>  Compare the results*.csv under out/ with those under <d>' \
@@ -549,7 +549,10 @@ check-public:
 	python3 -I $(UVM_ROOT)/scripts/check_public.py --range $(PUBLIC_BASE)..HEAD
 
 # Coverage merges passing runs only (verdict.txt says PASS); see AGENTS.md.
-PASSING = python3 $(UVM_ROOT)/scripts/passing_runs.py $(OUT_DIR)
+# COV_RID=<rid> merges only that regression's runs (default: every run in out/<build>/).
+COV_RID ?=
+COV_RID_OPT = $(if $(COV_RID),--rid $(COV_RID))
+PASSING = python3 $(UVM_ROOT)/scripts/passing_runs.py $(OUT_DIR) $(COV_RID_OPT)
 # T1 reports also take the register bench's passing runs from the same SIM/CONFIG and the
 # same RTL (RTL_PATCH build suffix), so the DUT parameters match (VCS maps them onto
 # COV_MAP_MODULE). The report stops if that build has no runs; COV_WITH= leaves it out.
@@ -558,7 +561,7 @@ COV_MAP_MODULE ?= AOU_CORE_TOP
 COV_WITH_BUILD = $(SIM)-$(COV_WITH)-$(CONFIG)-cov$(if $(RTL_PATCH),-fix-$(RTL_PATCH_NAME))
 COV_WITH_OUT = $(if $(COV_WITH),$(wildcard $(UVM_ROOT)/out/$(COV_WITH_BUILD)))
 COV_WITH_VDB = $(UVM_ROOT)/build/$(COV_WITH_BUILD)/cov/simv.vdb
-PASSING_WITH = python3 $(UVM_ROOT)/scripts/passing_runs.py $(COV_WITH_OUT)
+PASSING_WITH = python3 $(UVM_ROOT)/scripts/passing_runs.py $(COV_WITH_OUT) $(COV_RID_OPT)
 cov_report:
 	$(if $(and $(COV_WITH),$(if $(COV_WITH_OUT),,1)),@echo "cov_report: no $(COV_WITH) bench runs in out/$(COV_WITH_BUILD); run that build's list or set COV_WITH=" >&2; exit 1)
 	@mkdir -p $(REPORT_DIR)
@@ -570,7 +573,7 @@ cov_report:
 # Functional coverage (every testbench covergroup and the AXI4 monitors), bins
 # union-merged over the passing runs: out/<build>/merged/fc/ (scripts/fc_report.py).
 fc_report:
-	python3 $(UVM_ROOT)/scripts/fc_report.py $(OUT_DIR) -o $(REPORT_DIR)/fc
+	python3 $(UVM_ROOT)/scripts/fc_report.py $(OUT_DIR) -o $(REPORT_DIR)/fc $(COV_RID_OPT)
 
 # Reads files only (no LSF): run lists, run verdicts under PLAN_OUT and the plan items.
 # PLAN_STATUS_OPTS=--judge also judges runs that have no verdict.txt.

@@ -7,8 +7,17 @@ Each side is a directory tree (or explicit CSV files) holding results*.csv as
 scripts/run_list.py and scripts/judge_run.py write them. A run is identified by
 (test, plusargs, TB, CONFIG, seed), where TB and CONFIG come from the CSV's
 build directory name <sim>-<tb>-<config>[-assert] (--sim-agnostic drops the
-simulator from the key; by default a simulator compares with itself). Plusargs
-are compared as a set of tokens, so their order does not matter.
+simulator from the key; by default a simulator compares with itself). A `-cov`
+in the build name is dropped, so a coverage build compares with a plain one.
+Plusargs are compared as a set of tokens, so their order does not matter.
+
+The same key can occur more than once on a side: a test, seed and plusargs
+that two lists both run, or a coverage and a plain build of one config. Those
+are separate runs, paired by occurrence (the n-th on one side with the n-th on
+the other, in file and row order); an unpaired one is dropped or new.
+--rid (or --base-rid/--after-rid) keeps only the runs of that RID, read from
+each row's run directory (<test>.rid.<RID>.seed...), so results of different
+regressions in one out/ don't mix.
 
 Degradations (exit status 1 when there is one):
   PASS -> XFAIL/FAIL/missing, XFAIL -> FAIL/missing, and a run that is on the
@@ -19,7 +28,8 @@ Reported separately, not degradations:
   on the after side only (new).
 
 Usage:
-  compare_results.py BASELINE AFTER [-o report.md] [--sim-agnostic]
+  compare_results.py BASELINE AFTER [-o report.md] [--sim-agnostic] [--rid RID]
+  compare_results.py BASELINE AFTER --base-rid main1 --after-rid foo1
   compare_results.py --baseline b/results_g1a.csv --after a/results_g1a.csv
 """
 
@@ -32,6 +42,8 @@ from collections import Counter
 
 BUILD_RE = re.compile(r"^(?P<sim>[a-z]+)-(?P<tb>t1|reg|l3_unit|axi_selftest)(?:-(?P<config>.+))?$")
 RANK = {"PASS": 0, "XFAIL": 1, "FAIL": 2}
+RID_RE = re.compile(r"\.rid\.(?P<rid>[^/]+?)\.seed\.")
+COV_RE = re.compile(r"-cov(?=-|$)")
 
 
 def find_csvs(paths):
@@ -51,7 +63,13 @@ def build_of(csv_path):
     m = BUILD_RE.match(os.path.basename(os.path.dirname(os.path.abspath(csv_path))))
     if not m:
         return "", "", ""
-    return m.group("sim"), m.group("tb"), m.group("config") or ""
+    return m.group("sim"), m.group("tb"), COV_RE.sub("", m.group("config") or "")
+
+
+def rid_of(row):
+    """The RID of a results row, from its run directory ('' when there is none)."""
+    m = RID_RE.search(os.path.basename(row.get("run_dir") or ""))
+    return m.group("rid") if m else ""
 
 
 def split_status(status):
@@ -69,27 +87,30 @@ def norm_args(text):
     return " ".join(sorted(a for a in (text or "").split() if not REDUNDANT_ARG.match(a)))
 
 
-def load(paths, sim_agnostic=False):
-    """{key: row} over every CSV; key = (sim?, tb, config, test, plusargs, seed)."""
+def load(paths, sim_agnostic=False, rid=None):
+    """({key: row}, duplicated run keys) over every CSV, only RID's runs when rid is given;
+    key = (sim?, tb, config, test, plusargs, seed, n), n counting the occurrences
+    of one run key from 1."""
     rows = {}
-    dups = []
+    seen = Counter()
     for path in find_csvs(paths):
         sim, tb, config = build_of(path)
         with open(path, newline="", encoding="utf-8") as fh:
             for r in csv.DictReader(fh):
-                key = ("" if sim_agnostic else sim, tb, config, r["test"], norm_args(r.get("plusargs")),
+                if rid is not None and rid_of(r) != rid:
+                    continue
+                run = ("" if sim_agnostic else sim, tb, config, r["test"], norm_args(r.get("plusargs")),
                        r["seed"])
-                r = dict(r, sim=sim, tb=tb, config=config, csv=path)
-                if key in rows:
-                    dups.append(key)
-                rows[key] = r
-    return rows, dups
+                seen[run] += 1
+                rows[run + (seen[run],)] = dict(r, sim=sim, tb=tb, config=config, csv=path)
+    return rows, sorted(k for k, n in seen.items() if n > 1)
 
 
 def label(key):
-    sim, tb, config, test, plusargs, seed = key
+    sim, tb, config, test, plusargs, seed, n = key
     build = "-".join(x for x in (sim, tb, config) if x)
-    return f"{build} {test} seed={seed}" + (f" {plusargs}" if plusargs else "")
+    return (f"{build} {test} seed={seed}" + (f" {plusargs}" if plusargs else "")
+            + (f" (#{n})" if n > 1 else ""))
 
 
 def compare(base, after):
@@ -133,7 +154,8 @@ def report(result, base_n, after_n, dups):
     lines += ["| Category | Runs |", "|---|---|"]
     lines += [f"| {title} | {len(result[cat])} |" for cat, title in TITLES]
     if dups:
-        lines += ["", f"Duplicate keys (last one wins): {len(dups)}"]
+        lines += ["", f"Runs repeated on a side (same test, seed and plusargs; paired by occurrence): "
+                  f"{len(dups)}"]
     for cat, title in TITLES:
         if not result[cat]:
             continue
@@ -155,6 +177,9 @@ def main(argv=None):
                     help="more after trees/CSVs (repeatable)")
     ap.add_argument("--sim-agnostic", action="store_true",
                     help="compare across simulators (drop the simulator from the run key)")
+    ap.add_argument("--rid", help="only the runs of this RID, on both sides")
+    ap.add_argument("--base-rid", help="only the baseline runs of this RID (overrides --rid)")
+    ap.add_argument("--after-rid", help="only the after runs of this RID (overrides --rid)")
     ap.add_argument("-o", "--output", help="write the Markdown report here as well")
     args = ap.parse_args(argv)
     b_paths = ([args.baseline] if args.baseline else []) + args.baseline_paths
@@ -162,16 +187,17 @@ def main(argv=None):
     if not b_paths or not a_paths:
         ap.error("a baseline and an after side are required")
 
-    base, dups_b = load(b_paths, args.sim_agnostic)
-    after, dups_a = load(a_paths, args.sim_agnostic)
-    if not base:
-        print("compare_results: no results*.csv on the baseline side", file=sys.stderr)
-        return 2
-    if not after:
-        print("compare_results: no results*.csv on the after side", file=sys.stderr)
-        return 2
+    b_rid = args.base_rid if args.base_rid is not None else args.rid
+    a_rid = args.after_rid if args.after_rid is not None else args.rid
+    base, dups_b = load(b_paths, args.sim_agnostic, b_rid)
+    after, dups_a = load(a_paths, args.sim_agnostic, a_rid)
+    for side, rows, rid in (("baseline", base, b_rid), ("after", after, a_rid)):
+        if not rows:
+            print(f"compare_results: no results*.csv rows on the {side} side"
+                  + (f" for rid {rid}" if rid is not None else ""), file=sys.stderr)
+            return 2
     result = compare(base, after)
-    text = report(result, len(base), len(after), dups_b + dups_a)
+    text = report(result, len(base), len(after), sorted(set(dups_b) | set(dups_a)))
     print(text, end="")
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:

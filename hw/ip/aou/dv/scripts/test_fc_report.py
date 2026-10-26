@@ -42,8 +42,8 @@ BIN cg_aw|cx_size_x_len|bytes_0_X_beat_1 1
 
 
 class FcReportTest(unittest.TestCase):
-    def run_dir(self, root, name, verdict, hits):
-        d = os.path.join(root, f"{name}.rid.00.seed.1.time.0.uid.0")
+    def run_dir(self, root, name, verdict, hits, rid="00"):
+        d = os.path.join(root, f"{name}.rid.{rid}.seed.1.time.0.uid.0")
         os.makedirs(d)
         with open(os.path.join(d, "verdict.txt"), "w", encoding="utf-8") as fh:
             fh.write(f"{verdict}: sim.log\n")
@@ -73,6 +73,18 @@ class FcReportTest(unittest.TestCase):
             fc_report.write_holes(holes, db)
             self.assertIn("    cp: b\n", holes.getvalue())
             self.assertIn("    cp_b_resp: slverr\n", holes.getvalue())
+
+    def test_rid(self):
+        # Runs of two regressions in one out/<build>: --rid merges only one of them.
+        with tempfile.TemporaryDirectory() as root:
+            self.run_dir(root, "t1", "PASS", [2, 0], rid="a")
+            self.run_dir(root, "t1", "PASS", [0, 4], rid="a.b")
+            self.run_dir(root, "t2", "FAIL", [0, 5], rid="a")
+            db, counts = fc_report.merge(root, "a")
+            self.assertEqual((counts["PASS"], counts["FAIL"]), (1, 1))
+            self.assertEqual(db["groups"]["g"]["points"]["cp"]["bins"]["b"]["hits"], 0)
+            _, counts = fc_report.merge(root)
+            self.assertEqual((counts["PASS"], counts["FAIL"]), (2, 1))
 
     def test_illegal_and_spec(self):
         with tempfile.TemporaryDirectory() as root:
