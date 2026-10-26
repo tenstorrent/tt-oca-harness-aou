@@ -4,8 +4,8 @@
 // Address corners in both directions at once (plan 7.12-7.15): +dp_addr=
 // zero|top|sweep|4k runs aou_addr_seq on the local manager (to the remote
 // memory) and the remote manager (to the local memory) of RP0. A burst
-// across 4KB is illegal AXI4 and is not sent; what the DUT does with one
-// from the remote die is unspecified (BUGS/026 draft).
+// across 4KB is illegal AXI4 (and the AoU v0.8 Basic Profile binds the
+// remote die to that), so it is not sent and the DUT owes no result for one.
 class aou_addr_test extends aou_dp_base_test;
   `uvm_component_utils(aou_addr_test)
 

@@ -8,8 +8,8 @@
 // its AXI messages. The env's aou_t1_attr_chk checks the attributes on both
 // ends of the link and FLEX 0 from the DUT, the scoreboard the data (FLEX the
 // DUT receives must be ignored; it has no USER ports), and xfer_cov.attr_cg
-// shows every value was carried. FLEX[15:12] (v0.7 PROFEXTLEN) stays 0,
-// BUGS/027.
+// shows every value was carried. FLEX[15:12] (v0.7 PROFEXTLEN) stays 0: the
+// Base Profile ignores it and v0.8 removes it.
 // +attr_excl=1 (plan 4.25, 5.23) adds the exclusive rounds of aou_attr_vseq
 // first; aou_t1_attr_chk checks each exclusive response is the subordinate's,
 // and xfer_cov.excl_cg counts EXOKAY and failed exclusives each way.

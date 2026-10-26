@@ -401,7 +401,7 @@
   title: 'Retrain while ENABLED with traffic is transparent to AoU (interim expectation)'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '18.14'
-  added: 'UCIe r1.1 8.3.3.7, Table 8-2; BUGS/002, BUGS/037'
+  added: 'UCIe r1.1 8.3.3.7, Table 8-2; BUGS/002'
   priority: P2
   title: 'LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.

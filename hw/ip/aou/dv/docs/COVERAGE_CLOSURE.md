@@ -203,9 +203,9 @@ with no new run.
 - **xfail-only (16):**
   - 1.3, 1.8, 1.9 (BUGS/019/013/020/023)
   - 2.7 (BUGS/010)
-  - 9.5 (BUGS/030)
+  - 9.5 (a remote RX credit overrun: illegal peer stimulus, test since removed)
   - 9.9, 9.10, 19.8 (BUGS/029)
-  - 12.13 (BUGS/031)
+  - 12.13 (an asymmetric DEST_RP: illegal configuration, test since removed)
   - 14.5 (tenstorrent/tt-oca-harness-aou#90)
   - 20.4, 20.10, 20.12, 20.13, 20.15, 20.16 (reg bench, BUGS/003/004/007)
 - **blocked (1):** 9.8.
@@ -465,7 +465,7 @@ can't mean what it says. They are listed for owner review because the denominato
 | `l2.cg_link_state cp_tr l1_active` | L1 exits through Retrain (r1.1 §8.3.3, the PM exit path L1→Retrain→Active); a direct L1→Active isn't an FDI transition | remove; `l1_retrain` + `retrain_active` already cover the exit | −1 |
 | `l3.cg_act_fsm` | Samples the model's FSM. It has v0.8 ERROR bins but no v0.7 LinkReset→DISABLED bins | add `activate_disabled_lr`, `enabled_disabled_lr`, `deactivate_disabled_lr` (the model returns to DISABLED on link loss / LinkReset). Tag the four `*_error` bins v0.8 (§3.3) | +3 |
 | `l3.cg_act_op x_op_dir_legal` | `reserved,*,legal` can't happen. `*,rx,illegal` = the DUT sending an illegal op, which is a checker hit (AOU-R40) and can't occur in a PASS run. `*,tx,illegal` are never sampled because injection bypasses `link_ctrl` (that is why 1.5 is "covered" with empty illegal bins). | drop `reserved,*,legal` and `*,rx,illegal`; sample `tx,illegal` (op and reserved) from the L3 inject path | −7 |
-| `l3.cg_credit x_ev_cls_dir` | `saturate`/`overflow` are sampled only in RX (the DUT over-granting or over-running the model, which are DUT bugs). TX `saturate`/`overflow` and RX `zero_stall` are never sampled. The group describes the model, not the DUT (gaps B-a). | Re-home: keep `zero_stall,tx` (the model waits on DUT credit). Add DUT-side events: `dut_zero_stall` (the DUT holds a message the model hasn't credited), `dut_saturate` (the DUT absorbs a model over-grant, `+overgrant`), `inj_overflow,tx` (negative test: the model sends without credit, BUGS/030). Make RX overflow an illegal_bin (AOU-R16 already checks it). | −27 / +15 |
+| `l3.cg_credit x_ev_cls_dir` | `saturate`/`overflow` are sampled only in RX (the DUT over-granting or over-running the model, which are DUT bugs). TX `saturate`/`overflow` and RX `zero_stall` are never sampled. The group describes the model, not the DUT (gaps B-a). | Re-home: keep `zero_stall,tx` (the model waits on DUT credit). Add DUT-side events: `dut_zero_stall` (the DUT holds a message the model hasn't credited), `dut_saturate` (the DUT absorbs a model over-grant, `+overgrant`), `inj_overflow,tx` (negative test: the model sends without credit; AoU v0.8 §6.1 binds only the sender, so the DUT's reaction is undefined). Make RX overflow an illegal_bin (AOU-R16 already checks it). | −27 / +15 |
 | `l3.cg_msg x_kind_rp_dir` | Activation and CrdtGrant are Misc messages with no RP field (AoU Table 15/27; CrdtGrant carries every RP). `act,rp[1],tx` is hit today, which means the sample reads a non-wire field. | restrict `act`/`crdt` to one RP-less bin per direction | −12 (one hit removed) |
 | `l3.cg_flit_layout x_size_span g1,multi_flit` | A 1-granule message can't span | ignore | −1 |
 | `xfer.chan_cg cp_event w_taken_before_aw` | The DUT never takes W data before the burst's AW: `AOU_EARLY_BRESP_CTRL_AWCACHE` holds `WREADY` until the AW is accepted with early response on (table gating) and, since PR #89, off as well (`w_write_aw_credit`; MAS 3.7.5). `w_before_aw` still records the manager presenting W first (plan 4.31). | ignore | −1 |
@@ -578,11 +578,11 @@ The full gap tables were kept with the review notes; this section summarises the
 **Wait for a fix or a spec answer:**
 - 1.3, 1.8, 1.9 (BUGS/019; fix verified on `bugfix/BUGS-019-activation-linkreset-hold`)
 - 2.7 (BUGS/010)
-- 9.5 (BUGS/030; retitle: it is a remote RX credit overrun, not an "internal negative count")
-- 12.13 (BUGS/031)
 
 **Drop candidates (owner decision, via `test_plan_corrections.yaml`):**
 - 9.8: the RTL has no RX incomplete-flit timeout, and FDI completes or cancels flits.
+- 9.5: a remote RX credit overrun is a peer credit violation; AoU v0.8 §6.1 binds only the
+  sender and leaves the receiver's reaction undefined.
 - 22.5: the bench integrates only AOU_TOP.
 - 1.4: PropertyReq on ActivateReq has no RTL effect and is gone in v0.8.
 - 12.13: an asymmetric DEST_RP is a misconfiguration MAS 3.10.1 forbids.

@@ -1065,8 +1065,8 @@ the legal AxCACHE encodings, separately for writes and reads
 its AXI messages. The env's aou_t1_attr_chk checks the attributes on both
 ends of the link and FLEX 0 from the DUT, the scoreboard the data (FLEX the
 DUT receives must be ignored; it has no USER ports), and xfer_cov.attr_cg
-shows every value was carried. FLEX[15:12] (v0.7 PROFEXTLEN) stays 0,
-BUGS/027.
+shows every value was carried. FLEX[15:12] (v0.7 PROFEXTLEN) stays 0: the
+Base Profile ignores it and v0.8 removes it.
 
 ----
 +attr_excl=1 (plan 4.25, 5.23) adds the exclusive rounds of aou_attr_vseq
@@ -1634,8 +1634,8 @@ Class `aou_addr_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_addr_tes
 *Purpose.* Address corners in both directions at once (plan 7.12-7.15): +dp_addr=
 zero|top|sweep|4k runs aou_addr_seq on the local manager (to the remote
 memory) and the remote manager (to the local memory) of RP0. A burst
-across 4KB is illegal AXI4 and is not sent; what the DUT does with one
-from the remote die is unspecified (BUGS/026 draft).
+across 4KB is illegal AXI4 (and the AoU v0.8 Basic Profile binds the
+remote die to that), so it is not sent and the DUT owes no result for one.
 
 *Procedure.* Virtual sequence `aou_addr_vseq` (`uvm/seq_lib/stress/aou_addr_vseq.svh`):
 
