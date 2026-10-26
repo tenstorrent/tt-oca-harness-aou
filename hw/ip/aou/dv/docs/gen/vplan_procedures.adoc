@@ -650,7 +650,8 @@ Then traffic runs again, so leaving the idle state is covered too.
 Class `aou_dp_packing_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_packing_test.svh`).
 
 *Purpose.* Message packing (+dp_pack=wresp|crossflit|granule; plan 6.2, 6.9, 11.4,
-11.6, 11.7). aou_msg_stats requires the targeted layout to occur:
+11.6, 11.7). aou_msg_stats reports targeted layouts that did not occur
+(coverage, not an error):
 - wresp: many single-beat remote writes with zero-latency local B, so the
 DUT packs several 1-granule WriteResp into one flit.
 - crossflit: mixed sizes and lengths with the L3 packer allowed to span
@@ -971,12 +972,11 @@ Class `aou_dp_b_zero_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_d
 
 *Purpose.* Issue #64 (plan 16.16): back-to-back single-beat writes with zero delays end
 to end, so the M-port subordinate presents B in the cycle after the AW/W
-handshakes (and R after AR); both directions. The AXI monitors cover the
-zero-cycle case (zero_cg); DP-R01 fails the test if the M port never saw it.
+handshakes (and R after AR); both directions. The AXI monitors count the
+zero-cycle case as coverage (axi.zero_cg); report_phase notes when the M port
+never saw it. That is stimulus quality, never an error.
 
 *Procedure.* The base class's virtual sequence `aou_dp_vseq`, configured by this class and its arguments.
-
-*Rules named.* `DP-R01`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -1591,8 +1591,8 @@ Class `aou_pack_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_pack_tes
 
 *Purpose.* Flit packing in both directions (plan 6.3-6.8, 6.14, 6.18-6.21, 11.1, 11.2,
 11.5, 11.9, 11.14). The remote die's L3 packer runs non-DUT-like policies;
-aou_pack_stats requires the targeted layouts to occur (DP-R01), and the
-scoreboard and L3 rule checks judge them. +pk=:
+aou_pack_stats reports targeted layouts that did not occur (coverage, not
+an error), and the scoreboard and L3 rule checks judge them. +pk=:
 crossflit  every L3 data message longer than split_at (1-7) is forced
 across the flit boundary; sizes 256/512/1024 (+remote_bytes)
 mixed      sparse layout (holes, random order, mixed credit grants) with
@@ -1613,8 +1613,6 @@ twists some modes use: `bursts` makes L3 hold its credited messages back in rand
 while traffic runs, so they leave as dense backlogs (full flits, mixed
 types); `act_cycles` deactivates and reactivates the link between traffic
 phases, so Activation messages meet traffic and credit grants.
-
-*Rules named.* `DP-R01`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 

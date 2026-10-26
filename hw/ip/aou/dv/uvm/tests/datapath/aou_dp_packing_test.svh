@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Message packing (+dp_pack=wresp|crossflit|granule; plan 6.2, 6.9, 11.4,
-// 11.6, 11.7). aou_msg_stats requires the targeted layout to occur:
+// 11.6, 11.7). aou_msg_stats reports targeted layouts that did not occur
+// (coverage, not an error):
 // - wresp: many single-beat remote writes with zero-latency local B, so the
 //   DUT packs several 1-granule WriteResp into one flit.
 // - crossflit: mixed sizes and lengths with the L3 packer allowed to span

@@ -3,8 +3,8 @@
 
 // Flit packing in both directions (plan 6.3-6.8, 6.14, 6.18-6.21, 11.1, 11.2,
 // 11.5, 11.9, 11.14). The remote die's L3 packer runs non-DUT-like policies;
-// aou_pack_stats requires the targeted layouts to occur (DP-R01), and the
-// scoreboard and L3 rule checks judge them. +pk=:
+// aou_pack_stats reports targeted layouts that did not occur (coverage, not
+// an error), and the scoreboard and L3 rule checks judge them. +pk=:
 //   crossflit  every L3 data message longer than split_at (1-7) is forced
 //              across the flit boundary; sizes 256/512/1024 (+remote_bytes)
 //   mixed      sparse layout (holes, random order, mixed credit grants) with

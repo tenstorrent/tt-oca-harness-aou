@@ -23,7 +23,7 @@ class aou_l3_cov extends uvm_object;
 
   // Sampled values; each covergroup samples the members it names.
   int unsigned s_prev, s_cur, s_op, s_dir, s_kind, s_rp, s_start, s_size, s_nmsgs;
-  int unsigned s_misc0, s_misc1, s_carry, s_ev, s_cls;
+  int unsigned s_misc0, s_misc1, s_carry, s_ev, s_cls, s_nwresp;
   bit          s_legal, s_span, s_credit_only;
 
   covergroup cg_act_fsm;
@@ -75,6 +75,20 @@ class aou_l3_cov extends uvm_object;
     x_size_span: cross cp_size, cp_span;
   endgroup
 
+  // A message spanning flits, by kind and direction: which side's packing
+  // carried which message across a flit boundary. Stimulus quality for the
+  // packing scenarios (aou_pack_test +pk=crossflit), never an error: the DUT
+  // may leave granules empty instead (AoU 4.3 "Message Packing").
+  covergroup cg_span;
+    cp_kind: coverpoint s_kind {
+      `AOU_L3_FC_SPAN_KIND(AOU_FC_CG)
+    }
+    cp_dir: coverpoint s_dir {
+      `AOU_FC_DIR_BINS(AOU_FC_CG)
+    }
+    x_kind_dir: cross cp_kind, cp_dir;
+  endgroup
+
   covergroup cg_flit_occ;
     cp_nmsgs: coverpoint s_nmsgs {
       `AOU_L3_FC_NMSGS(AOU_FC_CG)
@@ -97,6 +111,20 @@ class aou_l3_cov extends uvm_object;
     x_nmsgs_dir: cross cp_nmsgs, cp_dir;
   endgroup
 
+  // WriteResp starting in one flit, by direction: how densely each side's
+  // packing shared a flit between write responses. Sampled only for flits that
+  // carry one. Stimulus quality for the packing scenarios (aou_dp_packing_test
+  // +dp_pack=wresp, aou_pack_test +pk=wresp48), never an error.
+  covergroup cg_wresp_flit;
+    cp_nwresp: coverpoint s_nwresp {
+      `AOU_L3_FC_NWRESP(AOU_FC_CG)
+    }
+    cp_dir: coverpoint s_dir {
+      `AOU_FC_DIR_BINS(AOU_FC_CG)
+    }
+    x_nwresp_dir: cross cp_nwresp, cp_dir;
+  endgroup
+
   covergroup cg_credit;
     cp_ev: coverpoint s_ev {
       `AOU_L3_FC_CREDIT_EV(AOU_FC_CG)
@@ -115,7 +143,9 @@ class aou_l3_cov extends uvm_object;
   aou_fc_group fc_act_op;
   aou_fc_group fc_msg;
   aou_fc_group fc_flit_layout;
+  aou_fc_group fc_span;
   aou_fc_group fc_flit_occ;
+  aou_fc_group fc_wresp_flit;
   aou_fc_group fc_credit;
 
   function new(string name = "aou_l3_cov");
@@ -124,7 +154,9 @@ class aou_l3_cov extends uvm_object;
     cg_act_op = new();
     cg_msg = new();
     cg_flit_layout = new();
+    cg_span = new();
     cg_flit_occ = new();
+    cg_wresp_flit = new();
     cg_credit = new();
     fc_declare();
   endfunction
@@ -164,6 +196,12 @@ class aou_l3_cov extends uvm_object;
       p = fc_flit_layout.add_cross("x_size_span", "cp_size cp_span");
       `AOU_L3_FC_X_SIZE_SPAN(AOU_FC_REG)
     end
+    fc_span = db.group("l3.cg_span", fresh);
+    if (fresh) begin
+      p = fc_span.cp("cp_kind"); `AOU_L3_FC_SPAN_KIND(AOU_FC_REG)
+      p = fc_span.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
+      void'(fc_span.add_cross("x_kind_dir", "cp_kind cp_dir"));
+    end
     fc_flit_occ = db.group("l3.cg_flit_occ", fresh);
     if (fresh) begin
       p = fc_flit_occ.cp("cp_nmsgs"); `AOU_L3_FC_NMSGS(AOU_FC_REG)
@@ -173,6 +211,12 @@ class aou_l3_cov extends uvm_object;
       p = fc_flit_occ.cp("cp_credit_only"); `AOU_L3_FC_CREDIT_ONLY(AOU_FC_REG)
       p = fc_flit_occ.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       void'(fc_flit_occ.add_cross("x_nmsgs_dir", "cp_nmsgs cp_dir"));
+    end
+    fc_wresp_flit = db.group("l3.cg_wresp_flit", fresh);
+    if (fresh) begin
+      p = fc_wresp_flit.cp("cp_nwresp"); `AOU_L3_FC_NWRESP(AOU_FC_REG)
+      p = fc_wresp_flit.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
+      void'(fc_wresp_flit.add_cross("x_nwresp_dir", "cp_nwresp cp_dir"));
     end
     fc_credit = db.group("l3.cg_credit", fresh);
     if (fresh) begin
@@ -232,6 +276,10 @@ class aou_l3_cov extends uvm_object;
       s_span = m.span_flits > 1;
       cg_flit_layout.sample();
       fc_flit_layout.sample(int'(s_start), int'(s_size), int'(s_span), int'(s_dir));
+      if (s_span) begin
+        cg_span.sample();
+        fc_span.sample(int'(s_kind), int'(s_dir));
+      end
     end
   endfunction
 
@@ -245,6 +293,13 @@ class aou_l3_cov extends uvm_object;
     cg_flit_occ.sample();
     fc_flit_occ.sample(int'(s_nmsgs), int'(s_misc0), int'(s_misc1), int'(s_carry),
                        int'(s_credit_only), int'(s_dir));
+    s_nwresp = 0;
+    foreach (f.msgs[i])
+      if (f.msgs[i].msg_type == AOU_MT_WRESP && f.msgs[i].start_flit == int'(f.seq)) s_nwresp++;
+    if (s_nwresp != 0) begin
+      cg_wresp_flit.sample();
+      fc_wresp_flit.sample(int'(s_nwresp), int'(s_dir));
+    end
   endfunction
 
   function void sample_credit(int unsigned ev, aou_cred_class_e cls, aou_l3_dir_e dir);

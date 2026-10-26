@@ -3,10 +3,13 @@
 
 // Flit layouts in both directions, rebuilt from where each message travelled
 // (L3 ap_rx_msg: sent by the DUT; ap_tx_msg: sent to the DUT), plus FDI
-// back-to-back runs from the L1 monitor. A test lists what its stimulus must
-// have produced in `req` ("<TX|RX>:<key>" or "<TX|RX>:<key>>=<n>"); check_phase
-// fails it (DP-R01) when a layout never occurred, since the test would then
-// prove nothing. Keys, counted per flit unless noted:
+// back-to-back runs from the L1 monitor. A test lists the layouts it aims for
+// in `req` ("<TX|RX>:<key>" or "<TX|RX>:<key>>=<n>"); report_phase lists those
+// that never occurred. That is stimulus quality, not a DUT check: a missed
+// layout is a coverage hole (l3.cg_span and the other aou_l3_cov groups count
+// it), never an error. On the TX side the layout is the DUT's own packing
+// choice, which AoU leaves open (granules may go empty; a message may, not
+// must, span flits). Keys, counted per flit unless noted:
 //   span_<W|F|R><g>  a WriteData/WriteDataFull/ReadData of g granules spans flits (per message)
 //   span_wdata       a WriteData or WriteDataFull of any size spans flits (per message)
 //   single           exactly one MsgStart, no continuation
@@ -156,6 +159,9 @@ class aou_pack_stats extends uvm_component;
     while (tb_fifo.try_get(m)) take(m, 1);
     layouts(0);
     layouts(1);
+  endfunction
+
+  function void report_phase(uvm_phase phase);
     foreach (req[i]) begin
       string r = req[i];
       int d = (r.substr(0, 1) == "TX") ? 0 : 1;
@@ -171,12 +177,10 @@ class aou_pack_stats extends uvm_component;
       end
       have = cnt[d].exists(key) ? cnt[d][key] : 0;
       if (have < need)
-        `uvm_error(get_type_name(), $sformatf("DP-R01: DUT %s: %s is %0d, scenario needs %0d",
-                                              dname(d), key, have, need))
+        `uvm_info(get_type_name(),
+                  $sformatf("not reached: DUT %s: %s is %0d, scenario aims for %0d",
+                             dname(d), key, have, need), UVM_LOW)
     end
-  endfunction
-
-  function void report_phase(uvm_phase phase);
     for (int d = 0; d < 2; d++) begin
       string s = "";
       foreach (cnt[d][k]) s = {s, $sformatf(" %s=%0d", k, cnt[d][k])};
