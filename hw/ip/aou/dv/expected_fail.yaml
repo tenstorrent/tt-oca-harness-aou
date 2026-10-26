@@ -583,3 +583,44 @@
   check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
   seed_dependent: true
   note: credits after DeactivateAck; which seeds reach it depends on the traffic at deactivation
+
+# aou_lp_mode_traffic_test: credits after the DUT's own DeactivateAck when the remote die
+# deactivates after a traffic burst.
+- test: aou_lp_mode_traffic_test
+  bug: BUGS/009
+  check_re: 'AOU-R29: AOU_FDI_CHECKER VIOL_ADV_ORDER LP\(DUT->peer\) .* CREDIT_MANAGE=1'
+  seed_dependent: true
+  note: >-
+    CREDIT_MANAGE=1: the DUT returns RDATA credit after its own DeactivateAck, until its own
+    DeactivateReq (1x512-sp64 seed 3: DeactivateAck in LP flit 2463 at 23036 ns, RDATA credit
+    in flits 2463-2467; also 1x512-sp64-nxt and 4x512-sp64)
+
+# aou_zero_credit_test: DEACTIVATE_START while a ReadData or WriteResp waits for credit.
+- test: aou_zero_credit_test
+  bug: BUGS/058
+  check_re: 'T1-L47: DUT DeactivateReq \(CREDIT_MANAGE=0\) with \d+ remote (read|write)\(s\) unanswered'
+  when_re: 'DEACTIVATE_START with (RDATA|WRESP) traffic waiting for credit'
+  seed_dependent: true
+  note: >-
+    a ReadData or WriteResp held in its RP FIFO for credit is invisible to the deactivate
+    gate, so DeactivateReq goes out with it queued (1x256-sp32 seed 2 +credit=wresp +deact=1
+    +grant=2: DEACTIVATE at 4362.5 ns with one WriteResp in the B FIFO and one in the output stage)
+
+- test: aou_zero_credit_test
+  bug: BUGS/058
+  check: 'T1-V04: remote (L3) not DISABLED'
+  requires: BUGS/058
+  seed_dependent: true
+  note: the remote die waits for the responses and never sends its DeactivateReq
+
+- test: aou_zero_credit_test
+  bug: BUGS/058
+  check: 'T1-V05: DUT not DISABLED'
+  requires: BUGS/058
+  seed_dependent: true
+
+- test: aou_zero_credit_test
+  bug: BUGS/058
+  check: 'T1-V08: traffic did not complete'
+  requires: BUGS/058
+  seed_dependent: true
