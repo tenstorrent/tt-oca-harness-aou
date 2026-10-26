@@ -8,19 +8,17 @@
 // with that clock's samples: it first checks the DUT outputs against the
 // prediction from the current state, then advances the state.
 //
-// With fdi_enc=SPEC, pl_state_sts is decoded with UCIe values and the
-// predicted lp_state_req/O_FDI_FSM_STATE use UCIe values. In Retrain the
-// protocol layer must not request Retrain, and the Adapter leaves a Retrain
-// entered from Active only after a NOP->Active transition on lp_state_req
-// (UCIe r1.1 §8.3.3.4 and rule 1). NOP may be held as long as the protocol
-// layer likes, so in Retrain the model accepts NOP, and Active once NOP has
-// been seen in this Retrain.
+// pl_state_sts, lp_state_req and O_FDI_FSM_STATE carry UCIe values. In
+// Retrain the protocol layer must not request Retrain, and the Adapter leaves
+// a Retrain entered from Active only after a NOP->Active transition on
+// lp_state_req (UCIe r1.1 §8.3.3.4 and rule 1). NOP may be held as long as the
+// protocol layer likes, so in Retrain the model accepts NOP, and Active once
+// NOP has been seen in this Retrain.
 //
-// lp_linkerror (FDI-M07) follows UCIe in either encoding. A LinkError the
-// protocol layer raises itself (O_AOU_REQ_LINKRESET or I_SW_LINKERROR_INJECT)
-// must reach the Adapter on lp_linkerror (r1.1 Table 8-2), which moves to
-// LinkError and stays there while it is 1; it is "the quickest path for error
-// containment", so it must rise within ref_slack of LINKERROR entry and hold
+// lp_linkerror (FDI-M07): a LinkError the protocol layer raises itself
+// (O_AOU_REQ_LINKRESET or I_SW_LINKERROR_INJECT) must reach the Adapter on
+// lp_linkerror (r1.1 Table 8-2), which moves to LinkError and stays there while
+// it is 1; it is "the quickest path for error containment", so it must rise within ref_slack of LINKERROR entry and hold
 // until the Adapter reports LinkError (or the FSM leaves LINKERROR). After
 // that either value is accepted, and outside LINKERROR it must be low.
 //
@@ -35,7 +33,7 @@
 //    once the Adapter reports Reset and a software reset has been seen since
 //    the LinkError began (either order), and requests nothing meanwhile (NOP;
 //    the Adapter leaves LinkError on its own, §8.3.3.7);
-//  - LinkReset or Disabled from the Adapter (BRG_LINKDOWN, fdi_enc=SPEC)
+//  - LinkReset or Disabled from the Adapter (BRG_LINKDOWN)
 //    means Link Status Down (Table 8-2): O_FDI_LINK_UP=0, O_FDI_FSM_STATE
 //    follows pl_state_sts, lp_state_req=NOP and lp_wake_req=0 until the
 //    Adapter reports Reset;
@@ -71,14 +69,9 @@ class aou_bringup_model extends uvm_object;
     super.new(name);
   endfunction
 
-  local function bit spec();
-    return cfg.fdi_enc == AOU_FDI_ENC_SPEC;
-  endfunction
-
   function aou_lsm_req_e pred_req();
     case (st)
       BRG_REQ_ACTIVE, BRG_ACTIVE: return LSM_REQ_ACTIVE;
-      BRG_RETRAIN:                return spec() ? LSM_REQ_NOP : LSM_REQ_RETRAIN;
       BRG_L1, BRG_L1_CLK_WAKE:    return LSM_REQ_L1;
       default:                    return LSM_REQ_NOP;
     endcase
@@ -129,8 +122,8 @@ class aou_bringup_model extends uvm_object;
     n_mismatch++;
     if (cfg.checks_en) n_bad[rule] = n_bad.exists(rule) ? n_bad[rule] + 1 : 1;
     if (cfg.checks_en)
-      `uvm_error(get_type_name(), $sformatf("%s: %s mismatch in %s (fdi_enc=%s): %s",
-                                            rule, what, st.name(), cfg.fdi_enc.name(), detail))
+      `uvm_error(get_type_name(), $sformatf("%s: %s mismatch in %s: %s", rule, what, st.name(),
+                                            detail))
   endfunction
 
   // A protocol-layer LinkError that ends (the Adapter reports LinkError, the
@@ -168,15 +161,15 @@ class aou_bringup_model extends uvm_object;
       return;
     end
 
-    fsm_code = sts_code(pred_fsm(), cfg.fdi_enc, ok);
-    if (st == BRG_RETRAIN && cfg.fdi_enc == AOU_FDI_ENC_SPEC) begin
-      if (o.lp_state_req == req_code(LSM_REQ_NOP, cfg.fdi_enc)) rt_nop_seen = 1'b1;
-      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(LSM_REQ_NOP, cfg.fdi_enc) ||
-          (rt_nop_seen && o.lp_state_req == req_code(LSM_REQ_ACTIVE, cfg.fdi_enc)),
+    fsm_code = sts_code(pred_fsm(), ok);
+    if (st == BRG_RETRAIN) begin
+      if (o.lp_state_req == req_code(LSM_REQ_NOP)) rt_nop_seen = 1'b1;
+      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(LSM_REQ_NOP) ||
+          (rt_nop_seen && o.lp_state_req == req_code(LSM_REQ_ACTIVE)),
           $sformatf("DUT 0x%0h, expected LSM_REQ_NOP, or LSM_REQ_ACTIVE after NOP",
                     o.lp_state_req));
     end else begin
-      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(pred_req(), cfg.fdi_enc),
+      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(pred_req()),
           $sformatf("DUT 0x%0h, expected %s%s", o.lp_state_req, pred_req().name(), why()));
     end
     cmp(1, "FDI-M02", "lp_wake_req", o.wake_req == pred_wake_req(),
@@ -251,7 +244,7 @@ class aou_bringup_model extends uvm_object;
     bit pl_linkerror = o.sts == LSM_LINKERROR;
     bit activate = o.sw_activate || o.int_activate;
     bit linkerror_req = o.req_linkreset || o.sw_linkerror;
-    bit pl_linkdown = spec() && o.sts inside {LSM_LINKRESET, LSM_DISABLED};
+    bit pl_linkdown = o.sts inside {LSM_LINKRESET, LSM_DISABLED};
     if (pl_linkerror && st != BRG_LINKERROR) return BRG_LINKERROR;
     if (pl_linkdown && !(st inside {BRG_LINKERROR, BRG_LINKDOWN}) &&
         !(st inside {BRG_ACTIVE, BRG_RETRAIN} && linkerror_req))

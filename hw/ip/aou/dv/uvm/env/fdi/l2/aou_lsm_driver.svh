@@ -9,8 +9,7 @@
 // and lowers rx_active (FDI-R29); every entry to Active repeats the
 // rx_active handshake (FDI-R34). Reset aborts the current event.
 //
-// With fdi_enc=SPEC (and cfg.react_en, cfg.react_linkerror_en) the Adapter
-// also answers the DUT's lp_linkerror while no event runs and the link is
+// With cfg.react_en and cfg.react_linkerror_en the Adapter also answers the DUT's lp_linkerror while no event runs and the link is
 // Active (r1.1 Table 8-2): LinkError, held while lp_linkerror is 1, then
 // Reset on its own internal request after the dwell (software clearing the
 // error; §8.3.3.7). A later LSM_EV_LINKERROR, the test's own answer to the
@@ -107,12 +106,12 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     end
   endtask
 
-  // The Adapter's answer to the DUT's lp_linkerror (fdi_enc=SPEC).
+  // The Adapter's answer to the DUT's lp_linkerror.
   local task react_loop();
     forever begin
       @(lsm_vif.drv_cb);
-      if (cfg.fdi_enc != AOU_FDI_ENC_SPEC || !cfg.react_en || !cfg.react_linkerror_en || busy ||
-          ev_busy || reacting || state != LSM_ACTIVE || !link_active)
+      if (!cfg.react_en || !cfg.react_linkerror_en || busy || ev_busy || reacting ||
+          state != LSM_ACTIVE || !link_active)
         continue;
       if (lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
         reacting = 1'b1;
@@ -169,11 +168,10 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   // -------------------------------------------------------------------------
   task set_state(aou_lsm_state_e s);
     bit ok;
-    logic [3:0] code = sts_code(s, cfg.fdi_enc, ok);
+    logic [3:0] code = sts_code(s, ok);
     bit ok_r;
-    logic [3:0] rst_code = sts_code(LSM_RESET, cfg.fdi_enc, ok_r);
-    if (!ok)
-      `uvm_fatal(get_type_name(), $sformatf("%s has no %s encoding", s.name(), cfg.fdi_enc.name()))
+    logic [3:0] rst_code = sts_code(LSM_RESET, ok_r);
+    if (!ok) `uvm_fatal(get_type_name(), {s.name(), " has no pl_state_sts encoding"})
     if (s != state) `uvm_info(get_type_name(), $sformatf("pl_state_sts %s -> %s (0x%0h)",
                                                          state.name(), s.name(), code), UVM_MEDIUM)
     state = s;
@@ -247,7 +245,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   endtask
 
   local task wait_req(aou_lsm_req_e r, string rule);
-    wait_dut("lp_state_req", req_code(r, cfg.fdi_enc), rule);
+    wait_dut("lp_state_req", req_code(r), rule);
   endtask
 
   local task wake_responder();
@@ -342,6 +340,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   endtask
 
   task do_retrain(int unsigned dwell);
+    int unsigned trig = 0;
     if (state != LSM_ACTIVE) begin
       `uvm_error(get_type_name(), $sformatf("Retrain requested in %s; ignored", state.name()))
       return;
@@ -353,26 +352,21 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     // rule 1). The Adapter registers that transition whenever it happens in
     // Retrain, including during the dwell, and starts Active entry after both
     // the dwell and the transition.
-    if (cfg.fdi_enc == AOU_FDI_ENC_SPEC) begin
-      int unsigned trig = 0;
-      aou_rule_log::check("FDI-R48", get_type_name());
-      repeat (dwell) begin
-        @(lsm_vif.drv_cb);
-        trig = retrain_trigger(trig);
-      end
-      if (trig < 1) wait_req(LSM_REQ_NOP, "FDI-R48");
-      if (trig < 2) wait_req(LSM_REQ_ACTIVE, "FDI-R48");
-    end else begin
-      wait_cycles(dwell);
+    aou_rule_log::check("FDI-R48", get_type_name());
+    repeat (dwell) begin
+      @(lsm_vif.drv_cb);
+      trig = retrain_trigger(trig);
     end
+    if (trig < 1) wait_req(LSM_REQ_NOP, "FDI-R48");
+    if (trig < 2) wait_req(LSM_REQ_ACTIVE, "FDI-R48");
     active_entry();
   endtask
 
   // NOP->Active progress in Retrain: 0 none, 1 NOP seen, 2 Active after NOP.
   local function int unsigned retrain_trigger(int unsigned trig);
     logic [3:0] r = lsm_vif.drv_cb.lp_state_req;
-    if (trig == 0 && r === req_code(LSM_REQ_NOP, cfg.fdi_enc)) return 1;
-    if (trig == 1 && r === req_code(LSM_REQ_ACTIVE, cfg.fdi_enc)) return 2;
+    if (trig == 0 && r === req_code(LSM_REQ_NOP)) return 1;
+    if (trig == 1 && r === req_code(LSM_REQ_ACTIVE)) return 2;
     return trig;
   endfunction
 
@@ -441,7 +435,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     set_inband(1'b0);
     rx_active(1'b0);
     wait_cycles(dwell);
-    if (cfg.fdi_enc == AOU_FDI_ENC_SPEC && by_lp) wait_linkerror_release();
+    if (by_lp) wait_linkerror_release();
     set_state(LSM_RESET);
   endtask
 
@@ -497,25 +491,21 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   endtask
 
   task do_link_reset(int unsigned dwell);
-    link_down(cfg.fdi_enc == AOU_FDI_ENC_SPEC ? LSM_LINKRESET : LSM_RESET, dwell);
+    link_down(LSM_LINKRESET, dwell);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 
   // Adapter-initiated Disabled (software Link Disable or the remote partner,
-  // §8.3.3.6). Only UCIe has an encoding the DUT is meant to decode.
+  // §8.3.3.6).
   task do_disabled(int unsigned dwell);
-    if (cfg.fdi_enc != AOU_FDI_ENC_SPEC) begin
-      `uvm_error(get_type_name(), "Disabled event needs fdi_enc=SPEC; ignored")
-      return;
-    end
     link_down(LSM_DISABLED, dwell);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 
-  // LinkReset/Disabled (or Reset in the RTL encoding) for `dwell` cycles,
-  // then Reset on the Adapter's internal request (software on the UCIe
-  // controller; §8.3.3.5 rule 1, §8.3.3.6). The DUT requests nothing
-  // meanwhile (the bringup model checks NOP in LINKDOWN).
+  // LinkReset or Disabled for `dwell` cycles, then Reset on the Adapter's
+  // internal request (software on the UCIe controller; §8.3.3.5 rule 1,
+  // §8.3.3.6). The DUT requests nothing meanwhile (the bringup model checks
+  // NOP in LINKDOWN).
   local task link_down(aou_lsm_state_e s, int unsigned dwell);
     close_gates();
     rx_active(1'b0);

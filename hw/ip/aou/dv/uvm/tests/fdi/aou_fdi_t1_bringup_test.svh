@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// FDI bringup on the real DUT, in the bench's FDI state encoding (UCIe, or
-// the pre-fix RTL codes with FDI_ENC=RTL):
+// FDI bringup on the real DUT, with UCIe state encodings:
 // 1. reset; the L2 agent runs the Adapter side of bringup (clk_req
 //    handshake, inband_pres) with pl_clk_req released, so the DUT waits in
 //    WAIT_PRESENCE until I_SW_ACTIVATE_START;
@@ -191,23 +190,19 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   endtask
 
   // Software's LinkError handling (MAS §7.3.6): AOU_CON0.AOU_SW_RESET once
-  // O_FDI_FSM_STATE reports LinkError, after a random delay. The state is
-  // matched in both encodings, since software knows the one its DUT has.
-  // The write lands only after the Adapter has left Active: AOU_CORE's TX
-  // is gated by pl_state_sts alone, so a reset while the Adapter still
-  // accepts flits would tear the one in flight. A working Adapter answers
-  // lp_state_req within cycles, long before any interrupt service; the
-  // wait only matters when it does not (fdi_enc=SPEC, where the Adapter
-  // does not recognise the DUT's LinkError request).
+  // O_FDI_FSM_STATE reports LinkError, after a random delay. The write lands
+  // only after the Adapter has left Active: AOU_CORE's TX is gated by
+  // pl_state_sts alone, so a reset while the Adapter still accepts flits would
+  // tear the one in flight. A working Adapter answers lp_state_req within
+  // cycles, long before any interrupt service; the wait only matters when it
+  // does not.
   local task sw_reset_on_linkerror();
     bit ok;
-    logic [3:0] le_rtl = sts_code(LSM_LINKERROR, AOU_FDI_ENC_RTL, ok);
-    logic [3:0] le_spec = sts_code(LSM_LINKERROR, AOU_FDI_ENC_SPEC, ok);
+    logic [3:0] le = sts_code(LSM_LINKERROR, ok);
     forever begin
       int unsigned delay;
       @(lsm_vif.mon_cb);
-      if (!(lsm_vif.mon_cb.fdi_fsm_state === le_rtl || lsm_vif.mon_cb.fdi_fsm_state === le_spec))
-        continue;
+      if (lsm_vif.mon_cb.fdi_fsm_state !== le) continue;
       while (env.lsm.drv.state == LSM_ACTIVE) @(lsm_vif.mon_cb);
       delay = $urandom_range(sw_reset_delay_max);
       repeat (delay) @(lsm_vif.mon_cb);
@@ -221,9 +216,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       // take that next LinkError for this one and never answer it.
       fork
         apb_write(32'h0000_0004, 32'h0000_0010);
-        while (lsm_vif.mon_cb.fdi_fsm_state === le_rtl ||
-               lsm_vif.mon_cb.fdi_fsm_state === le_spec)
-          @(lsm_vif.mon_cb);
+        while (lsm_vif.mon_cb.fdi_fsm_state === le) @(lsm_vif.mon_cb);
       join
       n_sw_reset++;
     end

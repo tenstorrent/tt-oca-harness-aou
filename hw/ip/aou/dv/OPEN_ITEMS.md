@@ -48,9 +48,9 @@ harness pattern.
   carry the harness's `expect_fail`/`expect_fail_match` keys for the entries
   whose expected failure is deterministic across seeds and configurations, so
   the harness's own grading agrees with the bench's on those; the entries that
-  are per-config, per-encoding (`fdi_enc`), `seed_dependent` or `requires:`
-  conditional have no `expect_fail` and show as FAIL to the harness until the
-  schema can express them. XPASS has no harness equivalent.
+  are per-config, `seed_dependent` or `requires:` conditional have no
+  `expect_fail` and show as FAIL to the harness until the schema can express
+  them. XPASS has no harness equivalent.
 - **Blocked scenarios.** The plan said `module = { uvm = false }` for
   scenarios that cannot run yet; the runner rejects that key, so blocked
   scenarios carry the `blocked` tag and their reason in
@@ -100,7 +100,7 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   break its build. Closing it takes a harness way to add a user-supplied
   source and define to a target (an optional overlay or a target that names
   `AXI4PC_DIR`), and a harness sweep with it on.
-- **`RTL_PATCH`, `FDI_ENC`.** The patched-RTL builds are standalone only. A
+- **`RTL_PATCH`.** The patched-RTL builds are standalone only. A
   harness equivalent needs targets that compile a patched copy of `RTL/`
   (`exclude_files` plus `sources`).
 - **Regression steering and metrics.** The harness's LSF executor has no live

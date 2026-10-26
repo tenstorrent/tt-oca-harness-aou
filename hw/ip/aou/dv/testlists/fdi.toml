@@ -147,9 +147,9 @@ tags = ["fdi"]
 run_modes = ["fdi"]
 args = ["+event=linkerror", "+le_mid_flit_pct=100"]
 
-# Disabled (18.18): Adapter-initiated entry and exit with AoU traffic (fdi_enc=SPEC; the
-# test selects it). O_FDI_LINK_UP drops (FDI-M06), the DUT requests nothing (FDI-M01), and
-# traffic resumes after recovery.
+# Disabled (18.18): Adapter-initiated entry and exit with AoU traffic. O_FDI_LINK_UP
+# drops (FDI-M06), the DUT requests nothing (FDI-M01), and traffic resumes after
+# recovery.
 [[tests]]
 name = "aou_link_event_test.event-disabled"
 module = { uvm = "aou_link_event_test" }

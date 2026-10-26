@@ -249,10 +249,10 @@ class PlanStatus(unittest.TestCase):
             fh.write('[[tests]]\nname = "t_inf"\ntarget = "1x512-sp64"\nargs = ["+k=1"]\n')
         with open(self.pids, "a") as fh:
             fh.write("plan_ids:\n  t_inf: '1.10'\n")
-        make_run(self.out, "vcs-t1-1x512-sp64-fix-p", "t_inf", "+k=1 +x=2 +FDI_ENC=SPEC", "PASS: log\n")
+        make_run(self.out, "vcs-t1-1x512-sp64-fix-p", "t_inf", "+k=1 +x=2 +aou_config=1x512-sp64", "PASS: log\n")
         self.assertEqual(self.statuses()["1.10"], "not covered")
         make_run(self.out, "vcs-t1-1x512-sp64-fix-p", "t_inf",
-                 f"+FDI_ENC=SPEC +k=1 +aou_fc_json={self.out}/fc.json +waves", "PASS: log\n")
+                 f"+aou_config=1x512-sp64 +k=1 +aou_fc_json={self.out}/fc.json +waves", "PASS: log\n")
         self.assertEqual(self.statuses()["1.10"], "covered")
 
     def test_xfail_only_names_bug(self):

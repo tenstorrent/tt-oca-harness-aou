@@ -123,8 +123,6 @@ def make_cmd(args, run, priority, queue_name):
            f"RID={args.rid}", "STALE_CHECK=0"]
     if args.out_dir:
         cmd.append(f"OUT_DIR={args.out_dir}")
-    if args.fdi_enc:
-        cmd.append(f"FDI_ENC={args.fdi_enc}")
     if args.lsf_extra_opts:
         cmd.append(f"LSF_EXTRA_OPTS={args.lsf_extra_opts}")
     if priority:
@@ -429,8 +427,6 @@ def main():
     ap.add_argument("--axi4pc", default="", choices=["", "0", "1"],
                     help="make AXI4PC for the build (default: make's, on when .deps/BP063/ is there)")
     ap.add_argument("--rtl-patch", default="", help="run on the RTL_PATCH=<absolute path> build")
-    ap.add_argument("--fdi-enc", default="", choices=["", "SPEC", "RTL"],
-                    help="FDI state encoding of every run (make FDI_ENC, +FDI_ENC)")
     ap.add_argument("--lsf-extra-opts", default=os.environ.get("LSF_EXTRA_OPTS", ""),
                     help="extra bsub options for every run (make LSF_EXTRA_OPTS; default: "
                          "$LSF_EXTRA_OPTS)")

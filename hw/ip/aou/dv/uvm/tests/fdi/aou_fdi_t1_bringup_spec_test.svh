@@ -13,7 +13,6 @@ class aou_fdi_t1_bringup_spec_test extends aou_fdi_t1_bringup_test;
 
   function void configure();
     super.configure();
-    env.lsm_cfg.fdi_enc = AOU_FDI_ENC_SPEC;
     env.lsm_cfg.req_timeout = 2000;
   endfunction
 

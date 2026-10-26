@@ -4,7 +4,6 @@
 class aou_lsm_cfg extends uvm_object;
   `uvm_object_utils(aou_lsm_cfg)
 
-  aou_fdi_enc_e fdi_enc = AOU_FDI_ENC_SPEC;
   int unsigned  n_phy = 1;
   int unsigned  active_phy = 0;          // drives I_PHY_TYPE
   // Two-PHY builds: the PHY I_PHY_TYPE does not select stays in Reset with its
@@ -24,7 +23,7 @@ class aou_lsm_cfg extends uvm_object;
   bit           clk_req_hold_bringup = 1'b1; // keep pl_clk_req until the state leaves Reset
   bit           rebringup_after_down = 1'b1; // LinkError/LinkReset events end with a bringup
   int unsigned  req_timeout = 20000;     // cycles to wait for a DUT request; 0 waits forever
-  bit           react_en = 1'b1;         // fdi_enc=SPEC: answer the DUT's lp_linkerror
+  bit           react_en = 1'b1;         // answer the DUT's lp_linkerror
   bit           react_linkerror_en = 1'b1; // between events (both must be set)
   // After LinkError/LinkReset/Disabled -> Reset the link is restarted by
   // software on the UCIe controller, never by the DUT: the Adapter stays in
@@ -69,9 +68,9 @@ class aou_lsm_cfg extends uvm_object;
   endfunction
 
   function string convert2string();
-    return $sformatf({"fdi_enc=%s n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
+    return $sformatf({"n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
                       "clk_hold=%0b sw_restart_delay=%0d"},
-                     fdi_enc.name(), n_phy, active_phy, lat_min, lat_max, auto_bringup,
+                     n_phy, active_phy, lat_min, lat_max, auto_bringup,
                      clk_req_hold_bringup, sw_restart_delay);
   endfunction
 endclass

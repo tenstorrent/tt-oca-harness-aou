@@ -193,9 +193,9 @@ reports any reset asserted otherwise. A test that resets mid-access on purpose p
   for driving, and timestamps. The L1 driver takes flits from a sequencer. The L1
   monitor publishes `ap_tx` (flits the DUT sent, after cancel rollback) and `ap_rx`
   (flits delivered to the DUT).
-- **L2:** `aou_lsm_cfg` holds the encoding map `fdi_enc = RTL|SPEC` (default
-  `SPEC`; `RTL` is the private encoding of RTL from before the UCIe encoding fix) and the latency ranges. The agent publishes state
-  changes, and L1 only drives while L2 reports Active.
+- **L2:** `aou_lsm_cfg` holds the latency ranges; states are encoded as in UCIe
+  r1.1 Table 8-2. The agent publishes state changes, and L1 only drives while L2
+  reports Active.
 - **L3 ↔ L4a:** L3 publishes decoded messages from the DUT (`aou_msg` subclasses)
   and accepts messages to send through `aou_l3_agent.send(aou_msg)`. Credits,
   packing and activation are L3's job. L4a's remote AXI model turns the DUT's
@@ -354,7 +354,7 @@ this API goes through the integrator, because every ported test depends on it.
 
 | Handle | Type |
 |---|---|
-| `cfg` | `aou_t1_env_cfg`: RP count and per-RP data bytes, `spec_rev`, `fdi_enc`, L1/L2/L3/AXI agent configs, timing profiles, check enables |
+| `cfg` | `aou_t1_env_cfg`: RP count and per-RP data bytes, `spec_rev`, L1/L2/L3/AXI agent configs, timing profiles, check enables |
 | `s_mgr[r]`, `m_sub[r]` | `aou_axi_mgr_agent` on the DUT's S port, `aou_axi_sub_agent` on its M port, per RP |
 | `fdi[p]`, `lsm` | L1 agent per PHY, L2 link-state agent |
 | `l3`, `remote` | `aou_l3_agent` (remote die protocol layer), `aou_remote_axi_model` (remote AXI side, behind the L4a adapter) |
@@ -373,7 +373,7 @@ Every test's virtual sequence extends this and composes these tasks:
 
 | Task | Meaning |
 |---|---|
-| `link_up()` | L2 bringup to Active (per `fdi_enc`) |
+| `link_up()` | L2 bringup to Active |
 | `activate(who, order)` | AoU activation: DUT-, remote- or both-initiated (APB `activate_start`, SW pin, or L3), with ordering and timing randomization |
 | `deactivate(who, force, credit_manage)` | orderly or forced deactivation from either side; waits for DISABLED |
 | `program(feature_cfg)` | DUT configuration through the register sequences (split, aggregator, early response, QoS, DEST_RP, LP mode, interrupt masks, error info, time-outs, credit_manage) |

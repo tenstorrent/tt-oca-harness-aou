@@ -16,7 +16,6 @@ class aou_t1_env_cfg extends uvm_object;
   int unsigned   remote_max_burst = 256;   // remote splitter's longest burst (2^n beats)
   bit            remote_max_burst_rand = 1'b0;  // re-pick it while the remote is idle
   aou_spec_rev_e spec_rev = AOU_SPEC_V07;
-  aou_fdi_enc_e  fdi_enc = AOU_FDI_ENC_SPEC;
 
   // Agent configs
   aou_fdi_cfg    fdi_cfg[AOU_T1_N_PHY];
@@ -160,7 +159,6 @@ class aou_t1_env_cfg extends uvm_object;
     end
     foreach (rp_remote_bytes[r])
       if (rp_remote_bytes[r] > AOU_T1_PEER_MAX_BYTES) rp_remote_bytes[r] = AOU_T1_PEER_MAX_BYTES;
-    lsm_cfg.fdi_enc = fdi_enc;
     l3_cfg.spec_rev = spec_rev;
     l3_cfg.rp_count = (remote_rp_count != 0) ? remote_rp_count : n_rp;
     l3_cfg.peer_rp_count = n_rp;
@@ -244,11 +242,11 @@ class aou_t1_env_cfg extends uvm_object;
   function string convert2string();
     return $sformatf({"n_rp=%0d remote_rp_count=%0d rp_bytes=%p remote_bytes=%0d ",
                       "rp_remote_bytes=%p phy=%0d/%0d ",
-                      "spec=%s fdi_enc=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
+                      "spec=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
                       "l1 cancel/bubble=%0d/%0d"},
                      n_rp, remote_rp_count, rp_bytes, remote_bytes, rp_remote_bytes,
                      lsm_cfg.active_phy,
-                     lsm_cfg.n_phy, spec_rev.name(), fdi_enc.name(),
+                     lsm_cfg.n_phy, spec_rev.name(),
                      local_timing.name(), remote_lat_max, l3_cfg.resp_fork, l1_cancel_pct,
                      l1_bubble_pct);
   endfunction

@@ -136,6 +136,6 @@ Rules the testbench checks beyond the two normative lists.
 | FDI-R43 | aou_fdi_monitor | A TX flit starts only while pl_state_sts is Active (L1; checks the DUT) | 5707534 |  |
 | FDI-R44 | aou_fdi_monitor | lp_irdy low while pl_state_sts is Reset (after irdy_reset_grace cycles) (L1; checks the DUT) | 57632 |  |
 | FDI-R45 | aou_fdi_monitor | TX flit: Byte0[7:6] (Protocol ID) non-zero; other Flit Header bits and CRC bytes zero (L1; checks the DUT) | 5706686 |  |
-| FDI-R46 | aou_lsm_monitor | lp_state_req never takes a reserved value (per fdi_enc) (L2; checks the DUT) | 2233 |  |
-| FDI-R47 | aou_lsm_monitor | No Retrain request outside Raw Format (fdi_enc=SPEC) (L2; checks the DUT) | 0 |  |
-| FDI-R48 | aou_lsm_driver | Retrain entered from Active ends with a NOP->Active request (fdi_enc=SPEC) (L2; checks the DUT) | 0 |  |
+| FDI-R46 | aou_lsm_monitor | lp_state_req never takes a reserved value (L2; checks the DUT) | 2233 |  |
+| FDI-R47 | aou_lsm_monitor | No Retrain request outside Raw Format (L2; checks the DUT) | 0 |  |
+| FDI-R48 | aou_lsm_driver | Retrain entered from Active ends with a NOP->Active request (L2; checks the DUT) | 0 |  |

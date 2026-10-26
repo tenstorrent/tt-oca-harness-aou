@@ -58,9 +58,6 @@ TEST ?= $(TEST_DEFAULT_$(TB))
 SEED ?= 1
 # Extra run-time plusargs, e.g. PLUSARGS=+L3_POLICY=sparse
 PLUSARGS ?=
-# FDI_ENC=SPEC|RTL forces the L2 state encoding of every test (+FDI_ENC).
-FDI_ENC ?=
-override PLUSARGS += $(if $(FDI_ENC),+FDI_ENC=$(FDI_ENC))
 # The build configuration, echoed in perf.json (docs/PERF_JSON.md).
 override PLUSARGS += $(if $(filter t1,$(TB)),+aou_config=$(CONFIG))
 # WAVES=1 dumps waves into the run directory with no rebuild: FSDB on VCS (UCLI
@@ -516,8 +513,7 @@ job-hooks:
 LINT_CFG = python3 -I $(UVM_ROOT)/scripts/sim_cfg.py --tb $(1)
 LINT_FLIST = $(if $(filter t1 reg,$(1)),-f $(ROOT)/RTL/filelist.f) +incdir+$(UVM_CORE_ROOT)/src \
   $(UVM_CORE_ROOT)/src/uvm_pkg.sv $(shell $(call LINT_CFG,$(1)) filelist)
-LINT_DEFINES = $(shell $(call LINT_CFG,$(1)) defines) AOU_WAVES_TOP=$(shell $(call LINT_CFG,$(1)) top) UVM \
-  $(if $(filter t1 reg,$(1)),$(filter AOU_DUT_%,$(DEFINES)))
+LINT_DEFINES = $(shell $(call LINT_CFG,$(1)) defines) AOU_WAVES_TOP=$(shell $(call LINT_CFG,$(1)) top) UVM
 # The configuration checks need Python (and PeakRDL from make setup) but no
 # simulator or linter; CI's smoke workflow runs them before building.
 check-config:

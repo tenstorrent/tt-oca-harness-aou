@@ -44,7 +44,7 @@ class aou_lsm_monitor extends uvm_monitor;
       if (cur.rst_n && prev.rst_n) check_rules(cur, prev);
       if (model != null) model.step(cur);
       if (cur.rst_n && (cur.sts != prev.sts || cur.req != prev.req) && cov != null)
-        cov.sample_link(prev.sts, cur.sts, cur.req, cfg.fdi_enc);
+        cov.sample_link(prev.sts, cur.sts, cur.req);
       if (changed(cur, prev)) ap.write(cur);
       prev = cur;
     end
@@ -57,13 +57,13 @@ class aou_lsm_monitor extends uvm_monitor;
       o.pl_state_sts = mb_vif[1].mon_cb.pl_state_sts;
     else
       o.pl_state_sts = mb_vif[0].mon_cb.pl_state_sts;
-    o.sts            = sts_decode(o.pl_state_sts, cfg.fdi_enc);
+    o.sts            = sts_decode(o.pl_state_sts);
     o.inband_pres    = lsm_vif.mon_cb.pl_inband_pres === 1'b1;
     o.clk_req        = lsm_vif.mon_cb.pl_clk_req === 1'b1;
     o.wake_ack       = lsm_vif.mon_cb.pl_wake_ack === 1'b1;
     o.rx_active_req  = lsm_vif.mon_cb.pl_rx_active_req === 1'b1;
     o.lp_state_req   = lsm_vif.mon_cb.lp_state_req;
-    o.req            = req_decode(o.lp_state_req, cfg.fdi_enc);
+    o.req            = req_decode(o.lp_state_req);
     o.wake_req       = lsm_vif.mon_cb.lp_wake_req === 1'b1;
     o.clk_ack        = lsm_vif.mon_cb.lp_clk_ack === 1'b1;
     o.rx_active_sts  = lsm_vif.mon_cb.lp_rx_active_sts === 1'b1;
@@ -106,7 +106,7 @@ class aou_lsm_monitor extends uvm_monitor;
     if (c.lp_state_req != p.lp_state_req) begin
       chk("FDI-R46");
       chk("FDI-R56");
-      if (cfg.fdi_enc == AOU_FDI_ENC_SPEC) chk("FDI-R47");
+      chk("FDI-R47");
     end
     if (c.req == LSM_REQ_ACTIVE && p.req != LSM_REQ_ACTIVE && c.sts == LSM_RESET) chk("FDI-R33");
     // UCIe r1.1 8.2.3.1: a request that leaves Reset or PM (Active, LinkReset,
@@ -136,12 +136,11 @@ class aou_lsm_monitor extends uvm_monitor;
     if (c.rx_active_req && !p.rx_active_req) chk("FDI-R25");
     if (p.sts == LSM_ACTIVE && c.sts != LSM_ACTIVE) chk("FDI-R29");
     if (c.req == LSM_REQ_RESERVED && c.lp_state_req != p.lp_state_req)
-      err("FDI-R46", $sformatf("lp_state_req 0x%0h is reserved in the %s encoding",
-                               c.lp_state_req, cfg.fdi_enc.name()));
+      err("FDI-R46", $sformatf("lp_state_req 0x%0h is reserved", c.lp_state_req));
     if (c.req == LSM_REQ_L2 && p.req != LSM_REQ_L2)
       err("FDI-R56", $sformatf("lp_state_req 0x%0h requests L2, which the DUT does not implement",
                                c.lp_state_req));
-    if (cfg.fdi_enc == AOU_FDI_ENC_SPEC && c.req == LSM_REQ_RETRAIN && p.req != LSM_REQ_RETRAIN)
+    if (c.req == LSM_REQ_RETRAIN && p.req != LSM_REQ_RETRAIN)
       err("FDI-R47", "Retrain request outside Raw Format");
     if (c.req == LSM_REQ_ACTIVE && p.req != LSM_REQ_ACTIVE && c.sts == LSM_RESET &&
         p.req != LSM_REQ_NOP)

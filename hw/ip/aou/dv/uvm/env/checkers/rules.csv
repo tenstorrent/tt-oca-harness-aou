@@ -93,13 +93,13 @@ FDI-R42,aou_fdi_monitor,,DUT,lp_valid only with lp_irdy (L1; checks the DUT),UCI
 FDI-R43,aou_fdi_monitor,,DUT,A TX flit starts only while pl_state_sts is Active (L1; checks the DUT),UCIe r1.1 8.2.4 / 8.3.3
 FDI-R44,aou_fdi_monitor,,DUT,lp_irdy low while pl_state_sts is Reset (after irdy_reset_grace cycles) (L1; checks the DUT),UCIe r1.1 Table 8-2 lp_irdy
 FDI-R45,aou_fdi_monitor,,DUT,TX flit: Byte0[7:6] (Protocol ID) non-zero; other Flit Header bits and CRC bytes zero (L1; checks the DUT),UCIe r1.1 2.4.4 / 3.3.4
-FDI-R46,aou_lsm_monitor,,DUT,lp_state_req never takes a reserved value (per fdi_enc) (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_state_req
-FDI-R47,aou_lsm_monitor,,DUT,No Retrain request outside Raw Format (fdi_enc=SPEC) (L2; checks the DUT),UCIe r1.1 8.3.3.4
-FDI-R48,aou_lsm_driver,,DUT,Retrain entered from Active ends with a NOP->Active request at any time in Retrain (fdi_enc=SPEC) (L2; checks the DUT),UCIe r1.1 8.3.3.4
-FDI-R49,aou_lsm_driver,aou_bringup_model (FDI-M07),DUT,"A LinkError the Protocol Layer requested on lp_linkerror: lp_linkerror falls within req_timeout once the Adapter reports LinkError, so the Adapter can leave on its own; the Protocol Layer requests nothing to leave it (fdi_enc=SPEC; L2; checks the DUT)",UCIe r1.1 8.3.3.7 / Table 8-2
+FDI-R46,aou_lsm_monitor,,DUT,lp_state_req never takes a reserved value (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_state_req
+FDI-R47,aou_lsm_monitor,,DUT,No Retrain request outside Raw Format (L2; checks the DUT),UCIe r1.1 8.3.3.4
+FDI-R48,aou_lsm_driver,,DUT,Retrain entered from Active ends with a NOP->Active request at any time in Retrain (L2; checks the DUT),UCIe r1.1 8.3.3.4
+FDI-R49,aou_lsm_driver,aou_bringup_model (FDI-M07),DUT,"A LinkError the Protocol Layer requested on lp_linkerror: lp_linkerror falls within req_timeout once the Adapter reports LinkError, so the Adapter can leave on its own; the Protocol Layer requests nothing to leave it (L2; checks the DUT)",UCIe r1.1 8.3.3.7 / Table 8-2
 FDI-R56,aou_lsm_monitor,aou_bringup_model (FDI-M01),DUT,"The DUT never requests L2 on lp_state_req (L2 is not implemented, integration guide 6.6.6 GAP-3; without that request the Adapter cannot enter L2, UCIe r1.1 8.2.9) (L2; checks the DUT)",integration guide 6.6.6 GAP-3; UCIe r1.1 8.2.9
 FDI-R57,aou_fdi_monitor,,DUT,lp_stallack answers pl_stallreq within stall_timeout cycles (the Protocol Layer stalls at the next flit boundary; liveness bound of the testbench) (L1; checks the DUT),UCIe r1.1 8.3.2
-FDI-M01,aou_bringup_model,,DUT,"lp_state_req matches the bringup model; in Retrain (fdi_enc=SPEC) NOP or Active after NOP; NOP in LinkError, LinkReset, Disabled and Reset (the DUT never takes the link down except on an error and never restarts it: software does, on the UCIe controller); Active held across an AoU deactivation (L2; checks the DUT)",integrator guide 3.14 / 6.6 / UCIe r1.1 8.3.3.1 / 8.3.3.4-8.3.3.8 / Table 8-3
+FDI-M01,aou_bringup_model,,DUT,"lp_state_req matches the bringup model; in Retrain NOP or Active after NOP; NOP in LinkError, LinkReset, Disabled and Reset (the DUT never takes the link down except on an error and never restarts it: software does, on the UCIe controller); Active held across an AoU deactivation (L2; checks the DUT)",integrator guide 3.14 / 6.6 / UCIe r1.1 8.3.3.1 / 8.3.3.4-8.3.3.8 / Table 8-3
 FDI-M02,aou_bringup_model,,DUT,"lp_wake_req matches the bringup model; low in LinkError, LinkReset, Disabled and Reset (L2; checks the DUT)",integrator guide 6.6.2 / UCIe r1.1 8.2.3.1
 FDI-M03,aou_bringup_model,,DUT,lp_clk_ack follows pl_clk_req (L2; checks the DUT),UCIe r1.1 8.2.3.2
 FDI-M04,aou_bringup_model,,DUT,lp_rx_active_sts rises on pl_rx_active_req outside Reset/LinkError and falls only after the request has; a drop with the request still high is an error in that cycle (L2; checks the DUT),integrator guide 6.6.2 / UCIe r1.1 8.2.7
@@ -200,7 +200,7 @@ T1-L25,aou_invalid_actmsg_vseq,,DUT,An invalid ActivateReq raises no INT_ACTIVAT
 T1-E16,aou_slv_id_mismatch_vseq,,DUT,An unsolicited B/R sets AXI_SLV_ID_MISMATCH_ERR_RPn of that kind with the ID in INFO; W1C clears it,MAS software-operation 7.2.2
 T1-E17,aou_slv_id_mismatch_vseq,,DUT,INT_SI0_ID_MISMATCH rises on a subordinate ID mismatch and falls after the W1C,MAS software-operation 7.2.2
 T1-E18,aou_slv_id_mismatch_vseq,,DUT,White-box: AOU_CORE's RID/BID subordinate mismatch aggregate of that kind only (main #76),main b8b9060 commit message
-FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (any fdi_enc; L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7
+FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7
 FEAT-R12,aou_qos_order_chk,,DUT,Port/AXI QoS: a lower-tier request waiting longer than TIMER_THRESHOLD x TIMER_RESOLUTION is promoted to high,MAS 3.2.1; RDL PRIOR_TIMER
 FEAT-R13,aou_qos_order_chk,,DUT,QoS scenario: both tiers were waiting at the arbiter after release (else the order check proves nothing),MAS 3.2.1
 FEAT-R14,aou_qos_order_chk,,DUT,Round-robin (ARB_MODE 0 or equal priority): no RP granted twice in a row while another has a request waiting,MAS 3.2.1 Figure 5

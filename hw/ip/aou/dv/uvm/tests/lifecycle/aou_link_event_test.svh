@@ -12,13 +12,6 @@ class aou_link_event_test extends aou_base_test;
     num_txns = 20;
   endfunction
 
-  // Disabled has only the UCIe encoding (UCIe r1.1 Table 8-2).
-  function void configure();
-    string ev;
-    if ($value$plusargs("event=%s", ev) && ev inside {"disabled", "sw_disable"})
-      cfg.fdi_enc = AOU_FDI_ENC_SPEC;
-  endfunction
-
   // A hang shows within 2 ms of simulated time; every scenario here,
   // the 2^18-cycle time-outs included, ends well before.
   function void build_phase(uvm_phase phase);

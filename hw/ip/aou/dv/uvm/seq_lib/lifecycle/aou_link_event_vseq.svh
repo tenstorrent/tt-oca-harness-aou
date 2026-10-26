@@ -13,8 +13,7 @@
 //   inband_drop,       brings it up and activates again. In-flight
 //   disabled           transactions are aborted by the reset (an M-port ID
 //                      mismatch interrupt is tolerated); all later traffic
-//                      must complete. Disabled is Adapter-initiated and needs
-//                      fdi_enc=SPEC.
+//                      must complete. Disabled is Adapter-initiated.
 //   sw_disable         software deactivates AoU (the FDI link stays Active:
 //                      the bringup model holds BRG_ACTIVE) and then disables
 //                      the link on the UCIe controller (Adapter Disabled).
@@ -22,7 +21,7 @@
 //                      INT_ACTIVATE_START; the DUT must request nothing of
 //                      the link until software restarts it (the model's NOP
 //                      in LINKDOWN and RESET), and the activation then runs
-//                      on the interrupt once the link is up. fdi_enc=SPEC.
+//                      on the interrupt once the link is up.
 //   l1_act             software deactivates, the adapter enters L1, and
 //                      software writes ACTIVATE_START while the link is in
 //                      L1: the link stays in L1 (the write wakes nothing),

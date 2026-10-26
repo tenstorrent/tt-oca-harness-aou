@@ -5,11 +5,6 @@
 // PHY, inband_pres, wake/clk/rx_active handshakes, PL-initiated events), its
 // monitor with the handshake checks, and a reference model of the DUT's
 // bringup controller (integrator guide §3.14-3.16, §6.6; UCIe r1.1 §8.2-8.3).
-//
-// fdi_enc selects the state encodings on pl_state_sts, lp_state_req and
-// O_FDI_FSM_STATE: SPEC is UCIe and the default; RTL is the private encoding
-// of RTL from before the UCIe encoding fix, kept for runs against such RTL
-// (+FDI_ENC=RTL).
 
 package aou_lsm_pkg;
   import uvm_pkg::*;
@@ -19,8 +14,6 @@ package aou_lsm_pkg;
   `include "aou_macros.svh"
   `include "aou_fc_macros.svh"
   import aou_fdi_pkg::*;
-
-  typedef enum bit {AOU_FDI_ENC_RTL, AOU_FDI_ENC_SPEC} aou_fdi_enc_e;
 
   // Adapter link states (pl_state_sts)
   typedef enum bit [3:0] {
@@ -36,8 +29,7 @@ package aou_lsm_pkg;
     LSM_UNKNOWN
   } aou_lsm_state_e;
 
-  // Protocol Layer requests (lp_state_req). LINKERROR exists only in the RTL
-  // encoding (integrator guide §3.14).
+  // Protocol Layer requests (lp_state_req)
   typedef enum bit [3:0] {
     LSM_REQ_NOP,
     LSM_REQ_ACTIVE,
@@ -46,7 +38,6 @@ package aou_lsm_pkg;
     LSM_REQ_LINKRESET,
     LSM_REQ_RETRAIN,
     LSM_REQ_DISABLED,
-    LSM_REQ_LINKERROR,
     LSM_REQ_RESERVED
   } aou_lsm_req_e;
 
@@ -62,7 +53,7 @@ package aou_lsm_pkg;
     BRG_RETRAIN,
     BRG_L1,
     BRG_L1_CLK_WAKE,
-    BRG_LINKDOWN         // Adapter in LinkReset/Disabled (fdi_enc=SPEC)
+    BRG_LINKDOWN         // Adapter in LinkReset/Disabled
   } aou_brg_state_e;
 
   typedef enum bit [3:0] {
@@ -71,11 +62,11 @@ package aou_lsm_pkg;
     LSM_EV_LINKERROR,    // Active to LinkError, then Reset and bringup
     LSM_EV_L1_ENTRY,     // stallreq/ack, Active to L1
     LSM_EV_L1_EXIT,      // clk_req wake, back to Active
-    LSM_EV_LINK_RESET,   // Active to LinkReset (RTL encoding: Reset), then Reset and bringup
+    LSM_EV_LINK_RESET,   // Active to LinkReset, then Reset and bringup
     LSM_EV_INBAND_DROP,  // inband_pres low for a while in Reset
     LSM_EV_CLK_WAKE,     // a pl_clk_req handshake
     LSM_EV_IDLE,         // wait `cycles`
-    LSM_EV_DISABLED      // Active to Disabled (fdi_enc=SPEC), then Reset and bringup
+    LSM_EV_DISABLED      // Active to Disabled, then Reset and bringup
   } aou_lsm_ev_e;
 
   // Bringup software pins of the DUT (integrator guide §3.15)
@@ -84,109 +75,61 @@ package aou_lsm_pkg;
     LSM_SW_LINKERROR
   } aou_lsm_sw_e;
 
-  // pl_state_sts and O_FDI_FSM_STATE codes. States the RTL encoding has no
-  // code for return 4'hF with ok=0.
-  function automatic logic [3:0] sts_code(aou_lsm_state_e s, aou_fdi_enc_e enc, output bit ok);
+  // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts, lp_state_req and
+  // O_FDI_FSM_STATE. States without a code return 4'hF with ok=0.
+  function automatic logic [3:0] sts_code(aou_lsm_state_e s, output bit ok);
     ok = 1'b1;
-    if (enc == AOU_FDI_ENC_SPEC) begin
-      case (s)
-        LSM_RESET:        return 4'h0;
-        LSM_ACTIVE:       return 4'h1;
-        LSM_ACTIVE_PMNAK: return 4'h3;
-        LSM_L1:           return 4'h4;
-        LSM_L2:           return 4'h8;
-        LSM_LINKRESET:    return 4'h9;
-        LSM_LINKERROR:    return 4'hA;
-        LSM_RETRAIN:      return 4'hB;
-        LSM_DISABLED:     return 4'hC;
-        default: begin ok = 1'b0; return 4'hF; end
-      endcase
-    end
     case (s)
-      LSM_RESET:     return 4'h0;
-      LSM_ACTIVE:    return 4'h1;
-      LSM_LINKERROR: return 4'h2;
-      LSM_RETRAIN:   return 4'h3;
-      LSM_L1:        return 4'h4;
-      LSM_L2:        return 4'h5;
-      LSM_DISABLED:  return 4'h6;
+      LSM_RESET:        return 4'h0;
+      LSM_ACTIVE:       return 4'h1;
+      LSM_ACTIVE_PMNAK: return 4'h3;
+      LSM_L1:           return 4'h4;
+      LSM_L2:           return 4'h8;
+      LSM_LINKRESET:    return 4'h9;
+      LSM_LINKERROR:    return 4'hA;
+      LSM_RETRAIN:      return 4'hB;
+      LSM_DISABLED:     return 4'hC;
       default: begin ok = 1'b0; return 4'hF; end
     endcase
   endfunction
 
-  function automatic aou_lsm_state_e sts_decode(logic [3:0] code, aou_fdi_enc_e enc);
-    if (enc == AOU_FDI_ENC_SPEC) begin
-      case (code)
-        4'h0:    return LSM_RESET;
-        4'h1:    return LSM_ACTIVE;
-        4'h3:    return LSM_ACTIVE_PMNAK;
-        4'h4:    return LSM_L1;
-        4'h8:    return LSM_L2;
-        4'h9:    return LSM_LINKRESET;
-        4'hA:    return LSM_LINKERROR;
-        4'hB:    return LSM_RETRAIN;
-        4'hC:    return LSM_DISABLED;
-        default: return LSM_UNKNOWN;
-      endcase
-    end
+  function automatic aou_lsm_state_e sts_decode(logic [3:0] code);
     case (code)
       4'h0:    return LSM_RESET;
       4'h1:    return LSM_ACTIVE;
-      4'h2:    return LSM_LINKERROR;
-      4'h3:    return LSM_RETRAIN;
+      4'h3:    return LSM_ACTIVE_PMNAK;
       4'h4:    return LSM_L1;
-      4'h5:    return LSM_L2;
-      4'h6:    return LSM_DISABLED;
+      4'h8:    return LSM_L2;
+      4'h9:    return LSM_LINKRESET;
+      4'hA:    return LSM_LINKERROR;
+      4'hB:    return LSM_RETRAIN;
+      4'hC:    return LSM_DISABLED;
       default: return LSM_UNKNOWN;
     endcase
   endfunction
 
-  function automatic logic [3:0] req_code(aou_lsm_req_e r, aou_fdi_enc_e enc);
-    if (enc == AOU_FDI_ENC_SPEC) begin
-      case (r)
-        LSM_REQ_NOP:       return 4'h0;
-        LSM_REQ_ACTIVE:    return 4'h1;
-        LSM_REQ_L1:        return 4'h4;
-        LSM_REQ_L2:        return 4'h8;
-        LSM_REQ_LINKRESET: return 4'h9;
-        LSM_REQ_RETRAIN:   return 4'hB;
-        LSM_REQ_DISABLED:  return 4'hC;
-        default:           return 4'hF;
-      endcase
-    end
+  function automatic logic [3:0] req_code(aou_lsm_req_e r);
     case (r)
       LSM_REQ_NOP:       return 4'h0;
       LSM_REQ_ACTIVE:    return 4'h1;
-      LSM_REQ_LINKERROR: return 4'h2;
-      LSM_REQ_RETRAIN:   return 4'h3;
       LSM_REQ_L1:        return 4'h4;
-      LSM_REQ_L2:        return 4'h5;
-      LSM_REQ_DISABLED:  return 4'h6;
+      LSM_REQ_L2:        return 4'h8;
+      LSM_REQ_LINKRESET: return 4'h9;
+      LSM_REQ_RETRAIN:   return 4'hB;
+      LSM_REQ_DISABLED:  return 4'hC;
       default:           return 4'hF;
     endcase
   endfunction
 
-  function automatic aou_lsm_req_e req_decode(logic [3:0] code, aou_fdi_enc_e enc);
-    if (enc == AOU_FDI_ENC_SPEC) begin
-      case (code)
-        4'h0:    return LSM_REQ_NOP;
-        4'h1:    return LSM_REQ_ACTIVE;
-        4'h4:    return LSM_REQ_L1;
-        4'h8:    return LSM_REQ_L2;
-        4'h9:    return LSM_REQ_LINKRESET;
-        4'hB:    return LSM_REQ_RETRAIN;
-        4'hC:    return LSM_REQ_DISABLED;
-        default: return LSM_REQ_RESERVED;
-      endcase
-    end
+  function automatic aou_lsm_req_e req_decode(logic [3:0] code);
     case (code)
       4'h0:    return LSM_REQ_NOP;
       4'h1:    return LSM_REQ_ACTIVE;
-      4'h2:    return LSM_REQ_LINKERROR;
-      4'h3:    return LSM_REQ_RETRAIN;
       4'h4:    return LSM_REQ_L1;
-      4'h5:    return LSM_REQ_L2;
-      4'h6:    return LSM_REQ_DISABLED;
+      4'h8:    return LSM_REQ_L2;
+      4'h9:    return LSM_REQ_LINKRESET;
+      4'hB:    return LSM_REQ_RETRAIN;
+      4'hC:    return LSM_REQ_DISABLED;
       default: return LSM_REQ_RESERVED;
     endcase
   endfunction

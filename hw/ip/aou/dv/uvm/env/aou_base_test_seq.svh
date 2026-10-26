@@ -656,19 +656,19 @@ class aou_base_test_seq extends ocah_sequence;
   endtask
 
   // Brings a link that is down back up: an Adapter LinkReset and bringup, or
-  // only the bringup when the Adapter is already in Reset (fdi_enc=SPEC:
-  // after a LinkError it took down on the DUT's lp_linkerror). If AoU state
+  // only the bringup when the Adapter is already in Reset (after a LinkError
+  // it took down on the DUT's lp_linkerror). If AoU state
   // is still in use, the system resets both dies while the link is down
   // (sys_reset()); both are then DISABLED and the caller activates them as
   // after any relink. Returns with sysrst_done set when it reset them.
   task relink();
-    bit spec_down = cfg.lsm_cfg.fdi_enc == AOU_FDI_ENC_SPEC && env.lsm.drv.state == LSM_RESET;
+    bit down = env.lsm.drv.state == LSM_RESET;
     sysrst_done = 1'b0;
     if (!sysrst_due()) begin
-      link_event(spec_down ? LSM_EV_BRINGUP : LSM_EV_LINK_RESET);
+      link_event(down ? LSM_EV_BRINGUP : LSM_EV_LINK_RESET);
       return;
     end
-    if (!spec_down) begin
+    if (!down) begin
       bit keep = cfg.lsm_cfg.rebringup_after_down;
       cfg.lsm_cfg.rebringup_after_down = 1'b0;
       link_event(LSM_EV_LINK_RESET);

@@ -49,10 +49,6 @@
   `B``_XIGN("linkerror,active|l1|retrain|linkreset|disabled") \
   `B``_XIGN("linkreset,active|l1|retrain|linkreset|disabled") \
   `B``_XIGN("disabled,active|l1|retrain|linkreset|disabled")
-// FDI state encoding of the run (lsm_cfg.fdi_enc). rtl (RTL from before the
-// UCIe encoding fix, +FDI_ENC=RTL) is no target.
-`define AOU_LSM_FC_ENC(B) \
-  `B``_IGN(rtl, AOU_FDI_ENC_RTL, AOU_FDI_ENC_RTL) `B``_BIN(spec, AOU_FDI_ENC_SPEC, AOU_FDI_ENC_SPEC)
 `define AOU_LSM_FC_BRG_TR(B) \
   `AOU_LSM_FC_TR(B, reset_wait, BRG_RESET, BRG_WAIT_PRESENCE) \
   `AOU_LSM_FC_TR(B, wait_reset, BRG_WAIT_PRESENCE, BRG_RESET) \

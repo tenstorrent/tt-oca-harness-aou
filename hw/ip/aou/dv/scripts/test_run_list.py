@@ -398,17 +398,15 @@ class RunListControl(unittest.TestCase):
     def test_make_vars_forwarded(self):
         lst = self.runlist("a", [("t_a", 2)])
         excl = '-R "select[hname!=hostA]"'
-        proc, _ = self.start([lst], "--fdi-enc", "SPEC", "--lsf-extra-opts", excl, sleep=0.1)
+        proc, _ = self.start([lst], "--lsf-extra-opts", excl, sleep=0.1)
         rc, text = self.finish(proc)
         self.assertEqual(rc, 0, text)
         for argv in self.make_args():
-            self.assertIn("FDI_ENC=SPEC", argv)
             self.assertIn("LSF_EXTRA_OPTS=" + excl, argv)
         proc, _ = self.start([lst], sleep=0.1, env_extra={"LSF_EXTRA_OPTS": excl})
         rc, text = self.finish(proc)
         self.assertEqual(rc, 0, text)
         for argv in self.make_args():
-            self.assertFalse(any(a.startswith("FDI_ENC=") for a in argv))
             self.assertIn("LSF_EXTRA_OPTS=" + excl, argv)
 
     def test_stale_build_warned_once(self):

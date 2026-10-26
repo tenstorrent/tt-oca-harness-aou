@@ -51,7 +51,7 @@ out of the denominator and a hit is reported under the rule that owns it.
 |===
 | Layer | Covergroups | What they cover
 | L1 FDI (`aou_fdi_cov`) | `cg_fdi_xfer`, `cg_fdi_cancel`, `cg_fdi_stall`, `cg_fdi_abandon` | Flit transfers per PHY and direction, cancel positions and rollback, stall lengths and positions, partial flits abandoned when the adapter left Active
-| L2 link state (`aou_lsm_cov`) | `cg_link_state`, `cg_bringup_fsm` | PL state-machine transitions and the requests that cause them, the FDI state encoding the run used (`cp_fdi_enc`), the bring-up reference model's states and transitions
+| L2 link state (`aou_lsm_cov`) | `cg_link_state`, `cg_bringup_fsm` | PL state-machine transitions and the requests that cause them, the bring-up reference model's states and transitions
 | L3 protocol (`aou_l3_cov`) | `cg_act_fsm`, `cg_act_op`, `cg_msg`, `cg_flit_layout`, `cg_flit_occ`, `cg_credit` | Activation state machine and message operations by direction and legality, message kinds per RP and direction, granule start and size and flit spanning, flit occupancy (messages per flit, Misc halves, carry, credit-only flits), credit events per class and direction
 | AXI monitor (`aou_axi_monitor`) | `txn_cg`, `zero_cg` | Transaction direction, size, length and alignment at every port; zero-cycle `B`/`R` responses
 | T1 env | `attr_cg`, `excl_cg`, `chan_cg` (`aou_t1_xfer_cov`); `cg_crd` (`aou_t1_crd_flow_chk`); `cg_crd_rr` (`aou_t1_crd_rr_chk`); `cg_early_tbl` (`aou_t1_early_tbl_chk`); `cg_wdt` (`aou_t1_wdt_chk`); `cg_mo` (`aou_t1_mo_chk`) | Attributes, exclusives and channel orderings across the link; the credit classes an RP had work for and credit for; how many RPs a round-robin window owed; early-response table fill and stall release; write-watchdog expiries, restarts at the threshold, W1C and mask; M-port pending-ID table fill (requests in service)
@@ -73,9 +73,6 @@ The bins of each coverpoint are in the layer's `*_fc_bins.svh` table
 ignored bin (`IGN`), an illegal bin (`ILL`, with the rule that reports a hit)
 or a cross exclusion by pattern (`XIGN`, `XILL`). The notable definitions:
 
-* `cg_link_state.cp_fdi_enc` is informational: it records whether the merged
-  runs include SPEC-encoded ones (`rtl`, the private encoding of RTL from
-  before the UCIe encoding fix, is an ignored bin).
 * `cg_act_op.x_op_dir_legal` crosses activation operation, direction and
   legality, so every out-of-state activation message the L3 injection
   sequences send is a bin.

@@ -24,7 +24,7 @@
 | `cg_fdi_cancel` | `aou_fdi_cov` | `uvm/env/fdi/l1/aou_fdi_cov.svh` | `cp_half`, `cp_kind`, `cp_repeat`, `cp_stalled` | `x_half_kind`
 | `cg_fdi_stall` | `aou_fdi_cov` | `uvm/env/fdi/l1/aou_fdi_cov.svh` | `cp_lat`, `cp_hold`, `cp_where`, `cp_trdy_at_req` | `x_where_lat`, `x_where_trdy`
 | `cg_fdi_abandon` | `aou_fdi_cov` | `uvm/env/fdi/l1/aou_fdi_cov.svh` | `cp_dir` | -
-| `cg_link_state` | `aou_lsm_cov` | `uvm/env/fdi/l2/aou_lsm_cov.svh` | `cp_tr`, `cp_sts`, `cp_req`, `cp_fdi_enc` | `x_sts_req`
+| `cg_link_state` | `aou_lsm_cov` | `uvm/env/fdi/l2/aou_lsm_cov.svh` | `cp_tr`, `cp_sts`, `cp_req` | `x_sts_req`
 | `cg_bringup_fsm` | `aou_lsm_cov` | `uvm/env/fdi/l2/aou_lsm_cov.svh` | `cp_tr` | -
 | `that` |  | `uvm/env/l3/aou_l3_cov.svh` | `cp_trans` | -
 | `cg_act_op` |  | `uvm/env/l3/aou_l3_cov.svh` | `cp_op`, `cp_dir`, `cp_legal` | `x_op_dir_legal`

@@ -9,7 +9,6 @@ class aou_lsm_cov extends uvm_object;
   int unsigned l_tr;    // aou_lsm_state_e pair
   int unsigned l_sts;
   int unsigned l_req;
-  int unsigned l_enc;   // aou_fdi_enc_e
   int unsigned b_tr;    // aou_brg_state_e pair
 
   covergroup cg_link_state;
@@ -21,12 +20,6 @@ class aou_lsm_cov extends uvm_object;
     }
     cp_req: coverpoint l_req {
       `AOU_LSM_FC_REQ(AOU_FC_CG)
-    }
-    // Informational: which encoding the run used, so a merge shows it includes
-    // SPEC-encoded runs. rtl (the private codes of RTL from before the UCIe encoding
-    // fix, +FDI_ENC=RTL) is ignored: no target.
-    cp_fdi_enc: coverpoint l_enc {
-      `AOU_LSM_FC_ENC(AOU_FC_CG)
     }
     x_sts_req: cross cp_sts, cp_req;
   endgroup
@@ -56,7 +49,6 @@ class aou_lsm_cov extends uvm_object;
       p = fc_link_state.cp("cp_tr"); `AOU_LSM_FC_LINK_TR(AOU_FC_REG)
       p = fc_link_state.cp("cp_sts"); `AOU_LSM_FC_STS(AOU_FC_REG)
       p = fc_link_state.cp("cp_req"); `AOU_LSM_FC_REQ(AOU_FC_REG)
-      p = fc_link_state.cp("cp_fdi_enc"); `AOU_LSM_FC_ENC(AOU_FC_REG)
       p = fc_link_state.add_cross("x_sts_req", "cp_sts cp_req");
       `AOU_LSM_FC_X_STS_REQ(AOU_FC_REG)
     end
@@ -66,14 +58,12 @@ class aou_lsm_cov extends uvm_object;
     end
   endfunction
 
-  function void sample_link(aou_lsm_state_e prev, aou_lsm_state_e cur, aou_lsm_req_e req,
-                            aou_fdi_enc_e enc);
+  function void sample_link(aou_lsm_state_e prev, aou_lsm_state_e cur, aou_lsm_req_e req);
     l_tr = int'(prev) * 16 + int'(cur);
     l_sts = int'(cur);
     l_req = int'(req);
-    l_enc = int'(enc);
     cg_link_state.sample();
-    fc_link_state.sample(int'(l_tr), int'(l_sts), int'(l_req), int'(l_enc));
+    fc_link_state.sample(int'(l_tr), int'(l_sts), int'(l_req));
   endfunction
 
   function void sample_brg(aou_brg_state_e prev, aou_brg_state_e cur);

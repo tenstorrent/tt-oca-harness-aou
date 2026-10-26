@@ -332,9 +332,8 @@ python3 scripts/run_list.py --sim vcs --target 1x512-sp64 --rid nightly -j 8 \
   --per-list --items g1a link
 ```
 
-`--fdi-enc SPEC|RTL` passes `FDI_ENC` to every run (the FDI state encoding,
-`+FDI_ENC`); `--rtl-patch` and `--cov` pick the build as the make
-variables of the same names do.
+`--rtl-patch` and `--cov` pick the build as the make variables of the same
+names do.
 
 Your own bsub options go in `LSF_EXTRA_OPTS`. Every build and run appends it
 after the site's options (`LSF_SITE_OPTS` in `site/site.mk`), for example to keep
@@ -496,11 +495,6 @@ ignored (`IGN`, no target) or illegal (`ILL`, out of the denominator; a hit is
 reported under the rule that owns it), and a cross cell is ignored or made
 illegal by pattern (`XIGN`, `XILL`; see `aou_fc_point::mark`). The service's
 count is the number; the simulators' covergroup scores are not used.
-`cg_link_state.cp_fdi_enc` records the FDI state encoding each run used (`spec`,
-UCIe r1.1 Table 8-2 and the default, or `rtl`, the private codes of RTL from
-before the UCIe encoding fix, selected with `FDI_ENC=RTL`). It is informational: it
-shows whether the merged coverage includes SPEC-encoded runs. `rtl` is an
-ignored bin, not a target.
 
 With `COV=1` each run writes `<run>/fc.json`: every group, coverpoint and
 cross, every declared bin with its hit count (zero-hit bins included, so holes

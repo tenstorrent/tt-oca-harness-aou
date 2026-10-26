@@ -143,7 +143,7 @@ packages, and calls `run_test()`. `tb/aou_waves.sv` is bound for `WAVES=1`.
 [cols="2,4",options="header"]
 |===
 | Component | Role
-| `aou_t1_env_cfg` | RP count and per-RP data bytes, remote widths (`+remote_bytes`), `spec_rev`, `fdi_enc` (RTL or SPEC state encoding), the L1/L2/L3/AXI agent configs, timing profiles, checker enables, drain and stale windows
+| `aou_t1_env_cfg` | RP count and per-RP data bytes, remote widths (`+remote_bytes`), `spec_rev`, the L1/L2/L3/AXI agent configs, timing profiles, checker enables, drain and stale windows
 | `aou_t1_feature_cfg` | What `program_cfg()` writes to the DUT: split, aggregator, early response, QoS, DEST_RP, LP mode, interrupt masks, error info, time-outs, credit management
 | `aou_t1_traffic_cfg` | A traffic profile: AXI sequence knobs, timing policies, RP mask (`named("rand"\|"unaligned"\|"b_zero"\|"long"\|"short"\|"narrow"\|"stall")`)
 | `aou_t1_vseqr` | The virtual sequencer: every agent's sequencer, the env, the model handles

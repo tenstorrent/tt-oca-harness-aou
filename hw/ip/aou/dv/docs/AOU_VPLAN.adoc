@@ -248,9 +248,8 @@ software recovers; 2.10 sends PropertyReq 0 only.
   pack-rate cap are under triage (`testlists/plan_ids.yaml`, `blocked:`).
 * *Expected failures.* Items whose only evidence is an `XFAIL` run depend on
   the reported DUT bugs; `make plan_status` lists them as xfail-only.
-* *FDI state encoding.* The L2 model uses the UCIe state codes
-  (`fdi_enc = SPEC`) by default. The private codes of RTL from before the
-  UCIe encoding fix run on request (`FDI_ENC=RTL`) and are no coverage target.
+* *FDI state encoding.* The L2 model uses the UCIe state codes (UCIe r1.1
+  Table 8-2) only.
 * *Two-PHY targets.* `AOU_FDI_CHECKER` is not instantiated on the two-PHY
   configurations; the L3 rule checker and the L1 monitor are the protocol
   checks there, and the remote die uses one PHY per run (`+active_phy`).

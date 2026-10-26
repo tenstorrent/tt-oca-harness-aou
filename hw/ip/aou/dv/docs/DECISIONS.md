@@ -346,7 +346,18 @@ the inventory rather than forgotten.
   and no test forces `RTL`; the `*_spec_test` tests (testlist `g1b`) select
   `SPEC` themselves because they check UCIe-only behaviour. A run-wide override
   (make `FDI_ENC`, plusarg `+FDI_ENC`) runs a whole regression with `RTL`
-  against RTL from before the fix.
+  against RTL from before the fix. (Retired; see the amendment below.)
+
+**Amendment (2026-10-26): one FDI encoding.** The DUT on `main` uses UCIe's
+encodings since its encoding fix, and the owner has ruled (2026-10-24) that the
+bench does not stay compatible with RTL that lacks a fix that is on `main`. So
+the `RTL` map is gone: L2 encodes and decodes UCIe r1.1 Table 8-2 only, with no
+selector (`fdi_enc`, `aou_fdi_enc_e`, make `FDI_ENC`, `+FDI_ENC`,
+`run_list.py --fdi-enc` and the informational coverpoint `cp_fdi_enc` were
+removed), and every check that ran only under `SPEC` (FDI-R47, R48, R49, the
+Retrain NOP/Active rule of FDI-M01, the Adapter's LinkReset and Disabled) now
+always runs. A DUT whose state codes disagree with UCIe is a DUT bug, not a
+bench mode. The `*_spec_test` names stay: they name the UCIe-only scenarios.
 
 **Why.** v0.7 is what the DUT claims, so checking it against v0.8 would report
 intended behaviour as bugs, while v0.8 support keeps the bench useful when the
@@ -361,8 +372,8 @@ bench. *Hard-coding UCIe encodings*: every FDI test fails until the DUT is fixed
 hiding all other findings. *Waiting for clarification before writing the
 check*: stalls the work and leaves the behaviour unchecked meanwhile.
 
-**Where.** `env/aou_t1_env_cfg.svh` and `l3/aou_l3_cfg.svh` (`spec_rev`,
-`fdi_enc`), `fdi/aou_lsm_pkg.sv` (encoding maps), `l3/aou_link_ctrl.svh`
+**Where.** `env/aou_t1_env_cfg.svh` and `l3/aou_l3_cfg.svh` (`spec_rev`),
+`fdi/aou_lsm_pkg.sv` (UCIe encodings), `l3/aou_link_ctrl.svh`
 (v0.8 ERROR state), CODING_GUIDELINES.md "Oracles", AGENTS.md "Boundaries".
 
 **Consequences.** Some checks encode an interim expectation, not a settled
@@ -675,10 +686,6 @@ twice.
 - **Closure.** Closure is measured on the union of every configuration. The
   plan, the gap analysis and the owner's decisions on it are in
   [COVERAGE_CLOSURE.md](COVERAGE_CLOSURE.md).
-- **Encoding coverpoint.** `l2.cg_link_state.cp_fdi_enc` records the run's FDI
-  state encoding (`rtl` or `spec`). It is informational, showing that the merge
-  includes SPEC-encoded runs; `rtl` (the private encodings of RTL from before the
-  UCIe encoding fix, `FDI_ENC=RTL`) is an ignored bin, not a target.
 
 **Why.**
 
@@ -1161,7 +1168,3 @@ the RDL (a write of 1 resets the bit with every other SFR).
   than the testbench or RTL sources it was built from (D12).
 - **Xcelium coverage.** Xcelium builds and runs but has no coverage flow and no
   full-regression matching (D2). Questa's run and coverage are also untested.
-- **RTL FDI encoding map.** `SPEC` is the default since the DUT uses UCIe
-  encodings; the `RTL` map stays only for runs against RTL from before the
-  UCIe encoding fix (`FDI_ENC=RTL`) and can be retired when that RTL is no longer
-  run (D5).

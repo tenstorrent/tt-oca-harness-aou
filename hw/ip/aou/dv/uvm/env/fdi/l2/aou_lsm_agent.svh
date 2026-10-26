@@ -20,17 +20,9 @@ class aou_lsm_agent extends uvm_agent;
   endfunction
 
   function void build_phase(uvm_phase phase);
-    string enc;
     super.build_phase(phase);
     if (cfg == null && !uvm_config_db #(aou_lsm_cfg)::get(this, "", "cfg", cfg))
       cfg = aou_lsm_cfg::type_id::create("cfg");
-    // +FDI_ENC=SPEC|RTL overrides the test's choice (RTL: runs against RTL from
-    // before the UCIe encoding fix).
-    if ($value$plusargs("FDI_ENC=%s", enc)) begin
-      if (enc == "SPEC") cfg.fdi_enc = AOU_FDI_ENC_SPEC;
-      else if (enc == "RTL") cfg.fdi_enc = AOU_FDI_ENC_RTL;
-      else `uvm_fatal(get_type_name(), $sformatf("+FDI_ENC=%s: not SPEC or RTL", enc))
-    end
     // +react_linkerror=0|1 overrides cfg.react_linkerror_en.
     void'($value$plusargs("react_linkerror=%b", cfg.react_linkerror_en));
     // +sw_restart_delay=N: cycles the Adapter stays in Reset after a link-down

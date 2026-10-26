@@ -176,8 +176,7 @@ passing each time.
 ===== 4. `aou_fdi_t1_bringup_test`
 Class `aou_fdi_t1_bringup_test` extends `uvm_test` (`uvm/tests/fdi/aou_fdi_t1_bringup_test.svh`).
 
-*Purpose.* FDI bringup on the real DUT, in the bench's FDI state encoding (UCIe, or
-the pre-fix RTL codes with FDI_ENC=RTL):
+*Purpose.* FDI bringup on the real DUT, with UCIe state encodings:
 1. reset; the L2 agent runs the Adapter side of bringup (clk_req
 handshake, inband_pres) with pl_clk_req released, so the DUT waits in
 WAIT_PRESENCE until I_SW_ACTIVATE_START;
@@ -735,8 +734,7 @@ link_reset,        rise; software resets AOU_CORE while the link is down,
 inband_drop,       brings it up and activates again. In-flight
 disabled           transactions are aborted by the reset (an M-port ID
 mismatch interrupt is tolerated); all later traffic
-must complete. Disabled is Adapter-initiated and needs
-fdi_enc=SPEC.
+must complete. Disabled is Adapter-initiated.
 sw_disable         software deactivates AoU (the FDI link stays Active:
 the bringup model holds BRG_ACTIVE) and then disables
 the link on the UCIe controller (Adapter Disabled).
@@ -744,7 +742,7 @@ Local traffic queued while the link is down raises
 INT_ACTIVATE_START; the DUT must request nothing of
 the link until software restarts it (the model's NOP
 in LINKDOWN and RESET), and the activation then runs
-on the interrupt once the link is up. fdi_enc=SPEC.
+on the interrupt once the link is up.
 l1_act             software deactivates, the adapter enters L1, and
 software writes ACTIVATE_START while the link is in
 L1: the link stays in L1 (the write wakes nothing),
