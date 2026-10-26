@@ -37,7 +37,7 @@
 | 2.9 | Test separate req/resp credit management during deactivation; verify response messages allowed | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 | 2.10 | Verify `int_deactivate_property` status bit during deactivation | P2 | `aou_deact_ctrl_test.mode-property`
 | 2.11 | No credit message in DISABLED; no response credit after the sender's DeactivateAck (request credits after it are permitted, v0.8 8.4) | P2 | `aou_link_act_deact_test`
-| 2.12 | DEACTIVATE_TIME_OUT_VALUE sweep: the DeactivateReq gate delay is 2^(v+3) cycles | P2 | `aou_deact_ctrl_test.mode-tov`
+| 2.12 | DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit | P2 | `aou_deact_ctrl_test.mode-tov`
 | 2.13 | No DeactivateReq while the DUT's own requests are outstanding | P2 | `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 | 2.14 | Requests received after DeactivateReq are still answered in DEACTIVATE | P2 | `aou_act_flit_test.mode-deact_rsp.v0p8`, `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1`, `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1`
 |===

@@ -2150,7 +2150,7 @@ while held>.
 ===== 44. `aou_deact_ctrl_test`
 Class `aou_deact_ctrl_test` extends `aou_base_test` (`uvm/tests/link/aou_deact_ctrl_test.svh`).
 
-*Purpose.* AOU_INIT deactivation controls: the DEACTIVATE_TIME_OUT_VALUE gate and
+*Purpose.* AOU_INIT deactivation controls: the DEACTIVATE_TIME_OUT_VALUE quiet window and
 INT_DEACTIVATE_PROPERTY (aou_deact_ctrl_vseq, +mode=tov|property).
 
 *Procedure.* Virtual sequence `aou_deact_ctrl_vseq` (`uvm/seq_lib/link/aou_deact_ctrl_vseq.svh`):
@@ -2164,9 +2164,9 @@ Deactivation controls in AOU_INIT.
 value v in +tov_values (default 0..7, shuffled) the remote die starts a few
 reads and software sets DEACTIVATE_START (CREDIT_MANAGE=1) +0..200 cycles
 later, so the DUT's last ReadData lands near the deactivation and its
-DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it.
-aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46; the
-quiet-window reading is the BUGS/057 interim).
+DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it
+(MAS 7.1: the window may already have elapsed when the TX was idle).
+aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46).
 
 ----
 +mode=property (plan 2.10; BUGS/010, which covers the bit too): the remote
@@ -2195,7 +2195,7 @@ before any DeactivateReq, in DEACTIVATE and again in the next ENABLED epoch
 *Plan items.*
 
 * 2.10: Verify `int_deactivate_property` status bit during deactivation
-* 2.12: DEACTIVATE_TIME_OUT_VALUE sweep: the DeactivateReq gate delay is 2^(v+3) cycles
+* 2.12: DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit
 
 [[aou-proc-aou_remote_react_test]]
 ===== 45. `aou_remote_react_test`

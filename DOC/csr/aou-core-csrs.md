@@ -195,7 +195,7 @@ Don't override. Generated from: aou_core
 
 #### deactivate_time_out_value field
 
-<p>Deactivation timeout value.</p>
+<p>Quiet window before DeactivateReq, in core clock cycles: 2^(value + 3), so 8, 16, 32, 64, 128, 256, 512 or 1024 (reset 0 is 8). The window runs while the activation FSM is ENABLED or DEACTIVATE and restarts whenever the TX path has a message to send; it is held clear in DISABLED and ACTIVATE. It may already have elapsed when DEACTIVATE_START is written, in which case DeactivateReq follows at once, subject to the other deactivation conditions. See MAS 7.1.</p>
 
 #### int_deactivate_start field
 

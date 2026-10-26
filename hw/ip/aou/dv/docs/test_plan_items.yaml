@@ -199,7 +199,7 @@
 - id: '2.12'
   section: '2.2'
   section_title: Link Deactivation Tests
-  title: 'DEACTIVATE_TIME_OUT_VALUE sweep: the DeactivateReq gate delay is 2^(v+3) cycles'
+  title: 'DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit'
   priority: P2
   added: MAS 7.1
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.

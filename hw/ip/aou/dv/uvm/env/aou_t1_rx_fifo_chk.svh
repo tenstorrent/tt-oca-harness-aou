@@ -12,10 +12,11 @@
 //   such message beyond the slack.
 // T1-L40 (MAS 7.3.2/7.3.4: the FIFO is emptied before ActivateReq): no more
 //   than the slack of them is still waiting when the DUT's ActivateReq arrives.
-// T1-L46 (MAS 7.1 DEACTIVATE_TIME_OUT_VALUE, read as a quiet window: BUGS/057
-//   interim): a DeactivateReq comes at least 2^(v+3) cycles (less tov_slack for
-//   the TX pipeline) after the DUT's last credited message; PropertyReq=1
-//   (DEACTIVATE_FORCE, BUGS/010) is exempt.
+// T1-L46 (MAS 7.1 DEACTIVATE_TIME_OUT_VALUE: a quiet window of 2^(v+3) cycles
+//   with nothing to transmit, which may already have elapsed): a DeactivateReq
+//   comes at least 2^(v+3) cycles (less tov_slack for the TX pipeline) after
+//   the DUT's last credited message; PropertyReq=1 (DEACTIVATE_FORCE, BUGS/010)
+//   is exempt.
 // T1-L47 (MAS 7.1 DEACTIVATE_START condition 1, CREDIT_MANAGE=0): a
 //   DeactivateReq comes only once the DUT has answered every remote request
 //   it had for more than cross_cycles (a request still crossing the link may

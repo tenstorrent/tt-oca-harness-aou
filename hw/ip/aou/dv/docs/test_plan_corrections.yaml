@@ -246,7 +246,7 @@
 - id: '2.12'
   added: 'MAS 7.1'
   priority: P2
-  title: 'DEACTIVATE_TIME_OUT_VALUE sweep: the DeactivateReq gate delay is 2^(v+3) cycles'
+  title: 'DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '2.13'
   added: 'AoU 8.3.2/8.4; BUGS/032'
