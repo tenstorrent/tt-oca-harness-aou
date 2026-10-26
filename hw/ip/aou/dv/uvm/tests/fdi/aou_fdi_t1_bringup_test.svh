@@ -215,10 +215,17 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       `uvm_info(get_type_name(), $sformatf(
                 "LinkError: software writes AOU_CON0.AOU_SW_RESET (+%0d cycles, pl_state_sts %s)",
                 delay, env.lsm.drv.state.name()), UVM_LOW)
-      apb_write(32'h0000_0004, 32'h0000_0010);
+      // The reset takes effect, and the link may come back and meet the next
+      // LinkError, before the APB transfer completes. So watch the state leave
+      // this LinkError from the write's start: waiting after the write would
+      // take that next LinkError for this one and never answer it.
+      fork
+        apb_write(32'h0000_0004, 32'h0000_0010);
+        while (lsm_vif.mon_cb.fdi_fsm_state === le_rtl ||
+               lsm_vif.mon_cb.fdi_fsm_state === le_spec)
+          @(lsm_vif.mon_cb);
+      join
       n_sw_reset++;
-      while (lsm_vif.mon_cb.fdi_fsm_state === le_rtl || lsm_vif.mon_cb.fdi_fsm_state === le_spec)
-        @(lsm_vif.mon_cb);
     end
   endtask
 
