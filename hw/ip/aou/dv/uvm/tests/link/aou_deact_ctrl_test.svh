@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// AOU_INIT deactivation controls: the DEACTIVATE_TIME_OUT_VALUE gate and
+// AOU_INIT deactivation controls: the DEACTIVATE_TIME_OUT_VALUE quiet window and
 // INT_DEACTIVATE_PROPERTY (aou_deact_ctrl_vseq, +mode=tov|property).
 class aou_deact_ctrl_test extends aou_base_test;
   `uvm_component_utils(aou_deact_ctrl_test)

@@ -1273,20 +1273,29 @@ activation is completed and AOU_ACTIVATE_STATE transitions to ENABLED.
 === 6.3 Deactivation Start
 
 Deactivation is initiated by setting the AOU_INIT.DEACTIVATE_START
-register. Setting this register does not immediately trigger sending a
-DeactivateReq message. The detailed conditions and sequence for
-deactivation can be found in the *Deactivation Sequence Flow* section.
-This section will only describe AOU_INIT.DEACTIVATE_TIME_OUT_VALUE SFR.
+register. The DeactivateReq waits until the conditions in
+xref:../MAS/software-operation.adoc#aou-71-sfr-setting[MAS Section 7.1]
+are met, including the DEACTIVATE_TIME_OUT_VALUE quiet window. The sequence
+is in the *Deactivation Sequence Flow* section below.
 
-* When software initiates a DeactivateReq by setting the SFR, there may
-still be outstanding requests that have not yet left AOU_CORE FDI
-outputs.
-* To handle this safely, a timeout mechanism is implemented to ensure
-that no valid packets remain in the AOU_TX_CORE.
-* If software guarantees that all responses to its issued requests have
-been received before setting the deactivation start SFR, the deactivate
-TIME_OUT_VALUE (AOU_INIT.DEACTIVATE_TIME_OUT_VALUE SFR) can be safely
-configured to a shorter duration.
+* AOU_INIT.DEACTIVATE_TIME_OUT_VALUE is the length of a quiet window on
+the TX path, 2^(v + 3) core clock cycles for a programmed value v (8,
+16, 32, 64, 128, 256, 512 or 1024; reset value 0 is 8). While the
+activation FSM is ENABLED or DEACTIVATE, the window completes after
+that many cycles with nothing to transmit, and it restarts when the TX
+path accepts or still holds a message. It is held clear in DISABLED and
+ACTIVATE.
+* The window may already have elapsed before software writes
+DEACTIVATE_START. When the TX path has been quiet for the whole window,
+the DeactivateReq follows the write at once; the other deactivation
+conditions still apply. When a message is still in the TX path, or one
+is accepted after the write, the DeactivateReq waits until that traffic
+has been gone for the full window.
+* A response the local die still has to send keeps the window open.
+Having received the responses to its own requests is a separate
+condition. When the TX path is already idle, the programmed value adds
+no further wait. A shorter value shortens only the wait after a message
+that is still in the TX path.
 
 The ACTIVATION_OP field encodes deactivation messages as follows:
 

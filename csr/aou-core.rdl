@@ -73,7 +73,7 @@ addrmap aou_core {
         field { sw = r; hw = w; desc = "Slave transaction completion status. Read-only, driven by HW."; } slv_tr_complete[9:9];
         field { sw = rw; hw = rw; onwrite = woclr; desc = "Activation start interrupt status. Set by HW, write 1 to clear."; } int_activate_start[8:8] = 0;
         field { sw = rw; hw = rw; onwrite = woclr; desc = "Deactivation start interrupt status. Set by HW, write 1 to clear."; } int_deactivate_start[7:7] = 0;
-        field { sw = rw; desc = "Deactivation timeout value."; } deactivate_time_out_value[6:4] = 0;
+        field { sw = rw; desc = "Quiet window before DeactivateReq, in core clock cycles: 2^(value + 3), so 8, 16, 32, 64, 128, 256, 512 or 1024 (reset 0 is 8). The window runs while the activation FSM is ENABLED or DEACTIVATE and restarts whenever the TX path has a message to send; it is held clear in DISABLED and ACTIVATE. It may already have elapsed when DEACTIVATE_START is written, in which case DeactivateReq follows at once, subject to the other deactivation conditions. See MAS 7.1."; } deactivate_time_out_value[6:4] = 0;
         field { sw = r; hw = w; desc = "Indicates the AoU activation FSM is in the DISABLED state. Read-only, driven by HW."; } activate_state_disabled[3:3];
         field { sw = r; hw = w; desc = "Indicates the AoU activation FSM is in the ENABLED state. Read-only, driven by HW."; } activate_state_enabled[2:2];
         field { sw = rw; hw = rw; desc = "Write 1 to initiate AoU protocol deactivation. Self-clears when activate_state_disabled asserts."; } deactivate_start[1:1] = 0;
