@@ -36,6 +36,7 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
     bit forced = 1'(arg_int("force", force_dflt));
     bit early = 1'(arg_int("early_act", 0));
     int unsigned n = num_txns;
+    int unsigned n_act0;
     if (early) env.rst.wait_released();
     else link_up();
     check_state(1'b0);
@@ -47,6 +48,7 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
       if (early) early_activate();
       else sw_activate(who, order);
       check_state(1'b1);
+      n_act0 = env.sw_isr.n_act;
       if (busy) begin
         busy_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced, cm, n);
       end else begin
@@ -54,6 +56,7 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
         drain();
         sw_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced, cm);
       end
+      redo_if_woken(n_act0, cm);
       check_state(1'b0);
     end
     // A clean restart after the last deactivation, with credits advertised
@@ -116,6 +119,23 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
     end
     if (pending())
       `uvm_error(get_type_name(), "T1-L07: transactions still pending after 4 re-activations")
+  endtask
+
+  // MAS 7.3.5: INT_ACTIVATE_START rises in DISABLED while AOU_INIT.SLV_TR_COMPLETE is 0,
+  // which includes a response already received and still waiting for a slow local
+  // manager to take it. Software (aou_t1_sw_isr) then re-activates, so the DUT can be
+  // ENABLED again by the time the test reads AOU_INIT. When that happened, let the
+  // service finish and deactivate once more before checking the DISABLED state.
+  task redo_if_woken(int unsigned n_act0, int cm);
+    int unsigned k = 0;
+    wait_cycles(8);   // the interrupt rises with DISABLED; let the ISR see it
+    while (env.sw_isr.n_act != n_act0 && k++ < 4) begin
+      n_act0 = env.sw_isr.n_act;
+      `uvm_info(get_type_name(), "INT_ACTIVATE_START after the deactivation: deactivating again",
+                UVM_LOW)
+      env.sw_isr.wait_idle();
+      if (!env.status.disabled) sw_deactivate(AOU_T1_BY_APB, 1'b0, cm);
+    end
   endtask
 
   function bit pending();
