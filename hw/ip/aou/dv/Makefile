@@ -241,7 +241,9 @@ UVM_DPI_DIR := $(UVM_CORE_ROOT)/src/dpi
 # bin counts to fc.json (cov/sv/aou_fc_pkg.sv); fc_report union-merges both.
 ifeq ($(COV),1)
 DEFINES += AOU_AXI4_FC_COV_EN
-FLISTS += $(UVM_ROOT)/cov/sv/aou_axi4_fc_pkg.sv $(UVM_ROOT)/cov/sv/aou_axi4_coverage_mod.sv $(UVM_ROOT)/cov/sv/aou_axi4_cov_bind.sv
+# The incdir is for aou_axi4_coverage_mod.sv's `include; the register bench's sim
+# config, unlike T1's, has no cov/sv incdir of its own.
+FLISTS += +incdir+$(UVM_ROOT)/cov/sv $(UVM_ROOT)/cov/sv/aou_axi4_fc_pkg.sv $(UVM_ROOT)/cov/sv/aou_axi4_coverage_mod.sv $(UVM_ROOT)/cov/sv/aou_axi4_cov_bind.sv
 FC_RUN = +AXI4_FC_RPT_DIR=$(RUN_DIR) +AXI4_FC_RUN_NAME=$(RUN_ID) +aou_fc_json=$(RUN_DIR)/fc.json
 endif
 
