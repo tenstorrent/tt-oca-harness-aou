@@ -292,44 +292,6 @@
   note: CREDIT_MANAGE=1, the DUT returns RDATA/WRESP credit after its DeactivateAck (first seen with +when=queued)
 
 # Entries added on the integration branch by streams I, J, K and L.
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'T1-RM01: WriteResp with no write outstanding'
-  seed_dependent: true
-  note: +side=mgr +kind=b. Clearing SPLIT_BID_MISMATCH_ERR sends WriteResps with the previous B's ID to the remote die
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'T1-RM02: ReadData with no read outstanding'
-  seed_dependent: true
-  note: +side=mgr +kind=r. Clearing SPLIT_RID_MISMATCH_ERR sends the never-accepted R beat to the remote die
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'split_bid_mismatch_err read 0x1, expected 0x0'
-  seed_dependent: true
-  note: +side=mgr. The error sets again while the unaccepted response is still presented
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'split_rid_mismatch_err read 0x1, expected 0x0'
-  seed_dependent: true
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'split_bid_mismatch_info read 0x'
-  seed_dependent: true
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'split_rid_mismatch_info read 0x'
-  seed_dependent: true
-
-- test: aou_id_mismatch_test
-  bug: BUGS/029
-  check: 'T1-E06: INT_MI0_ID_MISMATCH is 1, expected 0'
-  seed_dependent: true
-
 # BUGS/033 in aou_pack_test +pk=act (CREDIT_MANAGE=0): a MsgCredit in the flit of the
 # DUT's DeactivateAck.
 - test: aou_pack_test
@@ -428,9 +390,9 @@
   when_re: 'PERF_GATE (1x512-sp64|4x512-sp64|3x512-sp64|2x512-tp32_64)\|\d\|S1\|'
   seed_dependent: true
   note: >-
-    reads both ways: the DUT TX link carries remote read data at ~97.0-97.8% of the model,
-    right on the gate (1x512 bw_rd l2r 0.9704 in the first gated run, passing); not
-    seed-dependent on this deterministic bench, but borderline, so it may or may not fire
+    reads both ways: the DUT TX link carries remote read data at 97.0-97.8% of the model, just
+    above the gate (bw_rd l2r: 1x512 0.9704, 3x512 0.9735, 4x512 0.9773, 2x512-tp32_64 0.9780 and
+    0.9735; the same on every seed), so it does not fire today; kept for when it dips below
 
 - test: aou_dft_scan_test
   bug: BUGS/052
@@ -574,14 +536,6 @@
   requires: BUGS/033
   seed_dependent: true
   note: the same flit seen by AOU_FDI_CHECKER
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/019
-  check: 'T1-C40: [l3] DUT advertised'
-  seed_dependent: true
-  note: >-
-    an ActivateReq in ENABLED restarts the DUT's activation, which advertises the whole RX FIFO
-    again on top of the credit the remote die holds (019 B and its addendum); +state=enabled cases
 
 - test: '*'
   bug: BUGS/059
