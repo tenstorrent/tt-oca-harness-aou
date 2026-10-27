@@ -135,6 +135,14 @@ def read_rows(out_root, build, rid):
     return rows
 
 
+def planned_runs(args, u):
+    """The runs run_list.py plans for a build (its --dry-run), or None if it cannot say."""
+    p = subprocess.run(run_cmd(args, u) + ["--dry-run"], cwd=UVM_ROOT, capture_output=True,
+                       text=True, check=False)
+    m = re.search(r"^(\d+) run\(s\)", p.stdout, re.M)
+    return int(m.group(1)) if m else None
+
+
 def verdict(status):
     """(PASS|XFAIL|FAIL, XPASS note) of a run_list.py status; anything unknown is FAIL."""
     base, _, note = (status or "").partition("+")
@@ -501,6 +509,12 @@ def summary(args, units, notes, state, regdir):
                 c["XPASS"] += xpass
                 if base == "FAIL" or xpass:
                     bad.append((u, r))
+            want = planned_runs(args, u)
+            if want is not None and c["runs"] < want:
+                rc = state.get("runs", {}).get(u.build)
+                missing.append(f"{u.build}: {c['runs']} of {want} runs have results (drained or "
+                               f"interrupted{'' if rc is None else f', run_list.py rc={rc}'}; see "
+                               f"{os.path.join(regdir, 'logs', 'run-' + u.label + '.log')})")
             for k in c:
                 sec[k] += c[k]
             lines.append(f"| {u.build} | " + " | ".join(str(c[k]) for k in total) + " |")
@@ -521,7 +535,7 @@ def summary(args, units, notes, state, regdir):
                            + ([f"RTL_PATCH={args.rtl_patch}"] if args.rtl_patch else []))
         lines += ["", f"Rerun every failing scenario (all its seeds) under a new RID: `{again}`", ""]
     if missing:
-        lines += [f"## Builds without results ({len(missing)})", ""] + [f"- {m}" for m in missing] + [""]
+        lines += [f"## Builds with missing results ({len(missing)})", ""] + [f"- {m}" for m in missing] + [""]
     if state.get("cov_failed"):
         lines += ["## Coverage", "", f"- failed: {', '.join(state['cov_failed'])} "
                                      f"(logs in {os.path.join(regdir, 'logs')})", ""]
@@ -531,7 +545,7 @@ def summary(args, units, notes, state, regdir):
     ok = not bad and not missing and not state.get("cov_failed")
     lines.append(f"Result: {'PASS' if ok else 'FAIL'}: {total['runs']} runs, {total['PASS']} PASS, "
                  f"{total['XFAIL']} XFAIL, {total['FAIL']} FAIL, {total['XPASS']} XPASS"
-                 + (f", {len(missing)} build(s) without results" if missing else ""))
+                 + (f", {len(missing)} build(s) with missing results" if missing else ""))
     text = "\n".join(lines) + "\n"
     with open(os.path.join(regdir, "summary.md"), "w", encoding="utf-8") as fh:
         fh.write(text)
@@ -669,13 +683,22 @@ def main(argv=None):
             for u in units:
                 if "build" in steps and u not in units_ok:
                     continue
-                if results_files(args.out_root, u.build, args.rid):
-                    print(f"regress: run {u.label}: {u.build} has results for rid {args.rid}; skipped")
-                    continue
+                have = len(read_rows(args.out_root, u.build, args.rid))
+                if have:
+                    # A drained or interrupted run_list.py leaves results short of its plan.
+                    want = planned_runs(args, u)
+                    if want is not None and have >= want:
+                        print(f"regress: run {u.label}: {u.build} has results for rid {args.rid}; skipped")
+                        continue
+                    print(f"regress: run {u.label}: {u.build} has {have} of {want} runs for rid "
+                          f"{args.rid}; running it again")
                 todo.append(("run-" + u.label, run_cmd(args, u)))
             print(f"regress: {len(todo)} run_list.py job(s), -j {args.jobs} each; control files "
                   f"out/<build>/{args.rid}.ctl (scripts/run_ctl.py)", flush=True)
-            runner.execute("run", todo)
+            rcs = runner.execute("run", todo)
+            state.setdefault("runs", {}).update(
+                {u.build: rcs["run-" + u.label] for u in units if "run-" + u.label in rcs})
+            save_state(regdir, state)
         elif step == "cov":
             jobs, ujob = cov_cmds(args, units, configs, regdir)
             rcs = runner.execute("cov", jobs, lsf_job=True)

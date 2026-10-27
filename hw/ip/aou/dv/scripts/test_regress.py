@@ -23,6 +23,16 @@ import unittest
 
 SCRIPTS = os.path.dirname(os.path.abspath(__file__))
 REGRESS = os.path.join(SCRIPTS, "regress.py")
+UVM_ROOT = os.path.dirname(SCRIPTS)
+
+
+def planned(tb, testlist, items):
+    """The test of each run run_list.py plans on 1x512-sp64 (its --dry-run), so the expected
+    counts follow the testlists instead of being written into this test."""
+    p = subprocess.run([sys.executable, "-I", os.path.join(SCRIPTS, "run_list.py"), "--tb", tb,
+                        "--target", "1x512-sp64", "--dry-run", os.path.join(UVM_ROOT, testlist),
+                        "--items", *items.split()], capture_output=True, text=True, check=True)
+    return [ln.split()[1] for ln in p.stdout.splitlines() if ln.startswith("run ")]
 
 FAKE_MAKE = textwrap.dedent("""\
     #!/usr/bin/env python3
@@ -127,8 +137,13 @@ class Regress(unittest.TestCase):
             summary = fh.read()
         for sec in ("## T1", "## reg", "## assert", "## l3_unit", "## axi_selftest"):
             self.assertIn(sec, summary)
-        self.assertIn("| vcs-t1-1x512-sp64 | 12 | 11 | 0 | 1 | 0 |", summary)
-        self.assertIn("| vcs-reg-1x512-sp64 | 2 | 2 | 0 | 0 | 2 |", summary)
+        t1 = planned("t1", "testlists/all.toml", "smoke assertions")
+        nf = t1.count("aou_fdi_t1_bringup_test")
+        reg = planned("reg", "testlists/registers.toml", "smoke")
+        nx = reg.count("aou_reg_hw_reset_test")
+        self.assertTrue(nf and nx)
+        self.assertIn(f"| vcs-t1-1x512-sp64 | {len(t1)} | {len(t1) - nf} | 0 | {nf} | 0 |", summary)
+        self.assertIn(f"| vcs-reg-1x512-sp64 | {len(reg)} | {len(reg)} | 0 | 0 | {nx} |", summary)
         self.assertIn("FAIL vcs-t1-1x512-sp64 aou_fdi_t1_bringup_test", summary)
         self.assertIn("TEST=aou_fdi_t1_bringup_test SEED=", summary)
         self.assertIn("Result: FAIL", summary)
@@ -151,6 +166,28 @@ class Regress(unittest.TestCase):
                          ["aou_fdi_t1_bringup_test", "aou_reg_hw_reset_test"])
         self.assertIn("Result: PASS", p.stdout)
 
+    def test_partial_results(self):
+        # A drained or interrupted run_list.py leaves a results file short of its plan.
+        items = ("--items", "smoke", "--benches", "t1")
+        n = len(planned("t1", "testlists/all.toml", "smoke"))
+        p = self.regress("--sim", "vcs", "--rid", "p1", *items)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        files = glob.glob(os.path.join(self.out, "vcs-t1-1x512-sp64", "results*.rid.p1.csv"))
+        with open(files[0], newline="", encoding="utf-8") as fh:
+            rows = list(csv.reader(fh))
+        with open(files[0], "w", newline="", encoding="utf-8") as fh:
+            csv.writer(fh).writerows(rows[:-1])
+        p = self.regress("--sim", "vcs", "--rid", "p1", *items, "--steps", "summary")
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        self.assertIn(f"vcs-t1-1x512-sp64: {n - 1} of {n} runs have results", p.stdout)
+        self.assertIn("Result: FAIL", p.stdout)
+        runs = len(self.calls("run"))
+        p = self.regress("--sim", "vcs", "--rid", "p1", *items, "--steps", "run,summary")
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        self.assertIn(f"has {n - 1} of {n} runs for rid p1; running it again", p.stdout)
+        self.assertEqual(len(self.calls("run")), runs + n)
+        self.assertIn("Result: PASS", p.stdout)
+
     def test_build_failure(self):
         p = self.regress("--sim", "vcs", "--rid", "b1", "--items", "smoke", "--benches", "t1 reg",
                          FAKE_BUILD_FAIL="vcs-reg-1x512-sp64")
@@ -161,7 +198,7 @@ class Regress(unittest.TestCase):
         for f in glob.glob(os.path.join(self.out, "vcs-t1-1x512-sp64", "results*.rid.b1.csv")):
             with open(f, newline="", encoding="utf-8") as fh:
                 rows += list(csv.DictReader(fh))
-        self.assertEqual(len(rows), 12)     # smoke: 4 scenarios, 12 seeds
+        self.assertEqual(len(rows), len(planned("t1", "testlists/all.toml", "smoke")))
 
     def test_bad_options(self):
         self.assertNotEqual(self.regress("--rid", "a b", "--dry-run").returncode, 0)
