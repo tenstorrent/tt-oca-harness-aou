@@ -911,8 +911,8 @@ instance of [.monospaced]#++AOU_SOC_GFMUX_LVT++#) that selects the reset source 
   (functional SW reset)  |   GFMUX     |---> w_DFTED_sw_resetn ---> AOU_CORE.I_RESETN,
                          |             |                            AOU_FIFO_RP.I_RESETN
                          |  I_B        |
-  AOU_SOC_BUF(1'b0)     |             |
-  (scan bypass: low)     +-------------+
+  AOU_SOC_BUF(1'b1)     |             |
+  (scan bypass: high)    +-------------+
 ....
 
 * *Functional mode* ([.monospaced]#++TIEL_DFT_MODESCAN++# = 0): The mux selects [.monospaced]#++I_A++#,
@@ -920,14 +920,18 @@ the functional software-controlled reset path
 ([.monospaced]#++~r_sw_reset & I_RESETN++#). This allows the CSR-writable SW reset to
 combine with the hardware reset.
 * *Scan mode* ([.monospaced]#++TIEL_DFT_MODESCAN++# = 1): The mux selects [.monospaced]#++I_B++#, a
-constant [.monospaced]#++1'b0++# driven through [.monospaced]#++AOU_SOC_BUF++#
+constant [.monospaced]#++1'b1++# driven through [.monospaced]#++AOU_SOC_BUF++#
 ([.monospaced]#++dft_persistent_buf_scan_resetn_sw++#). This value de-asserts the
 active-low SW reset, neutralizing it so that scan chains can shift
 freely without the software reset logic interfering with controllability
-or observability.
+or observability. [.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_FIFO_RP++# stay out of
+reset for as long as [.monospaced]#++TIEL_DFT_MODESCAN++# is high, in shift and in capture. A
+write to [.monospaced]#++AOU_SW_RESET++# in scan mode does not reset them: the bit stays set
+and [.monospaced]#++O_SW_RESET++# stays high until [.monospaced]#++TIEL_DFT_MODESCAN++# falls,
+and the software reset then takes effect.
 
 The [.monospaced]#++AOU_SOC_BUF++# instance exists solely to prevent the synthesis tool
-from optimizing away the tied-low constant; it must be preserved as a
+from optimizing away the tied-high constant; it must be preserved as a
 persistent buffer (see xref:aou-ig-library-cell-replacement[Section 8.7]).
 
 The SDC file ([.monospaced]#++INTEG/constraints/aou_core_top.sdc++#) constrains this pin
@@ -2179,7 +2183,7 @@ classified as a test-mode signal, not a scannable data input.
 
 *[.monospaced]#++AOU_SOC_BUF++# -- Optimization protection*
 
-This buffer drives the tied-low scan-reset bypass value into
+This buffer drives the tied-high scan-reset bypass value into
 [.monospaced]#++u_sw_reset_mux++#. Without protection, the synthesis tool will optimize
 it away (replacing it with a direct tie-off), which may cause the
 downstream reset mux to be optimized or restructured in ways that break
