@@ -217,7 +217,7 @@ rules is an open item (`OPEN_ITEMS.md`).
 | `ci` | The pull-request gate: `smoke`, `g1a`, `g1b`, `t1_api` and the `datapath` area's default-target scenarios (real AXI traffic), on the default target (`.github/workflows/uvm-smoke.yml`, Verilator)
 | `<area>` | One group per testlist (`g1a`, `g1b`, `t1_api`, `fdi`, `datapath`, `features`, `stress`, `link`, `errors`, `err_int`, `lifecycle`, `matrix`, `perf`, `assertions`), the unit `run_list.py --per-list` reports on
 | `functional` | The functional areas (every area but `stress`, `matrix`, `perf` and `assertions`): the nightly on the default target
-| `all` | Every non-blocked scenario of the bench: the full regression, swept over every target (`run_list.py --target <t>`; the `assertions` scenarios on the `<t>-assert` targets)
+| `all` | Every non-blocked scenario of the bench: the full regression, swept over every target (`run_list.py --target <t>`; the `assertions` scenarios on the `<t>-assert` targets). `make regress` builds and runs it with the register and unit benches below and prints one summary (README "Run everything")
 | register bench `smoke` / `all` | `aou_reg_hw_reset_test`, then every register test, on every target
 | `l3_unit`, `axi_selftest` `all` | The model unit benches, run on any bench change
 |===

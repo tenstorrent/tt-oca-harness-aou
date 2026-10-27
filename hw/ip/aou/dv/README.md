@@ -58,6 +58,88 @@ make lint                                    # check-config, Verible and Verilat
 `all`); `--tb reg` selects the register bench and its testlist. `make help`
 lists every make target and variable.
 
+### Run everything
+
+`make regress` is the full regression: it builds every bench the testlists need and
+runs every scenario on it, then prints one summary. It needs the
+[prerequisites](#prerequisites) for the simulator you pick, `make setup`, and
+preferably LSF. Without `bsub` (or with `LSF=0`) the builds go one after another on
+the current host and each list runs as many runs at once as it has CPUs, so use a
+machine of your own, never a shared login host.
+
+```sh
+make regress SIM=vcs RID=full1             # every CONFIG, every bench, every testlist
+make regress SIM=verilator RID=full1v      # the same on Verilator, without the RTL assertions
+make regress SIM=vcs RID=pr1 CONFIGS="1x512-sp64 2x512-tp32_64" ITEMS="smoke ci assertions"
+make regress SIM=vcs RID=full1 DRY_RUN=1   # print the plan and the run counts only
+```
+
+What it does, in steps (`STEPS=build,run,summary`, plus `cov` with `COV=1`):
+
+1. **build**: `make build` of the T1 bench (`TB=t1`) and the register bench (`TB=reg`)
+   for every configuration (`make configs`), the `RTL_ASSERT=1` build of every
+   configuration with a `<CONFIG>-assert` target, and the two model unit benches
+   (`TB=l3_unit`, `TB=axi_selftest`): 27 builds on VCS. The RTL assertions are VCS-only
+   ([RTL assertions](#rtl-assertions)), so on Verilator they are skipped with a note: 22 builds.
+2. **run**: one `scripts/run_list.py` per build, with `--per-list`: T1 runs every
+   testlist `all.toml` includes except `assertions.toml`, which runs on the `-assert`
+   builds; the register bench runs `registers.toml` and the unit benches their own
+   lists. That is about 5,130 runs on VCS (4,870 T1, 210 register, 37 assertion, 13 unit).
+3. **cov** (`COV=1` only): `make cov_report` per configuration for this RID's
+   passing runs, the register bench's folded in, then the union over the
+   configurations in `out/regress/<RID>/union/`: code coverage (`urg -map AOU_CORE_TOP`
+   on VCS, `verilator_coverage` on Verilator) and functional coverage (`fc_report.py`).
+   The unit benches have no DUT and the `-assert` builds are left out of coverage.
+   The configurations differ in DUT parameters, so on VCS a module merges across them
+   only where its shape matches (urg warns `UCAPI-MAP-SHAPEMISMATCH` for the rest);
+   read the union's instance rows, not its module-definition table, which holds the
+   first configuration's modules only.
+4. **summary**: a table per bench (T1, reg, assert, l3_unit, axi_selftest) of runs, PASS,
+   XFAIL, FAIL and XPASS from the results CSVs, every FAIL and XPASS run with its run
+   directory and the `make run ... WAVES=1` line that repeats it, and an overall
+   result. The exit status is 1 when any run is FAIL or XPASS, or a build has no results.
+
+Under LSF every build starts at once, then every `run_list.py`, each with `RUN_JOBS`
+runs in flight (default 8; the CPU count with `LSF=0`), steerable live through its
+control file `out/<build>/<RID>.ctl` ([Regressions](#regressions)). On VCS the whole
+regression is about 14 CPU hours: each build takes about a minute, and the runs take
+well under an hour of wall time when LSF grants the slots (up to about 200 at once). A
+Verilator run costs about twice the CPU of a VCS run, and a Verilator T1 build takes
+several minutes (four or more); `COV=1` costs about three and a half times the CPU of
+a plain VCS run. `build/metrics.jsonl` records every job, so your own numbers are there.
+
+Logs (one per build and per `run_list.py`), the exact commands (`commands.sh`) and
+`summary.md` go to `out/regress/<RID>/`; the run directories and the results CSVs
+(`results_<list>.rid.<RID>.csv`) are where `make run` and `run_list.py` always put
+them, in `out/<build>/`.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `SIM` | `vcs` if on `PATH`, else `verilator` | Simulator |
+| `RID` | `r<yymmdd>-<hhmm>` | Regression ID; repeat it to resume |
+| `CONFIGS` | every configuration | Configurations, space separated |
+| `BENCHES` | `t1 reg assert l3_unit axi_selftest` | Benches to build and run |
+| `ITEMS` | everything | Groups or scenarios, run on every bench whose testlist defines them (`ITEMS="smoke ci assertions"` is the quick check) |
+| `COV` | 0 | 1: coverage builds and runs, then the `cov` step |
+| `RTL_PATCH` | none | Absolute path of a candidate RTL fix ([below](#building-against-a-candidate-rtl-fix)) |
+| `RUN_JOBS` | 8 (LSF), CPU count | Runs in flight per `run_list.py` |
+| `STEPS` | `build,run,summary` (`,cov`) | The steps to do, in their fixed order |
+| `RERUN_FAILED` | none | An earlier RID: run only its scenarios with a FAIL or XPASS run |
+| `COV_MEM` | `16GB` | LSF memory of each coverage job, always with a unit |
+| `DRY_RUN` | 0 | 1: print the plan, build and run nothing |
+
+Anything else on the command line (`LSF=0`, `LSF_EXTRA_OPTS`, `AXI4PC=0`, ...) reaches
+the `make build` and `make run` calls the regression makes.
+
+To **resume** an interrupted regression, repeat it with the same `RID`, leaving out the
+steps already done: `make regress RID=full1 STEPS=run,summary`. A build that already has
+results for that RID is skipped, so only the unfinished lists run again (from their
+start). `STEPS=summary` reprints the summary. To **rerun the failures**, give a new RID:
+`make regress RID=full1b RERUN_FAILED=full1` rebuilds only the builds that had a FAIL or
+XPASS and runs every seed of each failing scenario; a single run is repeated with the
+`make run` line the summary prints for it. `python3 scripts/test_regress.py` tests the
+script with a fake `make`.
+
 ### Through tt-oca-harness (not yet validated)
 
 Running the bench through the harness runner is a follow-up to the layout
@@ -119,7 +201,7 @@ into one book with Asciidoctor.
 | `cov/` | `sv/`: the coverage service, the AXI4 coverage monitors and binds; `config/vcs/`: coverage scope, exclusion and FSM reset filter files |
 | `testlists/` | TOML testlists (`all.toml` and the per-area lists, `registers.toml`, `l3_unit.toml`, `axi_selftest.toml`), `plan_ids.yaml` |
 | `docs/` | The documents above; `gen/` is generated |
-| `scripts/` | `run_list.py`, `check_run.py`, `sim_cfg.py`, `testlist.py`, the lint and report scripts, the harness-leg scripts; `bugs/`: the bug-report template and the tools that validate staged drafts, file them as GitHub issues and rewrite the bench's citations |
+| `scripts/` | `regress.py` (`make regress`), `run_list.py`, `check_run.py`, `sim_cfg.py`, `testlist.py`, the lint and report scripts, the harness-leg scripts; `bugs/`: the bug-report template and the tools that validate staged drafts, file them as GitHub issues and rewrite the bench's citations |
 | `aou_sim_cfg.toml`, `aou_reg_sim_cfg.toml`, `aou_l3_unit_sim_cfg.toml`, `aou_axi_selftest_sim_cfg.toml` | One sim config per top: sources, include directories, `[targets.<CONFIG>]` defines, run modes, testlist |
 | `expected_fail.yaml` | Known DUT-bug failures the grader accepts as XFAIL, each tied to its GitHub issue (`tenstorrent/tt-oca-harness-aou#<n>`; `BUGS/<NNN>` for a draft staged but not yet filed) |
 | `site/` | Git-ignored site settings (`site.mk`, `env.sh`, `public_patterns.txt`) |
@@ -309,7 +391,8 @@ are tuned from.
 
 ## Regressions
 
-`scripts/run_list.py` runs every scenario and seed of a testlist
+`make regress` ([Run everything](#run-everything)) builds and runs the whole
+regression through the script described here. `scripts/run_list.py` runs every scenario and seed of a testlist
 (`testlists/*.toml`; default: the bench's aggregate, `testlists/all.toml` for
 T1) through `make run`, at most `-j` at a time, and writes
 `out/<build>/results_rid.<rid>.csv` (one `results_<list>.rid.<rid>.csv` per

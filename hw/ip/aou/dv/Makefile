@@ -195,7 +195,7 @@ RAL_PKG := $(UVM_ROOT)/uvm/env/gen/aou_core_csr_uvm_pkg.sv
 # The sim config's include directories and ordered sources, the top last. Not
 # resolved for the goals that need no build: the source lists refer to the
 # dependencies make setup fetches, so a fresh clone must get that far.
-NO_BUILD_GOALS := help configs setup ral docs check-config check-public clean clean-out
+NO_BUILD_GOALS := help configs setup ral docs check-config check-public clean clean-out regress lsf-bsub
 ifneq ($(filter-out $(NO_BUILD_GOALS),$(or $(MAKECMDGOALS),build)),)
 TB_FLIST := $(shell $(SIM_CFG) filelist)
 ifeq ($(TB_FLIST),)
@@ -409,7 +409,7 @@ STALE_CMD = python3 -I $(UVM_ROOT)/scripts/stale_build.py --build-dir $(BUILD_DI
 TB_SOURCES = $(shell find $(UVM_ROOT) -path $(UVM_ROOT)/.deps -prune -o -path $(UVM_ROOT)/build -prune -o -path $(UVM_ROOT)/out -prune \
                -o -path $(UVM_ROOT)/uvm/env/gen -prune -o -type f \( -name '*.sv' -o -name '*.svh' \) -print | sort)
 
-.PHONY: help configs setup ral docs build run test cov_report fc_report check-config lint clean clean-out check-public plan_status compare rule_inventory perf_report perf_targets perf_check job-hooks stale-check build-name
+.PHONY: help configs setup ral docs build run test cov_report fc_report check-config lint clean clean-out check-public plan_status compare rule_inventory perf_report perf_targets perf_check job-hooks stale-check build-name regress lsf-bsub
 help:
 	@printf '%s\n' \
 	  'make setup                 Fetch the pinned UVM-core, OCAH library, z3, PeakRDL, pywellen' \
@@ -425,6 +425,9 @@ help:
 	  '                           $(TEST_DEFAULT_reg) (reg), $(TEST_DEFAULT_axi_selftest)' \
 	  '                           (axi_selftest), $(TEST_DEFAULT_l3_unit) (l3_unit)' \
 	  'make test                  Build, then run' \
+	  'make regress [SIM=..]      Build and run everything: every bench, CONFIG and testlist,' \
+	  '           [RID=..] [COV=1]  then one PASS/XFAIL/FAIL/XPASS summary (out/regress/<RID>/);' \
+	  '                           CONFIGS, BENCHES, ITEMS, RTL_PATCH, RUN_JOBS, STEPS, RERUN_FAILED, DRY_RUN=1' \
 	  'TB=t1|reg [CONFIG=<name>]  T1 / register bench build configuration, a [targets.<name>]' \
 	  '                           of aou_sim_cfg.toml (default $(shell $(SIM_CFG) default-target))' \
 	  'make configs               List the build configurations (CONFIG names and parameters)' \
@@ -497,6 +500,29 @@ run:
 	-$(call submit,run,$(RUN_ID),$(LSF_RUN_RES),$(RUN_DIR)/run.sh,$(RUN_DIR)/job.out)
 	@set -o pipefail; python3 $(UVM_ROOT)/scripts/check_run.py --test $(TEST) --expected $(UVM_ROOT)/expected_fail.yaml $(RUN_LOG) \
 	  | tee $(RUN_DIR)/verdict.txt
+
+# The whole regression (scripts/regress.py, README "Run everything"). Every make variable
+# given here reaches the builds and runs it starts; RID defaults to a new r<date>-<time>.
+CONFIGS ?=
+BENCHES ?=
+ITEMS ?=
+RUN_JOBS ?=
+STEPS ?=
+RERUN_FAILED ?=
+COV_MEM ?= 16GB
+DRY_RUN ?= 0
+regress:
+	python3 -I $(UVM_ROOT)/scripts/regress.py --sim $(SIM) --lsf $(LSF) --cov $(COV) \
+	  $(if $(filter-out default file,$(origin RID)),--rid '$(RID)') $(if $(RTL_PATCH),--rtl-patch '$(RTL_PATCH)') \
+	  $(if $(CONFIGS),--configs '$(CONFIGS)') $(if $(BENCHES),--benches '$(BENCHES)') \
+	  $(if $(ITEMS),--items '$(ITEMS)') $(if $(RUN_JOBS),-j $(RUN_JOBS)) $(if $(STEPS),--steps '$(STEPS)') \
+	  $(if $(RERUN_FAILED),--rerun-failed '$(RERUN_FAILED)') --cov-mem $(COV_MEM) \
+	  $(if $(filter 1,$(DRY_RUN)),--dry-run)
+
+# For scripts/regress.py: the bsub line of the jobs make does not submit itself (coverage).
+lsf-bsub:
+	$(info $(LSF_BSUB))
+	@:
 
 # Warn (stderr) when the build is older than its sources or its defines changed; never fails.
 build-name:
