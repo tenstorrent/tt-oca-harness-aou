@@ -61,15 +61,16 @@ tags = ["errors"]
 run_modes = ["errors"]
 args = ["+mask=1"]
 
-# The Adapter enters LinkError as soon as lp_linkerror rises. The invalid
+# The Adapter answers lp_linkerror by itself by default; here the test
+# recovers instead (an Adapter LinkError from the test). The invalid
 # ActivateReq gets no ActivateAck either way (AoU v0.8 8.3.3/8.4).
 [[tests]]
-name = "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-1"
+name = "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0"
 module = { uvm = "aou_invalid_actmsg_test" }
 seed = 1
 tags = ["errors"]
 run_modes = ["errors"]
-args = ["+state=deactivate", "+op=act_req", "+react_linkerror=1"]
+args = ["+state=deactivate", "+op=act_req", "+react_linkerror=0"]
 
 # T1-L15 (no ActivateAck to an invalid ActivateReq) with pl_trdy holes and low
 # runs, so the DUT's TX output stage is busy when the invalid ActivateReq
@@ -162,7 +163,7 @@ tests = [
   "aou_invalid_actmsg_test.state-deactivate",
   "aou_invalid_actmsg_test.state-disabled",
   "aou_invalid_actmsg_test.mask-1",
-  "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-1",
+  "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0",
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8",
   "aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8",
   "aou_linkreset_timeout_test.src-act_ack",

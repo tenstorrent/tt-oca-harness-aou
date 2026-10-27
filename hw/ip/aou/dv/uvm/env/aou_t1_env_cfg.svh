@@ -100,13 +100,9 @@ class aou_t1_env_cfg extends uvm_object;
     super.new(name);
     lsm_cfg = aou_lsm_cfg::type_id::create("lsm_cfg");
     lsm_cfg.n_phy = AOU_T1_N_PHY;
-    // T1 tests answer the DUT's LinkReset request themselves (recover():
-    // an Adapter LinkError, which still waits for lp_linkerror to fall,
-    // FDI-R49). The Adapter's own reaction to lp_linkerror is run by
-    // errors.toml with +react_linkerror=1. Turning it on for every T1 test
-    // changes when the link goes down in all of them and has not been
-    // measured.
-    lsm_cfg.react_linkerror_en = 1'b0;
+    // The Adapter answers the DUT's lp_linkerror by itself, as a UCIe Adapter
+    // does (react_linkerror_en, on by default in aou_lsm_cfg); +react_linkerror=0
+    // leaves it to the test's recover().
     foreach (fdi_cfg[p]) begin
       fdi_cfg[p] = aou_fdi_cfg::type_id::create($sformatf("fdi_cfg%0d", p));
       fdi_cfg[p].phy = p;
