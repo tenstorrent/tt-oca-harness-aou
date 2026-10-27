@@ -108,6 +108,31 @@ args = ["+part=fifo", "+err_len=1", "+agg_en=1", "+remote_bytes=32"]
 # The same, with the failing transactions at a 32-byte offset: the first
 # aggregated M-port beat is based below the read's start and holds one of its
 # two beats, the second holds the other.
+# Debug-window takes two at a time: two 16-beat reads of the head one cycle
+# apart, so the second request is accepted while the first burst is still being
+# returned, then two pops one cycle apart. Then four-beat accesses with six OKAY
+# writes just ahead of each pair and one WriteResp credit: the writes' responses
+# back up, so the first pop's response waits at the window while the second
+# pop's address and data arrive. aou_t1_dbg_fifo_chk checks every read and pop.
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.take_pair-1.dbg_len-15"
+module = { uvm = "aou_axi_err_resp_test" }
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo", "+take_pair=1", "+dbg_len=15"]
+
+[[tests]]
+name = "aou_axi_err_resp_test.part-fifo.take_pair-1.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48.4x512-sp64"
+module = { uvm = "aou_axi_err_resp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["err_int"]
+run_modes = ["err_int"]
+args = ["+part=fifo", "+take_pair=1", "+take_wflood=6", "+dbg_len=3", "+wresp_crd=1", "+crd_delay=48"]
+
 [[tests]]
 name = "aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64"
 module = { uvm = "aou_axi_err_resp_test" }
@@ -441,7 +466,7 @@ args = ["+part=fifo"]
 
 [[groups]]
 name = "err_int"
-expected_count = 40
+expected_count = 42
 tests = [
   "aou_axi_err_resp_test",
   "aou_axi_err_resp_test.4x512-sp64",
@@ -458,6 +483,8 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64",
+  "aou_axi_err_resp_test.part-fifo.take_pair-1.dbg_len-15",
+  "aou_axi_err_resp_test.part-fifo.take_pair-1.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32",

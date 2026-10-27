@@ -263,6 +263,8 @@ plan_ids:
   aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64: '9.13,9.14'
   aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64: '9.13,9.14'
   aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64: '9.13,9.14'
+  aou_axi_err_resp_test.part-fifo.take_pair-1.dbg_len-15: '9.13,9.14'
+  aou_axi_err_resp_test.part-fifo.take_pair-1.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48.4x512-sp64: '9.13,9.14'
   aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32: '9.13,9.14'
   aou_before_enable_test: '9.6,1.12'
   aou_id_mismatch_test.side-mgr.kind-b: '9.9'

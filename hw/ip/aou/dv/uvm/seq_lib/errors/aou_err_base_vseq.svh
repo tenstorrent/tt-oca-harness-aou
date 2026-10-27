@@ -144,19 +144,19 @@ class aou_err_base_vseq extends aou_link_base_vseq;
     end
   endtask
 
-  // The remote die reads the head entry (alt: with another ID, so it may
-  // complete before a debug read still in flight).
-  task fifo_read(int unsigned rp, bit alt = 1'b0);
+  // The remote die reads the head entry (ID id_base + rp).
+  task fifo_read(int unsigned rp, bit [9:0] id_base = 10'h3F0);
     aou_txn_list_seq s = aou_txn_list_seq::type_id::create("dbg_rd");
-    s.items.push_back(mk(1'b1, rp, AOU_AXI_RD, (alt ? 10'h3D0 : 10'h3F0) + 10'(rp), dbg_addr(rp),
-                         dbg_len_of(rp), dbg_cache));
+    s.items.push_back(mk(1'b1, rp, AOU_AXI_RD, id_base + 10'(rp), dbg_addr(rp), dbg_len_of(rp),
+                         dbg_cache));
     run_dbg(s, rp, "read");
   endtask
 
-  // The remote die pops the head entry with a write to the window.
-  task fifo_pop(int unsigned rp);
+  // The remote die pops the head entry with a write to the window (ID
+  // id_base + rp).
+  task fifo_pop(int unsigned rp, bit [9:0] id_base = 10'h3F8);
     aou_txn_list_seq s = aou_txn_list_seq::type_id::create("dbg_pop");
-    s.items.push_back(mk(1'b1, rp, AOU_AXI_WR, 10'h3F8 + 10'(rp), dbg_addr(rp), dbg_len_of(rp),
+    s.items.push_back(mk(1'b1, rp, AOU_AXI_WR, id_base + 10'(rp), dbg_addr(rp), dbg_len_of(rp),
                          dbg_cache));
     run_dbg(s, rp, "pop");
   endtask
