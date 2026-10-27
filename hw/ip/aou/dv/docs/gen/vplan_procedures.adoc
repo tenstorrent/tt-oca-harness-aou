@@ -2864,7 +2864,20 @@ clears the error, its INFO and the interrupt.
 
 interrupt and mask, then always ends the scenario with a hard reset instead
 of the write-1 clear and more traffic.
-Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1.
+Before the write-1 clear (or the reset) that ends an M-port mismatch, traffic
+is started and left +blk_hold cycles (default 1000) with the error still set,
+so aou_t1_crd_block_chk (T1-E20) sees credited messages waiting on the block;
+they complete after the clear, or end with the reset. Before a clear the
+orphan has been taken and traffic runs both ways; before a reset the orphan
+may still be presented, so only the local managers issue. +blk_txns (default 8 per RP and direction,
+0: none) sets the amount.
+Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1
+
+----
++blk_hold=<cycles> +blk_txns=<n>.
+----
+
+*Rules named.* `T1-E20`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 

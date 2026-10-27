@@ -36,7 +36,15 @@
 // +detect_only=1 (M port only): after the orphan it checks the status, INFO,
 // interrupt and mask, then always ends the scenario with a hard reset instead
 // of the write-1 clear and more traffic.
-// Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1.
+// Before the write-1 clear (or the reset) that ends an M-port mismatch, traffic
+// is started and left +blk_hold cycles (default 1000) with the error still set,
+// so aou_t1_crd_block_chk (T1-E20) sees credited messages waiting on the block;
+// they complete after the clear, or end with the reset. Before a clear the
+// orphan has been taken and traffic runs both ways; before a reset the orphan
+// may still be presented, so only the local managers issue. +blk_txns (default 8 per RP and direction,
+// 0: none) sets the amount.
+// Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1
+// +blk_hold=<cycles> +blk_txns=<n>.
 class aou_id_mismatch_vseq extends aou_err_base_vseq;
   `uvm_object_utils(aou_id_mismatch_vseq)
 
@@ -46,6 +54,8 @@ class aou_id_mismatch_vseq extends aou_err_base_vseq;
   string side;
   bit ok_last;      // the last check_and_clear() saw what it expected
   int unsigned accept_wait = 500;
+  // Traffic left waiting on the M-port mismatch block before its clear.
+  protected bit load_before_clear;
 
   function new(string name = "aou_id_mismatch_vseq");
     super.new(name);
@@ -124,10 +134,23 @@ class aou_id_mismatch_vseq extends aou_err_base_vseq;
       wr(mask, 1);
       check_pin(irq, 1'b0, "T1-E06", {what, ": masked again"});
     end
+    if (load_before_clear) load_blocked(AOU_T1_BOTH_DIRS);
     wr(err, 1);
+    if (load_before_clear) wait_traffic();
     check_field(err, 0, "REG-R04", {what, ": after write-1-to-clear"});
     check_field(info, 0, "T1-E04", {what, ": INFO clears with the error"});
     check_pin(irq, 1'b0, "T1-E06", {what, ": after write-1-to-clear"});
+  endtask
+
+  // Traffic left waiting +blk_hold cycles on the M-port mismatch block; the
+  // caller ends the block (write-1 clear or reset) and waits for it. While the
+  // orphan may still be on an M port only the local managers issue, so no M
+  // port has a real response in flight if the DUT takes the orphan late.
+  task load_blocked(aou_t1_dir_e dir);
+    int unsigned n = arg_int("blk_txns", 8);
+    if (n == 0) return;
+    traffic_nb(dir, n, aou_t1_traffic_cfg::named("short"));
+    wait_cycles(arg_int("blk_hold", 1000));
   endtask
 
   task mgr_one(int unsigned rp, bit rd);
@@ -154,6 +177,7 @@ class aou_id_mismatch_vseq extends aou_err_base_vseq;
       detect_then_reset(what, rp, rd, id);
       return;
     end
+    load_before_clear = 1'b1;
     check_and_clear(what,
                     rpf("error_info", rp, rd ? "split_rid_mismatch_err" : "split_bid_mismatch_err"),
                     rpf("error_info", rp, rd ? "split_bid_mismatch_err" : "split_rid_mismatch_err"),
@@ -161,6 +185,7 @@ class aou_id_mismatch_vseq extends aou_err_base_vseq;
                         rd ? "split_rid_mismatch_info" : "split_bid_mismatch_info"),
                     p_sequencer.regs.aou_interrupt_mask.int_mi0_id_mismatch_mask,
                     "INT_MI0_ID_MISMATCH", id, 1'b1);
+    load_before_clear = 1'b0;
   endtask
 
   // Status, INFO, interrupt and mask after the orphan, no write-1 clear, then
@@ -183,7 +208,9 @@ class aou_id_mismatch_vseq extends aou_err_base_vseq;
       wr(mask, 1);
       check_pin("INT_MI0_ID_MISMATCH", 1'b0, "T1-E06", {what, ": masked again"});
     end
+    load_blocked(AOU_T1_L2R);
     contain(side);
+    wait_traffic();
   endtask
 
   task sub_one(int unsigned rp, bit is_rd);
