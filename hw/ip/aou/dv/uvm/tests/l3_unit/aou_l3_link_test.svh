@@ -234,6 +234,7 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
   // 16'h0200 ({RP, WRESP, RDATA, WDATA, RREQ, WREQ}).
   function void deact_credit_rules();
     aou_l3_model a, b;
+    int unsigned fresh_rdata;
     // A deactivates; B's DeactivateAck leaves both in DEACTIVATE.
     pair(a, b);
     a.lnk.request_activate();
@@ -263,6 +264,7 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     pair(a, b);
     a.lnk.request_activate();
     void'(exchange(a, b));
+    fresh_rdata = a.crd.tx_cred[0][AOU_CC_RDATA];
     chk.clear_counts();
     b.lnk.request_deactivate();
     b.maybe_release_deact();
@@ -274,10 +276,18 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     expect_true(a.lnk.state == AOU_LS_DISABLED, "B's DeactivateAck takes A to DISABLED");
     expect_true(chk.count("AOU-R26") == 0,
                 "in the completing Ack's flit: WREQ and RDATA credits permitted");
+    expect_true(a.crd.tx_cred[0][AOU_CC_WREQ] == 0 && a.crd.tx_cred[0][AOU_CC_RDATA] == 0,
+                "the completing Ack's flit credits are discarded, not counted");
     b_to_a(a, b, 'h0200, 1'b1);
     expect_true(chk.count("AOU-R26") == 1, "a response credit in a later DISABLED flit is AOU-R26");
     chk.unexpect_rule("AOU-R26");
     chk.clear_counts();
+    a.lnk.request_activate();
+    void'(exchange(a, b));
+    both(a, b, AOU_LS_ENABLED, "re-activation after the completing Ack's credits");
+    expect_true(a.crd.tx_cred[0][AOU_CC_RDATA] == fresh_rdata,
+                $sformatf("fresh RDATA balance after re-activation: %0d, expected %0d",
+                          a.crd.tx_cred[0][AOU_CC_RDATA], fresh_rdata));
   endfunction
 
   // v0.8 4.4 under the v0.7 wire format: another message in the flit of an

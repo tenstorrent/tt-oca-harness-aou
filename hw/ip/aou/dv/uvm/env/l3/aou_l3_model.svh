@@ -380,9 +380,12 @@ class aou_l3_model extends uvm_object;
   endfunction
 
   // A permitted credit that funds our counters: request credits after the
-  // DUT's DeactivateAck are useless to us (our DeactivateReq preceded it) and
-  // DISABLED resets the counters anyway.
+  // DUT's DeactivateAck are useless to us (our DeactivateReq preceded it).
+  // None funds in DISABLED: the flit whose DeactivateAck completed the
+  // teardown is handled after the counters were reset, and its credits would
+  // otherwise carry into the next activation.
   function bit peer_adv_funds(aou_cred_class_e c);
+    if (lnk.state == AOU_LS_DISABLED) return 1'b0;
     return !(req_class(c) && (lnk.dack_rcvd || dut_dack_flit));
   endfunction
 
