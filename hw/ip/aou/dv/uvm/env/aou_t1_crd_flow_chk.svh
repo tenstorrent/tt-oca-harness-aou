@@ -12,7 +12,9 @@
 //   RREQ   an S-port AR accepted and not yet sent as a ReadReq; or an AR
 //          presented while x has no read in flight;
 //   WDATA  S-port W presented and not accepted, owed to a write whose
-//          WriteReq has been sent;
+//          WriteReq has been sent: the S port takes W in AW order, so the
+//          beats owed to the writes already sent come before those of any
+//          later AW still waiting to be sent, which do not count;
 //   RDATA  M-port R presented and not accepted; or an M-port read complete
 //          (RLAST accepted, no other M-port read of that ID open) whose last
 //          ReadData has not been sent;
@@ -141,6 +143,11 @@ class aou_t1_crd_flow_chk extends uvm_component;
   protected int unsigned rd_fly[AOU_RP_MAX];
   protected int unsigned w_need[AOU_RP_MAX];
   protected int unsigned w_got[AOU_RP_MAX];
+  // Beats of each AW in aw_pend, and their sum: w_need less pend_beats is the
+  // data of the accepted writes no longer waiting to be sent (sent, answered,
+  // or forgotten when the link closed).
+  protected int unsigned aw_pend_beats[AOU_RP_MAX][$];
+  protected int unsigned pend_beats[AOU_RP_MAX];
   protected bit          sent[AOU_CC_NUM];
   protected longint unsigned cyc;
   protected longint unsigned last_msg[AOU_CC_NUM];
@@ -223,9 +230,12 @@ class aou_t1_crd_flow_chk extends uvm_component;
         return ar_pend[x].size() != 0 ||
                (s_vif[x].mon_cb.arvalid === 1'b1 && s_vif[x].mon_cb.arready !== 1'b1 &&
                 rd_fly[x] == 0);
+      // The presented beat belongs to a write already sent while the beats
+      // of the sent writes are not all taken; a later AW waiting to be sent
+      // (it leaves with its first beat, see the header) does not stop them.
       AOU_CC_WDATA:
         return s_vif[x].mon_cb.wvalid === 1'b1 && s_vif[x].mon_cb.wready !== 1'b1 &&
-               w_need[x] > w_got[x] && aw_pend[x].size() == 0 && others_w_ok(x);
+               w_need[x] - pend_beats[x] > w_got[x] && others_w_ok(x);
       AOU_CC_RDATA:
         return (m_vif[x].mon_cb.rvalid === 1'b1 && m_vif[x].mon_cb.rready !== 1'b1) ||
                owed(x, 1'b1);
@@ -323,7 +333,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
       rp_wait[x][c] = 0;
       rp_rep[x][c] = 1'b0;
       if ($cast(q, m)) begin
-        if (c == AOU_CC_WREQ && drop_id(aw_pend[x], q.id)) begin
+        if (c == AOU_CC_WREQ && drop_aw(x, q.id)) begin
           aw_sent[x].push_back(q.id);
           return;
         end
@@ -391,11 +401,26 @@ class aou_t1_crd_flow_chk extends uvm_component;
 
   protected function void forget(int unsigned x);
     aw_pend[x].delete();
+    aw_pend_beats[x].delete();
+    pend_beats[x] = 0;
     ar_pend[x].delete();
     aw_sent[x].delete();
     ar_sent[x].delete();
     b_pend[x].delete();
     r_pend[x].delete();
+  endfunction
+
+  // Drops x's oldest AW of this ID waiting to be sent, with its beats.
+  protected function bit drop_aw(int unsigned x, bit [9:0] id);
+    foreach (aw_pend[x][i]) begin
+      if (aw_pend[x][i] == id) begin
+        pend_beats[x] -= aw_pend_beats[x][i];
+        aw_pend[x].delete(i);
+        aw_pend_beats[x].delete(i);
+        return 1'b1;
+      end
+    end
+    return 1'b0;
   endfunction
 
   static function bit drop_id(ref bit [9:0] ids[$], input bit [9:0] id);
@@ -437,13 +462,15 @@ class aou_t1_crd_flow_chk extends uvm_component;
     end
     if (s_vif[x].mon_cb.awvalid === 1'b1 && s_vif[x].mon_cb.awready === 1'b1) begin
       aw_pend[x].push_back(s_vif[x].mon_cb.awid);
+      aw_pend_beats[x].push_back(int'(s_vif[x].mon_cb.awlen) + 1);
+      pend_beats[x] += int'(s_vif[x].mon_cb.awlen) + 1;
       wr_fly[x]++;
       w_need[x] += int'(s_vif[x].mon_cb.awlen) + 1;
     end
     if (s_vif[x].mon_cb.wvalid === 1'b1 && s_vif[x].mon_cb.wready === 1'b1) w_got[x]++;
     if (s_vif[x].mon_cb.bvalid === 1'b1 && s_vif[x].mon_cb.bready === 1'b1) begin
       if (!drop_id(aw_sent[x], s_vif[x].mon_cb.bid))
-        void'(drop_id(aw_pend[x], s_vif[x].mon_cb.bid));
+        void'(drop_aw(x, s_vif[x].mon_cb.bid));
       if (wr_fly[x] > 0) wr_fly[x]--;
     end
     if (s_vif[x].mon_cb.arvalid === 1'b1 && s_vif[x].mon_cb.arready === 1'b1) begin
