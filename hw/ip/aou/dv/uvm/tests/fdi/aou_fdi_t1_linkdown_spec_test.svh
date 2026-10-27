@@ -12,10 +12,18 @@
 //    lp_wake_req low), then Reset and the Adapter's bringup;
 // 2. Adapter-initiated LinkReset, then Disabled, with AoU activated: the
 //    same, with flits around them;
-// 3. I_SW_LINKERROR_INJECT: lp_linkerror, the Adapter enters LinkError and
+// 3. a Retrain that ends in LinkReset, and one that ends in Disabled, instead
+//    of Active (UCIe r3.0 Figure 10-19: both may follow any state but
+//    LinkError);
+// 4. I_SW_LINKERROR_INJECT: lp_linkerror, the Adapter enters LinkError and
 //    holds it while lp_linkerror is 1 (FDI-R49), then leaves on its own;
 //    the DUT holds the link down until AOU_SW_RESET (the base test's
-//    software) and requests nothing.
+//    software) and requests nothing;
+// 5. a Retrain that ends in LinkError, and LinkReset and Disabled escalating
+//    to LinkError after the pl_clk_req handshake (UCIe r3.0 §10.2.3.2 rule
+//    6). The DUT holds each down until AOU_SW_RESET; software writes it only
+//    after the interrupt check below, and the Adapter trains again once it
+//    has.
 // Every link-down that finds the AoU core out of DISABLED (here: ACTIVATE,
 // its ActivateReq never answered) raises INT_FDI_LINK_DOWN and the core
 // disables itself; one that finds it DISABLED (1.) raises nothing (T1-L51).
@@ -40,13 +48,35 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     env.lsm_cfg.clk_req_hold_bringup = 1'b1;
   endfunction
 
-  local task adapter_event(aou_lsm_ev_e kind);
+  local task adapter_event(aou_lsm_ev_e kind, aou_lsm_state_e to = LSM_UNKNOWN);
     aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("ev");
     bit in_use = lsm_vif.mon_cb.act_st_disabled !== 1'b1;
+    string what = to == LSM_UNKNOWN ? kind.name() : {kind.name(), " ending in ", to.name()};
     s.ev_kind = kind;
-    `uvm_info(get_type_name(), {"Adapter event ", kind.name()}, UVM_LOW)
+    s.ev_to = to;
+    `uvm_info(get_type_name(), {"Adapter event ", what}, UVM_LOW)
     s.start(env.lsm.sqr);
-    check_link_down_irq(in_use, kind.name());
+    check_link_down_irq(in_use, what);
+  endtask
+
+  // An Adapter event that ends in `to` instead of its usual end, then the
+  // link back up. A LinkError holds the DUT down until AOU_SW_RESET, which
+  // also clears the interrupt: sw_reset_hold keeps it back until
+  // adapter_event() has checked the interrupt, and the Adapter trains again
+  // only after that.
+  local task down_event(aou_lsm_ev_e kind, aou_lsm_state_e to);
+    bit le = to == LSM_LINKERROR;
+    if (le) begin
+      sw_reset_hold = 1'b1;
+      env.lsm_cfg.rebringup_after_down = 1'b0;
+    end
+    adapter_event(kind, to);
+    if (le) begin
+      sw_reset_hold = 1'b0;
+      env.lsm_cfg.rebringup_after_down = 1'b1;
+      adapter_event(LSM_EV_BRINGUP);
+    end
+    wait_link_up({kind.name(), " ending in ", to.name()});
   endtask
 
   // INT_FDI_LINK_DOWN after a link-down: set iff the core was in use, the
@@ -110,6 +140,10 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     adapter_event(LSM_EV_DISABLED);
     wait_link_up("Disabled");
     send_flits(4, 25);
+    down_event(LSM_EV_RETRAIN, LSM_LINKRESET);
+    send_flits(2, 25);
+    down_event(LSM_EV_RETRAIN, LSM_DISABLED);
+    send_flits(2, 25);
     // The Adapter reacts to lp_linkerror by itself (react_linkerror_en); the
     // event afterwards only runs the bringup.
     `uvm_info(get_type_name(), "pulsing I_SW_LINKERROR_INJECT", UVM_LOW)
@@ -127,5 +161,11 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     wait_adapter(LSM_ACTIVE, 1'b0, down_wait, ok);
     adapter_event(LSM_EV_LINKERROR);
     wait_link_up("LinkError recovery");
+    send_flits(2, 25);
+    down_event(LSM_EV_RETRAIN, LSM_LINKERROR);
+    send_flits(2, 25);
+    down_event(LSM_EV_LINK_RESET, LSM_LINKERROR);
+    send_flits(2, 25);
+    down_event(LSM_EV_DISABLED, LSM_LINKERROR);
   endtask
 endclass

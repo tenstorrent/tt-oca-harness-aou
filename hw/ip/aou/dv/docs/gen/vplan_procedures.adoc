@@ -246,7 +246,10 @@ layer raises itself (I_SW_LINKERROR_INJECT). UCIe r1.1 Table 8-2: the
 protocol layer signals it on lp_linkerror, and the Adapter takes the link
 to LinkError, then Reset, once it sees it. The bringup model checks the
 raise and hold on the DUT's O_LP_LINKERROR (FDI-M07); the Adapter then
-takes the link down, which brings the DUT back.
+takes the link down, which brings the DUT back. Then the same request
+while the Adapter holds the link in Retrain: LinkError may follow any state
+(UCIe r3.0 Figure 10-19), so the Adapter answers it there too, and the DUT
+must raise and hold lp_linkerror as in Active.
 
 *Procedure.* The class's own `run_phase` (see the file).
 
@@ -282,10 +285,18 @@ drops, O_FDI_FSM_STATE follows), the DUT requests nothing (NOP,
 lp_wake_req low), then Reset and the Adapter's bringup;
 2. Adapter-initiated LinkReset, then Disabled, with AoU activated: the
 same, with flits around them;
-3. I_SW_LINKERROR_INJECT: lp_linkerror, the Adapter enters LinkError and
+3. a Retrain that ends in LinkReset, and one that ends in Disabled, instead
+of Active (UCIe r3.0 Figure 10-19: both may follow any state but
+LinkError);
+4. I_SW_LINKERROR_INJECT: lp_linkerror, the Adapter enters LinkError and
 holds it while lp_linkerror is 1 (FDI-R49), then leaves on its own;
 the DUT holds the link down until AOU_SW_RESET (the base test's
-software) and requests nothing.
+software) and requests nothing;
+5. a Retrain that ends in LinkError, and LinkReset and Disabled escalating
+to LinkError after the pl_clk_req handshake (UCIe r3.0 §10.2.3.2 rule
+6). The DUT holds each down until AOU_SW_RESET; software writes it only
+after the interrupt check below, and the Adapter trains again once it
+has.
 Every link-down that finds the AoU core out of DISABLED (here: ACTIVATE,
 its ActivateReq never answered) raises INT_FDI_LINK_DOWN and the core
 disables itself; one that finds it DISABLED (1.) raises nothing (T1-L51).
@@ -315,8 +326,58 @@ The bringup model checks the DUT side throughout.
 * 22.4: Verify bringup error handling
 * 22.7: Restart after link-down is software's on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset
 
+[[aou-proc-aou_fdi_t1_abort_test]]
+===== 8. `aou_fdi_t1_abort_test`
+Class `aou_fdi_t1_abort_test` extends `aou_fdi_t1_bringup_test` (`uvm/tests/fdi/aou_fdi_t1_abort_test.svh`).
+
+*Purpose.* The bringup test, then the Adapter abandoning a bringup or a PM exit from
+L1 part-way (aou_lsm_driver::do_abort), once at every point, in random
+order, with flits between:
+- from Reset: LinkError before pl_inband_pres (status first, or pl_clk_req
+first); LinkError with the DUT waiting for a trigger, one cycle after the
+waking pl_clk_req, and with pl_wake_ack held back; LinkReset or Disabled
+with pl_wake_ack held back; LinkError, LinkReset or Disabled after the DUT
+requested Active, before the Active entry; and pl_inband_pres falling
+again, with pl_wake_ack held back or after the Active request (UCIe r3.0
+§10.2.3: the DUT must return lp_state_req to NOP);
+- from L1: LinkError before the pl_clk_req; LinkError, LinkReset or
+Disabled one cycle after it, with pl_wake_ack held back, and after the
+DUT requested Active.
+pl_clk_req always comes before a LinkReset or Disabled (UCIe r3.0 §10.2.3.2
+rule 7) and before or after a LinkError (rule 6). LinkReset or Disabled
+straight from L1 or from the DUT waiting for a trigger needs the request in
+the same cycle as the status change, so neither is sent. After a LinkError
+the DUT holds the link down until software's AOU_SW_RESET (the bringup
+test's background software), then the Adapter trains again. The bringup
+model checks every DUT output throughout; the test only provides the
+stimulus.
+
+*Procedure.* The class's own `run_phase` (see the file).
+
+*Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
+
+*Scenarios.*
+
+[cols="3,2,1,1,3",options="header"]
+|===
+| Scenario | Arguments | Seeds | Target | Plan items
+| `aou_fdi_t1_abort_test` |  | 1-2 |  | 22.1,22.4,22.6,22.7,18.14,18.17,18.18,18.20,18.21
+|===
+
+*Plan items.*
+
+* 18.14: LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery
+* 18.17: LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask
+* 18.18: Disabled: Adapter-initiated entry and exit
+* 18.20: wake_req/wake_ack handshake
+* 18.21: pl_inband_pres drop
+* 22.1: Verify `AOU_FDI_BRINGUP_CTRL` state transitions
+* 22.4: Verify bringup error handling
+* 22.6: Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers
+* 22.7: Restart after link-down is software's on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset
+
 [[aou-proc-aou_t1_link_event_test]]
-===== 8. `aou_t1_link_event_test`
+===== 9. `aou_t1_link_event_test`
 Class `aou_t1_link_event_test` extends `aou_base_test` (`uvm/tests/aou_t1_link_event_test.svh`).
 
 *Purpose.* See aou_t1_link_event_vseq.
@@ -325,8 +386,8 @@ Class `aou_t1_link_event_test` extends `aou_base_test` (`uvm/tests/aou_t1_link_e
 
 FDI link events with AoU traffic: Adapter-initiated Retrain while traffic
 runs both ways, then L1 entry/exit and a clk_req wake on an idle link, then
-more traffic. Retrain and L1 are transparent to AOU_CORE (MAS 7.3.7): ENABLED
-and every transaction survive.
+more traffic. What the core does on these events is unspecified (BUGS/015);
+the interim expectation is that ENABLED and every transaction survive.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -347,7 +408,7 @@ and every transaction survive.
 * 22.3: Verify FDI ready indication to AOU_CORE
 
 [[aou-proc-aou_t1_lp_mode_test]]
-===== 9. `aou_t1_lp_mode_test`
+===== 10. `aou_t1_lp_mode_test`
 Class `aou_t1_lp_mode_test` extends `aou_base_test` (`uvm/tests/aou_t1_lp_mode_test.svh`).
 
 *Purpose.* See aou_t1_lp_mode_vseq.
@@ -380,7 +441,7 @@ each mode is its own activation session: deactivate, program, activate.
 * 21.7: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
 
 [[aou-proc-aou_t1_inject_test]]
-===== 10. `aou_t1_inject_test`
+===== 11. `aou_t1_inject_test`
 Class `aou_t1_inject_test` extends `aou_base_test` (`uvm/tests/aou_t1_inject_test.svh`).
 
 *Purpose.* See aou_t1_inject_vseq.
@@ -409,7 +470,7 @@ implementation (AoU v0.8 8.3.3): INT_REQ_LINKRESET is allowed, nothing else.
 * 19.6: Trigger protocol violation; verify interrupt
 
 [[aou-proc-aou_t1_sw_reset_test]]
-===== 11. `aou_t1_sw_reset_test`
+===== 12. `aou_t1_sw_reset_test`
 Class `aou_t1_sw_reset_test` extends `aou_base_test` (`uvm/tests/aou_t1_sw_reset_test.svh`).
 
 *Purpose.* See aou_t1_sw_reset_vseq.
@@ -440,7 +501,7 @@ again and traffic passes.
 * 11.17: PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK
 
 [[aou-proc-aou_t1_hard_reset_test]]
-===== 12. `aou_t1_hard_reset_test`
+===== 13. `aou_t1_hard_reset_test`
 Class `aou_t1_hard_reset_test` extends `aou_base_test` (`uvm/tests/aou_t1_hard_reset_test.svh`).
 
 *Purpose.* See aou_t1_hard_reset_vseq.
@@ -467,7 +528,7 @@ activation come back, and traffic passes again.
 * 20.14: Verify all registers reset to documented values
 
 [[aou-proc-aou_dp_random_test]]
-===== 13. `aou_dp_random_test`
+===== 14. `aou_dp_random_test`
 Class `aou_dp_random_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_random_test.svh`).
 
 *Purpose.* Constrained-random legal AXI4 traffic (INCR, 1-256 beats, every size, 4KB
@@ -527,7 +588,7 @@ directions at once (+dp_dir=both; D41). +dp_profile picks a profile
 * 18.25: Two-PHY I_PHY_TYPE selection with PHY1 active: state and stall muxing for the second PHY
 
 [[aou-proc-aou_stress_test]]
-===== 14. `aou_stress_test`
+===== 15. `aou_stress_test`
 Class `aou_stress_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_stress_test.svh`).
 
 *Purpose.* Random traffic in both directions on every RP under stimulus a real remote
@@ -599,7 +660,7 @@ in the flits to the DUT); none runs every channel at full rate
 * 18.22: Stall corners: stallreq mid-flit (ack at the boundary), stallreq while trdy=0, stallreq with LP mode
 
 [[aou-proc-aou_lp_mode_test]]
-===== 15. `aou_lp_mode_test`
+===== 16. `aou_lp_mode_test`
 Class `aou_lp_mode_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_lp_mode_test.svh`).
 
 *Purpose.* TX low-power mode (plan 21.1-21.6; old F7). +lp_mode=0|1 and +lp_thr=T
@@ -649,7 +710,7 @@ Then traffic runs again, so leaving the idle state is covered too.
 * 21.6: Verify credit-only flits still sent in LP mode
 
 [[aou-proc-aou_dp_packing_test]]
-===== 16. `aou_dp_packing_test`
+===== 17. `aou_dp_packing_test`
 Class `aou_dp_packing_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_packing_test.svh`).
 
 *Purpose.* Message packing (+dp_pack=wresp|crossflit|granule; plan 6.2, 6.9, 11.4,
@@ -687,11 +748,13 @@ less) in both directions.
 * 18.24: Flit-cancel corners: during a multi-flit message, repeated cancel, cancel of the second half, cancel with stall
 
 [[aou-proc-aou_fdi_t1_link_stress_test]]
-===== 17. `aou_fdi_t1_link_stress_test`
+===== 18. `aou_fdi_t1_link_stress_test`
 Class `aou_fdi_t1_link_stress_test` extends `aou_fdi_t1_bringup_test` (`uvm/tests/fdi/aou_fdi_t1_link_stress_test.svh`).
 
 *Purpose.* The bringup test followed by random Adapter-initiated link events
-(Retrain, L1, LinkError, LinkReset, clk_req wake) with flits between them,
+(Retrain, L1, LinkError, LinkReset, clk_req wake, a Retrain that ends in
+LinkError, LinkReset or Disabled, and a LinkReset or Disabled that escalates
+to LinkError) with flits between them,
 a random pl_trdy policy and random stand-alone stalls. pl_clk_req is held
 through bringup so the DUT leaves WAIT_PRESENCE on it after the Adapter's
 restart from LinkError/LinkReset.
@@ -718,7 +781,7 @@ restart from LinkError/LinkReset.
 * 18.23: pl_state_sts leaves Active mid-flit
 
 [[aou-proc-aou_link_event_test]]
-===== 18. `aou_link_event_test`
+===== 19. `aou_link_event_test`
 Class `aou_link_event_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_link_event_test.svh`).
 
 *Purpose.* FDI link events mid-traffic: Retrain, clk_req, L1, LinkError, LinkReset,
@@ -727,7 +790,7 @@ inband_pres (aou_link_event_vseq).
 *Procedure.* Virtual sequence `aou_link_event_vseq` (`uvm/seq_lib/lifecycle/aou_link_event_vseq.svh`):
 
 Adapter-initiated FDI link events while AoU is ENABLED and traffic runs.
-The expectations follow MAS 7.3.6 and 7.3.7:
+AoU's reaction is unspecified (BUGS/015); the interim expectations are:
 retrain, clk_wake  transparent: AoU stays ENABLED, no interrupt, every
 transaction completes with correct data;
 l1                 software deactivates first (MAS §7.3.6), the adapter
@@ -756,13 +819,20 @@ activation complete (T1-L50).
 retrain_act        software deactivates and writes ACTIVATE_START while
 the Adapter holds the link in Retrain: the handshake
 completes once the link is Active again (T1-L50).
+l1_traffic         software deactivates (ACTIVATE_START clear), the
+adapter enters L1, and local AXI traffic arrives: its
+INT_ACTIVATE_START is an activation request in L1, so
+the DUT wakes the link itself (lp_wake_req; UCIe r1.1
+8.2.9, integrator guide 6.6), the Adapter answers with
+Retrain and Active, and the activation runs on the
+interrupt; the traffic then completes.
 A link loss with AoU in use (linkerror, link_reset, inband_drop, disabled)
 raises INT_FDI_LINK_DOWN once and the DUT disables itself (T1-L48/L49,
 aou_base_test_seq); with +link_down_mask=1 the pin stays low and the
 sticky bit is checked instead.
 Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|
-sw_disable|l1_act|retrain_act|rand (rand never picks disabled, sw_disable,
-l1_act or retrain_act) +link_down_mask +loops +T1_TXN.
+sw_disable|l1_act|retrain_act|l1_traffic|rand (rand never picks disabled,
+sw_disable, l1_act, retrain_act or l1_traffic) +link_down_mask +loops +T1_TXN.
 
 *Rules named.* `T1-L48`, `T1-L50`
 
@@ -799,7 +869,7 @@ l1_act or retrain_act) +link_down_mask +loops +T1_TXN.
 * 11.11: Assert reset mid-transaction
 * 11.18: Regression on a build with the RTL's embedded ASSERTION_ON checks
 * 18.10: Verify correct FDI valid/ready protocol
-* 18.13: Retrain while ENABLED with traffic is transparent to AoU
+* 18.13: Retrain while ENABLED with traffic is transparent to AoU (interim expectation)
 * 18.14: LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery
 * 18.15: L1 entry and exit with the MAS power-management sequence, including the clk_req wake
 * 18.17: LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask
@@ -812,7 +882,7 @@ l1_act or retrain_act) +link_down_mask +loops +T1_TXN.
 * 22.6: Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers
 
 [[aou-proc-aou_dp_size_test]]
-===== 19. `aou_dp_size_test`
+===== 20. `aou_dp_size_test`
 Class `aou_dp_size_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_size_test.svh`).
 
 *Purpose.* Single-beat transfers of every AxSIZE (plan 4.1-4.8, 5.1-5.8, 11.13), aligned,
@@ -868,7 +938,7 @@ scoreboard checks bytes, OKAY responses and RLAST on every transfer (4.22,
 * 14.8: Local and remote both 512-bit; verify bypass path
 
 [[aou-proc-aou_dp_burst_test]]
-===== 20. `aou_dp_burst_test`
+===== 21. `aou_dp_burst_test`
 Class `aou_dp_burst_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_burst_test.svh`).
 
 *Purpose.* INCR bursts of the listed lengths (+dp_len; plan 4.9-4.15, 5.9-5.15) at any
@@ -911,7 +981,7 @@ size and start address, each write read back; RLAST only on the last beat
 * 11.18: Regression on a build with the RTL's embedded ASSERTION_ON checks
 
 [[aou-proc-aou_dp_wstrb_test]]
-===== 21. `aou_dp_wstrb_test`
+===== 22. `aou_dp_wstrb_test`
 Class `aou_dp_wstrb_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_wstrb_test.svh`).
 
 *Purpose.* Write strobe patterns (+dp_strb=full|partial|sparse|zero; plan 4.18-4.21,
@@ -943,7 +1013,7 @@ OKAY). Single beats and short bursts, read back, both directions.
 * 4.29: Test WriteDataFull (no WSTRB) vs WriteData
 
 [[aou-proc-aou_dp_unaligned_test]]
-===== 22. `aou_dp_unaligned_test`
+===== 23. `aou_dp_unaligned_test`
 Class `aou_dp_unaligned_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_unaligned_test.svh`).
 
 *Purpose.* Issue #56 and plan 7.11: unaligned and narrow writes at all offsets
@@ -971,7 +1041,7 @@ read back. Both directions.
 * 7.11: Test unaligned address accesses (narrow transfers)
 
 [[aou-proc-aou_dp_b_zero_test]]
-===== 23. `aou_dp_b_zero_test`
+===== 24. `aou_dp_b_zero_test`
 Class `aou_dp_b_zero_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_b_zero_test.svh`).
 
 *Purpose.* Issue #64 (plan 16.16): back-to-back single-beat writes with zero delays end
@@ -997,7 +1067,7 @@ never saw it. That is stimulus quality, never an error.
 * 16.16: B response presented zero cycles after the AW/W handshakes complete (issue 64)
 
 [[aou-proc-aou_dp_outstanding_test]]
-===== 24. `aou_dp_outstanding_test`
+===== 25. `aou_dp_outstanding_test`
 Class `aou_dp_outstanding_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_dp_outstanding_test.svh`).
 
 *Purpose.* Outstanding transactions (plan 8.1-8.15): batches of +dp_batch requests are
@@ -1059,7 +1129,7 @@ back-pressure without an error or a lost transfer.
 * 11.18: Regression on a build with the RTL's embedded ASSERTION_ON checks
 
 [[aou-proc-aou_attr_test]]
-===== 25. `aou_attr_test`
+===== 26. `aou_attr_test`
 Class `aou_attr_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_attr_test.svh`).
 
 *Purpose.* Stimulus for AXI request attributes across the link, both directions (plan
@@ -1133,7 +1203,7 @@ the EXOKAY write changed memory.
 * 5.26: Quality of service values 0-15
 
 [[aou-proc-aou_chan_test]]
-===== 26. `aou_chan_test`
+===== 27. `aou_chan_test`
 Class `aou_chan_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_chan_test.svh`).
 
 *Purpose.* AXI channel orderings the DUT must take: the scoreboard checks the data and
@@ -1174,7 +1244,7 @@ both forwards and receives interleaved read data.
 * 8.14: Read data beats from different IDs interleaved
 
 [[aou-proc-aou_small_size_test]]
-===== 27. `aou_small_size_test`
+===== 28. `aou_small_size_test`
 Class `aou_small_size_test` extends `aou_dp_base_test` (`uvm/tests/datapath/aou_small_size_test.svh`).
 
 *Purpose.* Register-like accesses: every AxSIZE below 5 (1 to 16 bytes), unaligned
@@ -1209,7 +1279,7 @@ die's widths, so a mixed build puts every pairing under small requests.
 * 14.11: Verify WLAST regenerated correctly for multi-beat burst
 
 [[aou-proc-aou_split_test]]
-===== 28. `aou_split_test`
+===== 29. `aou_split_test`
 Class `aou_split_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_split_test.svh`).
 
 *Purpose.* Splitter (plan 15.1-15.10, 15.12, 15.16, 15.17, 20.9; old F2). +split_aw/+split_ar
@@ -1278,7 +1348,7 @@ bursts the DUT splits on its M port (aou_split_chk).
 * 20.9: Read/write per-RP split config; legal 2^n-1 MAX_AxBURSTLEN values read back as written, any other value as 0xF
 
 [[aou-proc-aou_aggregator_test]]
-===== 29. `aou_aggregator_test`
+===== 30. `aou_aggregator_test`
 Class `aou_aggregator_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_aggregator_test.svh`).
 
 *Purpose.* Aggregator (plan 17.1-17.14; old F4-F6). +agg_en=0|1|per_rp programs
@@ -1333,7 +1403,7 @@ scoreboard the bytes (WDATA/WSTRB merge, R split and RLAST regeneration).
 * 17.14: `rp*_axi_aggregator_en=1`; narrow to full width
 
 [[aou-proc-aou_early_bresp_test]]
-===== 30. `aou_early_bresp_test`
+===== 31. `aou_early_bresp_test`
 Class `aou_early_bresp_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_early_bresp_test.svh`).
 
 *Purpose.* Early write response (plan 16.1-16.10, 16.13-16.15, 16.17; old F3, F8).
@@ -1436,7 +1506,7 @@ inverted (MAS 3.7.8); the checker judges the second phase by the new value.
 * 16.17: Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; the write watchdog that replaced it is 16.18-16.23)
 
 [[aou-proc-aou_qos_test]]
-===== 31. `aou_qos_test`
+===== 32. `aou_qos_test`
 Class `aou_qos_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_qos_test.svh`).
 
 *Purpose.* TX QoS arbitration modes (plan 13.1, 13.4, 13.11-13.14; 4x512-sp64 13.2-13.7).
@@ -1486,7 +1556,7 @@ aou_qos_order_test, which builds a backlog behind hold_tx().
 * 13.19: ARB_MODE=3 (reserved) behaves as round-robin
 
 [[aou-proc-aou_dest_rp_test]]
-===== 32. `aou_dest_rp_test`
+===== 33. `aou_dest_rp_test`
 Class `aou_dest_rp_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_dest_rp_test.svh`).
 
 *Purpose.* RP remapping (plan 12.10, 12.11). DEST_RP is a random permutation of the
@@ -1518,7 +1588,7 @@ returns to its own plane. With one RP the permutation is identity.
 * 12.11: Test all valid `dest_rp` permutations
 
 [[aou-proc-aou_wdt_test]]
-===== 33. `aou_wdt_test`
+===== 34. `aou_wdt_test`
 Class `aou_wdt_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_wdt_test.svh`).
 
 *Purpose.* Write-transaction watchdog (plan 16.17-16.23; MAS software-operation 7.2.6):
@@ -1590,7 +1660,7 @@ no rule ID; it polls the checker's model once per cycle for a bounded time.
 * 16.23: Write watchdog on several RPs: each expires on its own, and the pin stays high while any RP is set
 
 [[aou-proc-aou_pack_test]]
-===== 34. `aou_pack_test`
+===== 35. `aou_pack_test`
 Class `aou_pack_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_pack_test.svh`).
 
 *Purpose.* Flit packing in both directions (plan 6.3-6.8, 6.14, 6.18-6.21, 11.1, 11.2,
@@ -1665,7 +1735,7 @@ phases, so Activation messages meet traffic and credit grants.
 * 11.14: Test various `prof` and `profextlen` values
 
 [[aou-proc-aou_pattern_test]]
-===== 35. `aou_pattern_test`
+===== 36. `aou_pattern_test`
 Class `aou_pattern_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_pattern_test.svh`).
 
 *Purpose.* Data patterns written and read back in both directions (plan 7.4-7.9):
@@ -1703,7 +1773,7 @@ scoreboard compares every byte against the golden memories.
 * 7.9: Write address value as data; verify
 
 [[aou-proc-aou_addr_test]]
-===== 36. `aou_addr_test`
+===== 37. `aou_addr_test`
 Class `aou_addr_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_addr_test.svh`).
 
 *Purpose.* Address corners in both directions at once (plan 7.12-7.15): +dp_addr=
@@ -1737,7 +1807,7 @@ Runs aou_addr_seq (+dp_addr=) in both directions on RP0 (aou_addr_test).
 * 7.15: Sequential access across entire configured address space. AOU has no memory map
 
 [[aou-proc-aou_qos_order_test]]
-===== 37. `aou_qos_order_test`
+===== 38. `aou_qos_order_test`
 Class `aou_qos_order_test` extends `aou_dp_base_test` (`uvm/tests/stress/aou_qos_order_test.svh`).
 
 *Purpose.* QoS arbitration order with a TX backlog (plan 13.1-13.3, 13.5-13.11,
@@ -1839,7 +1909,7 @@ priorities) puts every RP in one tier.
 * 13.22: QoS timer extremes: TIMER_RESOLUTION and TIMER_THRESHOLD at 0 and at maximum
 
 [[aou-proc-aou_link_act_deact_test]]
-===== 38. `aou_link_act_deact_test`
+===== 39. `aou_link_act_deact_test`
 Class `aou_link_act_deact_test` extends `aou_base_test` (`uvm/tests/link/aou_link_act_deact_test.svh`).
 
 *Purpose.* Activation/deactivation loops from either side (aou_link_act_deact_vseq).
@@ -1857,12 +1927,7 @@ Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 
 ----
 +deact_who=... +busy=0|1 (-1 random)
-+T1_TXN=<per RP and direction>. Forced deactivation (DEACTIVATE_FORCE) has its
-----
-
-own test, aou_link_force_deact_vseq.
-
-----
++T1_TXN=<per RP and direction> +force=0|1.
 +early_act=1 (plan 1.11; MAS 7.3.2): every activation is software's
 ----
 
@@ -1915,33 +1980,16 @@ keeps the Adapter from bringing the link up after reset.
 * 19.2: Trigger and clear `int_deactivate_start`
 
 [[aou-proc-aou_link_force_deact_test]]
-===== 39. `aou_link_force_deact_test`
+===== 40. `aou_link_force_deact_test`
 Class `aou_link_force_deact_test` extends `aou_base_test` (`uvm/tests/link/aou_link_force_deact_test.svh`).
 
-*Purpose.* Forced deactivation through DEACTIVATE_FORCE, each ended by a software reset
-(aou_link_force_deact_vseq).
+*Purpose.* Forced deactivation through DEACTIVATE_FORCE (aou_link_force_deact_vseq).
 
 *Procedure.* Virtual sequence `aou_link_force_deact_vseq` (`uvm/seq_lib/link/aou_link_force_deact_vseq.svh`):
 
-Forced deactivation through AOU_CON0.DEACTIVATE_FORCE (plan 2.7; MAS
-software-operation 7.1). The force is an implementation-defined escape hatch
-for a deactivation that is not completing: nothing is promised after it and
-software resets the device. Each loop activates, carries traffic (drained,
-or with +busy=1 still in flight), writes DEACTIVATE_FORCE and waits for the
-DUT's DeactivateReq, which aou_t1_force_deact_chk times against the write
-(T1-L52). The remote die does not answer it, as when the deactivation is not
-completing, so the two dies exchange nothing after the force. The loop then
-ends with the reset software would apply (sw_reset(): the Adapter's
-LinkReset, AOU_SW_RESET, the link back up) instead of checking anything the
-DUT does after the force. After the last loop both dies activate again and
-traffic must pass.
-Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
-
-----
-+busy=0|1 (default -1: random per loop) +T1_TXN=<per RP and direction>.
-----
-
-*Rules named.* `T1-L52`
+aou_link_act_deact_vseq with every deactivation forced through
+AOU_CON0.DEACTIVATE_FORCE (plan 2.7). The DUT then sends DeactivateReq
+with PropertyReq=1, which the spec does not allow (BUGS/010).
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -1950,7 +1998,7 @@ Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 [cols="3,2,1,1,3",options="header"]
 |===
 | Scenario | Arguments | Seeds | Target | Plan items
-| `aou_link_force_deact_test` |  | 1-4 |  | 2.7
+| `aou_link_force_deact_test` |  | 1-2 |  | 2.7
 |===
 
 *Plan items.*
@@ -1958,7 +2006,7 @@ Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 * 2.7: Test `deactivate_force` CSR field; verify immediate deactivation
 
 [[aou-proc-aou_act_after_deact_test]]
-===== 40. `aou_act_after_deact_test`
+===== 41. `aou_act_after_deact_test`
 Class `aou_act_after_deact_test` extends `aou_base_test` (`uvm/tests/link/aou_act_after_deact_test.svh`).
 
 *Purpose.* ACTIVATE_START swept across the end of a deactivation (aou_act_after_deact_vseq,
@@ -2008,7 +2056,7 @@ Knobs: +offsets=<o,o,..> (cycles, may be negative; default -12..44)
 * 6.20: Verify rules for activation messages
 
 [[aou-proc-aou_credit_return_test]]
-===== 41. `aou_credit_return_test`
+===== 42. `aou_credit_return_test`
 Class `aou_credit_return_test` extends `aou_base_test` (`uvm/tests/link/aou_credit_return_test.svh`).
 
 *Purpose.* Credit advertisement and return corners (aou_credit_return_vseq).
@@ -2068,7 +2116,7 @@ withheld|rand +depth=<granules, all classes> +overgrant=0|1 +T1_TXN.
 * 11.18: Regression on a build with the RTL's embedded ASSERTION_ON checks
 
 [[aou-proc-aou_zero_credit_test]]
-===== 42. `aou_zero_credit_test`
+===== 43. `aou_zero_credit_test`
 Class `aou_zero_credit_test` extends `aou_base_test` (`uvm/tests/link/aou_zero_credit_test.svh`).
 
 *Purpose.* Zero credit for one class, then a late grant (aou_zero_credit_vseq).
@@ -2101,39 +2149,6 @@ queued.
 
 exactly k requests and the remote die returns none of it until released,
 with more than k requests queued per RP.
-
-----
-+limit=<k> with +credit=wdata: WDATA credit for k WriteData messages of the
-----
-
-widest RP, none returned until released, and every write at least k+1 beats
-long: the DUT commits each RP's first WriteReq and then runs out of WDATA
-credit with that write's data still owed, by a known number of beats.
-
-----
-+hold_wreq_rp=<r>: remote-to-DUT writes on every RP; for +hold cycles the
-----
-
-remote die sends no WriteReq on RP r while that RP's WriteData still goes on
-WDATA credit, so the data of several writes waits in the DUT's RX W FIFO
-ahead of their WriteReqs (AoU v0.8 5.7 does not order them). Then the
-WriteReqs go and every write completes with correct data.
-
-----
-+fair=1: DUT TX write fairness. Local writes only, the managers presenting
-----
-
-with no gaps: RP +fair_short (default 0) issues single-beat writes only,
-RP +fair_long (default 1) bursts of AWLEN +fair_min..+fair_max (31..63);
-
-----
-+fair_short_n and +fair_long_n writes (400 and 40).
-----
-
-A burst the DUT has committed must not be held open by the stream of short
-writes. aou_t1_wr_order_chk checks that it keeps making progress while it
-holds credit (DP-R11); it does not bound how long the short writes may slow
-a burst that still trickles.
 aou_t1_crd_flow_chk judges both in every test: an RP with credit and queued
 work keeps sending while another RP has none (T1-C01), the DUT uses all the
 credit it holds (T1-C02), never more (AOU-R16, the L3 model).
@@ -2148,7 +2163,7 @@ cycles later. Messages waiting for credit remain to be transmitted (MAS
 AOU-R33 in the L3 model), responses to the remote die before DISABLED, and
 every transaction completes (scoreboard).
 
-*Rules named.* `AOU-R16`, `AOU-R33`, `AOU-R34`, `DP-R11`, `T1-C01`, `T1-C02`
+*Rules named.* `AOU-R16`, `AOU-R33`, `AOU-R34`, `T1-C01`, `T1-C02`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2173,13 +2188,6 @@ every transaction completes (scoreboard).
 | `aou_zero_credit_test.credit-wreq.limit-12` | `+credit=wreq +limit=12` | 1-2 |  | 8.3
 | `aou_zero_credit_test.credit-rreq.limit-4` | `+credit=rreq +limit=4` | 1-3 |  | 8.6
 | `aou_zero_credit_test.credit-rreq.limit-12` | `+credit=rreq +limit=12` | 1-2 |  | 8.6
-| `aou_zero_credit_test.credit-wdata.limit-2` | `+credit=wdata +limit=2` | 1-3 |  | 3.10,3.13
-| `aou_zero_credit_test.credit-wdata.limit-6` | `+credit=wdata +limit=6` | 1-2 |  | 3.10,3.13
-| `aou_zero_credit_test.hold_wreq_rp-0` | `+hold_wreq_rp=0` | 1-3 |  | 4.32
-| `aou_zero_credit_test.hold_wreq_rp-2.hold_max_len-31.4x512-sp64` | `+hold_wreq_rp=2 +hold_max_len=31` | 1-2 | `4x512-sp64` | 4.32
-| `aou_zero_credit_test.fair-1.4x512-sp64` | `+fair=1` | 1-3 | `4x512-sp64` | 12.21
-| `aou_zero_credit_test.fair-1.4xmix4211-sp128` | `+fair=1` | 1-2 | `4xmix4211-sp128` | 12.21
-| `aou_zero_credit_test.fair-1.fair_short-3.fair_long-0.4xmix4211-sp128` | `+fair=1 +fair_short=3 +fair_long=0` | 1-2 | `4xmix4211-sp128` | 12.21
 | `aou_zero_credit_test.credit-wreq.deact-1` | `+credit=wreq +deact=1` | 1-2 |  | 2.5
 | `aou_zero_credit_test.credit-rreq.deact-1` | `+credit=rreq +deact=1` | 1-2 |  | 2.5
 | `aou_zero_credit_test.credit-wdata.deact-1` | `+credit=wdata +deact=1` | 1-2 |  | 2.5
@@ -2199,13 +2207,11 @@ every transaction completes (scoreboard).
 * 3.13: A message is packed only when credit for the whole message is available (never on partial credit), and queued messages drain when credits return
 * 3.15: Verify independent credit tracking across resource planes RP0-RP3
 * 3.16: Exhaust each credit type independently; verify only affected message type is queued
-* 4.32: Remote WriteData sent ahead of its WriteReq (one message to the whole burst, on several RPs at once) is held and written once the WriteReq arrives
 * 8.3: Send maximum outstanding writes per credit limit
 * 8.6: Send maximum outstanding reads per credit limit
-* 12.21: A write burst the DUT has committed is not held open by back-to-back single-beat writes on another RP (both managers saturating, AWLEN 0 against AWLEN 31-63)
 
 [[aou-proc-aou_act_rx_drain_test]]
-===== 43. `aou_act_rx_drain_test`
+===== 44. `aou_act_rx_drain_test`
 Class `aou_act_rx_drain_test` extends `aou_base_test` (`uvm/tests/link/aou_act_rx_drain_test.svh`).
 
 *Purpose.* Re-activation with remote requests still in the DUT's RX FIFO
@@ -2243,7 +2249,7 @@ Knobs: +hold=<cycles> +loops +T1_TXN=<per RP>.
 * 1.10: Activation waits while the RX FIFO holds data: ACTIVATE_START is not acted on until the RX FIFO drains (re-activation with the M port back-pressured)
 
 [[aou-proc-aou_rx_credit_test]]
-===== 44. `aou_rx_credit_test`
+===== 45. `aou_rx_credit_test`
 Class `aou_rx_credit_test` extends `aou_base_test` (`uvm/tests/link/aou_rx_credit_test.svh`).
 
 *Purpose.* The DUT's advertised RX credit against its FIFO depths, and credit held while
@@ -2285,7 +2291,7 @@ while held>.
 * 3.25: Non-default RX FIFO depths and RS_EN=0: maximum credit follows the depth
 
 [[aou-proc-aou_deact_ctrl_test]]
-===== 45. `aou_deact_ctrl_test`
+===== 46. `aou_deact_ctrl_test`
 Class `aou_deact_ctrl_test` extends `aou_base_test` (`uvm/tests/link/aou_deact_ctrl_test.svh`).
 
 *Purpose.* AOU_INIT deactivation controls: the DEACTIVATE_TIME_OUT_VALUE quiet window and
@@ -2307,7 +2313,7 @@ DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it
 aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46).
 
 ----
-+mode=property (plan 2.10; MAS 7.1 AOU_INIT.INT_DEACTIVATE_PROPERTY): the remote
++mode=property (plan 2.10; BUGS/010, which covers the bit too): the remote
 ----
 
 die deactivates with PropertyReq 0, the only value it may send (the bit is
@@ -2336,7 +2342,7 @@ before any DeactivateReq, in DEACTIVATE and again in the next ENABLED epoch
 * 2.12: DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit
 
 [[aou-proc-aou_remote_react_test]]
-===== 46. `aou_remote_react_test`
+===== 47. `aou_remote_react_test`
 Class `aou_remote_react_test` extends `aou_base_test` (`uvm/tests/link/aou_remote_react_test.svh`).
 
 *Purpose.* The remote die re-activates in the flit after its DeactivateAck
@@ -2370,7 +2376,7 @@ Knobs: +rounds=N (default 2..4) +T1_TXN.
 * 18.17: LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask
 
 [[aou-proc-aou_act_flit_test]]
-===== 47. `aou_act_flit_test`
+===== 48. `aou_act_flit_test`
 Class `aou_act_flit_test` extends `aou_base_test` (`uvm/tests/link/aou_act_flit_test.svh`).
 
 *Purpose.* Credited messages waiting as the DUT sends an Activation message
@@ -2413,7 +2419,7 @@ within a flit time. g sweeps 9..12 (default 12 loops).
 * 2.14: Requests received after DeactivateReq are still answered in DEACTIVATE
 
 [[aou-proc-aou_invalid_actmsg_test]]
-===== 48. `aou_invalid_actmsg_test`
+===== 49. `aou_invalid_actmsg_test`
 Class `aou_invalid_actmsg_test` extends `aou_base_test` (`uvm/tests/errors/aou_invalid_actmsg_test.svh`).
 
 *Purpose.* Activation messages in the wrong state, LinkReset and recovery (aou_invalid_actmsg_vseq).
@@ -2475,7 +2481,7 @@ deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
 * 19.10: Set link reset masks; verify interrupt masked
 
 [[aou-proc-aou_linkreset_timeout_test]]
-===== 49. `aou_linkreset_timeout_test`
+===== 50. `aou_linkreset_timeout_test`
 Class `aou_linkreset_timeout_test` extends `aou_base_test` (`uvm/tests/errors/aou_linkreset_timeout_test.svh`).
 
 *Purpose.* Ack and MsgCredit time-outs, LinkReset and recovery (aou_linkreset_timeout_vseq).
@@ -2515,7 +2521,7 @@ Knobs: +src=act_ack|deact_ack|msgcredit|rand +mask=0|1 +tmo=0..7.
 * 20.10: Read/write/clear error info
 
 [[aou-proc-aou_rx_msg_error_test]]
-===== 50. `aou_rx_msg_error_test`
+===== 51. `aou_rx_msg_error_test`
 Class `aou_rx_msg_error_test` extends `aou_base_test` (`uvm/tests/errors/aou_rx_msg_error_test.svh`).
 
 *Purpose.* Malformed messages from the remote die (aou_rx_msg_error_vseq).
@@ -2566,7 +2572,7 @@ Knobs: +kind=<one of the above>|all +T1_TXN.
 * 9.16: Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers
 
 [[aou-proc-aou_slv_id_mismatch_test]]
-===== 51. `aou_slv_id_mismatch_test`
+===== 52. `aou_slv_id_mismatch_test`
 Class `aou_slv_id_mismatch_test` extends `aou_base_test` (`uvm/tests/errors/aou_slv_id_mismatch_test.svh`).
 
 *Purpose.* Subordinate-side ID mismatch on every RP (aou_slv_id_mismatch_vseq). No
@@ -2608,7 +2614,7 @@ Knobs: +kind=b|r|both (default both) +id=<hex>.
 * 9.12: RRESP with RID not matching pending (subordinate side), on every RP; per-RP status and the RID mismatch interrupt
 
 [[aou-proc-aou_axi_err_resp_test]]
-===== 52. `aou_axi_err_resp_test`
+===== 53. `aou_axi_err_resp_test`
 Class `aou_axi_err_resp_test` extends `aou_base_test` (`uvm/tests/errors/aou_axi_err_resp_test.svh`).
 
 *Purpose.* AXI error responses both ways and the response error debug FIFO
@@ -2721,19 +2727,23 @@ read returns the entry the pop removed, sampled when the
 read became active.
 
 ----
-+read_after_pop=1  with +take_overlap: once the pop has completed, a
++take_pair=1    two takes at once wherever the fifo part takes two or
 ----
 
-second debug read with another ID, issued while the first
-still waits behind the take_flood read's data. It was
-issued after the pop, so it returns the entry behind the
-popped one and tells the checker the head, although the
-first read, which the pop overlapped, is still in flight.
-A section before the pairs pushes a B and an R error
-together and a third error well after them, then takes
-all three: the second read of the first take shows which
-of the pair is left, and that of the second take must not
-return the entry its pop removed.
+more entries in a row: two debug reads one cycle apart
+(both return the head; the second request is accepted
+while the first burst is still being returned), then two
+pops one cycle apart (the second's address and data
+arrive while the first pop's response may still wait).
+
+----
++take_wflood=N issues N single-beat OKAY writes on the
+----
+
+RP just ahead of each pair; with few WriteResp credits
+(+wresp_crd, +crd_delay) their responses back up behind
+the credit, so the first pop's response waits at the
+window while the second pop's address and data arrive.
 
 ----
 +pop_lead=G +wresp_crd=N  each take is an OKAY write on the RP, then the
@@ -2770,7 +2780,6 @@ in flight, returns the same entry.
 | `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64 +pair_writes=3` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64` | `+part=fifo +err_len=7 +agg_en=1 +remote_bytes=32 +pair_gap=64` | 1-2 | `4xmix2144-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15` | 1-2 | `4x512-sp64` | 9.13,9.14
-| `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15 +read_after_pop=1` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64` | `+part=fifo +pop_lead=16 +wresp_crd=1 +crd_delay=256` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32` | `+part=fifo +err_off=32` | 1-2 | `1x256-sp32` | 9.13,9.14
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq` | `+T1_VSEQ=aou_dbg_off_vseq` | 1-2 | `1x512-sp64` | 9.18
@@ -2801,7 +2810,7 @@ in flight, returns the same entry.
 * 20.12: Read/write debug addresses
 
 [[aou-proc-aou_before_enable_test]]
-===== 53. `aou_before_enable_test`
+===== 54. `aou_before_enable_test`
 Class `aou_before_enable_test` extends `aou_base_test` (`uvm/tests/errors/aou_before_enable_test.svh`).
 
 *Purpose.* AXI requests before AoU activation (aou_before_enable_vseq).
@@ -2834,7 +2843,7 @@ Knobs: +hold=<cycles to wait before activating> (default 500..3000).
 * 9.6: Attempt transaction before link enabled (`activate_state_enabled=0`)
 
 [[aou-proc-aou_id_mismatch_test]]
-===== 54. `aou_id_mismatch_test`
+===== 55. `aou_id_mismatch_test`
 Class `aou_id_mismatch_test` extends `aou_base_test` (`uvm/tests/errors/aou_id_mismatch_test.svh`).
 
 *Purpose.* AXI ID mismatch on the M and S ports, every RP (aou_id_mismatch_vseq).
@@ -2880,20 +2889,7 @@ clears the error, its INFO and the interrupt.
 
 interrupt and mask, then always ends the scenario with a hard reset instead
 of the write-1 clear and more traffic.
-Before the write-1 clear (or the reset) that ends an M-port mismatch, traffic
-is started and left +blk_hold cycles (default 1000) with the error still set,
-so aou_t1_crd_block_chk (T1-E20) sees credited messages waiting on the block;
-they complete after the clear, or end with the reset. Before a clear the
-orphan has been taken and traffic runs both ways; before a reset the orphan
-may still be presented, so only the local managers issue. +blk_txns (default 8 per RP and direction,
-0: none) sets the amount.
-Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1
-
-----
-+blk_hold=<cycles> +blk_txns=<n>.
-----
-
-*Rules named.* `T1-E20`
+Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2925,7 +2921,7 @@ Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1
 * 20.13: Read/W1C slave ID errors
 
 [[aou-proc-aou_int_test]]
-===== 55. `aou_int_test`
+===== 56. `aou_int_test`
 Class `aou_int_test` extends `aou_base_test` (`uvm/tests/errors/aou_int_test.svh`).
 
 *Purpose.* Interrupt status, masks and write-1-to-clear (aou_int_vseq).
@@ -2990,7 +2986,7 @@ Knobs: +mode=all|w1c|early|multi|race +mask=0|1 +race_span=<cycles>.
 * 19.12: Multiple interrupt sources active; verify all captured
 
 [[aou-proc-aou_lp_mode_traffic_test]]
-===== 56. `aou_lp_mode_traffic_test`
+===== 57. `aou_lp_mode_traffic_test`
 Class `aou_lp_mode_traffic_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_lp_mode_traffic_test.svh`).
 
 *Purpose.* TX low-power mode and heartbeat with traffic (aou_lp_mode_traffic_vseq).
@@ -3036,7 +3032,7 @@ Knobs: +threshold=0..255 (random, 0 one time in three) +T1_TXN.
 * 21.7: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
 
 [[aou-proc-aou_reset_test]]
-===== 57. `aou_reset_test`
+===== 58. `aou_reset_test`
 Class `aou_reset_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_reset_test.svh`).
 
 *Purpose.* Software and hard resets mid-traffic, mid-activation and with queued messages (aou_reset_vseq).
@@ -3097,7 +3093,7 @@ rand +loops +T1_TXN.
 * 11.17: PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK
 
 [[aou-proc-aou_dft_scan_test]]
-===== 58. `aou_dft_scan_test`
+===== 59. `aou_dft_scan_test`
 Class `aou_dft_scan_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_dft_scan_test.svh`).
 
 *Purpose.* DFT scan mode and the software reset path (aou_dft_scan_vseq, plan 11.19).
@@ -3132,7 +3128,7 @@ reset itself is judged by aou_t1_sw_reset_chk (T1-DFT01) whenever scan mode is o
 * 11.19: DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path
 
 [[aou-proc-aou_mrp_test]]
-===== 59. `aou_mrp_test`
+===== 60. `aou_mrp_test`
 Class `aou_mrp_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_mrp_test.svh`).
 
 *Purpose.* Multi-RP traffic (plan 2.12): aou_mrp_vseq's scenarios with aou_mrp_chk's
@@ -3222,7 +3218,7 @@ MsgCredit order (round robin, 3.19)
 * 12.20: Local and remote RP_COUNT differ: the effective count is the smaller, and a larger remote die is configured down to it (AoU v0.8 6.2)
 
 [[aou-proc-aou_dest_rp_dup_test]]
-===== 60. `aou_dest_rp_dup_test`
+===== 61. `aou_dest_rp_dup_test`
 Class `aou_dest_rp_dup_test` extends `aou_dest_rp_test` (`uvm/tests/matrix/aou_dest_rp_dup_test.svh`).
 
 *Purpose.* [NEG] Duplicate DEST_RP values (plan 12.12, MAS 3.10.3): RP1 is mapped to
@@ -3254,7 +3250,7 @@ describes. Needs 4 RPs.
 * 12.12: [NEG] Configure duplicate `dest_rp` values; verify behavior
 
 [[aou-proc-aou_dw_test]]
-===== 61. `aou_dw_test`
+===== 62. `aou_dw_test`
 Class `aou_dw_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_dw_test.svh`).
 
 *Purpose.* Data width conversion (plan 2.14). The remote die's width per RP comes from
@@ -3344,7 +3340,7 @@ any targeted conversion the run never produced (coverage, not an error).
 * 18.5: Configure `FDI_CFG_TP_64B_128B` with `+define+TWO_PHY`
 
 [[aou-proc-aou_dw_down1024_test]]
-===== 62. `aou_dw_down1024_test`
+===== 63. `aou_dw_down1024_test`
 Class `aou_dw_down1024_test` extends `aou_dw_test` (`uvm/tests/matrix/aou_dw_test.svh`).
 
 *Purpose.* A 1024-bit remote die on the 256-bit RPs (plan 14.5), 512 bits on the
@@ -3381,7 +3377,7 @@ every write as WriteData1024, through the 1024-bit downsizer.
 * 14.16: Verify narrow R data duplicated to match local bus width
 
 [[aou-proc-aou_perf_test]]
-===== 63. `aou_perf_test`
+===== 64. `aou_perf_test`
 Class `aou_perf_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_perf_test.svh`).
 
 *Purpose.* Performance (plan 2.10): aou_perf_vseq's windows (+perf_scn=S1..S5, or
@@ -3518,7 +3514,7 @@ the DUT; then one grant per RP releases them (10.7)
 * 18.5: Configure `FDI_CFG_TP_64B_128B` with `+define+TWO_PHY`
 
 [[aou-proc-aou_sanity_test]]
-===== 64. `aou_sanity_test`
+===== 65. `aou_sanity_test`
 Class `aou_sanity_test` extends `aou_base_test` (`uvm/tests/aou_sanity_test.svh`).
 
 *Purpose.* Bring-up gate test and the default T1 test: the DUT comes up through the
@@ -3542,7 +3538,7 @@ simulator seed; +T1_TXN=<n> sets the transaction count (default 8).
 
 ==== Register bench (`aou_reg_top`, APB only)
 [[aou-proc-aou_reg_hw_reset_test]]
-===== 65. `aou_reg_hw_reset_test`
+===== 66. `aou_reg_hw_reset_test`
 Class `aou_reg_hw_reset_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_hw_reset_test.svh`).
 
 *Purpose.* Reset values of every register against the RDL (uvm_reg_hw_reset_seq).
@@ -3565,7 +3561,7 @@ Class `aou_reg_hw_reset_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_re
 * 20.14: Verify all registers reset to documented values
 
 [[aou-proc-aou_reg_bit_bash_test]]
-===== 66. `aou_reg_bit_bash_test`
+===== 67. `aou_reg_bit_bash_test`
 Class `aou_reg_bit_bash_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_bit_bash_test.svh`).
 
 *Purpose.* Walks a 1 and a 0 through every bit of every register (uvm_reg_bit_bash_seq).
@@ -3606,7 +3602,7 @@ are bashed: writing 1 to a clear flag must leave it 0.
 * 20.13: Read/W1C slave ID errors
 
 [[aou-proc-aou_reg_access_test]]
-===== 67. `aou_reg_access_test`
+===== 68. `aou_reg_access_test`
 Class `aou_reg_access_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_access_test.svh`).
 
 *Purpose.* Every field behaves as its RDL access policy says (see aou_reg_access_seq).
@@ -3643,7 +3639,7 @@ Class `aou_reg_access_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_
 * 20.13: Read/W1C slave ID errors
 
 [[aou-proc-aou_reg_reserved_test]]
-===== 68. `aou_reg_reserved_test`
+===== 69. `aou_reg_reserved_test`
 Class `aou_reg_reserved_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_reserved_test.svh`).
 
 *Purpose.* Reserved bits read 0 and unmapped offsets are inert (see aou_reg_reserved_seq).
@@ -3666,7 +3662,7 @@ Class `aou_reg_reserved_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_re
 * 20.16: Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers
 
 [[aou-proc-aou_reg_alias_test]]
-===== 69. `aou_reg_alias_test`
+===== 70. `aou_reg_alias_test`
 Class `aou_reg_alias_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_alias_test.svh`).
 
 *Purpose.* Addresses above the 64 KiB window alias the registers (see aou_reg_alias_seq).
@@ -3688,7 +3684,7 @@ Class `aou_reg_alias_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_a
 * 20.16: Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers
 
 [[aou-proc-aou_reg_feature_seq_test]]
-===== 70. `aou_reg_feature_seq_test`
+===== 71. `aou_reg_feature_seq_test`
 Class `aou_reg_feature_seq_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_feature_seq_test.svh`).
 
 *Purpose.* Every feature-programming sequence programs the fields it names
@@ -3719,7 +3715,7 @@ Class `aou_reg_feature_seq_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou
 
 ==== L3 protocol-model unit bench (no DUT)
 [[aou-proc-aou_l3_codec_test]]
-===== 71. `aou_l3_codec_test`
+===== 72. `aou_l3_codec_test`
 Class `aou_l3_codec_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_codec_test.svh`).
 
 *Purpose.* Encodings without time: granule counts for every type and DLENGTH, pack /
@@ -3739,7 +3735,7 @@ cross-check of every encoder against PR 80's independent aou_pkg.
 |===
 
 [[aou-proc-aou_l3_credit_test]]
-===== 72. `aou_l3_credit_test`
+===== 73. `aou_l3_credit_test`
 Class `aou_l3_credit_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_credit_test.svh`).
 
 *Purpose.* Credit manager scenarios (spec chapter 6): zero credit holds a message
@@ -3762,7 +3758,7 @@ returns; RP round robin; and an overflow by the peer is AOU-R16.
 |===
 
 [[aou-proc-aou_l3_crossflit_test]]
-===== 73. `aou_l3_crossflit_test`
+===== 74. `aou_l3_crossflit_test`
 Class `aou_l3_crossflit_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_crossflit_test.svh`).
 
 *Purpose.* Every multi-granule message at every start granule, through the packer and
@@ -3784,7 +3780,7 @@ exactly at G47 and a continuation followed by a new message.
 |===
 
 [[aou-proc-aou_l3_dest_rp_test]]
-===== 74. `aou_l3_dest_rp_test`
+===== 75. `aou_l3_dest_rp_test`
 Class `aou_l3_dest_rp_test` extends `aou_l3_loopback_test` (`uvm/tests/l3_unit/aou_l3_dest_rp_test.svh`).
 
 *Purpose.* Loopback with a non-identity DEST_RP (MAS 3.10): die A maps its planes
@@ -3808,7 +3804,7 @@ bookkeeping (AOU-R13) by plane, not by the RP a response arrives on.
 |===
 
 [[aou-proc-aou_l3_inject_test]]
-===== 75. `aou_l3_inject_test`
+===== 76. `aou_l3_inject_test`
 Class `aou_l3_inject_test` extends `aou_l3_unit_env_test` (`uvm/tests/l3_unit/aou_l3_inject_test.svh`).
 
 *Purpose.* One error injected by model B (the remote die) after legal traffic, chosen
@@ -3849,7 +3845,7 @@ at DISABLED.
 |===
 
 [[aou-proc-aou_l3_link_test]]
-===== 76. `aou_l3_link_test`
+===== 77. `aou_l3_link_test`
 Class `aou_l3_link_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_link_test.svh`).
 
 *Purpose.* Link controller, two models back to back without time. Legal sequences:
@@ -3879,7 +3875,7 @@ DISABLED flit is not), and v0.8's ERROR state with its recovery.
 |===
 
 [[aou-proc-aou_l3_loopback_test]]
-===== 77. `aou_l3_loopback_test`
+===== 78. `aou_l3_loopback_test`
 Class `aou_l3_loopback_test` extends `aou_l3_unit_env_test` (`uvm/tests/l3_unit/aou_l3_loopback_test.svh`).
 
 *Purpose.* Legal traffic both ways between two L3 models under the chosen packer and
@@ -3900,7 +3896,7 @@ from AOU_FDI_CHECKER.
 |===
 
 [[aou-proc-aou_l3_unit_env_test]]
-===== 78. `aou_l3_unit_env_test`
+===== 79. `aou_l3_unit_env_test`
 Class `aou_l3_unit_env_test` extends `aou_l3_unit_base_test` (`uvm/tests/l3_unit/aou_l3_unit_env_test.svh`).
 
 *Purpose.* Clocked unit environment: two L3 agents (A on the LP stream in the DUT's
@@ -3926,7 +3922,7 @@ Plusargs: +L3_POLICY=dut|sparse|min|max|random|split, +L3_FORK=1,
 
 ==== AXI agent self-test bench (no DUT)
 [[aou-proc-aou_axi_selftest_test]]
-===== 79. `aou_axi_selftest_test`
+===== 80. `aou_axi_selftest_test`
 Class `aou_axi_selftest_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_axi_selftest_test.svh`).
 
 *Purpose.* Loopback self-test: random traffic, then the #56 and #64 directed sequences,
@@ -3950,7 +3946,7 @@ e.g. AOU_AXI_TIMING_STALL> (default: random per seed), +AXI_NUM_TXNS=<n>.
 |===
 
 [[aou-proc-aou_axi_selftest_neg_test]]
-===== 80. `aou_axi_selftest_neg_test`
+===== 81. `aou_axi_selftest_neg_test`
 Class `aou_axi_selftest_neg_test` extends `aou_axi_selftest_test` (`uvm/tests/axi_selftest/aou_axi_selftest_neg_test.svh`).
 
 *Purpose.* Checks the checkers: the subordinate flips read-data bits, drops writes and
@@ -3970,14 +3966,14 @@ errors are demoted to info and counted; the test fails if either count is 0.
 |===
 
 [[aou-proc-aou_axi_sb_reset_test]]
-===== 81. `aou_axi_sb_reset_test`
+===== 82. `aou_axi_sb_reset_test`
 Class `aou_axi_sb_reset_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_axi_sb_reset_test.svh`).
 
 *Purpose.* Directed check of the scoreboard's reset rule, with no bus: transactions are
 fed to the scoreboard directly. A reset_outstanding write is lost or landed
 whatever its response, and the bytes it addresses may then hold their old
 value or the write's, until a checked write; a reset_outstanding read may
-end with SLVERR beats (MAS 7.3.6 defines no response for it); anything else is still an error.
+end with SLVERR beats (BUGS/015 interim); anything else is still an error.
 Each step expects an exact set of errors.
 
 *Procedure.* The class's own `run_phase` (see the file).

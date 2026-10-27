@@ -14,13 +14,14 @@
 | `aou_t1_remote_act_test` | `aou_t1_remote_act_test` |  | 1-2 |  | 1.1,1.6,1.7,2.1,2.4,19.1,19.2 | 
 | `aou_fdi_t1_bringup_test` | `aou_fdi_t1_bringup_test` |  | 1 |  | 18.10,22.1,22.2,22.3 | 
 |===
-===== `testlists/g1b.toml` (3 scenarios)
+===== `testlists/g1b.toml` (4 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
 | `aou_fdi_t1_bringup_spec_test` | `aou_fdi_t1_bringup_spec_test` |  | 1 |  | 22.1 | 
 | `aou_fdi_t1_linkerror_spec_test` | `aou_fdi_t1_linkerror_spec_test` |  | 1 |  | 22.1,22.4 | 
 | `aou_fdi_t1_linkdown_spec_test` | `aou_fdi_t1_linkdown_spec_test` |  | 1 |  | 22.1,22.4,22.7,18.18 | 
+| `aou_fdi_t1_abort_test` | `aou_fdi_t1_abort_test` |  | 1-2 |  | 22.1,22.4,22.6,22.7,18.14,18.17,18.18,18.20,18.21 | 
 |===
 ===== `testlists/t1_api.toml` (5 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]

@@ -66,8 +66,16 @@ package aou_lsm_pkg;
     LSM_EV_INBAND_DROP,  // inband_pres low for a while in Reset
     LSM_EV_CLK_WAKE,     // a pl_clk_req handshake
     LSM_EV_IDLE,         // wait `cycles`
-    LSM_EV_DISABLED      // Active to Disabled, then Reset and bringup
+    LSM_EV_DISABLED,     // Active to Disabled, then Reset and bringup
+    LSM_EV_ABORT         // a bringup or an L1 exit abandoned part-way (aou_lsm_item::at)
   } aou_lsm_ev_e;
+
+  // Where LSM_EV_ABORT leaves the bringup or the L1 exit (aou_lsm_driver::do_abort)
+  typedef enum bit [1:0] {
+    LSM_AB_RESET,        // Reset before pl_inband_pres: training never completed
+    LSM_AB_WAKE,         // `gap` cycles after the pl_clk_req that wakes the DUT (0: status first)
+    LSM_AB_REQ_ACTIVE    // `gap` cycles after the DUT requested Active, before the Active entry
+  } aou_lsm_abort_e;
 
   // Bringup software pins of the DUT (integrator guide §3.15)
   typedef enum bit {

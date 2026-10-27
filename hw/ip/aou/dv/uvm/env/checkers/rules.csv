@@ -68,7 +68,7 @@ FDI-R17,n/a,,N/A,The PL waits for pl_wake_ack before driving lp_cfg (the DUT has
 FDI-R18,aou_lsm_monitor,aou_lsm_driver,DUT,lp_clk_ack rises at least one clock after pl_clk_req and answers it (L2; checks the DUT),UCIe r1.1 8.2.3.2
 FDI-R19,aou_lsm_monitor,aou_lsm_driver,DUT,lp_clk_ack falls after pl_clk_req falls (L2; checks the DUT),UCIe r1.1 8.2.3.2
 FDI-R20,by construction (aou_lsm_driver),,MODEL,"The Adapter may change level signals (inband_pres, rx_active_req, ...) without waiting for lp_clk_ack (a permission)",UCIe r1.1 8.2.3.2
-FDI-R21,by construction (aou_lsm_driver),,MODEL,pl_clk_req handshake before a LinkError transition from Reset/LinkReset/Disabled/PM (L2 enters LinkError only from Active),UCIe r1.1 8.2.3.2
+FDI-R21,by construction (aou_lsm_driver),,MODEL,"pl_clk_req handshake before a LinkError transition from Reset/LinkReset/Disabled/PM: before the status change and held until it, or after it with the ack awaited (L2's aborts and LinkReset/Disabled escalations)",UCIe r1.1 8.2.3.2
 FDI-R22,not checked,,MODEL,"pl_clk_req asserted before leaving Reset/PM and held until the status leaves (L2 releases it before Active unless clk_req_hold_bringup, a deliberate variation)",UCIe r1.1 8.2.3.2
 FDI-R23,n/a,,N/A,The Adapter waits for lp_clk_ack before driving pl_cfg (no sideband config interface),UCIe r1.1 8.2.3.2
 FDI-R24,via FDI-M01,,DUT,No clock gating in LinkError; a gated PL in Reset requests Active only after pl_inband_pres (the bringup model predicts lp_state_req from inband_pres),UCIe r1.1 8.2.3 / 8.2.3.2

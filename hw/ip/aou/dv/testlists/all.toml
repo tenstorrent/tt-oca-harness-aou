@@ -88,7 +88,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 254
+expected_count = 255
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -97,6 +97,7 @@ tests = [
   "aou_fdi_t1_bringup_spec_test",
   "aou_fdi_t1_linkerror_spec_test",
   "aou_fdi_t1_linkdown_spec_test",
+  "aou_fdi_t1_abort_test",
   "aou_t1_link_event_test",
   "aou_t1_lp_mode_test",
   "aou_t1_inject_test",
@@ -349,7 +350,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 469
+expected_count = 470
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -368,6 +369,7 @@ tests = [
   "aou_fdi_t1_bringup_spec_test",
   "aou_fdi_t1_linkerror_spec_test",
   "aou_fdi_t1_linkdown_spec_test",
+  "aou_fdi_t1_abort_test",
   "aou_t1_link_event_test",
   "aou_t1_lp_mode_test",
   "aou_t1_inject_test",

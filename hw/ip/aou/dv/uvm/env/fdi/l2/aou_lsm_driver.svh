@@ -20,6 +20,16 @@
 // cfg.sw_restart_delay cycles (software's Start UCIe Link Training) and then
 // trains again by itself, without waiting for a NOP->Active request
 // (§8.3.3.8 allows either trigger).
+//
+// Events can also end another way (aou_lsm_item::to): a Retrain that ends in
+// LinkError, LinkReset or Disabled, a LinkReset or Disabled that escalates to
+// LinkError, and LSM_EV_ABORT, a bringup or a PM exit from L1 that the
+// Adapter abandons part-way (do_abort). LinkError may follow any state,
+// Disabled and LinkReset any but LinkError (UCIe r3.0 Figure 10-19). These
+// exits from Reset, LinkReset, Disabled or L1 follow the pl_clk_req ordering
+// of UCIe r3.0 §10.2.3.2 rules 6 and 7 (r1.1 §8.2.3.2): before a LinkError the
+// request may come before or after the status change, before any other exit
+// it must come first.
 class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   `uvm_component_utils(aou_lsm_driver)
 
@@ -40,6 +50,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   local bit       down_reset;    // Reset entered from LinkError/LinkReset/Disabled
   local bit       clk_req_q;
   local bit       wake_ack_q;
+  local bit       wake_ack_hold; // an abort keeps pl_wake_ack low (aou_lsm_item::hold_wake_ack)
   local bit       rx_req_q;
 
   function new(string name, uvm_component parent);
@@ -87,6 +98,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     foreach (cfg.gate[i]) cfg.gate[i].rx_early = 1'b0;
     link_active = 1'b0;
     down_reset = 1'b0;
+    wake_ack_hold = 1'b0;
   endtask
 
   local task main_loop();
@@ -151,14 +163,15 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     if (it.kind != LSM_EV_LINKERROR) le_absorbed = 1'b0;
     case (it.kind)
       LSM_EV_BRINGUP:     do_bringup();
-      LSM_EV_RETRAIN:     do_retrain(dwell);
+      LSM_EV_RETRAIN:     do_retrain(dwell, it.to);
       LSM_EV_LINKERROR:   do_linkerror(dwell);
       LSM_EV_L1_ENTRY:    do_l1_entry();
       LSM_EV_L1_EXIT:     do_l1_exit();
-      LSM_EV_LINK_RESET:  do_link_reset(dwell);
+      LSM_EV_LINK_RESET:  do_link_reset(dwell, it.to == LSM_LINKERROR);
       LSM_EV_INBAND_DROP: do_inband_drop(dwell);
       LSM_EV_CLK_WAKE:    do_clk_wake();
-      LSM_EV_DISABLED:    do_disabled(dwell);
+      LSM_EV_DISABLED:    do_disabled(dwell, it.to == LSM_LINKERROR);
+      LSM_EV_ABORT:       do_abort(it, dwell);
       default:            wait_cycles(dwell);
     endcase
   endtask
@@ -254,10 +267,11 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
       if (lsm_vif.drv_cb.rst_n !== 1'b1) begin
         wake_ack_q = 1'b0;
         lsm_vif.drv_cb.pl_wake_ack <= 1'b0;
-      end else if ((lsm_vif.drv_cb.lp_wake_req === 1'b1) != wake_ack_q) begin
+      end else if ((lsm_vif.drv_cb.lp_wake_req === 1'b1) != wake_ack_q &&
+                   !(wake_ack_hold && !wake_ack_q)) begin
         bit want = !wake_ack_q;
         repeat (cfg.lat() - 1) @(lsm_vif.drv_cb);
-        if ((lsm_vif.drv_cb.lp_wake_req === 1'b1) == want) begin
+        if ((lsm_vif.drv_cb.lp_wake_req === 1'b1) == want && !(want && wake_ack_hold)) begin
           wake_ack_q = want;
           lsm_vif.drv_cb.pl_wake_ack <= want;
         end
@@ -339,26 +353,54 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     if (clk_req_q) clk_handshake(1'b0);
   endtask
 
-  task do_retrain(int unsigned dwell);
+  // Retrain entered from Active ends on a NOP->Active request (§8.3.3.4
+  // rule 1). The Adapter registers that transition whenever it happens in
+  // Retrain, including during the dwell, and starts Active entry after both
+  // the dwell and the transition. With `to` LinkError, LinkReset or Disabled it
+  // ends there instead after the dwell (all legal exits of Retrain, §8.3.3;
+  // no clk_req handshake: rules 21/22 cover Reset, LinkReset, Disabled and PM
+  // only). A LinkError the DUT raises on lp_linkerror meanwhile is answered as
+  // in Active (Table 8-2: LinkError, held while lp_linkerror is 1).
+  task do_retrain(int unsigned dwell, aou_lsm_state_e to = LSM_UNKNOWN);
     int unsigned trig = 0;
+    int unsigned n = 0;
     if (state != LSM_ACTIVE) begin
       `uvm_error(get_type_name(), $sformatf("Retrain requested in %s; ignored", state.name()))
       return;
     end
+    if (!(to inside {LSM_UNKNOWN, LSM_ACTIVE, LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}))
+      `uvm_fatal(get_type_name(), {"a Retrain cannot end in ", to.name()})
     close_gates();
     rx_active(1'b0);
     set_state(LSM_RETRAIN);
-    // Retrain entered from Active ends on a NOP->Active request (§8.3.3.4
-    // rule 1). The Adapter registers that transition whenever it happens in
-    // Retrain, including during the dwell, and starts Active entry after both
-    // the dwell and the transition.
-    aou_rule_log::check("FDI-R48", get_type_name());
-    repeat (dwell) begin
-      @(lsm_vif.drv_cb);
-      trig = retrain_trigger(trig);
+    if (to inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) begin
+      wait_cycles(dwell);
+      `uvm_info(get_type_name(), {"Retrain ends in ", to.name()}, UVM_LOW)
+      if (to == LSM_LINKERROR) linkerror_down(dwell);
+      else link_down(to, dwell);
+      if (cfg.rebringup_after_down) do_bringup();
+      return;
     end
-    if (trig < 1) wait_req(LSM_REQ_NOP, "FDI-R48");
-    if (trig < 2) wait_req(LSM_REQ_ACTIVE, "FDI-R48");
+    aou_rule_log::check("FDI-R48", get_type_name());
+    while (n < dwell || trig < 2) begin
+      @(lsm_vif.drv_cb);
+      n++;
+      if (cfg.react_en && cfg.react_linkerror_en && lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
+        `uvm_info(get_type_name(), "lp_linkerror in Retrain: Adapter enters LinkError (Table 8-2)",
+                  UVM_LOW)
+        n_le_react++;
+        linkerror_down(cfg.dwell());
+        if (cfg.rebringup_after_down) do_bringup();
+        return;
+      end
+      trig = retrain_trigger(trig);
+      if (n >= dwell && cfg.req_timeout != 0 && n - dwell == cfg.req_timeout) begin
+        aou_rule_log::fire("FDI-R48", get_type_name());
+        `uvm_error(get_type_name(), $sformatf({"FDI-R48: no NOP->Active request on lp_state_req ",
+                   "%0d cycles after the Retrain dwell"}, cfg.req_timeout))
+        break;
+      end
+    end
     active_entry();
   endtask
 
@@ -490,29 +532,129 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     active_entry();
   endtask
 
-  task do_link_reset(int unsigned dwell);
-    link_down(LSM_LINKRESET, dwell);
+  task do_link_reset(int unsigned dwell, bit escalate = 1'b0);
+    link_down(LSM_LINKRESET, dwell, escalate);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 
   // Adapter-initiated Disabled (software Link Disable or the remote partner,
   // §8.3.3.6).
-  task do_disabled(int unsigned dwell);
-    link_down(LSM_DISABLED, dwell);
+  task do_disabled(int unsigned dwell, bit escalate = 1'b0);
+    link_down(LSM_DISABLED, dwell, escalate);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 
   // LinkReset or Disabled for `dwell` cycles, then Reset on the Adapter's
   // internal request (software on the UCIe controller; §8.3.3.5 rule 1,
   // §8.3.3.6). The DUT requests nothing meanwhile (the bringup model checks
-  // NOP in LINKDOWN).
-  local task link_down(aou_lsm_state_e s, int unsigned dwell);
+  // NOP in LINKDOWN). With `escalate` the Adapter goes on to LinkError before
+  // Reset (LinkReset and Disabled may both move to LinkError, §8.3.3), after
+  // the pl_clk_req handshake rule 21 asks for; the request is held until the
+  // status has changed.
+  local task link_down(aou_lsm_state_e s, int unsigned dwell, bit escalate = 1'b0);
     close_gates();
     rx_active(1'b0);
     set_state(s);
     set_inband(1'b0);
     wait_cycles(dwell);
+    if (escalate) begin
+      `uvm_info(get_type_name(), {s.name(), " escalates to LinkError"}, UVM_LOW)
+      clk_handshake(1'b1);
+      set_state(LSM_LINKERROR);
+      wait_cycles(dwell);
+      clk_handshake(1'b0);
+    end
     set_state(LSM_RESET);
+  endtask
+
+  // The Adapter abandons a bringup, or a PM exit from L1 (it.in_l1), part-way
+  // and reports it.to instead: LinkError (training or the Active entry failed,
+  // UCIe §8.3.3.7), LinkReset or Disabled (software or the remote die takes the
+  // link down), or, from Reset only, it drops pl_inband_pres again (UCIe r3.0
+  // §10.2.3: the Protocol Layer then returns lp_state_req to NOP, which the
+  // bringup model checks). Where (it.at):
+  //   LSM_AB_RESET       Reset, before pl_inband_pres (from Active the link
+  //                      first goes down through LinkReset);
+  //   LSM_AB_WAKE        it.gap cycles after the pl_clk_req that wakes the DUT:
+  //                      in Reset once pl_inband_pres is 1 and pl_clk_req was
+  //                      released (the DUT waits for a trigger), or in L1;
+  //                      it.gap 0 sends the status first and the clk_req after;
+  //   LSM_AB_REQ_ACTIVE  it.gap cycles after the DUT, woken by pl_clk_req,
+  //                      requests Active, before the Active entry starts.
+  // it.hold_wake_ack keeps pl_wake_ack low until then. pl_clk_req follows UCIe
+  // r1.1 §8.2.3.2: for a LinkError (rule 21) before the status change and held
+  // until it, or after it with the ack awaited; for LinkReset and Disabled
+  // (rule 22) strictly before, so those need it.gap of at least 1 unless the
+  // DUT already requested Active on it (a request in the same cycle as the
+  // status change is not used). After the dwell the
+  // Adapter reports Reset and, with cfg.rebringup_after_down, trains again.
+  task do_abort(aou_lsm_item it, int unsigned dwell);
+    bit linkdown = it.to inside {LSM_LINKRESET, LSM_DISABLED};
+    if (!(it.to inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED, LSM_RESET}))
+      `uvm_fatal(get_type_name(), {"an abort cannot end in ", it.to.name()})
+    if (it.to == LSM_RESET && (it.in_l1 || it.at == LSM_AB_RESET))
+      `uvm_fatal(get_type_name(), "pl_inband_pres can fall only in Reset, after it rose")
+    if (it.in_l1 && it.at == LSM_AB_RESET)
+      `uvm_fatal(get_type_name(), "LSM_AB_RESET is no point of a PM exit")
+    if (linkdown && it.at != LSM_AB_REQ_ACTIVE && it.gap == 0)
+      `uvm_fatal(get_type_name(), {"FDI-R22: pl_clk_req must come before ", it.to.name(),
+                                   " (it.gap 0)"})
+    `uvm_info(get_type_name(), {"abort: ", it.convert2string()}, UVM_LOW)
+    if (it.in_l1) begin
+      if (state != LSM_ACTIVE) begin
+        `uvm_error(get_type_name(), $sformatf("L1 abort requested in %s; ignored", state.name()))
+        return;
+      end
+      do_l1_entry();
+      wait_cycles(dwell);
+    end else begin
+      if (state != LSM_RESET) link_down(LSM_LINKRESET, dwell);
+      if (down_reset && cfg.sw_restart_delay != 0) wait_cycles(cfg.sw_restart_delay);
+      down_reset = 1'b0;
+      wait_cycles(cfg.lat());
+      if (it.at != LSM_AB_RESET) begin
+        // Training done; pl_clk_req released with pl_inband_pres rising, so
+        // the DUT waits for a trigger (the bringup test's cold start).
+        clk_handshake(1'b1);
+        wait_cycles(cfg.lat());
+        set_inband(1'b1);
+        clk_handshake(1'b0);
+        wait_cycles(cfg.lat());
+      end
+    end
+    wake_ack_hold = it.hold_wake_ack;
+    if (it.at == LSM_AB_REQ_ACTIVE) begin
+      set_clk_req(1'b1);
+      wait_req(LSM_REQ_ACTIVE, it.in_l1 ? "FDI-R41" : "FDI-R33");
+      wait_cycles(it.gap);
+    end else if (it.gap != 0) begin
+      set_clk_req(1'b1);
+      wait_cycles(it.gap);
+    end
+    if (it.to == LSM_RESET) begin
+      // The DUT goes back to Reset and requests NOP (FDI-M01 in the model).
+      set_inband(1'b0);
+      wait_cycles(dwell);
+      wake_ack_hold = 1'b0;
+      // Presence again with pl_clk_req held (rule 20), which wakes the DUT.
+      if (!clk_req_q) clk_handshake(1'b1);
+      set_inband(1'b1);
+      wait_req(LSM_REQ_ACTIVE, "FDI-R33");
+      active_entry();
+      clk_handshake(1'b0);
+      return;
+    end
+    set_state(it.to);
+    set_inband(1'b0);
+    // A LinkError reported first: the clk_req handshake follows, and the
+    // Adapter waits for the ack before its next transition (rule 21).
+    if (!clk_req_q) set_clk_req(1'b1);
+    wait_dut("lp_clk_ack", 4'h1, "FDI-R18");
+    wake_ack_hold = 1'b0;
+    wait_cycles(dwell);
+    clk_handshake(1'b0);
+    set_state(LSM_RESET);
+    if (cfg.rebringup_after_down) do_bringup();
   endtask
 
   task do_inband_drop(int unsigned dwell);

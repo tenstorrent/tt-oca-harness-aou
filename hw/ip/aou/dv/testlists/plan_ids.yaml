@@ -16,6 +16,7 @@ plan_ids:
   aou_fdi_t1_bringup_spec_test: '22.1'
   aou_fdi_t1_linkerror_spec_test: '22.1,22.4'
   aou_fdi_t1_linkdown_spec_test: '22.1,22.4,22.7,18.18'
+  aou_fdi_t1_abort_test: '22.1,22.4,22.6,22.7,18.14,18.17,18.18,18.20,18.21'
   aou_t1_link_event_test: '18.9,18.10,22.1,22.2,22.3'
   aou_t1_lp_mode_test: '21.1,21.2,21.4,21.7'
   aou_t1_inject_test: '19.6'

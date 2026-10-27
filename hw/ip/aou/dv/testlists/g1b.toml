@@ -33,11 +33,25 @@ seed = 1
 tags = ["g1b"]
 run_modes = ["g1b"]
 
+# The Adapter abandons a bringup or a PM exit from L1 part-way: LinkError,
+# LinkReset or Disabled before presence, after the waking pl_clk_req (with
+# pl_wake_ack held back) and after the DUT's Active request, and pl_inband_pres
+# falling again in Reset (UCIe r3.0 §10.2.3), with the pl_clk_req ordering of
+# §10.2.3.2. The bringup model checks the DUT's requests and its hold-down.
+[[tests]]
+name = "aou_fdi_t1_abort_test"
+module = { uvm = "aou_fdi_t1_abort_test" }
+seed = 1
+reseed = 2
+tags = ["g1b"]
+run_modes = ["g1b"]
+
 [[groups]]
 name = "g1b"
-expected_count = 3
+expected_count = 4
 tests = [
   "aou_fdi_t1_bringup_spec_test",
   "aou_fdi_t1_linkerror_spec_test",
   "aou_fdi_t1_linkdown_spec_test",
+  "aou_fdi_t1_abort_test",
 ]

@@ -40,4 +40,5 @@ package aou_fdi_test_pkg;
   `include "aou_fdi_t1_linkerror_spec_test.svh"
   `include "aou_fdi_t1_linkdown_spec_test.svh"
   `include "aou_fdi_t1_link_stress_test.svh"
+  `include "aou_fdi_t1_abort_test.svh"
 endpackage
