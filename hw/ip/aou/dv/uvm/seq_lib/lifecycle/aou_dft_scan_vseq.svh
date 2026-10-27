@@ -10,8 +10,6 @@
 // survive (T1-DFT02, register read-backs at the end of each step), also after an
 // AOU_SW_RESET write; scan mode off; a hard reset and traffic again. The core
 // reset itself is judged by aou_t1_sw_reset_chk (T1-DFT01) whenever scan mode is on.
-// The interim expectation follows the guide's text; the RTL ties the scan input
-// to 0 (BUGS/052).
 class aou_dft_scan_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_dft_scan_vseq)
 

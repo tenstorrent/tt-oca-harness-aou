@@ -381,16 +381,6 @@
     above the gate (bw_rd l2r: 1x512 0.9704, 3x512 0.9735, 4x512 0.9773, 2x512-tp32_64 0.9780 and
     0.9735; the same on every seed), so it does not fire today; kept for when it dips below
 
-- test: aou_dft_scan_test
-  bug: BUGS/052
-  check: 'T1-DFT01: the core reset was asserted for'
-  note: w_DFTED_sw_resetn is 0 for the whole scan window (every seed)
-
-- test: aou_dft_scan_test
-  bug: BUGS/052
-  check: 'T1-DFT02: aou_core.lp_linkreset.msgcredit_time_out_value read 0x0, expected 0x6'
-  note: the SFRs are held in reset in scan mode, so the marker reads 0 (before and after the AOU_SW_RESET write)
-
 # Plan 1.10, 2.5, 2.10, 2.12, 3.20/3.23/3.25: deactivations in these tests meet the same
 # credit-after-DeactivateAck findings as the activation tests.
 

@@ -298,8 +298,6 @@ seed = 1
 reseed = 2
 tags = ["lifecycle"]
 run_modes = ["lifecycle"]
-expect_fail = "BUGS/052 (expected_fail.yaml)"
-expect_fail_match = "T1-DFT01: the core reset was asserted for|T1-DFT02: aou_core\\.lp_linkreset\\.msgcredit_time_out_value read 0x0, expected 0x6"
 
 [[groups]]
 name = "lifecycle"

@@ -364,7 +364,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-40000` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=40000` | 1 |  | 11.17 | 
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-600` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=600` | 1 |  | 11.17 | 
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
-| `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | BUGS/052 (expected_fail.yaml)
+| `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | 
 |===
 ===== `testlists/matrix.toml` (105 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
