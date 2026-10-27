@@ -199,7 +199,7 @@
   section_title: Link Deactivation Tests
   title: 'No credit message in DISABLED; credits of every class are permitted after the sender''s DeactivateAck (v0.8 8.4, MAS 7.3.1), including in the flit whose Ack completes the teardown'
   priority: P2
-  added: 'AoU 8.2/8.4; BUGS/009, BUGS/033'
+  added: AoU 8.2/8.4
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
 
 - id: '2.12'
@@ -215,7 +215,7 @@
   section_title: Link Deactivation Tests
   title: 'No DeactivateReq while the DUT''s own requests are outstanding'
   priority: P2
-  added: AoU 8.3.2/8.4; BUGS/032
+  added: AoU 8.3.2/8.4
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '2.14'

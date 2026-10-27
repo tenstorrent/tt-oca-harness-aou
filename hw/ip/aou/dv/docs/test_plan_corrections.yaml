@@ -250,7 +250,7 @@
   title: 'Reserved ACTIVATIONOP (4-15) received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '2.11'
-  added: 'AoU 8.2/8.4; BUGS/009, BUGS/033'
+  added: 'AoU 8.2/8.4'
   priority: P2
   title: 'No credit message in DISABLED; credits of every class are permitted after the sender''s DeactivateAck (v0.8 8.4, MAS 7.3.1), including in the flit whose Ack completes the teardown'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
@@ -260,7 +260,7 @@
   title: 'DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 - id: '2.13'
-  added: 'AoU 8.3.2/8.4; BUGS/032'
+  added: 'AoU 8.3.2/8.4'
   priority: P2
   title: 'No DeactivateReq while the DUT''s own requests are outstanding'
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.

@@ -75,7 +75,7 @@ The untriaged mix4, w256 and tp2 failures from `d04b2da` are gone (`err_resp`, `
 XFAIL. There are two new failures, not triaged here:
 
 - **4x512-sp64 `aou_act_after_deact_test` seed 1.** AOU-R26 "DUT MsgCredit RDATA RP2=1 in DISABLED",
-  plus AOU-R29. This looks like the BUGS/009/033 family with a signature that `expected_fail.yaml`
+  plus AOU-R29. This looks like the credit-after-deactivation bugs PR #122 fixed, with a signature that `expected_fail.yaml`
   doesn't match on this config.
 - **4xmix4121-sp128 `aou_pack_test +pk=crossflit +remote_bytes=128` seed 1.** AXI-R10, a 4 KB crossing
   on the RP1 (256-bit) M port. This looks like tenstorrent/tt-oca-harness-aou#90 with a signature `expected_fail.yaml`
@@ -502,7 +502,7 @@ can't mean what it says. They are listed for owner review because the denominato
 | `cg_act_fsm activate_error/enabled_error/deactivate_error/error_disabled` (4) | ERROR state (v0.8 §8.3.3) | model under `spec_rev=V08` with an illegal op received |
 | `cg_flit_layout cp_size g4` and every `g*,g4` start cell, `x_size_span g4,*` (51) | 4-granule ActivateReq with ProfileID/Rev/Opt (v0.8 Table 27/§5.6) | a v0.8 DUT, or a model that sends it |
 | `cg_flit_occ cp_misc_half1 over` (1) | half-flit Misc limit (v0.8 §4.4) | negative test |
-| **to add:** `l3.cg_flex cp_flex {zero, nonzero} × dir`, `cg_act_req_profile {basic, other}`, `cg_rdata_variant {matches_arsize, wider}`, `cg_deact_credit {credit_after_deact_req, after_deact_ack}` (BUGS/009) | FLEX = USER[15:0]; ActivateReq profile; ReadData-variant rule; DEACTIVATE credit rules | as above |
+| **to add:** `l3.cg_flex cp_flex {zero, nonzero} × dir`, `cg_act_req_profile {basic, other}`, `cg_rdata_variant {matches_arsize, wider}`, `cg_deact_credit {credit_after_deact_req, after_deact_ack}` | FLEX = USER[15:0]; ActivateReq profile; ReadData-variant rule; DEACTIVATE credit rules | as above |
 
 **Problem.** No T1 test sets `spec_rev=V08`, and there is no plusarg for it. A v0.8 model can't
 interoperate with the v0.7 DUT, because ActivateReq sizes differ (4 granules against 1). So T1
@@ -624,7 +624,7 @@ the item and a `plan_ids` entry), 36 have a checker, and 11 have an FC bin.
 
 | Area | New items (examples; full list in `gaps.md` §C) | Cites |
 |---|---|---|
-| Activation and deactivation (8) | 1.10 activation waits for the RX FIFO to drain; 1.11 ACTIVATE_START before FDI Active; 1.12 each INT_ACTIVATE_START source; 1.13 reserved ACTIVATIONOP received; 2.11 no credit in DISABLED or after DeactivateAck; 2.12 DEACTIVATE_TIME_OUT_VALUE sweep; 2.13 no DeactivateReq with own requests outstanding; 2.14 responses still sent in DEACTIVATE | AoU §8.2-8.4, Table 27; MAS 7.1, 7.3.2-7.3.5; BUGS/009, 032, 033 |
+| Activation and deactivation (8) | 1.10 activation waits for the RX FIFO to drain; 1.11 ACTIVATE_START before FDI Active; 1.12 each INT_ACTIVATE_START source; 1.13 reserved ACTIVATIONOP received; 2.11 no credit in DISABLED or after DeactivateAck; 2.12 DEACTIVATE_TIME_OUT_VALUE sweep; 2.13 no DeactivateReq with own requests outstanding; 2.14 responses still sent in DEACTIVATE | AoU §8.2-8.4, Table 27; MAS 7.1, 7.3.2-7.3.5 |
 | Credits (4) | 3.22 TX saturation on over-grant; 3.23 credit returned at dequeue only; 3.24 initial CrdtGrant covers every class and RP; 3.25 non-default RX FIFO depths and RS_EN=0 | AoU v0.7.1 §6.4, §6.4.3; MAS 3.4, 3.9 |
 | AXI (2) | 4.30 FLEX/USER carriage; 4.31 W before AW | AoU §5.2; AXI4 A3.3.1 |
 | Errors and debug (8) | 9.15 RP ≥ RP_COUNT received; 9.16 reserved MISCOP/DLENGTH/RsvdZero/stray MsgStart; 9.17-9.19 debug FIFO depth, disable and narrow-RP read; 9.20 M-port tables full; 9.21 ReadData wider than the remote; 9.22 subordinate ID-check enable | AoU Table 15, §4.4, §6.4.1; MAS 7.2.2, 7.2.4, §2.1 |
