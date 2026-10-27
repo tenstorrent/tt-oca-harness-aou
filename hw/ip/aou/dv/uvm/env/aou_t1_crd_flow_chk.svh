@@ -493,7 +493,9 @@ class aou_t1_crd_flow_chk extends uvm_component;
   protected function bit fdi_ready();
     int unsigned p = cfg.lsm_cfg.active_phy;
     if (p >= AOU_T1_N_PHY || mb_vif[p] == null) return 1'b1;
-    return mb_vif[p].mon_cb.pl_trdy === 1'b1 &&
+    // An acknowledged stall (lp_stallack high) keeps the DUT from sending even
+    // with pl_trdy high.
+    return mb_vif[p].mon_cb.pl_trdy === 1'b1 && mb_vif[p].mon_cb.lp_stallack !== 1'b1 &&
            mb_vif[p].mon_cb.pl_state_sts == aou_fdi_pkg::FDI_STS_ACTIVE;
   endfunction
 
@@ -537,7 +539,8 @@ class aou_t1_crd_flow_chk extends uvm_component;
         continue;
       end
       was_open = 1'b1;
-      // A cycle the Adapter holds pl_trdy low neither counts nor ends a stall.
+      // A cycle the Adapter holds the TX (pl_trdy low, or a stall acknowledged)
+      // neither counts nor ends a stall.
       if (fdi_ready()) judge();
     end
   endtask

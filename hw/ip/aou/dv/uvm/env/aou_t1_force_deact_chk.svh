@@ -18,7 +18,7 @@
 // takes it at the next flit boundary, a few cycles more plus the Adapter's
 // pl_trdy back-pressure. Allowing BOUND_PCLKS PCLK periods and BOUND_CLKS core
 // cycles leaves several times that. Core cycles in which the Adapter holds
-// pl_trdy low do not count: they extend both the deadline and the PropertyReq
+// pl_trdy low, or a stall is acknowledged, do not count: they extend both the deadline and the PropertyReq
 // window below, since FDI backpressure is a stress case, not the DUT's delay.
 //
 // The RTL marks the forced DeactivateReq with PropertyReq=1, a bit v0.7 keeps
@@ -156,10 +156,12 @@ class aou_t1_force_deact_chk extends uvm_component;
     end
   endtask
 
-  // The Adapter holds pl_trdy low on the active PHY.
+  // The Adapter holds the DUT's TX on the active PHY: pl_trdy low, or a stall
+  // the DUT has acknowledged (lp_stallack high).
   protected function bit fdi_held();
     int unsigned p = (cfg == null) ? 0 : cfg.lsm_cfg.active_phy;
-    return p < AOU_T1_N_PHY && mb_vif[p] != null && mb_vif[p].mon_cb.pl_trdy !== 1'b1;
+    return p < AOU_T1_N_PHY && mb_vif[p] != null &&
+           (mb_vif[p].mon_cb.pl_trdy !== 1'b1 || mb_vif[p].mon_cb.lp_stallack === 1'b1);
   endfunction
 
   function void write(aou_msg m);
