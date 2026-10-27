@@ -263,6 +263,8 @@ class aou_t1_env extends uvm_env;
       l3.ap_rx_msg.connect(rx_fifo_chk.dut_imp);
     end
     sw_isr.status = status;
+    status.model = l3.model;
+    status.rm = regs.model;
     sw_isr.rm = regs.model;
     sw_isr.apb_sqr = regs.apb.sqr;
     sw_isr.mgr = new[cfg.n_rp];
@@ -277,6 +279,7 @@ class aou_t1_env extends uvm_env;
     pump.gap_pct = cfg.l1_gap_pct;
     pump.cancel_mix = cfg.l1_cancel_mix;
     pump.fdi = fdi[cfg.lsm_cfg.active_phy];
+    status.pump = pump;
     fork
       pump.start(fdi[cfg.lsm_cfg.active_phy].sqr);
       forever begin

@@ -19,6 +19,7 @@ class aou_t1_l1_pump_seq extends uvm_sequence #(aou_flit_item);
   int unsigned bubble_pct = 10;
   bit          cancel_mix = 1'b0;  // cancel plans over every shape (aou_flit_item::mix_cancel_plan)
   int unsigned n_flits;
+  bit          busy;    // holding a flit L3 built that L1 has not finished driving
 
   function new(string name = "aou_t1_l1_pump_seq");
     super.new(name);
@@ -37,12 +38,14 @@ class aou_t1_l1_pump_seq extends uvm_sequence #(aou_flit_item);
       bit gap;
       int unsigned gen;
       l3.tx_flit_export.get(lit);
+      busy = 1'b1;
       gen = flush_gen;   // L3 built the flit in this time step
       // Hand the flit to L1 only once the link can receive (Active, or Reset
       // with +fdi_rx_early), so a reset while it waits can still cancel it.
       while (!fdi.cfg.gate.rx_open() && gen == flush_gen) @(fdi.vif.mon_cb);
       if (gen != flush_gen) begin
         n_dropped++;
+        busy = 1'b0;
         `uvm_info(get_type_name(), "flit built before a reset dropped", UVM_MEDIUM)
         continue;
       end
@@ -62,6 +65,7 @@ class aou_t1_l1_pump_seq extends uvm_sequence #(aou_flit_item);
       if (it.data[0][7:6] == 2'b00) it.data[0][7:6] = 2'b11;
       finish_item(it);
       n_flits++;
+      busy = 1'b0;
     end
   endtask
 endclass

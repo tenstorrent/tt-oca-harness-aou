@@ -271,7 +271,7 @@
 | `aou_act_flit_test.mode-act_req.v0p9draft` | `aou_act_flit_test` | `+mode=act_req +v0p9draft` | 1-3 |  | 1.12 | 
 | `aou_act_flit_test.mode-deact_rsp.v0p9draft` | `aou_act_flit_test` | `+mode=deact_rsp +v0p9draft` | 1-3 |  | 2.14 | 
 |===
-===== `testlists/errors.toml` (16 scenarios)
+===== `testlists/errors.toml` (17 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -284,6 +284,7 @@
 | `aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0` | `aou_invalid_actmsg_test` | `+state=deactivate +op=act_req +react_linkerror=0` | 1 |  | 1.5,19.6 | 
 | `aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8` | `aou_invalid_actmsg_test` | `+state=deactivate +op=act_req +trdy=bursty +burst_max=8 +reps=8` | 1-4 |  | 1.5,19.6 | 
 | `aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8` | `aou_invalid_actmsg_test` | `+state=enabled +op=act_req +trdy=random +trdy_pct=40 +reps=8` | 1-4 |  | 1.9,19.6 | 
+| `aou_invalid_actmsg_test.state-enabled.op-deact_ack.followup-remote` | `aou_invalid_actmsg_test` | `+state=enabled +op=deact_ack +followup=remote` | 1-2 |  | 2.1,19.6 | 
 | `aou_linkreset_timeout_test.src-act_ack` | `aou_linkreset_timeout_test` | `+src=act_ack` | 1 |  | 1.3,19.6 | 
 | `aou_linkreset_timeout_test.src-deact_ack` | `aou_linkreset_timeout_test` | `+src=deact_ack` | 1 |  | 2.6,19.6,20.10 | 
 | `aou_linkreset_timeout_test.src-msgcredit` | `aou_linkreset_timeout_test` | `+src=msgcredit` | 1 |  | 3.18,19.6,20.10 | 

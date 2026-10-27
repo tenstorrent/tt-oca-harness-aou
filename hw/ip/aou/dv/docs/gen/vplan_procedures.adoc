@@ -2511,20 +2511,37 @@ invalid ActivateReq nor an invalid ActivateAck: AoU v0.8 8.3.3 makes the
 out-of-step Req/Ack an error and 8.4 transmits nothing in that state
 Software then recovers (LinkReset, AOU_SW_RESET,
 re-activation) and traffic must work.
-Opcodes the MAS permits but the spec calls inconsistent (BUGS/013) must
-not raise LinkReset, and the link must still work afterwards.
+The remaining opcodes (an ActivateAck in DISABLED, a DeactivateAck in
+ENABLED) are ones MAS §7.2.3 does not list as invalid but AoU v0.8 8.3.3
+calls out of step: no compliant peer sends them, and what the DUT does
+with one is not defined. Either ending is accepted and neither is
+expected: the stray is absorbed and the link keeps working, or it ends in a
+reported error (LinkReset or interrupt) followed by the documented recovery
+(AOU_SW_RESET, re-activation), after which traffic must complete. What
+still fails (T1-L16) is a hang, silent corruption or misdelivery (the
+scoreboard), an unreported divergence from the peer, or the DUT answering
+the stray. For a DeactivateAck in ENABLED env.status records which ending
+happened (cg_stray_dack).
 
 ----
 +reps and the pl_trdy knobs keep the DUT's TX stage busy when the invalid
 ----
 
 ActivateReq arrives, where an Ack queued by mistake would still go out.
+After a permitted opcode the follow-up deactivation is started by the DUT
+(+followup=dut, the default) or by the remote die (+followup=remote). The
+remote die then sends its DeactivateReq before its DeactivateAck, so a DUT
+that kept a stray DeactivateAck from ENABLED reaches DISABLED before the
+real Ack, which then arrives as an invalid message and requests LinkReset:
+one of the accepted endings.
 Knobs: +state=disabled|activate|enabled|deactivate|all +op=act_req|act_ack|
 deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
 
 ----
-+T1_TXN.
++followup=dut|remote +T1_TXN.
 ----
+
+*Rules named.* `T1-L16`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2542,6 +2559,7 @@ deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
 | `aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0` | `+state=deactivate +op=act_req +react_linkerror=0` | 1 |  | 1.5,19.6
 | `aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8` | `+state=deactivate +op=act_req +trdy=bursty +burst_max=8 +reps=8` | 1-4 |  | 1.5,19.6
 | `aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8` | `+state=enabled +op=act_req +trdy=random +trdy_pct=40 +reps=8` | 1-4 |  | 1.9,19.6
+| `aou_invalid_actmsg_test.state-enabled.op-deact_ack.followup-remote` | `+state=enabled +op=deact_ack +followup=remote` | 1-2 |  | 2.1,19.6
 |===
 
 *Plan items.*
@@ -2549,6 +2567,7 @@ deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
 * 1.5: Send malformed activation message; verify `invalid_actmsg_err` and `invalid_actmsg_info` capture
 * 1.8: Send deactivate while in activate; verify interrupt request linkreset
 * 1.9: Send ActivateReq while ENABLED; INVALID_ACTMSG and INT_REQ_LINKRESET, the ActivateAck is still sent
+* 2.1: Verify DeactivateReq → DeactivateAck handshake and state transitions ENABLED → DEACTIVATE → DISABLED
 * 11.15: Test `aou_sw_reset` CSR field
 * 19.6: Trigger protocol violation; verify interrupt
 * 19.10: Set link reset masks; verify interrupt masked

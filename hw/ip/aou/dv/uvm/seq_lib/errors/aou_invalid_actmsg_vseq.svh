@@ -13,13 +13,28 @@
 // out-of-step Req/Ack an error and 8.4 transmits nothing in that state
 // Software then recovers (LinkReset, AOU_SW_RESET,
 // re-activation) and traffic must work.
-// Opcodes the MAS permits but the spec calls inconsistent (BUGS/013) must
-// not raise LinkReset, and the link must still work afterwards.
+// The remaining opcodes (an ActivateAck in DISABLED, a DeactivateAck in
+// ENABLED) are ones MAS §7.2.3 does not list as invalid but AoU v0.8 8.3.3
+// calls out of step: no compliant peer sends them, and what the DUT does
+// with one is not defined. Either ending is accepted and neither is
+// expected: the stray is absorbed and the link keeps working, or it ends in a
+// reported error (LinkReset or interrupt) followed by the documented recovery
+// (AOU_SW_RESET, re-activation), after which traffic must complete. What
+// still fails (T1-L16) is a hang, silent corruption or misdelivery (the
+// scoreboard), an unreported divergence from the peer, or the DUT answering
+// the stray. For a DeactivateAck in ENABLED env.status records which ending
+// happened (cg_stray_dack).
 // +reps and the pl_trdy knobs keep the DUT's TX stage busy when the invalid
 // ActivateReq arrives, where an Ack queued by mistake would still go out.
+// After a permitted opcode the follow-up deactivation is started by the DUT
+// (+followup=dut, the default) or by the remote die (+followup=remote). The
+// remote die then sends its DeactivateReq before its DeactivateAck, so a DUT
+// that kept a stray DeactivateAck from ENABLED reaches DISABLED before the
+// real Ack, which then arrives as an invalid message and requests LinkReset:
+// one of the accepted endings.
 // Knobs: +state=disabled|activate|enabled|deactivate|all +op=act_req|act_ack|
 // deact_req|deact_ack|all +mask=0|1 +reps=N (each case N times, default 1)
-// +T1_TXN.
+// +followup=dut|remote +T1_TXN.
 class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_invalid_actmsg_vseq)
 
@@ -28,6 +43,8 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
   bit                mask;
   aou_t1_feature_cfg reprog;   // what software programs again after AOU_SW_RESET
   bit                race_lr;  // race_state() ended on a LinkReset
+  bit                lr_seen;  // result of linkreset_seen()
+  bit                remote_deact;  // +followup=remote
 
   function new(string name = "aou_invalid_actmsg_vseq");
     super.new(name);
@@ -66,6 +83,12 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
     int unsigned n_permitted = 0;
     int unsigned reps = arg_int("reps", 1);
     mask = 1'(arg_int("mask", 0));
+    begin
+      string fu = arg_str("followup", "dut");
+      if (!(fu inside {"dut", "remote"}))
+        `uvm_fatal(get_type_name(), {"+followup must be dut or remote, not ", fu})
+      remote_deact = (fu == "remote");
+    end
     for (int s = ST_DISABLED; s <= ST_DEACTIVATE; s++) begin
       string nm = (s == ST_DISABLED) ? "disabled" : (s == ST_ACTIVATE) ? "activate" :
                   (s == ST_ENABLED) ? "enabled" : "deactivate";
@@ -80,8 +103,8 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
       if (invalid(states[i], ops[j])) n_invalid += reps;
       else n_permitted += reps;
     end
-    // A permitted opcode that still ends in LinkReset is reported as T1-L16
-    // and recovered from; the interrupt itself is then not a second error.
+    // A permitted opcode may end in LinkReset, which software recovers from;
+    // the interrupt itself is then not an error.
     if (!mask && n_invalid + n_permitted != 0)
       expect_event("INT_REQ_LINKRESET", n_invalid, n_invalid + n_permitted);
     // The injected opcode is out of sequence by the spec; AOU_FDI_CHECKER
@@ -172,8 +195,9 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
       if (!mask && irq_rises("INT_REQ_LINKRESET") == irq0)
         `uvm_error(get_type_name(), "T1-L14: no INT_REQ_LINKRESET for an invalid opcode")
       // Neither an invalid ActivateReq nor an invalid ActivateAck is answered
-      // (AoU v0.8 8.3.3/8.4: error, nothing transmitted). Whether
-      // an invalid DeactivateReq is: BUGS/013.
+      // (AoU v0.8 8.3.3/8.4: error, nothing transmitted). Neither the MAS
+      // nor the spec says whether an invalid DeactivateReq is, so at most one
+      // DeactivateAck is accepted.
       case (op)
         AOU_ACT_REQ:
           if (acks != 0)
@@ -196,22 +220,29 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
       check_traffic(num_txns);
       sw_deactivate(AOU_T1_BY_APB);
     end else begin
-      // Permitted by the MAS (BUGS/013): no LinkReset and no answer, and
-      // the link still activates, carries traffic and deactivates.
-      aou_core rm = p_sequencer.regs;
-      check_field(rm.lp_linkreset.invalid_actmsg_err, 0, "T1-L16", "permitted by the MAS");
+      // Not invalid by the MAS but out of step by the spec: no answer to it,
+      // and either a reported error at once, which software recovers from,
+      // or the link still activates, carries traffic and deactivates.
+      linkreset_seen(irq0);
       if (model_r40() != r40)
         `uvm_error(get_type_name(), $sformatf("T1-L16: the DUT answered a %s in %s",
                                               op_name(op), s.name()))
       restore_l3();
-      followup(s, op);
+      if (lr_seen) begin
+        `uvm_info(get_type_name(), $sformatf(
+                  "%s in %s: the DUT requested LinkReset; recovering", op_name(op), s.name()),
+                  UVM_LOW)
+        recover_linkreset();
+      end else begin
+        followup(s, op);
+      end
     end
   endtask
 
-  // After a permitted opcode: activation (from DISABLED), traffic and
-  // deactivation, each raced against INT_REQ_LINKRESET. A LinkReset here is
-  // the DUT reacting late to the opcode it accepted (BUGS/013); software
-  // then recovers.
+  // After a permitted opcode the DUT did not flag at once: activation (from
+  // DISABLED), traffic and deactivation, each raced against
+  // INT_REQ_LINKRESET. A LinkReset here is the DUT reacting late to the
+  // stray, an accepted ending; software then recovers.
   task followup(st_e s, bit [3:0] op);
     int unsigned irq0 = irq_rises("INT_REQ_LINKRESET");
     if (s == ST_DISABLED) begin
@@ -224,7 +255,12 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
       end
     end
     check_traffic(num_txns);
-    begin
+    if (remote_deact) begin
+      // The local software answers INT_DEACTIVATE_START (env.sw_isr).
+      env.l3.model.lnk.request_deactivate();
+      env.l3.model.maybe_release_deact();
+      env.l3.model.kick();
+    end else begin
       aou_reg_activation_seq d = aou_reg_activation_seq::type_id::create("d");
       prep_reg(d);
       d.op = AOU_REG_DEACTIVATE;
@@ -232,18 +268,46 @@ class aou_invalid_actmsg_vseq extends aou_link_base_vseq;
       d.start(null);
     end
     race_state(1'b0, irq0);
+    // A LinkReset may also follow DISABLED (after a DeactivateAck in
+    // ENABLED, the remote die's own DeactivateAck arriving after the DUT
+    // disabled early). Once the remote die has nothing left to send the DUT,
+    // give the DUT the status watcher's reaction time, so software recovers
+    // from such a LinkReset before the test ends.
+    if (!race_lr) begin
+      int unsigned n = 0;
+      while (!env.status.remote_tx_idle() && n++ < cfg.act_timeout) wait_cycles(1);
+      wait_cycles(aou_t1_status::REACT_CYCLES + 1);
+      linkreset_seen(irq0);
+      race_lr = lr_seen;
+    end
     if (race_lr) late_linkreset(s, op);
     else ensure_link();
   endtask
 
   task late_linkreset(st_e s, bit [3:0] op);
-    `uvm_error(get_type_name(), $sformatf(
-               "T1-L16: LinkReset after a %s in %s that the MAS permits (BUGS/013)",
-               op_name(op), s.name()))
+    `uvm_info(get_type_name(), $sformatf(
+              "LinkReset after a %s in %s, which no compliant peer sends; recovering",
+              op_name(op), s.name()), UVM_LOW)
+    recover_linkreset();
+  endtask
+
+  // Software's answer to a LinkReset request: clear the cause, recover, and
+  // the link must carry traffic and deactivate again.
+  task recover_linkreset();
     clear_linkreset_status(p_sequencer.regs.lp_linkreset.invalid_actmsg_err);
     recover(reprog);
     check_traffic(num_txns);
     sw_deactivate(AOU_T1_BY_APB);
+  endtask
+
+  // INT_REQ_LINKRESET rose past irq0, or, with the source masked, the sticky
+  // INVALID_ACTMSG_ERR bit is set.
+  task linkreset_seen(int unsigned irq0);
+    uvm_reg_data_t v;
+    lr_seen = irq_rises("INT_REQ_LINKRESET") > irq0;
+    if (lr_seen || !mask) return;
+    rd(p_sequencer.regs.lp_linkreset.invalid_actmsg_err, v);
+    lr_seen = v == 1;
   endtask
 
   // Waits until both sides report ENABLED (en=1) or DISABLED, or until

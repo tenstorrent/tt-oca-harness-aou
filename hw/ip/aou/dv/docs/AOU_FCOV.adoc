@@ -54,7 +54,7 @@ out of the denominator and a hit is reported under the rule that owns it.
 | L2 link state (`aou_lsm_cov`) | `cg_link_state`, `cg_bringup_fsm` | PL state-machine transitions and the requests that cause them, the bring-up reference model's states and transitions
 | L3 protocol (`aou_l3_cov`) | `cg_act_fsm`, `cg_act_op`, `cg_msg`, `cg_flit_layout`, `cg_flit_occ`, `cg_credit` | Activation state machine and message operations by direction and legality, message kinds per RP and direction, granule start and size and flit spanning, flit occupancy (messages per flit, Misc halves, carry, credit-only flits), credit events per class and direction
 | AXI monitor (`aou_axi_monitor`) | `txn_cg`, `zero_cg` | Transaction direction, size, length and alignment at every port; zero-cycle `B`/`R` responses
-| T1 env | `attr_cg`, `excl_cg`, `chan_cg` (`aou_t1_xfer_cov`); `cg_crd` (`aou_t1_crd_flow_chk`); `cg_crd_rr` (`aou_t1_crd_rr_chk`); `cg_early_tbl` (`aou_t1_early_tbl_chk`); `cg_wdt` (`aou_t1_wdt_chk`); `cg_mo` (`aou_t1_mo_chk`) | Attributes, exclusives and channel orderings across the link; the credit classes an RP had work for and credit for; how many RPs a round-robin window owed; early-response table fill and stall release; write-watchdog expiries, restarts at the threshold, W1C and mask; M-port pending-ID table fill (requests in service)
+| T1 env | `attr_cg`, `excl_cg`, `chan_cg` (`aou_t1_xfer_cov`); `cg_crd` (`aou_t1_crd_flow_chk`); `cg_crd_rr` (`aou_t1_crd_rr_chk`); `cg_early_tbl` (`aou_t1_early_tbl_chk`); `cg_wdt` (`aou_t1_wdt_chk`); `cg_mo` (`aou_t1_mo_chk`); `cg_stray_dack` (`aou_t1_status`) | Attributes, exclusives and channel orderings across the link; the credit classes an RP had work for and credit for; how many RPs a round-robin window owed; early-response table fill and stall release; write-watchdog expiries, restarts at the threshold, W1C and mask; M-port pending-ID table fill (requests in service); how the DUT handled an injected DeactivateAck in ENABLED (ignored, flagged on arrival, error at the next deactivation)
 | Bound AXI4 monitors (`aou_axi4_coverage_mod`, `COV=1`) | `cg_aw_channel`, `cg_ar_channel`, `cg_w_channel`, `cg_r_channel`, `cg_b_channel`, `cg_cmd`, `cg_outstanding`, `cg_backpressure` | Per S and M port: address range and alignment, size, length, attributes, ID buckets, strobe patterns, last flags, responses, outstanding depth, back-pressure run lengths
 |===
 
@@ -86,6 +86,12 @@ or a cross exclusion by pattern (`XIGN`, `XILL`). The notable definitions:
 * `cg_mo.full` and `cg_early_tbl`'s fill bins record that a limit was reached
   and a stall released; the limits themselves are checks (`FEAT-R22`,
   `FEAT-R15`, `FEAT-R16`).
+* `cg_stray_dack` records how the DUT handled an injected DeactivateAck in
+  ENABLED, which no compliant peer sends and the spec does not define: ignored,
+  flagged as an error on arrival, or an error at the next deactivation. Any of
+  them is accepted (the stray is absorbed and the link keeps working, or it
+  ends in a reported error followed by the documented recovery); the bins show
+  which the DUT implements, so a change in its behaviour is visible.
 
 === Closure Policy
 
@@ -123,6 +129,7 @@ or a cross exclusion by pattern (`XIGN`, `XILL`). The notable definitions:
 | `cg_early_tbl` | 2.17 early response (16.11, 16.12, 16.17) | `features` (`aou_early_bresp_test`), every test with `EARLY_BRESP_EN`
 | `cg_wdt` | 2.17 early response (16.18-16.23, the write watchdog) | `features` (`aou_wdt_test`); every test that sets WDT_EN
 | `cg_mo` | 2.8 outstanding (9.20 M-port limit) | `datapath` (`aou_dp_outstanding_test`), `stress`
+| `cg_stray_dack` | 2.2 deactivation (2.1) and 2.19 interrupts (19.6), for an activation message the spec leaves undefined | `errors` (`aou_invalid_actmsg_test` with a DeactivateAck in ENABLED)
 | AXI4 monitor covergroups | 2.4, 2.5, 2.8, 2.13 (QoS values), 2.14 (sizes per width), 2.18 | every `COV=1` run of every configuration
 |===
 

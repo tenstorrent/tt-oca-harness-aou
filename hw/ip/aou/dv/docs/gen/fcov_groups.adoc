@@ -11,6 +11,7 @@
 | `cg_crd_rr` | `aou_t1_crd_rr_chk` | `uvm/env/aou_t1_crd_rr_chk.svh` | `cp_owed` | -
 | `cg_early_tbl` | `aou_t1_early_tbl_chk` | `uvm/env/aou_t1_early_tbl_chk.svh` | `cp_ev` | -
 | `cg_mo` | `aou_t1_mo_chk` | `uvm/env/aou_t1_mo_chk.svh` | `cp_dir`, `cp_occ` | `x_mo`
+| `cg_stray_dack` | `aou_t1_status` | `uvm/env/aou_t1_status.svh` | `cp_outcome` | -
 | `cg_wdt` | `aou_t1_wdt_chk` | `uvm/env/aou_t1_wdt_chk.svh` | `cp_ev` | -
 | `attr_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_path`, `cp_dir`, `cp_qos`, `cp_prot`, `cp_cache` | `x_qos`, `x_prot`, `x_cache`
 | `excl_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_path`, `cp_dir`, `cp_resp` | `x_excl`

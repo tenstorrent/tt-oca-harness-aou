@@ -25,3 +25,8 @@
   `B``_BIN(w1c_while_hung, 8, 8) `B``_BIN(unmask_while_set, 9, 9) \
   `B``_BIN(multi_rp_set, 10, 10) `B``_BIN(re_expiry_after_sw, 11, 11) \
   `B``_BIN(re_expiry_after_hard, 12, 12) `B``_VALS(expiry_rp, 13, 16)
+// aou_t1_status: how the DUT handled an injected DeactivateAck in ENABLED,
+// which the spec does not define (any of these is accepted): ignored, flagged
+// as an error on arrival (still ENABLED), or an error at the next deactivation.
+`define AOU_T1_STRAY_FC_OUTCOME(B) \
+  `B``_BIN(ignored, 0, 0) `B``_BIN(flagged_on_arrival, 1, 1) `B``_BIN(error_at_deact, 2, 2)

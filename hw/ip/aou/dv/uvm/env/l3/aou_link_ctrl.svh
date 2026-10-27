@@ -28,6 +28,11 @@ class aou_link_ctrl extends uvm_object;
   int unsigned epoch;           // activation epochs, bumped on every return to DISABLED
   int unsigned illegal_rcvd;
   bit          link_lost;       // set_state() is returning to DISABLED after a link loss
+  // We sent an injected DeactivateAck in ENABLED. No compliant peer sends one
+  // and the spec does not say what the DUT does with it, so the check that
+  // the DUT waits for our real DeactivateAck (AOU-R37) stands down for the
+  // next deactivation: cleared when we next reach DISABLED, or on a reset.
+  bit          stray_dack_enabled;
   aou_msg_act out_q[$];
   uvm_event   state_ev;
 
@@ -95,7 +100,9 @@ class aou_link_ctrl extends uvm_object;
     // An injected message bypasses the state machine but is still covered,
     // judged as the peer would judge it.
     if (m.ignore_state) begin
-      if (cov != null) cov.sample_act_op(m.op, AOU_L3_TX, legal_sent(m.op));
+      bit legal = legal_sent(m.op);
+      if (cov != null) cov.sample_act_op(m.op, AOU_L3_TX, legal);
+      if (!legal && m.op == AOU_DEACT_ACK && state == AOU_LS_ENABLED) stray_dack_enabled = 1'b1;
       return;
     end
     case (m.op)
@@ -202,6 +209,7 @@ class aou_link_ctrl extends uvm_object;
     grant_due = 1'b0;
     want_deact = 1'b0;
     dack_hold = 0;
+    stray_dack_enabled = 1'b0;
     epoch++;
     crd.reset_link();
   endfunction

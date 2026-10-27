@@ -88,7 +88,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 259
+expected_count = 260
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -259,6 +259,7 @@ tests = [
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0",
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8",
   "aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8",
+  "aou_invalid_actmsg_test.state-enabled.op-deact_ack.followup-remote",
   "aou_linkreset_timeout_test.src-act_ack",
   "aou_linkreset_timeout_test.src-deact_ack",
   "aou_linkreset_timeout_test.src-msgcredit",
@@ -354,7 +355,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 474
+expected_count = 475
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -591,6 +592,7 @@ tests = [
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0",
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8",
   "aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8",
+  "aou_invalid_actmsg_test.state-enabled.op-deact_ack.followup-remote",
   "aou_linkreset_timeout_test.src-act_ack",
   "aou_linkreset_timeout_test.src-deact_ack",
   "aou_linkreset_timeout_test.src-msgcredit",

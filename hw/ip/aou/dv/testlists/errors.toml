@@ -93,6 +93,20 @@ tags = ["errors"]
 run_modes = ["errors"]
 args = ["+state=enabled", "+op=act_req", "+trdy=random", "+trdy_pct=40", "+reps=8"]
 
+# A DeactivateAck in ENABLED, which no compliant peer sends and the spec does
+# not define, then a deactivation the remote die starts (its DeactivateReq
+# before its DeactivateAck). Either the stray is absorbed and the link keeps
+# working, or it ends in a reported error and software's recovery, after which
+# traffic must complete (T1-L16); a hang fails. env.status records which.
+[[tests]]
+name = "aou_invalid_actmsg_test.state-enabled.op-deact_ack.followup-remote"
+module = { uvm = "aou_invalid_actmsg_test" }
+seed = 1
+reseed = 2
+tags = ["errors"]
+run_modes = ["errors"]
+args = ["+state=enabled", "+op=deact_ack", "+followup=remote"]
+
 [[tests]]
 name = "aou_linkreset_timeout_test.src-act_ack"
 module = { uvm = "aou_linkreset_timeout_test" }
@@ -155,7 +169,7 @@ run_modes = ["errors"]
 
 [[groups]]
 name = "errors"
-expected_count = 16
+expected_count = 17
 tests = [
   "aou_invalid_actmsg_test.state-all.op-all",
   "aou_invalid_actmsg_test.state-enabled",
@@ -166,6 +180,7 @@ tests = [
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.react_linkerror-0",
   "aou_invalid_actmsg_test.state-deactivate.op-act_req.trdy-bursty.burst_max-8.reps-8",
   "aou_invalid_actmsg_test.state-enabled.op-act_req.trdy-random.trdy_pct-40.reps-8",
+  "aou_invalid_actmsg_test.state-enabled.op-deact_ack.followup-remote",
   "aou_linkreset_timeout_test.src-act_ack",
   "aou_linkreset_timeout_test.src-deact_ack",
   "aou_linkreset_timeout_test.src-msgcredit",
