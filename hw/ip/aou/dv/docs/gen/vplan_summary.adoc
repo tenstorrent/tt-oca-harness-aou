@@ -563,17 +563,17 @@
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
 | `aou_reg_hw_reset_test` | `aou_reg_hw_reset_test` |  | 1-2 |  | 20.1,20.14 | 
-| `aou_reg_bit_bash_test` | `aou_reg_bit_bash_test` |  | 1-2 |  | 20.2,20.3,20.4,20.5,20.6,20.7,20.8,20.9,20.10,20.11,20.12,20.13 | BUGS/004 (expected_fail.yaml)
-| `aou_reg_access_test` | `aou_reg_access_test` |  | 1-2 |  | 20.2,20.3,20.4,20.5,20.6,20.7,20.8,20.9,20.10,20.11,20.12,20.13 | BUGS/004 (expected_fail.yaml)
+| `aou_reg_bit_bash_test` | `aou_reg_bit_bash_test` |  | 1-2 |  | 20.2,20.3,20.4,20.5,20.6,20.7,20.8,20.9,20.10,20.11,20.12,20.13 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
+| `aou_reg_access_test` | `aou_reg_access_test` |  | 1-2 |  | 20.2,20.3,20.4,20.5,20.6,20.7,20.8,20.9,20.10,20.11,20.12,20.13 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
 | `aou_reg_reserved_test` | `aou_reg_reserved_test` |  | 1-2 |  | 20.15,20.16 | 
 | `aou_reg_alias_test` | `aou_reg_alias_test` |  | 1-2 |  | 20.16 | 
 | `aou_reg_feature_seq_test` | `aou_reg_feature_seq_test` |  | 1-2 |  | 20.2,20.3,20.5,20.6,20.7,20.8,20.9,20.11 | 
-| `aou_reg_bit_bash_test.pclk_ps-40000` | `aou_reg_bit_bash_test` | `+pclk_ps=40000` | 1-2 |  | 11.17 | BUGS/004 (expected_fail.yaml)
-| `aou_reg_bit_bash_test.pclk_ps-600` | `aou_reg_bit_bash_test` | `+pclk_ps=600` | 1-2 |  | 11.17 | BUGS/004 (expected_fail.yaml)
-| `aou_reg_bit_bash_test.pclk_ps-1013` | `aou_reg_bit_bash_test` | `+pclk_ps=1013` | 1-2 |  | 11.17 | BUGS/004 (expected_fail.yaml)
-| `aou_reg_access_test.pclk_ps-40000` | `aou_reg_access_test` | `+pclk_ps=40000` | 1 |  | 11.17 | BUGS/004 (expected_fail.yaml)
-| `aou_reg_access_test.pclk_ps-600` | `aou_reg_access_test` | `+pclk_ps=600` | 1 |  | 11.17 | BUGS/004 (expected_fail.yaml)
-| `aou_reg_access_test.pclk_ps-1013` | `aou_reg_access_test` | `+pclk_ps=1013` | 1 |  | 11.17 | BUGS/004 (expected_fail.yaml)
+| `aou_reg_bit_bash_test.pclk_ps-40000` | `aou_reg_bit_bash_test` | `+pclk_ps=40000` | 1-2 |  | 11.17 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
+| `aou_reg_bit_bash_test.pclk_ps-600` | `aou_reg_bit_bash_test` | `+pclk_ps=600` | 1-2 |  | 11.17 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
+| `aou_reg_bit_bash_test.pclk_ps-1013` | `aou_reg_bit_bash_test` | `+pclk_ps=1013` | 1-2 |  | 11.17 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
+| `aou_reg_access_test.pclk_ps-40000` | `aou_reg_access_test` | `+pclk_ps=40000` | 1 |  | 11.17 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
+| `aou_reg_access_test.pclk_ps-600` | `aou_reg_access_test` | `+pclk_ps=600` | 1 |  | 11.17 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
+| `aou_reg_access_test.pclk_ps-1013` | `aou_reg_access_test` | `+pclk_ps=1013` | 1 |  | 11.17 | tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)
 |===
 ==== L3 protocol-model unit bench (no DUT)
 ===== `testlists/l3_unit.toml` (10 scenarios)

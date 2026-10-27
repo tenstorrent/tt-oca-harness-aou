@@ -45,8 +45,8 @@
   title: Access an unmapped APB address; PSLVERR stays 0, unmapped offsets read 0 and addresses above the window alias the registers
   note: PSLVERR is tied 0, so the old PSLVERR expectation was wrong; aliasing and read-0 are tested instead.
 - id: '20.2'
-  title: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, BUGS/004)
-  note: AXI_SPLIT_TR_EN cannot be written; register tests that hit it are XFAIL against BUGS/004.
+  title: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, tenstorrent/tt-oca-harness-aou#119)
+  note: AXI_SPLIT_TR_EN cannot be written; register tests that hit it are XFAIL against tenstorrent/tt-oca-harness-aou#119.
 
 # Items changed by fixes merged on main.
 - id: '13.12'

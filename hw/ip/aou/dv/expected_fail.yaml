@@ -15,16 +15,16 @@
 # CONFIG or active PHY of aou_perf_test (its PERF_GATE lines carry the key).
 
 - test: aou_reg_bit_bash_test
-  bug: BUGS/004
+  bug: tenstorrent/tt-oca-harness-aou#119
   check: 'Writing a 1 in bit #2 of register "aou_core.aou_con0"'
   note: AXI_SPLIT_TR_EN has no storage and reads 0
 
 - test: aou_reg_access_test
-  bug: BUGS/004
+  bug: tenstorrent/tt-oca-harness-aou#119
   check: 'REG-R02: aou_core.aou_con0.axi_split_tr_en'
 
 - test: aou_reg_alias_test
-  bug: BUGS/004
+  bug: tenstorrent/tt-oca-harness-aou#119
   check: 'REG-R08: aou_core.aou_con0.axi_split_tr_en'
   seed_dependent: true
   note: only seeds whose alias walk writes aou_con0 (Verilator seed 2 never touches it)

@@ -3692,7 +3692,7 @@ are bashed: writing 1 to a clear flag must leave it 0.
 *Plan items.*
 
 * 11.17: PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK
-* 20.2: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, BUGS/004)
+* 20.2: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, tenstorrent/tt-oca-harness-aou#119)
 * 20.3: Read/write activation control
 * 20.4: Read/write interrupt masks
 * 20.5: Read/write/write-1-clear fields
@@ -3729,7 +3729,7 @@ Class `aou_reg_access_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou_reg_
 *Plan items.*
 
 * 11.17: PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK
-* 20.2: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, BUGS/004)
+* 20.2: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, tenstorrent/tt-oca-harness-aou#119)
 * 20.3: Read/write activation control
 * 20.4: Read/write interrupt masks
 * 20.5: Read/write/write-1-clear fields
@@ -3808,7 +3808,7 @@ Class `aou_reg_feature_seq_test` extends `aou_reg_base_test` (`uvm/tests/reg/aou
 
 *Plan items.*
 
-* 20.2: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, BUGS/004)
+* 20.2: Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, tenstorrent/tt-oca-harness-aou#119)
 * 20.3: Read/write activation control
 * 20.5: Read/write/write-1-clear fields
 * 20.6: Read/write RP destination mapping

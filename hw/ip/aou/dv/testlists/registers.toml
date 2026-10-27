@@ -27,7 +27,7 @@ seed = 1
 reseed = 2
 tags = ["registers"]
 run_modes = ["registers"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
 
 [[tests]]
@@ -37,7 +37,7 @@ seed = 1
 reseed = 2
 tags = ["registers"]
 run_modes = ["registers"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[tests]]
@@ -75,7 +75,7 @@ reseed = 2
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=40000"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
 
 [[tests]]
@@ -86,7 +86,7 @@ reseed = 2
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=600"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
 
 [[tests]]
@@ -97,7 +97,7 @@ reseed = 2
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=1013"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "Writing a 1 in bit #2 of register \"aou_core\\.aou_con0\""
 
 [[tests]]
@@ -107,7 +107,7 @@ seed = 1
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=40000"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[tests]]
@@ -117,7 +117,7 @@ seed = 1
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=600"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[tests]]
@@ -127,7 +127,7 @@ seed = 1
 tags = ["registers"]
 run_modes = ["registers"]
 args = ["+pclk_ps=1013"]
-expect_fail = "BUGS/004 (expected_fail.yaml)"
+expect_fail = "tenstorrent/tt-oca-harness-aou#119 (expected_fail.yaml)"
 expect_fail_match = "REG-R02: aou_core\\.aou_con0\\.axi_split_tr_en"
 
 [[groups]]

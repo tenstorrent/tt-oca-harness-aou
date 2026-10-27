@@ -2864,12 +2864,12 @@
 - id: '20.2'
   section: '2.20'
   section_title: Register Access Tests
-  title: 'Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, BUGS/004)'
+  title: 'Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, tenstorrent/tt-oca-harness-aou#119)'
   priority: P0
   old_test: aou_reg_con0_test
   old_status: '50%'
   old_title: Read/write control register 0
-  note: AXI_SPLIT_TR_EN cannot be written; register tests that hit it are XFAIL against BUGS/004.
+  note: 'AXI_SPLIT_TR_EN cannot be written; register tests that hit it are XFAIL against tenstorrent/tt-oca-harness-aou#119.'
 
 - id: '20.3'
   section: '2.20'
