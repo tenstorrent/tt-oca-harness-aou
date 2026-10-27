@@ -516,16 +516,25 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
   protected function void learn_head(int unsigned r, int unsigned i);
     ent_t h = q[r][i];
     ent_t rest[$];
-    int unsigned n = 0;
+    ent_t gone[$];
     foreach (q[r][j]) begin
       if (j == i) continue;
-      if (pend[r] != 0 && may_lead(r, j, pend[r] - 1)) n++;
+      if (pend[r] != 0 && may_lead(r, j, pend[r] - 1)) gone.push_back(q[r][j]);
       else rest.push_back(q[r][j]);
     end
-    if (n != pend[r]) begin
+    if (gone.size() != pend[r]) begin
       unsure[r] = 1'b1;
       return;
     end
+    // An older read still in flight may have sampled one of them before its pop,
+    // as in take_front().
+    if (rd_open[r].size() != 0)
+      foreach (gone[k]) begin
+        taken_t t;
+        t.e = gone[k];
+        t.seq = pop_seq[r];
+        taken[r].push_back(t);
+      end
     q[r] = rest;
     q[r].push_front(h);
     pend[r] = 0;
