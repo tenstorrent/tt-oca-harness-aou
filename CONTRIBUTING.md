@@ -29,7 +29,7 @@ We welcome bug fixes, improvements, and new features via Pull Requests:
    enforces this convention; PRs from branches that do not match will
    fail the check and not be considered.
 3. **Make your changes** following the coding standards below
-4. **Test your changes** using the verification testbench
+4. **Test your changes** using the verification testbench (see Testing Requirements)
 5. **Commit your changes** with clear, descriptive commit messages
 6. **Submit a Pull Request** with a detailed description of your changes
 
@@ -62,7 +62,13 @@ We welcome bug fixes, improvements, and new features via Pull Requests:
 
 ### Testing Requirements
 
-- Run the verification testbench and ensure all tests pass
+- A change to `RTL/`, `csr/` or the verification testbench (`hw/ip/aou/dv`) runs the full
+  regression before review: `make regress SIM=vcs` (or `SIM=verilator`) in `hw/ip/aou/dv`, as
+  described in its README under "Run everything". The pull request states the simulator and the
+  `Result:` line of the regression's `summary.md`. CI runs only the short `ci` group, so it does not
+  replace this run.
+- The regression must show no FAIL or XPASS that `main` does not already have. Failures caused by
+  known bugs are judged XFAIL through `hw/ip/aou/dv/expected_fail.yaml`; explain any new one.
 - Add new tests for new functionality
 - Document test methodology in commit messages
 
