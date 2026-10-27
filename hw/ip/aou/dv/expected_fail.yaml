@@ -50,55 +50,6 @@
     the same DeactivateReq seen by AOU_FDI_CHECKER; two-PHY builds (tp configs) have no
     AOU_FDI_CHECKER, so only the L3 model's entry above matches there
 
-- test: aou_invalid_actmsg_test
-  bug: BUGS/019
-  check: 'T1-L15: 2 answers to an invalid DeactivateReq'
-  seed_dependent: true
-  note: in ACTIVATE the DUT answers DeactivateAck and also re-sends ActivateReq (+state=activate)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/019
-  check: 'T1-L15: 1 answers to an invalid deact_ack'
-  seed_dependent: true
-  note: in ACTIVATE the DUT re-sends ActivateReq after an invalid DeactivateAck (+state=activate)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/019
-  check: 'INT_FDI_LINK_DOWN: interrupt asserted'
-  requires: BUGS/019
-  seed_dependent: true
-  note: >-
-    the re-sent ActivateReq is accepted in the cycle the requested LinkError takes the link
-    down, so the activation FSM reports it lost instead of waiting on a dead link
-    (+state=activate)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/020
-  check: 'AOU-R6: DUT->remote'
-  seed_dependent: true
-  note: DeactivateAck and ActivateReq in one flit, one at G12 (L3 model; +state=activate)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/020
-  check: 'AOU-R6: AOU_FDI_CHECKER VIOL_MISC_PLACEMENT'
-  seed_dependent: true
-  note: the same flit seen by AOU_FDI_CHECKER
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/020
-  check: 'G1: undefined encoding, first granule 0000000000'
-  seed_dependent: true
-  note: >-
-    SP_32B (1x256-sp32): the second activation message gets MsgStart at G1 after G1's bytes have
-    left in chunk 0, so G1 is all zero and the ActivateReq is lost (+state=activate)
-
-- test: aou_invalid_actmsg_test
-  bug: BUGS/020
-  check: 'AOU-R3: AOU_FDI_CHECKER VIOL_MISCOP LP(DUT->peer)'
-  requires: BUGS/020
-  seed_dependent: true
-  note: the same empty G1 seen by AOU_FDI_CHECKER
-
 - test: aou_act_after_deact_test
   bug: BUGS/020
   check: 'AOU-R6: DUT->remote'
@@ -112,22 +63,6 @@
   check: 'AOU-R6: AOU_FDI_CHECKER VIOL_MISC_PLACEMENT'
   seed_dependent: true
   note: the same flit seen by AOU_FDI_CHECKER
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/019
-  check: 'AOU-R40: [l3] DUT ActivateReq while AOU_LS_ACTIVATE'
-  seed_dependent: true
-  note: on the ActivateAck time-out the DUT sends a second ActivateReq (+src=act_ack only)
-
-- test: aou_linkreset_timeout_test
-  bug: BUGS/019
-  check: 'INT_FDI_LINK_DOWN: interrupt asserted'
-  requires: BUGS/019
-  seed_dependent: true
-  note: >-
-    the second ActivateReq is accepted in the cycle the requested LinkError takes the link
-    down, so the activation FSM reports it lost instead of waiting on a dead link
-    (+src=act_ack only)
 
 # Each bug has bug-specific checks; the generic symptoms it causes (traffic stalls,
 # scoreboard mismatches, failed handshakes) carry `requires:` and only count when
