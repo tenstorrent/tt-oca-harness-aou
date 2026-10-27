@@ -31,35 +31,35 @@ run_modes = ["link"]
 args = ["+who=both", "+order=simul", "+deact_who=both", "+busy=0"]
 
 [[tests]]
-name = "aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1"
+name = "aou_link_act_deact_test.who-remote.deact_who-remote.busy-1"
 module = { uvm = "aou_link_act_deact_test" }
 seed = 1
 reseed = 2
 tags = ["link"]
 run_modes = ["link"]
-args = ["+who=remote", "+deact_who=remote", "+credit_manage=1", "+busy=1"]
+args = ["+who=remote", "+deact_who=remote", "+busy=1"]
 
 [[tests]]
-name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1"
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1"
 module = { uvm = "aou_link_act_deact_test" }
 seed = 1
 reseed = 2
 tags = ["link"]
 run_modes = ["link"]
-args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1"]
+args = ["+who=apb", "+deact_who=apb", "+busy=1"]
 
-# 2.13 with CREDIT_MANAGE=0: both dies deactivate with requests in flight while the FDI
-# throttles the DUT's TX, so a request the DUT accepted before the remote DeactivateReq can
-# still be queued when that DeactivateReq arrives (AOU-R33).
+# 2.13: both dies deactivate with requests in flight while the FDI throttles the DUT's TX,
+# so the DUT's own requests can still be open when the remote DeactivateReq arrives; its
+# DeactivateReq waits for their answers (AOU-R33).
 [[tests]]
-name = "aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64"
+name = "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-1.fdi_trdy-random.4x512-sp64"
 module = { uvm = "aou_link_act_deact_test" }
 target = "4x512-sp64"
 seed = 1
 reseed = 13
 tags = ["link"]
 run_modes = ["link"]
-args = ["+who=both", "+order=simul", "+deact_who=both", "+credit_manage=0", "+busy=1", "+fdi_trdy=random"]
+args = ["+who=both", "+order=simul", "+deact_who=both", "+busy=1", "+fdi_trdy=random"]
 
 [[tests]]
 name = "aou_link_force_deact_test"
@@ -80,13 +80,13 @@ tags = ["link"]
 run_modes = ["link"]
 
 [[tests]]
-name = "aou_act_after_deact_test.credit_manage-1.busy-1"
+name = "aou_act_after_deact_test.busy-1"
 module = { uvm = "aou_act_after_deact_test" }
 seed = 1
 reseed = 2
 tags = ["link"]
 run_modes = ["link"]
-args = ["+credit_manage=1", "+busy=1"]
+args = ["+busy=1"]
 
 [[tests]]
 name = "aou_credit_return_test.method-grant"
@@ -325,7 +325,7 @@ tags = ["link"]
 run_modes = ["link"]
 args = ["+loops=3"]
 
-# 2.5: DEACTIVATE_START while traffic waits for credit (AOU-R33/AOU-R34, T1-L47, scoreboard).
+# 2.5: DEACTIVATE_START while traffic waits for credit (AOU-R33/AOU-R34, scoreboard).
 [[tests]]
 name = "aou_zero_credit_test.credit-wreq.deact-1"
 module = { uvm = "aou_zero_credit_test" }
@@ -442,12 +442,12 @@ expected_count = 43
 tests = [
   "aou_link_act_deact_test",
   "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0",
-  "aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1",
-  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1",
-  "aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64",
+  "aou_link_act_deact_test.who-remote.deact_who-remote.busy-1",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1",
+  "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-1.fdi_trdy-random.4x512-sp64",
   "aou_link_force_deact_test",
   "aou_act_after_deact_test",
-  "aou_act_after_deact_test.credit_manage-1.busy-1",
+  "aou_act_after_deact_test.busy-1",
   "aou_credit_return_test.method-grant",
   "aou_credit_return_test.method-hdr",
   "aou_credit_return_test.method-mixed.ret-withheld",

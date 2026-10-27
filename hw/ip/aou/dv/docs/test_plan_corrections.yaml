@@ -90,6 +90,14 @@
   title: Switch between LP mode enabled/disabled across activation sessions (programmed only while DISABLED)
   note: 'Main #105 - TX_LP_MODE is static configuration, written only while DISABLED.'
 
+# AOU_CON0.CREDIT_MANAGE removed: one deactivation behaviour, AoU v0.8 8.4.
+- id: '2.8'
+  dropped: 'AOU_CON0.CREDIT_MANAGE is removed; AOU_CORE always manages request and response credits separately (AoU v0.8 8.4, MAS 7.3.1), so there is no combined mode to test.'
+  note: 'The old 2.8 tested CREDIT_MANAGE = 0.'
+- id: '2.9'
+  title: 'Request and response credits managed separately during deactivation (AoU v0.8 8.4); responses and response credits continue after DeactivateReq'
+  note: 'The old 2.9 tested CREDIT_MANAGE = 1, now the only behaviour.'
+
 # Duplicates: the second ID reports through the first.
 - id: '2.4'
   merged_into: '1.6'
@@ -244,8 +252,8 @@
 - id: '2.11'
   added: 'AoU 8.2/8.4; BUGS/009, BUGS/033'
   priority: P2
-  title: 'No credit message in DISABLED; no response credit after the sender''s DeactivateAck (request credits after it are permitted, v0.8 8.4)'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  title: 'No credit message in DISABLED; credits of every class are permitted after the sender''s DeactivateAck (v0.8 8.4, MAS 7.3.1), including in the flit whose Ack completes the teardown'
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
 - id: '2.12'
   added: 'MAS 7.1'
   priority: P2

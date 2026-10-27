@@ -9,10 +9,9 @@
 // leaves the interrupts to the test.
 // Before DEACTIVATE_START (quiesce(), also used when the test itself starts a
 // deactivation) software stops its AXI managers from issuing new requests
-// until DISABLED; requests already issued complete normally. 7.3.5 asks for
-// that with CREDIT_MANAGE = 0; with CREDIT_MANAGE = 1 software may keep
-// issuing but sets DEACTIVATE_START only "once all messages have been sent",
-// so it also waits until no request is part-way onto the bus.
+// until DISABLED; requests already issued complete normally. It sets
+// DEACTIVATE_START once the managers have stopped (7.3.4), so it also waits
+// until no request is part-way onto the bus.
 // drain_before_deact also waits for every response first (7.3.3: software
 // that guarantees this may shorten DEACTIVATE_TIME_OUT_VALUE; AoU 8.3.2
 // option 1). hold_on_deact = 0 breaks the rule on purpose (negative tests).
@@ -96,14 +95,13 @@ class aou_t1_sw_isr extends uvm_component;
   task quiesce();
     int unsigned g = gen;
     int unsigned n = 0;
-    bit cm = 1'(rm.aou_con0.credit_manage.get_mirrored_value());
     if (!hold_on_deact) begin
       `uvm_info(get_type_name(),
                 "hold_on_deact=0: requests keep issuing (MAS 7.3.5 broken on purpose)", UVM_LOW)
       return;
     end
     hold_requests(1'b1);
-    while ((drain_before_deact && count_reqs(1'b1) != 0) || (cm && count_reqs(1'b0) != 0)) begin
+    while ((drain_before_deact && count_reqs(1'b1) != 0) || count_reqs(1'b0) != 0) begin
       @(status.vif.mon_cb);
       if (g != gen || link_lost()) return;
       if (++n >= state_timeout) begin

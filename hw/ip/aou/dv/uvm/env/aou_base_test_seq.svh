@@ -213,22 +213,12 @@ class aou_base_test_seq extends ocah_sequence;
   endtask
 
   // Orderly (or, by APB, forced) deactivation from the DUT, the remote side
-  // or both; waits for DISABLED on both sides. credit_manage >= 0 programs
-  // AOU_CON0.CREDIT_MANAGE first. New local requests are held from before
-  // DEACTIVATE_START until DISABLED.
-  task deactivate(aou_t1_who_e who = AOU_T1_BY_APB, bit forced = 1'b0, int credit_manage = -1);
+  // or both; waits for DISABLED on both sides. New local requests are held
+  // from before DEACTIVATE_START until DISABLED.
+  task deactivate(aou_t1_who_e who = AOU_T1_BY_APB, bit forced = 1'b0);
     who = pick_who(who);
-    `uvm_info(get_type_name(), $sformatf("deactivate: %s forced=%0b credit_manage=%0d",
-                                         who.name(), forced, credit_manage), UVM_LOW)
-    // CREDIT_MANAGE reaches the DUT before either side starts deactivating, and
-    // only then does L3 adopt the same credit rule after DeactivateAck
-    // (BUGS/009): otherwise the two sides judge one deactivation by different rules.
-    if (credit_manage >= 0) begin
-      write_field(p_sequencer.regs.aou_con0.credit_manage, uvm_reg_data_t'(credit_manage));
-      cfg.l3_cfg.resp_credits_after_deact_ack = credit_manage[0];
-    end
-    cfg.l3_cfg.cm0_deact = cfg.l3_cm0_deact &&
-        p_sequencer.regs.aou_con0.credit_manage.get_mirrored_value() == 0;
+    `uvm_info(get_type_name(), $sformatf("deactivate: %s forced=%0b", who.name(), forced),
+              UVM_LOW)
     // The remote request goes first: an APB access takes long enough for the
     // whole handshake to finish, and a request made in DISABLED would linger
     // until the next activation.
@@ -376,9 +366,6 @@ class aou_base_test_seq extends ocah_sequence;
       s.deactivate = f.deactivate_timeout;
       s.start(null);
     end
-    if (f.credit_manage >= 0) cfg.l3_cfg.resp_credits_after_deact_ack = f.credit_manage[0];
-    if (f.credit_manage >= 0) write_field(p_sequencer.regs.aou_con0.credit_manage,
-                                          uvm_reg_data_t'(f.credit_manage));
   endtask
 
   // TX low-power mode. Static configuration: call it only while the DUT is

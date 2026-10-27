@@ -237,7 +237,7 @@ for a number nobody read.
 | 7 | `VIOL_MSG_ORDER` | Credited message outside its window: before the sender's ActivateAck is received (9.2), a request after its own DeactivateReq, any after DISABLED (8.4). |
 | 8 | `VIOL_CRD_UNDERFLOW` | Shadow credit would go negative (6). |
 | 9 | `VIOL_MISC_PLACEMENT` | Activation message not at granule 0, including a second Activation message in the same flit (4.4). |
-| 10 | `VIOL_ADV_ORDER` | Credits advertised before the advertiser's ActivateAck, response credits after its DeactivateAck, or any in DISABLED (8.4). |
+| 10 | `VIOL_ADV_ORDER` | Credits advertised before the advertiser's ActivateAck or in DISABLED (8.4). |
 | 11 | `VIOL_RP_RANGE` | Plane field naming a plane the link lacks (5.2.2, 6.2, 6.4). |
 | 12 | `VIOL_FDID` | Flit whose FDId is not the bridge this instance watches (4.3.1, 6.4). |
 | 13 | `VIOL_CRD_OVERFLOW` | Advertisement took a shadow counter past `CRD_CAPACITY`. |
@@ -662,35 +662,33 @@ that runs into the next flit; Misc is not credited.
 
 Boundary messages on the same stream affect the remainder of their own flit:
 an Activation message is first (4.4), so later messages in that flit are after
-it. The advertising window therefore opens and closes with the die's own
-acknowledge flits, and the request part of the consume window closes with its
-own DeactivateReq flit. Its opening boundary is a received ActivateAck on the
+it. The advertising window therefore opens with the die's own ActivateAck
+flit and closes after the flit that completes the teardown, and the request
+part of the consume window closes with its own DeactivateReq flit. Its opening boundary is a received ActivateAck on the
 opposite stream, so credited traffic is enabled once that ActivateAck is
 received: when its flit is consumed, or earlier when it lies in a committed
 first half (see "First halves fund early").
 
-The windows are v0.8 8.4's, which made them depend on the class (v0.7 gated
-every class alike):
+The windows are v0.8 8.4's, which made the consume window depend on the class
+(v0.7 gated every class alike):
 
 - **Advertising**: from the die's own ActivateAck ("after ActivateAck is sent,
   it is permitted ... to send credits" -- the header can share the flit, and a
   CrdtGrant may follow the Activation message at granule 0 under v0.7) until the
-  link reaches DISABLED, where 8.4 forbids every credit. Response credits
-  (ReadData, WriteResp) stop earlier, at the die's own DeactivateAck: credits in
-  the DeactivateAck's own flit are already after it. v0.8 is silent on them, and
-  the checker keeps v0.7's rule as the interim. Request credits (WriteReq,
-  ReadReq and, as an interim reading, WriteData) are permitted after it (v0.8
-  8.4 allows, without requiring, request credits after one's own DeactivateAck),
-  so they may share the flit of an Ack that completes the teardown; whether
-  "Request" covers WriteData is an open spec question. Header and grant are
-  judged by whether they carry any response credit; a grant at granule 47 has
-  its body in the next flit and is held to the response window. Outside the
-  window: `VIOL_ADV_ORDER`. Before the advertiser's ActivateAck and in DISABLED
-  the advertisement funds nothing. After its own DeactivateAck every credit
-  still funds the counters until DISABLED, the response credits that are
-  reported included: the peer may spend them (v0.8 is silent), and leaving them
-  unfunded turned one report into a stream of underflows once responses became
-  legal after the DeactivateReq.
+  link reaches DISABLED, where 8.4 forbids every credit. The window is the same
+  for every class. After the die's own DeactivateAck, v0.8 8.4 permits request
+  credits (WriteReq, ReadReq and, as an interim reading, WriteData; whether
+  "Request" covers WriteData is an open spec question). v0.8 is silent on
+  response credits (ReadData, WriteResp) there; MAS 7.3.1 sends them, since the
+  die's own requests may still be open, and the checker follows it. A flit's
+  credits -- header MsgCredit and grants alike -- are consumed with the flit or
+  half flit that carries them, once it passes the cancel window (MAS 7.3.1), not
+  ordered by byte position among its messages. So the flit carrying the
+  DeactivateAck that completes the teardown is judged against the link it tore
+  down, and its credits are legal (they are discarded with the rest at
+  DISABLED). Outside the window: `VIOL_ADV_ORDER`. Before the advertiser's
+  ActivateAck and in DISABLED the advertisement funds nothing; inside it, every
+  credit funds the counters.
 - **Sending credited messages**: from the die having sent an ActivateReq and
   received the ActivateAck answering it. Requests (WriteReq, ReadReq, WriteData)
   stop at its own DeactivateReq (8.4). Pending ReadData and WriteResp must still
@@ -726,9 +724,9 @@ advertising flit's consume. Without this the checker funded credit one half late
 and reported an underflow against a die that spent a first-half grant before the
 second half arrived.
 
-The peer keeps advertising response credits until its own DeactivateAck and
-the response counters keep being spent until DISABLED, so the windows are all
-teardown needs and nothing is suspended.
+Both dies may advertise until DISABLED and the response counters keep being
+spent until DISABLED, so the windows are all teardown needs and nothing is
+suspended.
 
 **Planes.** A counter is per die, per local plane, per class. The plane field
 means two things: a credited message carries the **destination** plane, already
@@ -935,6 +933,10 @@ not tried again.
   DeactivateAck. v0.8 8.4 requires pending ReadData and WriteResp after the
   DeactivateReq and permits request credits after the DeactivateAck, so both
   windows now depend on the class (2026-10-20).
+- **Response credits closing at the advertiser's own DeactivateAck**, v0.7's
+  rule kept as the interim while v0.8 was silent, with a grant at G47 held to
+  it. The MAS sends them until DISABLED (7.3.1, 2026-10-26), so the
+  advertising window is one for every class again.
 - **The consume window opening only when the ActivateAck's flit completes.**
   A committed first half is received (UCIe 3.0 10.2), as the early funding
   already assumed; see [Credit accounting](#credit-accounting).

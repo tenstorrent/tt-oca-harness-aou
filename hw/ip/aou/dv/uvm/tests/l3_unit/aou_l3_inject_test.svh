@@ -15,11 +15,12 @@
 //   overgrant  credit beyond any buffer   saturation in A, AOU-R21 (checker)
 //   req_after_dreq  WriteReq after B's own DeactivateReq
 //                                         AOU-R30 (checker), AOU-R34 (A)
-//   rsp_after_dack  ReadData credit after B's own DeactivateAck
+//   crd_in_disabled  ReadData credit once the teardown has completed
 //                                         AOU-R29 (checker), AOU-R26 (A)
-// The last two keep the v0.8 8.4 rules honest: ReadData/WriteResp may follow
-// one's own DeactivateReq and request credits one's own DeactivateAck, so
-// the checker's windows depend on the class.
+// The last two keep the deactivation windows honest: ReadData/WriteResp may
+// follow one's own DeactivateReq and every credit one's own DeactivateAck
+// (v0.8 8.4, MAS 7.3.1), but requests stop at the DeactivateReq and credits
+// at DISABLED.
 class aou_l3_inject_test extends aou_l3_unit_env_test;
   `uvm_component_utils(aou_l3_inject_test)
 
@@ -58,7 +59,7 @@ class aou_l3_inject_test extends aou_l3_unit_env_test;
         rx_check = 1'b0;
         also.push_back("AOU-R34");
       end
-      "rsp_after_dack": begin
+      "crd_in_disabled": begin
         rule = "AOU-R29";
         rx_check = 1'b0;
         also.push_back("AOU-R26");
@@ -134,11 +135,12 @@ class aou_l3_inject_test extends aou_l3_unit_env_test;
         wait (b.model.lnk.dreq_sent);
         b.send(w);
       end
-      "rsp_after_dack": begin
+      "crd_in_disabled": begin
         a.model.lnk.request_deactivate();
         a.model.maybe_release_deact();
         a.model.kick();
-        wait (b.model.lnk.dack_sent);
+        wait (a.model.lnk.state == AOU_LS_DISABLED && b.model.lnk.state == AOU_LS_DISABLED);
+        idle(20);
         // RP0 RDATA=1 in an otherwise empty flit ({RP, WRESP, RDATA, ...}).
         b.model.pk.inj_msg_credit = 'h0200;
         b.model.pk.inj_empty = 1'b1;

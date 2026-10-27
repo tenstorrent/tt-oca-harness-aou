@@ -17,9 +17,6 @@ class aou_l3_model extends uvm_object;
   aou_unpacker    rx_unp;
   aou_unpacker    tx_unp;
   aou_l3_cov      cov;
-  // The DUT's AOU_CON0.CREDIT_MANAGE (set by the T1 env; null elsewhere). Credit-order
-  // reports end in it, as AOU_FDI_CHECKER's do, so an expected-fail entry can tell the modes.
-  uvm_reg_field   credit_manage;
 
   uvm_event       work_ev;
   int unsigned    work_gen;
@@ -40,9 +37,10 @@ class aou_l3_model extends uvm_object;
   int unsigned    dut_wr_out[AOU_RP_MAX];
   int unsigned    dut_rd_out[AOU_RP_MAX];
   // Of those, the ones received once our DeactivateReq was queued and before
-  // the DUT's: with CREDIT_MANAGE=0 a request the DUT accepted earlier can
-  // still cross our DeactivateReq on the link (BUGS/032). Responses come off
-  // these first, so they never include a request we had before that point.
+  // the DUT's: the DUT may still send requests then (8.4), and must wait for
+  // their answers before its DeactivateReq. Counted apart so an AOU-R33
+  // report says which kind it was. Responses come off these first, so they
+  // never include a request we had before that point.
   int unsigned    dut_wr_late[AOU_RP_MAX];
   int unsigned    dut_rd_late[AOU_RP_MAX];
 
@@ -162,12 +160,6 @@ class aou_l3_model extends uvm_object;
     return n;
   endfunction
 
-  function int unsigned dut_requests_open();
-    int unsigned n = 0;
-    foreach (dut_wr_out[r]) n += dut_wr_out[r] + dut_rd_out[r];
-    return n;
-  endfunction
-
   // Our DeactivateReq is queued or sent and the DUT's has not arrived.
   function bit deact_committed();
     return (lnk.dreq_sent || lnk.queued(AOU_DEACT_REQ)) && !lnk.dreq_rcvd;
@@ -175,8 +167,7 @@ class aou_l3_model extends uvm_object;
 
   function void maybe_release_deact();
     if (lnk.want_deact &&
-        (cfg.deact_own_open ? pk.queued_msgs() == 0 : our_requests_outstanding() == 0) &&
-        !(cfg.cm0_deact && dut_requests_open() != 0)) begin
+        (cfg.deact_own_open ? pk.queued_msgs() == 0 : our_requests_outstanding() == 0)) begin
       lnk.release_deact();
       kick();
     end
@@ -369,12 +360,13 @@ class aou_l3_model extends uvm_object;
       dut_dack_flit = 1'b1;
   endfunction
 
-  // Credits may come from the DUT after its ActivateAck (8.4) and never in
-  // DISABLED (8.4). After its DeactivateAck, v0.8 8.4 permits request credits;
-  // WriteData counts as a request class here (interim: 8.4 does not say). The
-  // flit carrying that Ack is after it, so it may carry them even when the Ack
-  // completes the teardown. Response credits after the Ack: v0.8 is silent;
-  // v0.7 forbade them, the MAS allows them with CREDIT_MANAGE=1.
+  // Credits may come from the DUT after its ActivateAck and until DISABLED
+  // (8.4), of every class: request credits after its DeactivateAck (8.4), and
+  // response credits too, which fund the answers to the DUT's own open
+  // requests (MAS 7.3.1; v0.8 is silent on them). WriteData counts as a
+  // request class (interim: 8.4 does not say). A flit's credits are consumed
+  // with the flit (MAS 7.3.1), so the flit carrying the DeactivateAck that
+  // completes the teardown may still carry them; they are discarded.
   static function bit req_class(aou_cred_class_e c);
     return c inside {AOU_CC_WREQ, AOU_CC_RREQ, AOU_CC_WDATA};
   endfunction
@@ -382,11 +374,8 @@ class aou_l3_model extends uvm_object;
   function bit peer_adv_ok(aou_cred_class_e c, output string why);
     why = "";
     if (lnk.state == AOU_LS_DISABLED) begin
-      if (!(req_class(c) && dut_dack_flit)) why = "in DISABLED";
+      if (!dut_dack_flit) why = "in DISABLED";
     end else if (!lnk.ack_rcvd) why = "before its ActivateAck";
-    else if (lnk.dack_rcvd && !req_class(c) &&
-             !(c inside {AOU_CC_RDATA, AOU_CC_WRESP} && cfg.resp_credits_after_deact_ack))
-      why = "after its DeactivateAck";
     return why == "";
   endfunction
 
@@ -395,11 +384,6 @@ class aou_l3_model extends uvm_object;
   // DISABLED resets the counters anyway.
   function bit peer_adv_funds(aou_cred_class_e c);
     return !(req_class(c) && (lnk.dack_rcvd || dut_dack_flit));
-  endfunction
-
-  function string cm_sfx();
-    if (credit_manage == null) return "";
-    return $sformatf(" CREDIT_MANAGE=%0d", credit_manage.get_mirrored_value());
   endfunction
 
   function void rx_hdr_credit(bit [15:0] mc);
@@ -414,8 +398,8 @@ class aou_l3_model extends uvm_object;
         ledger_chk("AOU-R29");
         if (!peer_adv_ok(aou_cred_class_e'(c), why)) begin
           viol(why == "before its ActivateAck" ? "AOU-R29" : "AOU-R26",
-               $sformatf("DUT MsgCredit %s RP%0d=%0d %s%s", aou_cc_name(aou_cred_class_e'(c)), r,
-                         n[c], why, cm_sfx()));
+               $sformatf("DUT MsgCredit %s RP%0d=%0d %s", aou_cc_name(aou_cred_class_e'(c)), r,
+                         n[c], why));
         end else if (peer_adv_funds(aou_cred_class_e'(c))) begin
           rx_tx_grant(r, aou_cred_class_e'(c), n[c]);
         end
@@ -441,8 +425,8 @@ class aou_l3_model extends uvm_object;
         if (n != 0) begin
           if (!peer_adv_ok(aou_cred_class_e'(c), why))
             viol(why == "before its ActivateAck" ? "AOU-R29" : "AOU-R26",
-                 $sformatf("DUT CrdtGrant %s RP%0d=%0d %s%s", aou_cc_name(aou_cred_class_e'(c)),
-                           r, n, why, cm_sfx()));
+                 $sformatf("DUT CrdtGrant %s RP%0d=%0d %s", aou_cc_name(aou_cred_class_e'(c)),
+                           r, n, why));
           else if (peer_adv_funds(aou_cred_class_e'(c)))
             rx_tx_grant(r, aou_cred_class_e'(c), n);
         end

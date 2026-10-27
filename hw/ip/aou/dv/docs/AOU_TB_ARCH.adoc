@@ -164,7 +164,7 @@ The sequence library (`uvm/seq_lib/aou_seq_lib_pkg.sv`) holds every virtual
 sequence, one file per family and area subdirectories (`errors/`, `lifecycle/`,
 `link/`, `matrix/`, `perf/`, `stress/`). `aou_base_test_seq` composes the
 scenario primitives: `link_up()`, `activate(who, order)`,
-`deactivate(who, forced, credit_manage)`, `program_cfg(feature_cfg)`,
+`deactivate(who, forced)`, `program_cfg(feature_cfg)`,
 `traffic(dir, n, profile)` / `traffic_nb()` / `wait_traffic()`,
 `pause_traffic()` / `resume_traffic()`, `drain(timeout)`, `link_event(kind)`,
 `lp_mode(en, threshold)`, `hold_tx()` / `release_tx()`,

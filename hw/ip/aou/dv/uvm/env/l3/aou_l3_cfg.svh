@@ -31,14 +31,6 @@ class aou_l3_cfg extends uvm_object;
   // Most credit the DUT may advertise per RP and class (its RX FIFO, MAS 3.9);
   // 0: not known, unchecked (T1-C40).
   int unsigned       dut_max_cred[AOU_RP_MAX][AOU_CC_NUM];
-  // Return RDATA/WRESP credits after our DeactivateAck (MAS CREDIT_MANAGE=1
-  // reading). Off follows v0.7 8.4: no credits after DeactivateAck.
-  bit                resp_credits_after_deact_ack;
-  // A MAS CREDIT_MANAGE=0 partner: our DeactivateReq waits until every DUT
-  // request has been answered (MAS 7.2 DEACTIVATE_START condition 1), and no
-  // credited message follows it (7.3.1). A DUT request that crosses our
-  // DeactivateReq is answered after the next activation (7.3.5).
-  bit                cm0_deact;
   // Our DeactivateReq goes out once our queued messages are sent, with our
   // requests still unanswered; they are answered after the next activation
   // (MAS 7.3.4: a request crossing the partner's DeactivateReq).

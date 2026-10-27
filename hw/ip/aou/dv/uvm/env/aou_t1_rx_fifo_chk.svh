@@ -17,21 +17,12 @@
 //   comes at least 2^(v+3) cycles (less tov_slack for the TX pipeline) after
 //   the DUT's last credited message; PropertyReq=1 (DEACTIVATE_FORCE, BUGS/010)
 //   is exempt.
-// T1-L47 (MAS 7.1 DEACTIVATE_START condition 1, CREDIT_MANAGE=0): a
-//   DeactivateReq comes only once the DUT has answered every remote request
-//   it had for more than cross_cycles (a request still crossing the link may
-//   meet it). Responses retire the oldest open request of their kind (any RP,
-//   so DEST_RP remapping does not matter): an out-of-order answer only makes
-//   the check younger, never stricter.
 // The checks other than T1-L46 stop for good once the remote die sends beyond its credit
 // or the DUT requests LinkReset (injection tests: the DUT may drop messages).
-`uvm_analysis_imp_decl(_rx_fifo_tb)
-
 class aou_t1_rx_fifo_chk extends uvm_component;
   `uvm_component_utils(aou_t1_rx_fifo_chk)
 
   uvm_analysis_imp #(aou_msg, aou_t1_rx_fifo_chk) dut_imp;   // DUT -> remote die messages
-  uvm_analysis_imp_rx_fifo_tb #(aou_msg, aou_t1_rx_fifo_chk) tb_imp;   // remote die -> DUT
 
   aou_axi_vif_t  vif[];                        // M ports
   aou_l3_model   model;
@@ -39,7 +30,6 @@ class aou_t1_rx_fifo_chk extends uvm_component;
   aou_core       rm;
   int unsigned   slack = 8;                    // messages per RP and class
   int unsigned   tov_slack = 8;                // cycles
-  int unsigned   cross_cycles = 200;
 
   protected longint unsigned cycle;
   protected int unsigned     hs[AOU_RP_MAX][2];      // M-port AW, AR handshakes
@@ -49,12 +39,10 @@ class aou_t1_rx_fifo_chk extends uvm_component;
   protected bit              crd_off;
   protected bit              req_seen;
   protected longint          last_msg = -1;
-  protected longint unsigned req_t[2][$];   // remote writes, reads open: send cycle
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     dut_imp = new("dut_imp", this);
-    tb_imp = new("tb_imp", this);
   endfunction
 
   // Requests the remote die sent on RP r (k: 0 WriteReq, 1 ReadReq) whose AW/AR
@@ -78,7 +66,6 @@ class aou_t1_rx_fifo_chk extends uvm_component;
     end
     req_seen = 1'b0;
     last_msg = -1;
-    foreach (req_t[k]) req_t[k].delete();
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -147,37 +134,10 @@ class aou_t1_rx_fifo_chk extends uvm_component;
     end
   endfunction
 
-  function void write_rx_fifo_tb(aou_msg m);
-    if (int'(m.rp) >= vif.size()) return;   // beyond RP_COUNT: dropped (plan 9.15)
-    if (m.msg_type == AOU_MT_WREQ) req_t[0].push_back(cycle);
-    if (m.msg_type == AOU_MT_RREQ) req_t[1].push_back(cycle);
-  endfunction
-
   protected function void retire(aou_msg m);
     aou_msg_rdata rd;
-    if (m.msg_type == AOU_MT_WRESP) begin
-      if (req_t[0].size() != 0) void'(req_t[0].pop_front());
-      if (int'(m.rp) < AOU_RP_MAX) answered[m.rp][0]++;
-    end
-    if ($cast(rd, m) && rd.last) begin
-      if (req_t[1].size() != 0) void'(req_t[1].pop_front());
-      if (int'(m.rp) < AOU_RP_MAX) answered[m.rp][1]++;
-    end
-  endfunction
-
-  protected function void check_answered();
-    string kind[2] = '{"write(s)", "read(s)"};
-    if (crd_off || rm == null || rm.aou_con0.credit_manage.get_mirrored_value() != 0) return;
-    foreach (req_t[k]) begin
-      aou_rule_log::check("T1-L47", get_type_name());
-      if (req_t[k].size() != 0 && cycle - req_t[k][0] > 64'(cross_cycles)) begin
-        aou_rule_log::fire("T1-L47", get_type_name());
-        `uvm_error(get_type_name(), $sformatf(
-            {"T1-L47: DUT DeactivateReq (CREDIT_MANAGE=0) with %0d remote %s unanswered, ",
-             "the oldest sent %0d cycles before"}, req_t[k].size(),
-            kind[k], cycle - req_t[k][0]))
-      end
-    end
+    if (m.msg_type == AOU_MT_WRESP && int'(m.rp) < AOU_RP_MAX) answered[m.rp][0]++;
+    if ($cast(rd, m) && rd.last && int'(m.rp) < AOU_RP_MAX) answered[m.rp][1]++;
   endfunction
 
   function void write(aou_msg m);
@@ -187,7 +147,6 @@ class aou_t1_rx_fifo_chk extends uvm_component;
       retire(m);
       return;
     end
-    if ($cast(a, m) && a.op == AOU_DEACT_REQ) check_answered();
     if (!$cast(a, m) || a.op != AOU_DEACT_REQ || a.property_req || rm == null) return;
     if (last_msg >= 0) begin
       int unsigned v = int'(rm.aou_init.deactivate_time_out_value.get_mirrored_value());

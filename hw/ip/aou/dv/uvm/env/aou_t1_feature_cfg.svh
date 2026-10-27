@@ -40,8 +40,6 @@ class aou_t1_feature_cfg extends uvm_object;
   int msgcredit_timeout = -1;
   int ack_timeout = -1;
   int deactivate_timeout = -1;
-  // AOU_CON0.CREDIT_MANAGE
-  int credit_manage = -1;
   // Error info: RPn_ERROR_INFO_ACCESS_EN
   int error_info_access[4] = '{-1, -1, -1, -1};
 

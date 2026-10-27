@@ -2,11 +2,12 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Stimulus for activation with data in the RX FIFO (plan 1.10; MAS 7.3.2,
-// 7.3.4). The scenario MAS 7.3.4 and 7.3.5 describe, with CREDIT_MANAGE=0: the
-// remote die's requests cross the DUT's DeactivateReq, the remote die then
-// deactivates with them unanswered (they are answered after the next
-// activation), and the DUT's M ports hold AWREADY, WREADY and ARREADY low, so
-// the requests are still in its RX FIFOs when the link reaches DISABLED.
+// 7.3.4). The remote die's requests follow the DUT's DeactivateReq, the
+// remote die then deactivates with them unanswered, which AoU v0.8 8.4 does
+// not allow a remote die but the DUT survives (they are answered after the
+// next activation, MAS 7.3.5), and the DUT's M ports hold AWREADY, WREADY and
+// ARREADY low, so the requests are still in its RX FIFOs when the link
+// reaches DISABLED.
 // Software sets ACTIVATE_START and the M ports stay held for +hold cycles,
 // then drain; activation follows and every held request completes.
 // aou_t1_rx_fifo_chk checks that the DUT's ActivateReq waits for the FIFO
@@ -57,9 +58,6 @@ class aou_act_rx_drain_vseq extends aou_link_base_vseq;
     aou_t1_traffic_cfg p = aou_t1_traffic_cfg::named("short");
     `uvm_info(get_type_name(), $sformatf(
         "loop %0d/%0d: remote requests behind the DUT's DeactivateReq", loop, loops), UVM_LOW)
-    write_field(p_sequencer.regs.aou_con0.credit_manage, 0);
-    cfg.l3_cfg.resp_credits_after_deact_ack = 1'b0;
-    cfg.l3_cfg.cm0_deact = cfg.l3_cm0_deact;
     cfg.l3_cfg.deact_own_open = 1'b1;
     foreach (cfg.m_sub_cfg[r]) cfg.m_sub_cfg[r].hold_req = 1'b1;
     // The remote die's requests wait in its packer until the DUT's DeactivateReq.

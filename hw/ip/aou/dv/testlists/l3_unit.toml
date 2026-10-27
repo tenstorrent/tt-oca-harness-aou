@@ -56,12 +56,12 @@ run_modes = ["l3_unit"]
 args = ["+L3_INJECT=req_after_dreq"]
 
 [[tests]]
-name = "aou_l3_inject_test.L3_INJECT-rsp_after_dack"
+name = "aou_l3_inject_test.L3_INJECT-crd_in_disabled"
 module = { uvm = "aou_l3_inject_test" }
 seed = 1
 tags = ["l3_unit"]
 run_modes = ["l3_unit"]
-args = ["+L3_INJECT=rsp_after_dack"]
+args = ["+L3_INJECT=crd_in_disabled"]
 
 [[tests]]
 name = "aou_l3_link_test"
@@ -94,7 +94,7 @@ tests = [
   "aou_l3_dest_rp_test",
   "aou_l3_inject_test",
   "aou_l3_inject_test.L3_INJECT-req_after_dreq",
-  "aou_l3_inject_test.L3_INJECT-rsp_after_dack",
+  "aou_l3_inject_test.L3_INJECT-crd_in_disabled",
   "aou_l3_link_test",
   "aou_l3_loopback_test",
   "aou_l3_unit_env_test",
@@ -117,7 +117,7 @@ tests = [
   "aou_l3_dest_rp_test",
   "aou_l3_inject_test",
   "aou_l3_inject_test.L3_INJECT-req_after_dreq",
-  "aou_l3_inject_test.L3_INJECT-rsp_after_dack",
+  "aou_l3_inject_test.L3_INJECT-crd_in_disabled",
   "aou_l3_link_test",
   "aou_l3_loopback_test",
   "aou_l3_unit_env_test",

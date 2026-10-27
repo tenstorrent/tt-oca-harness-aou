@@ -18,10 +18,6 @@ class aou_fdi_chk_adapter extends uvm_component;
   bit                        expect_lp_traffic = 1'b1;
   bit                        expect_pl_traffic = 1'b1;
   int unsigned               reports[NCLS];
-  // AOU_CON0.CREDIT_MANAGE (T1 sets it): the deactivation-window reports name the
-  // mode, because which credits and responses may follow DeactivateReq/Ack
-  // depends on it (BUGS/009 for CREDIT_MANAGE=1, BUGS/033 for 0).
-  uvm_reg_field              credit_manage;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -73,13 +69,6 @@ class aou_fdi_chk_adapter extends uvm_component;
     return d ? "PL(peer->DUT)" : "LP(DUT->peer)";
   endfunction
 
-  function string mode(int unsigned c);
-    if (credit_manage == null || !(c inside {aou_fdi_checker_pkg::VIOL_MSG_ORDER,
-                                             aou_fdi_checker_pkg::VIOL_ADV_ORDER}))
-      return "";
-    return $sformatf(" CREDIT_MANAGE=%0d", credit_manage.get_mirrored_value());
-  endfunction
-
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     if (!uvm_config_db#(virtual aou_fdi_checker_if)::get(this, "", "fdi_chk", vif))
@@ -107,11 +96,11 @@ class aou_fdi_chk_adapter extends uvm_component;
             cap_dir = vif.mon_cb.capture_dir;
             done[cap_dir] = 1'b1;
             chk.violation(rule_of(c), get_type_name(),
-                          $sformatf("AOU_FDI_CHECKER %s %s flit#%0d G%0d granule=%010h%s",
+                          $sformatf("AOU_FDI_CHECKER %s %s flit#%0d G%0d granule=%010h",
                                     class_name(c), dir_name(cap_dir),
                                     vif.mon_cb.capture_flit_seq,
                                     vif.mon_cb.capture_granule_idx,
-                                    vif.mon_cb.capture_granule, mode(c)));
+                                    vif.mon_cb.capture_granule));
           end
           // Classes the capture record doesn't describe get their direction
           // from the per-direction tap, one report per direction.
@@ -119,13 +108,13 @@ class aou_fdi_chk_adapter extends uvm_component;
             if (!done[d] && vif.mon_cb.dir_violation[d][c] === 1'b1) begin
               done[d] = 1'b1;
               chk.violation(rule_of(c), get_type_name(),
-                            $sformatf("AOU_FDI_CHECKER %s %s from flit#%0d%s", class_name(c),
-                                      dir_name(1'(d)), vif.mon_cb.dir_flit_seq[d], mode(c)));
+                            $sformatf("AOU_FDI_CHECKER %s %s from flit#%0d", class_name(c),
+                                      dir_name(1'(d)), vif.mon_cb.dir_flit_seq[d]));
             end
           end
           if (!done[0] && !done[1])
             chk.violation(rule_of(c), get_type_name(),
-                          $sformatf("AOU_FDI_CHECKER %s%s", class_name(c), mode(c)));
+                          $sformatf("AOU_FDI_CHECKER %s", class_name(c)));
         end
       end
       reported |= fresh;

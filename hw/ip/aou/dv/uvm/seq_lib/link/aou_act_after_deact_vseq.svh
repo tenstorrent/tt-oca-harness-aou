@@ -19,7 +19,7 @@
 // ACTIVATE_START write at DISABLED + offset and logs the offset it got. The
 // register takes the write about halfway through (26 of 52 cycles on T1).
 // Knobs: +offsets=<o,o,..> (cycles, may be negative; default -12..44)
-// +busy=0|1 (-1: random per loop) +credit_manage=0|1 +T1_TXN.
+// +busy=0|1 (-1: random per loop) +T1_TXN.
 class aou_act_after_deact_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_act_after_deact_vseq)
 
@@ -60,10 +60,6 @@ class aou_act_after_deact_vseq extends aou_link_base_vseq;
     int offsets[$];
     string os = arg_str("offsets", "");
     int busy_arg = arg_int("busy", -1);
-    int cm = arg_int("credit_manage", 0);
-    // With CREDIT_MANAGE=0 only the local side issues: a remote request caught
-    // by the DUT's DeactivateReq could not complete (BUGS/009).
-    aou_t1_dir_e dir = (cm != 0) ? AOU_T1_BOTH_DIRS : AOU_T1_L2R;
     if (os != "") begin
       parse_offsets(os, offsets);
     end else begin
@@ -74,10 +70,10 @@ class aou_act_after_deact_vseq extends aou_link_base_vseq;
     for (int i = -1; i < int'(offsets.size()); i++) begin
       bit busy = (busy_arg >= 0) ? 1'(busy_arg) : 1'($urandom_range(1));
       if (busy) begin
-        traffic_nb(dir, (num_txns + 1) / 2, aou_t1_traffic_cfg::named("short"));
+        traffic_nb(AOU_T1_BOTH_DIRS, (num_txns + 1) / 2, aou_t1_traffic_cfg::named("short"));
         wait_cycles($urandom_range(200, 10));
       end
-      deact_then_activate(cm, (i < 0) ? 0 : offsets[i], i < 0, i + 1, offsets.size());
+      deact_then_activate((i < 0) ? 0 : offsets[i], i < 0, i + 1, offsets.size());
       wait_traffic();
       drain();
     end
@@ -86,7 +82,7 @@ class aou_act_after_deact_vseq extends aou_link_base_vseq;
 
   // calib: write ACTIVATE_START once DISABLED is seen and measure the two
   // latencies; otherwise aim the end of the write at DISABLED + off.
-  task deact_then_activate(int cm, int off, bit calib, int unsigned loop, int unsigned loops);
+  task deact_then_activate(int off, bit calib, int unsigned loop, int unsigned loops);
     aou_reg_activation_seq s = aou_reg_activation_seq::type_id::create("deact");
     longint unsigned t_rel = 0;
     longint unsigned t_dis = 0;
@@ -98,10 +94,6 @@ class aou_act_after_deact_vseq extends aou_link_base_vseq;
     if (calib) `uvm_info(get_type_name(), $sformatf("loop 0/%0d: calibration", loops), UVM_LOW)
     else `uvm_info(get_type_name(), $sformatf("loop %0d/%0d: ACTIVATE_START aimed at DISABLED %0d",
                                               loop, loops, off), UVM_LOW)
-    // As in deactivate(): CREDIT_MANAGE first, then L3 adopts the same rule.
-    write_field(p_sequencer.regs.aou_con0.credit_manage, uvm_reg_data_t'(cm));
-    cfg.l3_cfg.resp_credits_after_deact_ack = cm[0];
-    cfg.l3_cfg.cm0_deact = cfg.l3_cm0_deact && cm == 0;
     cfg.l3_cfg.auto_deactivate = 1'b0;
     env.sw_isr.quiesce();
     prep_reg(s);

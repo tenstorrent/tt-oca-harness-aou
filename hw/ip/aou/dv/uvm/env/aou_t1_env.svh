@@ -195,8 +195,6 @@ class aou_t1_env extends uvm_env;
     wdt_chk.rm = regs.model;
     early_tbl.vif = new[cfg.n_rp];
     foreach (s_mgr[r]) early_tbl.vif[r] = s_mgr[r].cfg.vif;
-    if (fdi_chk != null) fdi_chk.credit_manage = regs.model.aou_con0.credit_manage;
-    l3.model.credit_manage = regs.model.aou_con0.credit_manage;
     lsm.mon.ap.connect(axi4pc.lsm_imp);
     axi4pc.m_drv = new[cfg.n_rp];
     foreach (m_sub[r]) axi4pc.m_drv[r] = m_sub[r].drv;
@@ -239,7 +237,6 @@ class aou_t1_env extends uvm_env;
       rx_fifo_chk.status = status;
       rx_fifo_chk.rm = regs.model;
       l3.ap_rx_msg.connect(rx_fifo_chk.dut_imp);
-      l3.ap_tx_msg.connect(rx_fifo_chk.tb_imp);
     end
     sw_isr.status = status;
     sw_isr.rm = regs.model;

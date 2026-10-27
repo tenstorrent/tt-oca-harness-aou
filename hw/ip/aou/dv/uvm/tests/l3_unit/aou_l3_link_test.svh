@@ -8,9 +8,10 @@
 // before ActivateAck (AOU-R29), credited traffic in DISABLED (AOU-R26), a
 // DeactivateReq with requests unanswered (AOU-R33, with the requests that
 // crossed our own DeactivateReq counted apart), a request after DeactivateReq
-// (AOU-R34), credits after the DUT's DeactivateAck (AOU-R26, v0.8 8.4: request
-// credits are permitted, response credits and any credit in a later DISABLED
-// flit are not), and v0.8's ERROR state with its recovery.
+// (AOU-R34), credits after the DUT's DeactivateAck (AOU-R26: credits of every
+// class are permitted until DISABLED, v0.8 8.4 and MAS 7.3.1, including those
+// in the flit whose Ack completes the teardown; any credit in a later
+// DISABLED flit is not), and v0.8's ERROR state with its recovery.
 class aou_l3_link_test extends aou_l3_unit_base_test;
   `uvm_component_utils(aou_l3_link_test)
 
@@ -249,14 +250,16 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     b_to_a(a, b, 'h0001);
     expect_true(chk.count("AOU-R26") == 0, "a request credit after the DeactivateAck is permitted");
     b_to_a(a, b, 'h0200);
-    expect_true(chk.count("AOU-R26") == 1, "a response credit after the DeactivateAck is AOU-R26");
+    expect_true(chk.count("AOU-R26") == 0,
+                "a response credit after the DeactivateAck is permitted (MAS 7.3.1)");
     void'(exchange(a, b));
     both(a, b, AOU_LS_DISABLED, "A's deactivation completes");
     b_to_a(a, b, 'h0001, 1'b1);
-    expect_true(chk.count("AOU-R26") == 2, "a request credit in a later DISABLED flit is AOU-R26");
+    expect_true(chk.count("AOU-R26") == 1, "a request credit in a later DISABLED flit is AOU-R26");
     chk.clear_counts();
     // B deactivates; its DeactivateAck completes the teardown, and the flit
-    // carrying it may still carry request credits.
+    // carrying it may still carry credits of any class: they are consumed
+    // with the flit and discarded.
     pair(a, b);
     a.lnk.request_activate();
     void'(exchange(a, b));
@@ -269,8 +272,10 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     expect_true(a.lnk.dreq_sent && b.lnk.dreq_rcvd, "A's DeactivateReq is out");
     b_to_a(a, b, 'h0201);
     expect_true(a.lnk.state == AOU_LS_DISABLED, "B's DeactivateAck takes A to DISABLED");
-    expect_true(chk.count("AOU-R26") == 1,
-                "in the completing Ack's flit: WREQ credit permitted, RDATA credit AOU-R26");
+    expect_true(chk.count("AOU-R26") == 0,
+                "in the completing Ack's flit: WREQ and RDATA credits permitted");
+    b_to_a(a, b, 'h0200, 1'b1);
+    expect_true(chk.count("AOU-R26") == 1, "a response credit in a later DISABLED flit is AOU-R26");
     chk.unexpect_rule("AOU-R26");
     chk.clear_counts();
   endfunction

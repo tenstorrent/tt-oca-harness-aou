@@ -69,9 +69,6 @@ class aou_t1_env_cfg extends uvm_object;
   // half-flit). Further v0.8-only DUT checks belong behind the same switch.
   bit            v0p8;
   bit            sw_drain_before_deact = 1'b0;
-  // With CREDIT_MANAGE=0 the remote die (L3) deactivates as a MAS partner
-  // would (aou_l3_cfg::cm0_deact); 0 restores the AoU-only remote die.
-  bit            l3_cm0_deact = 1'b1;
   // aou_t1_rx_fifo_chk (T1-C41, T1-L40, T1-L46) and the messages per RP and
   // class it allows past the RX FIFO (register slice, splitter, width converter).
   bit            rx_fifo_chk_en = 1'b1;
@@ -112,9 +109,6 @@ class aou_t1_env_cfg extends uvm_object;
     // complete. A real remote die streams W beats; model that buffer as
     // returning WDATA credits on receipt.
     l3_cfg.ret_policy[AOU_CC_WDATA] = AOU_RET_IMMEDIATE;
-    // AOU_CON0.CREDIT_MANAGE resets to 1: response credits continue after
-    // DeactivateAck (MAS 7.3.1; BUGS/009).
-    l3_cfg.resp_credits_after_deact_ack = 1'b1;
     apb_cfg = aou_apb_cfg::type_id::create("apb_cfg");
     local_mem = aou_mem::type_id::create("local_mem");
     remote_cfg = aou_axi_cfg::type_id::create("remote_cfg");

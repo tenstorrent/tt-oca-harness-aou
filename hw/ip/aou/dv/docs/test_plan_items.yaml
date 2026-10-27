@@ -175,13 +175,17 @@
   title: Test AoU v0.5 mode where req/resp credits managed together during deactivation
   priority: P1
   old_test: aou_credit_manage_mode0_test
+  dropped: 'AOU_CON0.CREDIT_MANAGE is removed; AOU_CORE always manages request and response credits separately (AoU v0.8 8.4, MAS 7.3.1), so there is no combined mode to test.'
+  note: The old 2.8 tested CREDIT_MANAGE = 0.
 
 - id: '2.9'
   section: '2.2'
   section_title: Link Deactivation Tests
-  title: Test separate req/resp credit management during deactivation; verify response messages allowed
+  title: Request and response credits managed separately during deactivation (AoU v0.8 8.4); responses and response credits continue after DeactivateReq
   priority: P1
   old_test: aou_credit_manage_mode1_test
+  old_title: Test separate req/resp credit management during deactivation; verify response messages allowed
+  note: 'The old 2.9 tested CREDIT_MANAGE = 1, now the only behaviour.'
 
 - id: '2.10'
   section: '2.2'
@@ -193,10 +197,10 @@
 - id: '2.11'
   section: '2.2'
   section_title: Link Deactivation Tests
-  title: 'No credit message in DISABLED; no response credit after the sender''s DeactivateAck (request credits after it are permitted, v0.8 8.4)'
+  title: 'No credit message in DISABLED; credits of every class are permitted after the sender''s DeactivateAck (v0.8 8.4, MAS 7.3.1), including in the flit whose Ack completes the teardown'
   priority: P2
   added: 'AoU 8.2/8.4; BUGS/009, BUGS/033'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
 
 - id: '2.12'
   section: '2.2'

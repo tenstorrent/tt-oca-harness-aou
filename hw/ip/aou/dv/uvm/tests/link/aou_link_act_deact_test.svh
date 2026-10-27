@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Activation/deactivation loops from either side and each CREDIT_MANAGE value
-// (aou_link_act_deact_vseq).
+// Activation/deactivation loops from either side (aou_link_act_deact_vseq).
 class aou_link_act_deact_test extends aou_base_test;
   `uvm_component_utils(aou_link_act_deact_test)
 

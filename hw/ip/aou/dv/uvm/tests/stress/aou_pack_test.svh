@@ -68,11 +68,6 @@ class aou_pack_test extends aou_dp_base_test;
       "rp", "act", "crdt", "prof": begin
         k.lens = '{0, 1, 3};
         k.n = 48;
-        // No response credits after DeactivateAck (BUGS/009 covers the other setting).
-        if (pk == "act") begin
-          k.feat = aou_t1_feature_cfg::type_id::create("feat");
-          k.feat.credit_manage = 0;
-        end
       end
       default: `uvm_fatal(get_type_name(), {"bad +pk=", pk})
     endcase

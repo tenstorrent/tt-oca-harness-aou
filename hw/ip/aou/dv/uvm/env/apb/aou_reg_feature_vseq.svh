@@ -129,14 +129,10 @@ class aou_reg_feature_vseq extends aou_reg_base_seq;
     aou_reg_activation_seq deact = aou_reg_activation_seq::type_id::create("deact");
     prep(act);
     act.op = AOU_REG_ACTIVATE;
-    act.credit_manage = 0;
     act.wait_done = 1'b0;
     act.start(null, this);
-    expect_field(rm.aou_con0.credit_manage, 0);
     prep(deact);
     deact.op = AOU_REG_FORCE_DEACTIVATE;
-    deact.credit_manage = 1;
     deact.start(null, this);
-    expect_field(rm.aou_con0.credit_manage, 1);
   endtask
 endclass

@@ -122,7 +122,7 @@ else keeps the API's names.
 |---|---|---|
 | `env.expect` | `env.expects` | `expect` is a keyword |
 | `program(feature_cfg)` | `program_cfg(aou_t1_feature_cfg)` | `program` is a keyword |
-| `deactivate(who, force, ...)` | `deactivate(who, forced, credit_manage)` | `force` is a keyword |
+| `deactivate(who, force)` | `deactivate(who, forced)` | `force` is a keyword |
 | reset agent on `aou_reset_if` | `aou_t1_reset_agent` on `aou_rst_if` (key `rst`) | PR 80's `aou_reset_if` (since retired) had no clock, so no clocking block |
 | `regs.model` | `aou_t1_reg_env` (extends `aou_reg_env`) adds `model` | `aou_reg_env` calls it `regmodel` |
 
@@ -375,8 +375,8 @@ Every test's virtual sequence extends this and composes these tasks:
 |---|---|
 | `link_up()` | L2 bringup to Active |
 | `activate(who, order)` | AoU activation: DUT-, remote- or both-initiated (APB `activate_start`, SW pin, or L3), with ordering and timing randomization |
-| `deactivate(who, force, credit_manage)` | orderly or forced deactivation from either side; waits for DISABLED |
-| `program(feature_cfg)` | DUT configuration through the register sequences (split, aggregator, early response, QoS, DEST_RP, LP mode, interrupt masks, error info, time-outs, credit_manage) |
+| `deactivate(who, force)` | orderly or forced deactivation from either side; waits for DISABLED |
+| `program(feature_cfg)` | DUT configuration through the register sequences (split, aggregator, early response, QoS, DEST_RP, LP mode, interrupt masks, error info, time-outs) |
 | `traffic(dir, n, profile)` / `traffic_nb(...)` + `wait_traffic()` | local→remote, remote→local or both; a profile names AXI sequence knobs and timing policies |
 | `pause_traffic()` / `resume_traffic()` | quiesce or resume all traffic sources |
 | `drain(timeout)` | wait until nothing is outstanding anywhere |

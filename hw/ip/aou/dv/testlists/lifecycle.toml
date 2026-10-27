@@ -195,28 +195,28 @@ run_modes = ["lifecycle"]
 args = ["+mode=w1c", "+pclk_ps=1013"]
 
 [[tests]]
-name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-40000"
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-40000"
 module = { uvm = "aou_link_act_deact_test" }
 seed = 1
 tags = ["lifecycle"]
 run_modes = ["lifecycle"]
-args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1", "+pclk_ps=40000"]
+args = ["+who=apb", "+deact_who=apb", "+busy=1", "+pclk_ps=40000"]
 
 [[tests]]
-name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-600"
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-600"
 module = { uvm = "aou_link_act_deact_test" }
 seed = 1
 tags = ["lifecycle"]
 run_modes = ["lifecycle"]
-args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1", "+pclk_ps=600"]
+args = ["+who=apb", "+deact_who=apb", "+busy=1", "+pclk_ps=600"]
 
 [[tests]]
-name = "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-1013"
+name = "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-1013"
 module = { uvm = "aou_link_act_deact_test" }
 seed = 1
 tags = ["lifecycle"]
 run_modes = ["lifecycle"]
-args = ["+who=apb", "+deact_who=apb", "+credit_manage=0", "+busy=1", "+pclk_ps=1013"]
+args = ["+who=apb", "+deact_who=apb", "+busy=1", "+pclk_ps=1013"]
 
 [[tests]]
 name = "aou_t1_sw_reset_test.pclk_ps-40000"
@@ -324,9 +324,9 @@ tests = [
   "aou_int_test.mode-w1c.pclk_ps-40000",
   "aou_int_test.mode-w1c.pclk_ps-600",
   "aou_int_test.mode-w1c.pclk_ps-1013",
-  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-40000",
-  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-600",
-  "aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-1013",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-40000",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-600",
+  "aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-1013",
   "aou_t1_sw_reset_test.pclk_ps-40000",
   "aou_t1_sw_reset_test.pclk_ps-600",
   "aou_t1_sw_reset_test.pclk_ps-1013",

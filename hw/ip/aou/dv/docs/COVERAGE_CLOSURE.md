@@ -617,7 +617,7 @@ today. The new groups below are white-box where allowed. Each new bin gets `plan
 
 These map onto the earlier FC plan's Part A (A1-A9) and Part B (B1-B6). The cross-layer groups
 X1-X4 (link event × activation state × outstanding; reset × state × mid-burst; zero credit × FDI
-back-pressure; deactivation phase × message class × CREDIT_MANAGE) are still to be added.
+back-pressure; deactivation phase × message class) are still to be added.
 
 ### 4.3 Features with no plan item: 51 proposed
 

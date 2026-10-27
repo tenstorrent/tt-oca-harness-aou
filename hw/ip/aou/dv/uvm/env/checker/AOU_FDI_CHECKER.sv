@@ -987,11 +987,12 @@ logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0][CRD_WD-1:0]  r_crd;
 
 // The windows v0.8 8.4 and 9.2 open and close for die d. Advertising is legal
 // from the flit that carries its own ActivateAck ("after ActivateAck is sent,
-// it is permitted ... to send credits"). Response credits stop with the flit
-// that carries its own DeactivateAck (v0.7's rule; v0.8 is silent on them).
-// Request credits -- WriteReq, ReadReq and, as an interim reading, WriteData --
-// are permitted after the die's own DeactivateAck (v0.8 8.4) until the link
-// reaches DISABLED, where no credit may be sent (8.4 DISABLED). Sending
+// it is permitted ... to send credits") until the link reaches DISABLED, where
+// no credit may be sent (8.4 DISABLED). That includes every class after the
+// die's own DeactivateAck: request credits -- WriteReq, ReadReq and, as an
+// interim reading, WriteData -- by v0.8 8.4, response credits by MAS 7.3.1
+// (v0.8 is silent on them). A flit's credits are consumed with the flit, so
+// the flit completing the teardown is still judged before DISABLED. Sending
 // credited messages is legal once it has sent an ActivateReq and received the
 // ActivateAck answering it (9.2) -- the lenient of the two readings, since
 // 8.4's ENABLED additionally waits for the die's own acknowledge; an
@@ -1001,15 +1002,13 @@ logic [DIR_CNT-1:0][RP_COUNT-1:0][CRD_CLS_CNT-1:0][CRD_WD-1:0]  r_crd;
 // the first in its flit (4.4), so the rest of that flit is after it and the
 // windows close with the flit rather than after it.
 logic [DIR_CNT-1:0]                                 w_adv_en;
-logic [DIR_CNT-1:0]                                 w_adv_req_en;
 logic [DIR_CNT-1:0]                                 w_consume_en;
 logic [DIR_CNT-1:0]                                 w_consume_rsp_en;
 logic [DIR_CNT-1:0][CRD_CLS_CNT-1:0]                w_consume_cls_en;
 
 always_comb begin
     for (int unsigned d = 0; d < DIR_CNT; d++) begin
-        w_adv_req_en[d]     = r_act_ack[d] | w_flit_act_ack[d];
-        w_adv_en[d]         = w_adv_req_en[d] & ~w_deact_ack_nxt[d];
+        w_adv_en[d]         = r_act_ack[d] | w_flit_act_ack[d];
         w_consume_rsp_en[d] = r_act_req[d] & (r_act_ack[1-d] | r_act_ack_half[1-d]);
         w_consume_en[d]     = w_consume_rsp_en[d] & ~w_deact_req_nxt[d];
         for (int unsigned c = 0; c < CRD_CLS_CNT; c++) begin
@@ -1075,12 +1074,6 @@ logic [DIR_CNT-1:0][GRANT_POS_CNT-1:0]
 logic [DIR_CNT-1:0][RP_WIRE_CNT-1:0][CRD_CLS_CNT-1:0][CRD_ENC_WD-1:0] w_grant_span_enc;
 logic [DIR_CNT-1:0][RP_WIRE_CNT-1:0][CRD_CLS_CNT-1:0][CRD_ENC_WD-1:0] w_hdr_enc;
 logic [DIR_CNT-1:0]                                         w_hdr_adv;
-// Advertisements carrying response (ReadData, WriteResp) credits, whose window
-// closes earlier than the request classes' (see w_adv_req_en). A grant at G47
-// has its body in the next flit, so its classes are unknown when it is judged
-// and it is held to the response window.
-logic [DIR_CNT-1:0]                                         w_hdr_adv_rsp;
-logic [DIR_CNT-1:0][GRANULE_CNT-1:0]                        w_grant_adv_rsp;
 logic [DIR_CNT-1:0][RP_WD-1:0]                              w_hdr_rp;
 // Advertisements naming a plane the advertising die does not have (6.4.2), a
 // grant's attributed to its first granule and a spanning grant's to G0.
@@ -1167,16 +1160,6 @@ always_comb begin
 
         // A header advertising nothing names no plane.
         w_hdr_adv[d]    = |w_chk_msg_credit[d][MC_WREQ_LSB +: MC_RP_LSB];
-        w_hdr_adv_rsp[d] = (|w_chk_msg_credit[d][MC_RDATA_LSB +: CRD_ENC_WD]) |
-                           (|w_chk_msg_credit[d][MC_WRESP_LSB +: CRD_ENC_B_WD]);
-        w_grant_adv_rsp[d] = '1;
-        for (int unsigned g = 0; g < GRANT_POS_CNT; g++) begin
-            w_grant_adv_rsp[d][g] = 1'b0;
-            for (int unsigned q = 0; q < RP_WIRE_CNT; q++) begin
-                w_grant_adv_rsp[d][g] |= (|w_grant_enc[d][g][q][CRD_R]) |
-                                         (|w_grant_enc[d][g][q][CRD_B]);
-            end
-        end
         w_hdr_rp_bad[d] = w_hdr_adv[d] & ~w_adv_rp_ok[d][w_hdr_rp[d]];
 
         w_grant_rp_bad[d] = '0;
@@ -1240,10 +1223,8 @@ logic [DIR_CNT-1:0]                                                   r_early_cl
 always_comb begin
     for (int unsigned d = 0; d < DIR_CNT; d++) begin
         w_early_go[d]     = w_half0_commit[d] & ~w_flit_nop[d];
-        // Funds every advertisement until DISABLED, including the response
-        // credits reported after the advertiser's own DeactivateAck (v0.8 is
-        // silent on them): the peer may spend them, and leaving them unfunded
-        // turned one report into a stream of underflows.
+        // Funds every advertisement until DISABLED, the same window as
+        // w_adv_en; the ActivateAck at G0 opens it within the first half.
         w_early_adv_en[d] =
             r_act_ack[d] | (w_act_believed[d][0] & (w_chk_actop[d][0] == ACTOP_ACTIVATE_ACK));
 
@@ -1365,7 +1346,7 @@ always_comb begin
                 // Advertisements crossing the other way in this same cycle are
                 // counted before this cycle's spending.
                 w_crd_avail[d][p][c] = CRD_SUM_WD'(r_crd[d][p][c]) +
-                    ((w_chk_go[1-d] & w_adv_req_en[1-d]) ? w_late_for[1-d][p][c] : '0) +
+                    ((w_chk_go[1-d] & w_adv_en[1-d]) ? w_late_for[1-d][p][c] : '0) +
                     w_early_for[1-d][p][c];
 
                 w_crd_uf[d][p][c]   = w_crd_avail[d][p][c] < CRD_SUM_WD'(w_spent[d][p][c]);
@@ -1508,14 +1489,9 @@ always_comb begin
 
             // A grant is attributed to its own granule; the protocol header has
             // none, so a header finding names granule 0.
-            // Request credits only need w_adv_req_en; response credits need
-            // w_adv_en, which closes earlier.
             w_granule_viol[d][g][VIOL_ADV_ORDER] =
-                w_chk_class_en[VIOL_ADV_ORDER] &
-                ((w_starts_crdtgrant[d][g] &
-                  (~w_adv_req_en[d] | (w_grant_adv_rsp[d][g] & ~w_adv_en[d]))) |
-                 ((g == 0) & w_hdr_adv[d] &
-                  (~w_adv_req_en[d] | (w_hdr_adv_rsp[d] & ~w_adv_en[d]))));
+                w_chk_class_en[VIOL_ADV_ORDER] & ~w_adv_en[d] &
+                (w_starts_crdtgrant[d][g] | ((g == 0) & w_hdr_adv[d]));
 
             w_granule_viol[d][g][VIOL_RP_RANGE] =
                 w_chk_class_en[VIOL_RP_RANGE] &

@@ -19,12 +19,11 @@
 // work keeps sending while another RP has none (T1-C01), the DUT uses all the
 // credit it holds (T1-C02), never more (AOU-R16, the L3 model).
 // +deact=1 (plan 2.5; MAS 7.3.3): with the traffic still queued for want of
-// credit, software sets DEACTIVATE_START (CREDIT_MANAGE from +credit_manage,
-// default 0), and the grant comes +deact_hold cycles later. Messages waiting
-// for credit remain to be transmitted (MAS 7.1), so they must still go out
-// before the DUT's DeactivateReq (AOU-R34, AOU-R33 in the L3 model; T1-L47 in
-// aou_t1_rx_fifo_chk for responses to the remote die) and every transaction
-// completes (scoreboard).
+// credit, software sets DEACTIVATE_START, and the grant comes +deact_hold
+// cycles later. Messages waiting for credit remain to be transmitted (MAS
+// 7.1): requests must still go out before the DUT's DeactivateReq (AOU-R34,
+// AOU-R33 in the L3 model), responses to the remote die before DISABLED, and
+// every transaction completes (scoreboard).
 class aou_zero_credit_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_zero_credit_vseq)
 
@@ -200,13 +199,12 @@ class aou_zero_credit_vseq extends aou_link_base_vseq;
 
   task deact_pending(aou_cred_class_e c, int unsigned grant, int unsigned depth0);
     int unsigned dhold = arg_int("deact_hold", 2000);
-    int cm = arg_int("credit_manage", 0);
     deact_done = 1'b0;
     `uvm_info(get_type_name(), $sformatf("DEACTIVATE_START with %s traffic waiting for credit",
                                          aou_cc_name(c)), UVM_LOW)
     fork
       begin
-        deactivate(AOU_T1_BY_APB, 1'b0, cm);
+        deactivate(AOU_T1_BY_APB);
         deact_done = 1'b1;
       end
     join_none

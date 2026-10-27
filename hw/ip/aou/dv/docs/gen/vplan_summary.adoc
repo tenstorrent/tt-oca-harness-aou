@@ -217,14 +217,14 @@
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
-| `aou_link_act_deact_test` | `aou_link_act_deact_test` |  | 1-4 |  | 1.1,1.2,1.6,1.7,2.1,2.2,2.3,2.4,2.8,2.9,3.1,3.2,18.10,19.1,19.2,2.11 | 
+| `aou_link_act_deact_test` | `aou_link_act_deact_test` |  | 1-4 |  | 1.1,1.2,1.6,1.7,2.1,2.2,2.3,2.4,2.9,3.1,3.2,18.10,19.1,19.2,2.11 | 
 | `aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0` | `aou_link_act_deact_test` | `+who=both +order=simul +deact_who=both +busy=0` | 1-2 |  | 1.2,2.1 | 
-| `aou_link_act_deact_test.who-remote.deact_who-remote.credit_manage-1.busy-1` | `aou_link_act_deact_test` | `+who=remote +deact_who=remote +credit_manage=1 +busy=1` | 1-2 |  | 1.1,2.2,2.3,2.9,19.1,19.2,2.13,2.14 | 
-| `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +credit_manage=0 +busy=1` | 1-2 |  | 2.2,2.3,2.8,2.13,2.14 | 
-| `aou_link_act_deact_test.who-both.order-simul.deact_who-both.credit_manage-0.busy-1.fdi_trdy-random.4x512-sp64` | `aou_link_act_deact_test` | `+who=both +order=simul +deact_who=both +credit_manage=0 +busy=1 +fdi_trdy=random` | 1-13 | `4x512-sp64` | 2.2,2.3,2.8,2.13 | 
+| `aou_link_act_deact_test.who-remote.deact_who-remote.busy-1` | `aou_link_act_deact_test` | `+who=remote +deact_who=remote +busy=1` | 1-2 |  | 1.1,2.2,2.3,2.9,19.1,19.2,2.13,2.14 | 
+| `aou_link_act_deact_test.who-apb.deact_who-apb.busy-1` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +busy=1` | 1-2 |  | 2.2,2.3,2.13,2.14 | 
+| `aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-1.fdi_trdy-random.4x512-sp64` | `aou_link_act_deact_test` | `+who=both +order=simul +deact_who=both +busy=1 +fdi_trdy=random` | 1-13 | `4x512-sp64` | 2.2,2.3,2.13 | 
 | `aou_link_force_deact_test` | `aou_link_force_deact_test` |  | 1-2 |  | 2.7 | BUGS/010 (expected_fail.yaml)
 | `aou_act_after_deact_test` | `aou_act_after_deact_test` |  | 1-4 |  | 1.6,6.20 | 
-| `aou_act_after_deact_test.credit_manage-1.busy-1` | `aou_act_after_deact_test` | `+credit_manage=1 +busy=1` | 1-2 |  | 1.6,6.20 | 
+| `aou_act_after_deact_test.busy-1` | `aou_act_after_deact_test` | `+busy=1` | 1-2 |  | 1.6,6.20 | 
 | `aou_credit_return_test.method-grant` | `aou_credit_return_test` | `+method=grant` | 1-2 |  | 3.1,3.3,3.4,3.5,3.6,3.7,3.17 | 
 | `aou_credit_return_test.method-hdr` | `aou_credit_return_test` | `+method=hdr` | 1-2 |  | 3.2,6.17 | 
 | `aou_credit_return_test.method-mixed.ret-withheld` | `aou_credit_return_test` | `+method=mixed +ret=withheld` | 1-2 |  | 3.2,3.14,3.21 | 
@@ -352,9 +352,9 @@
 | `aou_int_test.mode-w1c.pclk_ps-40000` | `aou_int_test` | `+mode=w1c +pclk_ps=40000` | 1 |  | 11.17 | 
 | `aou_int_test.mode-w1c.pclk_ps-600` | `aou_int_test` | `+mode=w1c +pclk_ps=600` | 1 |  | 11.17 | 
 | `aou_int_test.mode-w1c.pclk_ps-1013` | `aou_int_test` | `+mode=w1c +pclk_ps=1013` | 1 |  | 11.17 | 
-| `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-40000` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +credit_manage=0 +busy=1 +pclk_ps=40000` | 1 |  | 11.17 | 
-| `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-600` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +credit_manage=0 +busy=1 +pclk_ps=600` | 1 |  | 11.17 | 
-| `aou_link_act_deact_test.who-apb.deact_who-apb.credit_manage-0.busy-1.pclk_ps-1013` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +credit_manage=0 +busy=1 +pclk_ps=1013` | 1 |  | 11.17 | 
+| `aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-40000` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +busy=1 +pclk_ps=40000` | 1 |  | 11.17 | 
+| `aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-600` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +busy=1 +pclk_ps=600` | 1 |  | 11.17 | 
+| `aou_link_act_deact_test.who-apb.deact_who-apb.busy-1.pclk_ps-1013` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +busy=1 +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_t1_sw_reset_test.pclk_ps-40000` | `aou_t1_sw_reset_test` | `+pclk_ps=40000` | 1 |  | 11.17 | 
 | `aou_t1_sw_reset_test.pclk_ps-600` | `aou_t1_sw_reset_test` | `+pclk_ps=600` | 1 |  | 11.17 | 
 | `aou_t1_sw_reset_test.pclk_ps-1013` | `aou_t1_sw_reset_test` | `+pclk_ps=1013` | 1 |  | 11.17 | 
@@ -573,7 +573,7 @@
 | `aou_l3_dest_rp_test` | `aou_l3_dest_rp_test` |  | 1 |  |  | 
 | `aou_l3_inject_test` | `aou_l3_inject_test` |  | 1 |  |  | 
 | `aou_l3_inject_test.L3_INJECT-req_after_dreq` | `aou_l3_inject_test` | `+L3_INJECT=req_after_dreq` | 1 |  |  | 
-| `aou_l3_inject_test.L3_INJECT-rsp_after_dack` | `aou_l3_inject_test` | `+L3_INJECT=rsp_after_dack` | 1 |  |  | 
+| `aou_l3_inject_test.L3_INJECT-crd_in_disabled` | `aou_l3_inject_test` | `+L3_INJECT=crd_in_disabled` | 1 |  |  | 
 | `aou_l3_link_test` | `aou_l3_link_test` |  | 1 |  |  | 
 | `aou_l3_loopback_test` | `aou_l3_loopback_test` |  | 1 |  |  | 
 | `aou_l3_unit_env_test` | `aou_l3_unit_env_test` |  | 1 |  |  | 

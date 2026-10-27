@@ -13,7 +13,7 @@
 //              reads and writes with long bursts while the DUT's M ports space
 //              every R beat and B by g cycles, just over the DUT's quiet window
 //              (DEACTIVATE_TIME_OUT_VALUE 0: 8 cycles); software sets
-//              DEACTIVATE_START (CREDIT_MANAGE=1) mid-stream, so the
+//              DEACTIVATE_START mid-stream, so the
 //              DeactivateReq leaves in a gap and the next response follows it
 //              within a flit time. g sweeps 9..12 (default 12 loops).
 class aou_act_flit_vseq extends aou_link_base_vseq;
@@ -64,7 +64,7 @@ class aou_act_flit_vseq extends aou_link_base_vseq;
     end
     traffic_nb(AOU_T1_R2L, 12, p);
     wait_cycles(100);
-    deactivate(AOU_T1_BY_APB, 1'b0, 1);
+    deactivate(AOU_T1_BY_APB, 1'b0);
     wait_traffic();
     foreach (cfg.m_sub_cfg[r]) cfg.m_sub_cfg[r].timing.apply(AOU_AXI_TIMING_RANDOM);
     ensure_link();

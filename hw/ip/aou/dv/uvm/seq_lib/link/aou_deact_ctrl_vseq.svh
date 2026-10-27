@@ -4,7 +4,7 @@
 // Deactivation controls in AOU_INIT.
 // +mode=tov (plan 2.12; MAS 7.1 AOU_INIT.DEACTIVATE_TIME_OUT_VALUE): for each
 //   value v in +tov_values (default 0..7, shuffled) the remote die starts a few
-//   reads and software sets DEACTIVATE_START (CREDIT_MANAGE=1) +0..200 cycles
+//   reads and software sets DEACTIVATE_START +0..200 cycles
 //   later, so the DUT's last ReadData lands near the deactivation and its
 //   DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it
 //   (MAS 7.1: the window may already have elapsed when the TX was idle).
@@ -55,7 +55,7 @@ class aou_deact_ctrl_vseq extends aou_link_base_vseq;
                   uvm_reg_data_t'(vals[i]));
       traffic_nb(AOU_T1_R2L, 2, p);
       wait_cycles($urandom_range(200));
-      deactivate(AOU_T1_BY_APB, 1'b0, 1);
+      deactivate(AOU_T1_BY_APB, 1'b0);
       sw_activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
       wait_traffic();
       drain();

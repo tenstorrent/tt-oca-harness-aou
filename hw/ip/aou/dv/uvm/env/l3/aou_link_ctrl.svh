@@ -75,16 +75,19 @@ class aou_link_ctrl extends uvm_object;
     if (state inside {AOU_LS_DISABLED, AOU_LS_ERROR}) return 1'b0;
     open = cfg.send_after_ack_rcvd ? (req_sent && ack_rcvd) :
                                      (state inside {AOU_LS_ENABLED, AOU_LS_DEACTIVATE});
-    if ((cfg.cm0_deact || c inside {AOU_CC_WREQ, AOU_CC_RREQ}) && dreq_sent) return 1'b0;
+    if (c inside {AOU_CC_WREQ, AOU_CC_RREQ} && dreq_sent) return 1'b0;
     return open;
   endfunction
 
-  // Credits may be advertised now (8.4: after our ActivateAck, not after
-  // our DeactivateAck).
+  // Credits may be advertised now: after our ActivateAck (8.4), as the DUT does
+  // (MAS 7.3.1). Request credits stop at our DeactivateAck; response credits
+  // fund the answers to our own open requests and stop at our DeactivateReq,
+  // after which none is open. Later ones could reach a peer already DISABLED:
+  // the final DeactivateAck answers our DeactivateReq, and we learn of DISABLED
+  // only when it arrives.
   function bit can_advertise(bit rsp_class);
     if (state inside {AOU_LS_DISABLED, AOU_LS_ERROR} || !ack_sent) return 1'b0;
-    if (dack_sent) return rsp_class && cfg.resp_credits_after_deact_ack;
-    return 1'b1;
+    return rsp_class ? !dreq_sent : !dack_sent;
   endfunction
 
   // An activation message of ours went out in a flit.

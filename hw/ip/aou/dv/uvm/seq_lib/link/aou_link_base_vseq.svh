@@ -150,11 +150,10 @@ class aou_link_base_vseq extends aou_base_test_seq;
       `uvm_error(get_type_name(), "T1-L05: no INT_ACTIVATE_START after a remote ActivateReq")
   endtask
 
-  task sw_deactivate(aou_t1_who_e who = AOU_T1_BY_RANDOM, bit forced = 1'b0,
-                     int credit_manage = -1);
+  task sw_deactivate(aou_t1_who_e who = AOU_T1_BY_RANDOM, bit forced = 1'b0);
     int unsigned base_cnt = irq_rises("INT_DEACTIVATE_START");
     who = pick_who(who);
-    deactivate(who, forced, credit_manage);
+    deactivate(who, forced);
     if (who == AOU_T1_BY_REMOTE && irq_rises("INT_DEACTIVATE_START") == base_cnt)
       `uvm_error(get_type_name(), "T1-L06: no INT_DEACTIVATE_START after a remote DeactivateReq")
   endtask

@@ -4,12 +4,12 @@
 // Repeated activation and deactivation with traffic in between (port of
 // ucie_axi_fdi_aou_flits_test, extended). Each loop activates from the DUT,
 // the remote die or both (randomized order and gap, simultaneous included),
-// carries traffic, and deactivates from either side under a CREDIT_MANAGE
-// value, either idle or with transactions still in flight (MAS §7.3.6:
-// requests the deactivation caught are answered after a re-activation).
+// carries traffic, and deactivates from either side, either idle or with
+// transactions still in flight (MAS §7.3.6: requests the deactivation caught
+// are answered after a re-activation).
 // The AOU_INIT status bits are read back at every step.
 // Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
-// +deact_who=... +credit_manage=0|1 (-1 random per loop) +busy=0|1 (-1 random)
+// +deact_who=... +busy=0|1 (-1 random)
 // +T1_TXN=<per RP and direction> +force=0|1.
 // +early_act=1 (plan 1.11; MAS 7.3.2): every activation is software's
 // ACTIVATE_START written while the FDI link is down (at power-on, then after
@@ -31,7 +31,6 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
     aou_t1_who_e who = who_of(arg_str("who", "rand"));
     aou_t1_order_e order = order_of(arg_str("order", "rand"));
     aou_t1_who_e deact_who = who_of(arg_str("deact_who", force_dflt ? "apb" : "rand"));
-    int cm_arg = arg_int("credit_manage", -1);
     int busy_arg = arg_int("busy", force_dflt ? 0 : -1);
     bit forced = 1'(arg_int("force", force_dflt));
     bit early = 1'(arg_int("early_act", 0));
@@ -41,22 +40,21 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
     else link_up();
     check_state(1'b0);
     for (int unsigned i = 0; i < loops; i++) begin
-      int cm = (cm_arg >= 0) ? cm_arg : $urandom_range(1);
       bit busy = (busy_arg >= 0) ? 1'(busy_arg) : 1'($urandom_range(1));
-      `uvm_info(get_type_name(), $sformatf("loop %0d/%0d: credit_manage=%0d busy=%0b forced=%0b",
-                                           i + 1, loops, cm, busy, forced), UVM_LOW)
+      `uvm_info(get_type_name(), $sformatf("loop %0d/%0d: busy=%0b forced=%0b",
+                                           i + 1, loops, busy, forced), UVM_LOW)
       if (early) early_activate();
       else sw_activate(who, order);
       check_state(1'b1);
       n_act0 = env.sw_isr.n_act;
       if (busy) begin
-        busy_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced, cm, n);
+        busy_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced, n);
       end else begin
         traffic(AOU_T1_BOTH_DIRS, n);
         drain();
-        sw_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced, cm);
+        sw_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced);
       end
-      redo_if_woken(n_act0, cm);
+      redo_if_woken(n_act0);
       check_state(1'b0);
     end
     // A clean restart after the last deactivation, with credits advertised
@@ -100,22 +98,19 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
       `uvm_error(get_type_name(), "T1-V03: DUT not ENABLED after link-up with ACTIVATE_START set")
   endtask
 
-  // Deactivates with traffic in flight. With CREDIT_MANAGE=0 only the local
-  // side issues: the MAS forbids responses after the DUT's DeactivateReq, so
-  // a remote request caught by it could never complete (BUGS/009).
-  task busy_deactivate(aou_t1_who_e who, bit forced, int cm, int unsigned n);
-    aou_t1_dir_e dir = (cm != 0) ? AOU_T1_BOTH_DIRS : AOU_T1_L2R;
+  // Deactivates with traffic in flight both ways.
+  task busy_deactivate(aou_t1_who_e who, bit forced, int unsigned n);
     int unsigned k = 0;
-    traffic_nb(dir, (n + 1) / 2, aou_t1_traffic_cfg::named("short"));
+    traffic_nb(AOU_T1_BOTH_DIRS, (n + 1) / 2, aou_t1_traffic_cfg::named("short"));
     wait_cycles($urandom_range(400, 20));
-    sw_deactivate(who, forced, cm);
+    sw_deactivate(who, forced);
     while (pending() && k++ < 4) begin
       `uvm_info(get_type_name(), "transactions pending after deactivation: activating again",
                 UVM_LOW)
       sw_activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
       wait_traffic();
       drain();
-      sw_deactivate(AOU_T1_BY_APB, 1'b0, cm);
+      sw_deactivate(AOU_T1_BY_APB, 1'b0);
     end
     if (pending())
       `uvm_error(get_type_name(), "T1-L07: transactions still pending after 4 re-activations")
@@ -126,7 +121,7 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
   // manager to take it. Software (aou_t1_sw_isr) then re-activates, so the DUT can be
   // ENABLED again by the time the test reads AOU_INIT. When that happened, let the
   // service finish and deactivate once more before checking the DISABLED state.
-  task redo_if_woken(int unsigned n_act0, int cm);
+  task redo_if_woken(int unsigned n_act0);
     int unsigned k = 0;
     wait_cycles(8);   // the interrupt rises with DISABLED; let the ISR see it
     while (env.sw_isr.n_act != n_act0 && k++ < 4) begin
@@ -134,7 +129,7 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
       `uvm_info(get_type_name(), "INT_ACTIVATE_START after the deactivation: deactivating again",
                 UVM_LOW)
       env.sw_isr.wait_idle();
-      if (!env.status.disabled) sw_deactivate(AOU_T1_BY_APB, 1'b0, cm);
+      if (!env.status.disabled) sw_deactivate(AOU_T1_BY_APB, 1'b0);
     end
   endtask
 
