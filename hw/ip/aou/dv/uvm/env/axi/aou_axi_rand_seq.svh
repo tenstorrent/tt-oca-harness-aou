@@ -172,10 +172,10 @@ class aou_axi_rand_seq extends aou_axi_base_seq;
       endcase
       lmax = lmin;
     end
-    if (b == AOU_AXI_FIXED && lmax > 15) lmax = 15;
-    if (lmax > max_len) lmax = max_len;
     if (b != AOU_AXI_WRAP && lmin < min_len) lmin = min_len;
     if (lmax < lmin) lmax = lmin;
+    // A FIXED burst is at most 16 beats (AXI4 A3.4.1), whatever min_len asks.
+    if (b == AOU_AXI_FIXED && lmax > 15) lmax = 15;
     if (lmax > max_len) lmax = max_len;
     if (lmin > lmax) lmin = lmax;
     full_size = ($urandom_range(1) == 1);
