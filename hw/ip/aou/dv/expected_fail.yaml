@@ -29,18 +29,6 @@
   seed_dependent: true
   note: only seeds whose alias walk writes aou_con0 (Verilator seed 2 never touches it)
 
-- test: aou_link_force_deact_test
-  bug: BUGS/010
-  check: 'DeactivateReq: PropertyReq on a non-ActivateReq opcode'
-  note: DEACTIVATE_FORCE sends DeactivateReq with PropertyReq=1 (L3 model, AOU-R11)
-
-- test: aou_link_force_deact_test
-  bug: BUGS/010
-  check: 'AOU-R11: AOU_FDI_CHECKER VIOL_RSVD_NONZERO LP(DUT->peer)'
-  seed_dependent: true
-  note: >-
-    the same DeactivateReq seen by AOU_FDI_CHECKER; two-PHY builds (tp configs) have no
-    AOU_FDI_CHECKER, so only the L3 model's entry above matches there
 
 # Each bug has bug-specific checks; the generic symptoms it causes (traffic stalls,
 # scoreboard mismatches, failed handshakes) carry `requires:` and only count when

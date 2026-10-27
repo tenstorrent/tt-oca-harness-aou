@@ -222,7 +222,7 @@
 | `aou_link_act_deact_test.who-remote.deact_who-remote.busy-1` | `aou_link_act_deact_test` | `+who=remote +deact_who=remote +busy=1` | 1-2 |  | 1.1,2.2,2.3,2.9,19.1,19.2,2.13,2.14 | 
 | `aou_link_act_deact_test.who-apb.deact_who-apb.busy-1` | `aou_link_act_deact_test` | `+who=apb +deact_who=apb +busy=1` | 1-2 |  | 2.2,2.3,2.13,2.14 | 
 | `aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-1.fdi_trdy-random.4x512-sp64` | `aou_link_act_deact_test` | `+who=both +order=simul +deact_who=both +busy=1 +fdi_trdy=random` | 1-13 | `4x512-sp64` | 2.2,2.3,2.13 | 
-| `aou_link_force_deact_test` | `aou_link_force_deact_test` |  | 1-2 |  | 2.7 | BUGS/010 (expected_fail.yaml)
+| `aou_link_force_deact_test` | `aou_link_force_deact_test` |  | 1-4 |  | 2.7 | 
 | `aou_act_after_deact_test` | `aou_act_after_deact_test` |  | 1-4 |  | 1.6,6.20 | 
 | `aou_act_after_deact_test.busy-1` | `aou_act_after_deact_test` | `+busy=1` | 1-2 |  | 1.6,6.20 | 
 | `aou_credit_return_test.method-grant` | `aou_credit_return_test` | `+method=grant` | 1-2 |  | 3.1,3.3,3.4,3.5,3.6,3.7,3.17 | 

@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Forced deactivation through DEACTIVATE_FORCE (aou_link_force_deact_vseq).
+// Forced deactivation through DEACTIVATE_FORCE, each ended by a software reset
+// (aou_link_force_deact_vseq).
 class aou_link_force_deact_test extends aou_base_test;
   `uvm_component_utils(aou_link_force_deact_test)
 

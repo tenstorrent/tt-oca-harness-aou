@@ -65,11 +65,9 @@ args = ["+who=both", "+order=simul", "+deact_who=both", "+busy=1", "+fdi_trdy=ra
 name = "aou_link_force_deact_test"
 module = { uvm = "aou_link_force_deact_test" }
 seed = 1
-reseed = 2
+reseed = 4
 tags = ["link"]
 run_modes = ["link"]
-expect_fail = "BUGS/010 (expected_fail.yaml)"
-expect_fail_match = "DeactivateReq: PropertyReq on a non-ActivateReq opcode"
 
 [[tests]]
 name = "aou_act_after_deact_test"

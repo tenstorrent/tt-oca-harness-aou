@@ -32,7 +32,7 @@
 | 2.4 | Complete deactivate then re-activate; verify clean restart and credit re-initialization | P1 | merged into 1.6
 | 2.5 | Deactivate when TX queue has pending messages due to no credits | P2 | `aou_zero_credit_test.credit-rdata.deact-1`, `aou_zero_credit_test.credit-rreq.deact-1`, `aou_zero_credit_test.credit-wdata.deact-1`, `aou_zero_credit_test.credit-wreq.deact-1`, `aou_zero_credit_test.credit-wresp.deact-1`, `aou_zero_credit_test.credit-wresp.deact-1.grant-2`
 | 2.6 | Verify behavior when DeactivateAck not received within timeout; verify `deact_ack_err` | P2 | `aou_linkreset_timeout_test.src-deact_ack`
-| 2.7 | Test `deactivate_force` CSR field; verify immediate deactivation | P2 | `aou_link_force_deact_test` (expected failure only)
+| 2.7 | Test `deactivate_force` CSR field; verify immediate deactivation | P2 | `aou_link_force_deact_test`
 | 2.8 | Test AoU v0.5 mode where req/resp credits managed together during deactivation | P1 | dropped: AOU_CON0.CREDIT_MANAGE is removed; AOU_CORE always manages request and response credits separately (AoU v0.8 8.4, MAS 7.3.1), so there is no combined mode to test.
 | 2.9 | Request and response credits managed separately during deactivation (AoU v0.8 8.4); responses and response credits continue after DeactivateReq | P1 | `aou_link_act_deact_test`, `aou_link_act_deact_test.who-remote.deact_who-remote.busy-1`
 | 2.10 | Verify `int_deactivate_property` status bit during deactivation | P2 | `aou_deact_ctrl_test.mode-property`

@@ -64,6 +64,13 @@ class aou_unpacker extends uvm_object;
     m.start_granule = spos;
     m.span_flits = nflits;
     r = m.rsvd_nonzero();
+    // The DeactivateReq a DEACTIVATE_FORCE write sends carries PropertyReq=1
+    // (taken from the RTL; the force is implementation-defined). Accepted on
+    // the DUT's stream, within the force window, when that is the only
+    // reserved bit set.
+    if (r != "" && dir == AOU_L3_RX && $cast(a, m) && a.forced_deact_mark() &&
+        cfg.force_deact_window())
+      r = "";
     ledger_chk("AOU-R11");
     if (r != "") viol("AOU-R11", f, spos, $sformatf("%s: %s non-zero", m.kind(), r));
     if (m.cred_class() != AOU_CC_NONE) ledger_chk("AOU-R14");

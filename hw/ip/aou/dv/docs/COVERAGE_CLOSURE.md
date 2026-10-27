@@ -199,7 +199,7 @@ with no new run.
   fix is in WP1.
 - **xfail-only (16):**
   - 1.3, 1.8, 1.9 (BUGS/019/013/020/023)
-  - 2.7 (BUGS/010)
+  - 2.7 (forced deactivation; the test was reworked to accept the forced DeactivateReq)
   - 9.5 (a remote RX credit overrun: illegal peer stimulus, test since removed)
   - 9.9, 9.10, 19.8 (a response that answers no request: illegal stimulus, detection-only checks since PR #117)
   - 12.13 (an asymmetric DEST_RP: illegal configuration, test since removed)
@@ -574,7 +574,6 @@ The full gap tables were kept with the review notes; this section summarises the
 
 **Wait for a fix or a spec answer:**
 - 1.3, 1.8, 1.9 (BUGS/019; fix verified on `bugfix/BUGS-019-activation-linkreset-hold`)
-- 2.7 (BUGS/010)
 
 **Drop candidates (owner decision, via `test_plan_corrections.yaml`):**
 - 9.8: the RTL has no RX incomplete-flit timeout, and FDI completes or cancels flits.

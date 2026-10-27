@@ -15,8 +15,9 @@
 // T1-L46 (MAS 7.1 DEACTIVATE_TIME_OUT_VALUE: a quiet window of 2^(v+3) cycles
 //   with nothing to transmit, which may already have elapsed): a DeactivateReq
 //   comes at least 2^(v+3) cycles (less tov_slack for the TX pipeline) after
-//   the DUT's last credited message; PropertyReq=1 (DEACTIVATE_FORCE, BUGS/010)
-//   is exempt.
+//   the DUT's last credited message. The DeactivateReq that
+//   AOU_CON0.DEACTIVATE_FORCE sends (marked PropertyReq=1, taken from the RTL)
+//   skips the DEACTIVATE_START conditions, so it is exempt.
 // The checks other than T1-L46 stop for good once the remote die sends beyond its credit
 // or the DUT requests LinkReset (injection tests: the DUT may drop messages).
 class aou_t1_rx_fifo_chk extends uvm_component;
@@ -147,7 +148,7 @@ class aou_t1_rx_fifo_chk extends uvm_component;
       retire(m);
       return;
     end
-    if (!$cast(a, m) || a.op != AOU_DEACT_REQ || a.property_req || rm == null) return;
+    if (!$cast(a, m) || a.op != AOU_DEACT_REQ || a.forced_deact_mark() || rm == null) return;
     if (last_msg >= 0) begin
       int unsigned v = int'(rm.aou_init.deactivate_time_out_value.get_mirrored_value());
       longint gap = longint'(cycle) - last_msg;

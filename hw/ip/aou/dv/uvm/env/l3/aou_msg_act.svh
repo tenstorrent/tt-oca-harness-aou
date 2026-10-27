@@ -72,6 +72,16 @@ class aou_msg_act extends aou_msg;
     return "";
   endfunction
 
+  // A DeactivateReq whose only non-zero reserved bit is v0.7's PropertyReq
+  // position (v0.8 makes it the top RsvdZero bit). Taken from the RTL: the DUT
+  // marks the DeactivateReq that AOU_CON0.DEACTIVATE_FORCE sends this way and
+  // no other (MAS software-operation 7.1).
+  function bit forced_deact_mark();
+    if (op != AOU_DEACT_REQ) return 1'b0;
+    if (spec_rev == AOU_SPEC_V08) return rsvd == 29'h1000_0000;
+    return property_req && rsvd == 0;
+  endfunction
+
   // Basic Profile: every ProfileID/Rev/Opt is zero (v0.8 11.1).
   function bit profile_nonzero();
     if (!v08_req()) return 1'b0;

@@ -35,8 +35,16 @@ class aou_l3_cfg extends uvm_object;
   // requests still unanswered; they are answered after the next activation
   // (MAS 7.3.4: a request crossing the partner's DeactivateReq).
   bit                deact_own_open;
-  // PropertyReq of our DeactivateReq (BUGS/010: DEACTIVATE_FORCE on the wire).
+  // PropertyReq of our DeactivateReq. The bench keeps it 0: v0.8 reserves the
+  // bit and defines no reaction to it.
   bit                deact_prop;
+  // AOU_CON0.DEACTIVATE_FORCE (implementation-defined, MAS software-operation
+  // 7.1): when software last started writing it while the DUT could deactivate
+  // (aou_t1_force_deact_chk sets it; -1: never), and how long after that the
+  // DUT's DeactivateReq may follow. Within that window, and only there, a DUT
+  // DeactivateReq may carry the PropertyReq mark the RTL gives a forced one.
+  realtime           force_deact_t = -1;
+  realtime           force_deact_win = 0;
 
   // Link controller.
   bit                auto_activate = 1'b1;   // answer a peer ActivateReq with our own
@@ -99,6 +107,11 @@ class aou_l3_cfg extends uvm_object;
 
   function int unsigned peer_count();
     return (peer_rp_count == 0) ? rp_count : peer_rp_count;
+  endfunction
+
+  // A DUT DeactivateReq seen now may carry the forced-deactivation mark.
+  function bit force_deact_window();
+    return force_deact_t >= 0 && $realtime - force_deact_t <= force_deact_win;
   endfunction
 
   // RPs both dies have: the only ones AXI messages may use (MAS 3.10.1).

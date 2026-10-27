@@ -9,7 +9,7 @@
 //   DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it
 //   (MAS 7.1: the window may already have elapsed when the TX was idle).
 //   aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46).
-// +mode=property (plan 2.10; BUGS/010, which covers the bit too): the remote
+// +mode=property (plan 2.10; MAS 7.1 AOU_INIT.INT_DEACTIVATE_PROPERTY): the remote
 //   die deactivates with PropertyReq 0, the only value it may send (the bit is
 //   reserved on DeactivateReq in v0.7 and RsvdZero in v0.8, which defines no
 //   reaction to a set bit). Software holds off DEACTIVATE_START, so the DUT

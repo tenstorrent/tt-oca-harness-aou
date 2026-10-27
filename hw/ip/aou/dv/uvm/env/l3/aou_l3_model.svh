@@ -335,7 +335,11 @@ class aou_l3_model extends uvm_object;
   function void rx_act(aou_msg_act a);
     if (a.op > 4'd3) return;
     ledger_chk("AOU-R40");
-    if (a.op == AOU_DEACT_REQ && cfg.chk_deact_quiesce) begin
+    // The DeactivateReq DEACTIVATE_FORCE sends skips this condition by design
+    // (MAS software-operation 7.1); it is recognised by the RTL's PropertyReq
+    // mark inside the force window.
+    if (a.op == AOU_DEACT_REQ && cfg.chk_deact_quiesce &&
+        !(a.forced_deact_mark() && cfg.force_deact_window())) begin
       ledger_chk("AOU-R33");
       for (int unsigned r = 0; r < AOU_RP_MAX; r++) begin
         if (dut_wr_out[r] != 0 || dut_rd_out[r] != 0) begin

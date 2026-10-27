@@ -10,7 +10,8 @@
 // The AOU_INIT status bits are read back at every step.
 // Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 // +deact_who=... +busy=0|1 (-1 random)
-// +T1_TXN=<per RP and direction> +force=0|1.
+// +T1_TXN=<per RP and direction>. Forced deactivation (DEACTIVATE_FORCE) has its
+// own test, aou_link_force_deact_vseq.
 // +early_act=1 (plan 1.11; MAS 7.3.2): every activation is software's
 // ACTIVATE_START written while the FDI link is down (at power-on, then after
 // an Adapter LinkReset). The register reads back 1 with the DUT still DISABLED
@@ -20,8 +21,6 @@
 class aou_link_act_deact_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_link_act_deact_vseq)
 
-  bit force_dflt;
-
   function new(string name = "aou_link_act_deact_vseq");
     super.new(name);
   endfunction
@@ -30,9 +29,8 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
     int unsigned loops = arg_range("loops", 3, 6);
     aou_t1_who_e who = who_of(arg_str("who", "rand"));
     aou_t1_order_e order = order_of(arg_str("order", "rand"));
-    aou_t1_who_e deact_who = who_of(arg_str("deact_who", force_dflt ? "apb" : "rand"));
-    int busy_arg = arg_int("busy", force_dflt ? 0 : -1);
-    bit forced = 1'(arg_int("force", force_dflt));
+    aou_t1_who_e deact_who = who_of(arg_str("deact_who", "rand"));
+    int busy_arg = arg_int("busy", -1);
     bit early = 1'(arg_int("early_act", 0));
     int unsigned n = num_txns;
     int unsigned n_act0;
@@ -41,18 +39,18 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
     check_state(1'b0);
     for (int unsigned i = 0; i < loops; i++) begin
       bit busy = (busy_arg >= 0) ? 1'(busy_arg) : 1'($urandom_range(1));
-      `uvm_info(get_type_name(), $sformatf("loop %0d/%0d: busy=%0b forced=%0b",
-                                           i + 1, loops, busy, forced), UVM_LOW)
+      `uvm_info(get_type_name(), $sformatf("loop %0d/%0d: busy=%0b", i + 1, loops, busy),
+                UVM_LOW)
       if (early) early_activate();
       else sw_activate(who, order);
       check_state(1'b1);
       n_act0 = env.sw_isr.n_act;
       if (busy) begin
-        busy_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced, n);
+        busy_deactivate(deact_who, n);
       end else begin
         traffic(AOU_T1_BOTH_DIRS, n);
         drain();
-        sw_deactivate(forced ? AOU_T1_BY_APB : deact_who, forced);
+        sw_deactivate(deact_who);
       end
       redo_if_woken(n_act0);
       check_state(1'b0);
@@ -99,11 +97,11 @@ class aou_link_act_deact_vseq extends aou_link_base_vseq;
   endtask
 
   // Deactivates with traffic in flight both ways.
-  task busy_deactivate(aou_t1_who_e who, bit forced, int unsigned n);
+  task busy_deactivate(aou_t1_who_e who, int unsigned n);
     int unsigned k = 0;
     traffic_nb(AOU_T1_BOTH_DIRS, (n + 1) / 2, aou_t1_traffic_cfg::named("short"));
     wait_cycles($urandom_range(400, 20));
-    sw_deactivate(who, forced);
+    sw_deactivate(who);
     while (pending() && k++ < 4) begin
       `uvm_info(get_type_name(), "transactions pending after deactivation: activating again",
                 UVM_LOW)

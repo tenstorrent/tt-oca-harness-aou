@@ -1857,7 +1857,12 @@ Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 
 ----
 +deact_who=... +busy=0|1 (-1 random)
-+T1_TXN=<per RP and direction> +force=0|1.
++T1_TXN=<per RP and direction>. Forced deactivation (DEACTIVATE_FORCE) has its
+----
+
+own test, aou_link_force_deact_vseq.
+
+----
 +early_act=1 (plan 1.11; MAS 7.3.2): every activation is software's
 ----
 
@@ -1913,13 +1918,30 @@ keeps the Adapter from bringing the link up after reset.
 ===== 39. `aou_link_force_deact_test`
 Class `aou_link_force_deact_test` extends `aou_base_test` (`uvm/tests/link/aou_link_force_deact_test.svh`).
 
-*Purpose.* Forced deactivation through DEACTIVATE_FORCE (aou_link_force_deact_vseq).
+*Purpose.* Forced deactivation through DEACTIVATE_FORCE, each ended by a software reset
+(aou_link_force_deact_vseq).
 
 *Procedure.* Virtual sequence `aou_link_force_deact_vseq` (`uvm/seq_lib/link/aou_link_force_deact_vseq.svh`):
 
-aou_link_act_deact_vseq with every deactivation forced through
-AOU_CON0.DEACTIVATE_FORCE (plan 2.7). The DUT then sends DeactivateReq
-with PropertyReq=1, which the spec does not allow (BUGS/010).
+Forced deactivation through AOU_CON0.DEACTIVATE_FORCE (plan 2.7; MAS
+software-operation 7.1). The force is an implementation-defined escape hatch
+for a deactivation that is not completing: nothing is promised after it and
+software resets the device. Each loop activates, carries traffic (drained,
+or with +busy=1 still in flight), writes DEACTIVATE_FORCE and waits for the
+DUT's DeactivateReq, which aou_t1_force_deact_chk times against the write
+(T1-L52). The remote die does not answer it, as when the deactivation is not
+completing, so the two dies exchange nothing after the force. The loop then
+ends with the reset software would apply (sw_reset(): the Adapter's
+LinkReset, AOU_SW_RESET, the link back up) instead of checking anything the
+DUT does after the force. After the last loop both dies activate again and
+traffic must pass.
+Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
+
+----
++busy=0|1 (default -1: random per loop) +T1_TXN=<per RP and direction>.
+----
+
+*Rules named.* `T1-L52`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -1928,7 +1950,7 @@ with PropertyReq=1, which the spec does not allow (BUGS/010).
 [cols="3,2,1,1,3",options="header"]
 |===
 | Scenario | Arguments | Seeds | Target | Plan items
-| `aou_link_force_deact_test` |  | 1-2 |  | 2.7
+| `aou_link_force_deact_test` |  | 1-4 |  | 2.7
 |===
 
 *Plan items.*
@@ -2243,7 +2265,7 @@ DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it
 aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46).
 
 ----
-+mode=property (plan 2.10; BUGS/010, which covers the bit too): the remote
++mode=property (plan 2.10; MAS 7.1 AOU_INIT.INT_DEACTIVATE_PROPERTY): the remote
 ----
 
 die deactivates with PropertyReq 0, the only value it may send (the bit is
