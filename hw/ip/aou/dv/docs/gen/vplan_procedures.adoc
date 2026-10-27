@@ -2034,13 +2034,12 @@ Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 ===== 41. `aou_act_after_deact_test`
 Class `aou_act_after_deact_test` extends `aou_base_test` (`uvm/tests/link/aou_act_after_deact_test.svh`).
 
-*Purpose.* ACTIVATE_START swept across the end of a deactivation (aou_act_after_deact_vseq,
-BUGS/020).
+*Purpose.* ACTIVATE_START swept across the end of a deactivation (aou_act_after_deact_vseq).
 
 *Procedure.* Virtual sequence `aou_act_after_deact_vseq` (`uvm/seq_lib/link/aou_act_after_deact_vseq.svh`):
 
-Software starts activation again just as a deactivation completes
-(BUGS/020). The DUT starts the deactivation; the remote die acknowledges
+Software starts activation again just as a deactivation completes.
+The DUT starts the deactivation; the remote die acknowledges
 at once but holds its own DeactivateReq until the test releases it, as a
 remote die still finishing its own requests would (AoU 8.4). The DUT's
 DeactivateAck to that request is then its last message before DISABLED,
@@ -2049,7 +2048,7 @@ DUT's DISABLED, so the DUT's ActivateReq moves across the flit that carries
 the DeactivateAck and the flits after it. A write that lands before
 DISABLED is held by the DUT until DISABLED: the MAS allows ACTIVATE_START
 before link-up (7.3.2) and activation right after DISABLED (7.3.6) but says
-nothing about DEACTIVATE (noted in BUGS/020). The placement of the
+nothing about DEACTIVATE. The placement of the
 Activation messages (one per flit, at G0, AoU 4.4; with +v0p9draft only the
 permitted company beside it) is judged by AOU-R6 in the L3 unpacker and
 AOU_FDI_CHECKER.

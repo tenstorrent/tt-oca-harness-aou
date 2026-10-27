@@ -198,7 +198,7 @@ with no new run.
   numbers above come from a copy of the script that ignores the plusarg. The
   fix is in WP1.
 - **xfail-only (16):**
-  - 1.3, 1.8, 1.9 (BUGS/019/013/020/023)
+  - 1.3, 1.8, 1.9 (activation after a LinkReset, fixed by PR #126; invalid activation messages, BUGS/013)
   - 2.7 (forced deactivation; the test was reworked to accept the forced DeactivateReq)
   - 9.5 (a remote RX credit overrun: illegal peer stimulus, test since removed)
   - 9.9, 9.10, 19.8 (a response that answers no request: illegal stimulus, detection-only checks since PR #117)
@@ -291,7 +291,7 @@ structural.
 There are five FSMs in the database. Every state is visited, and URG scores transitions only.
 The 24 holes split as follows:
 - **14 need stimulus**;
-- **1 is behind BUGS/019**;
+- **1 waited for the activation fix after a LinkReset (PR #126)**;
 - **9 are reachable only through an asynchronous reset mid-state**.
 
 **AOU_FDI_BRINGUP_CTRL `r_cur_st`: 17/35** (`RTL/AOU_FDI_BRINGUP_CTRL.sv:155-330`, 12 one-hot states)
@@ -325,10 +325,10 @@ Other holes in the same module:
 extensions: event-at-state injection, `wake_ack` delay, and LP-initiated L1 exit. Expected yield:
 bringup FSM 17→31/35 and **global FSM 34→48/58**.
 
-**AOU_ACTIVATION_CTRL: 5/6.** ACTIVATE→DISABLED is missing. It is class **b** (BUGS/019).
+**AOU_ACTIVATION_CTRL: 5/6.** ACTIVATE→DISABLED is missing. It was class **b** until PR #126 fixed the activation FSM after a LinkReset.
 - Variant: `aou_invalid_actmsg_test +state=activate +op=deact_req`, ending right after the
   LinkReset interrupt and `activate_state_disabled` are checked, then `hard_reset()` instead of
-  re-activating. BUGS/019 and 020 only show after the LinkReset.
+  re-activating. The activation bugs PR #126 fixed only showed after the LinkReset.
 - An ActivateAck timeout run built the same way also reaches it.
 
 **AOU_AGGREGATOR: 3/4 on 1x512, 0/4 elsewhere.**
@@ -360,7 +360,7 @@ The filter option name still needs confirming on X-2025.06. The choice is decisi
 | Bug | Code held back | Variant now? |
 |---|---|---|
 | Register model: AXI_SPLIT_TR_EN (the reserved enable bit and AOU_SW_RESET were fixed by PR #118 and PR #113) | SFR: ~35 lines, ~80 cond, ~45 branches, ~1.5k toggle bits per config | **Yes.** `+reg_skip_known_bugs`: `NO_CHECK`/`NO_REG_BIT_BASH_TEST` on `aou_con0.axi_split_tr_en`, run as extra PASS entries. Keep the strict XFAIL entries. |
-| Activation messages out of step (BUGS/019, 013) | ACTIVATION FSM 1, ~10 lines, ~15 cond | **Yes:** check, then hard reset. |
+| Activation messages out of step (PR #126; BUGS/013) | ACTIVATION FSM 1, ~10 lines, ~15 cond | **Yes:** check, then hard reset. |
 | A response that answers no request | SFR error-info set/info registers (24 lines), CORE_RP and AXIMUX mismatch muxes, SLV_AXI_INFO R path | **Done.** The stimulus is illegal AXI and MAS 7.2.2 defines only the detection, so the test checks the detection and, where the DUT holds the stray response, ends with a hard reset (`+detect_only=1`, decision D8). |
 | 1024-to-256-bit downsizer (tenstorrent/tt-oca-harness-aou#90, fixed by PR #89) | dn_1024_256, its RDATA_ORDER, AXI4MUX_3X1_256 CH2: ~6 lines, ~120 cond, ~37 branches and ~60k toggle bits per config | **Not needed now.** The aligned `aou_dw_test +remote_bytes=128 +dp_align=aligned` entries on `4xmix4211-sp128` (RP2/RP3) and `4xmix2144-sp64` (RP1) were added as the variant (WP10); with the fix every `aou_dw_test` run counts. |
 | Debug window through a narrow RP (fixed by PR #111) | ERROR_INFO debug FIFO on 4xmix and 1x256 | **Not needed now:** `err_resp` passes there. |
@@ -575,7 +575,7 @@ The full gap tables were kept with the review notes; this section summarises the
 - 9.9, 9.10, 19.8: done, with the `+detect_only` entries (decision D8).
 
 **Wait for a fix or a spec answer:**
-- 1.3, 1.8, 1.9 (BUGS/019; fix verified on `bugfix/BUGS-019-activation-linkreset-hold`)
+- 1.3, 1.8, 1.9: the fix merged as PR #126; rerun them and close the items.
 
 **Drop candidates (owner decision, via `test_plan_corrections.yaml`):**
 - 9.8: the RTL has no RX incomplete-flit timeout, and FDI completes or cancels flits.

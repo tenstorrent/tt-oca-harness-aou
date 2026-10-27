@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Software starts activation again just as a deactivation completes
-// (BUGS/020). The DUT starts the deactivation; the remote die acknowledges
+// Software starts activation again just as a deactivation completes.
+// The DUT starts the deactivation; the remote die acknowledges
 // at once but holds its own DeactivateReq until the test releases it, as a
 // remote die still finishing its own requests would (AoU 8.4). The DUT's
 // DeactivateAck to that request is then its last message before DISABLED,
@@ -11,7 +11,7 @@
 // the DeactivateAck and the flits after it. A write that lands before
 // DISABLED is held by the DUT until DISABLED: the MAS allows ACTIVATE_START
 // before link-up (7.3.2) and activation right after DISABLED (7.3.6) but says
-// nothing about DEACTIVATE (noted in BUGS/020). The placement of the
+// nothing about DEACTIVATE. The placement of the
 // Activation messages (one per flit, at G0, AoU 4.4; with +v0p9draft only the
 // permitted company beside it) is judged by AOU-R6 in the L3 unpacker and
 // AOU_FDI_CHECKER.
