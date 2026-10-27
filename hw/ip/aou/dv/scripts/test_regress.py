@@ -200,6 +200,16 @@ class Regress(unittest.TestCase):
                 rows += list(csv.DictReader(fh))
         self.assertEqual(len(rows), len(planned("t1", "testlists/all.toml", "smoke")))
 
+    def test_rebuild_failure_on_reused_rid(self):
+        # Results from an earlier build under the same RID must not hide a failed rebuild.
+        items = ("--items", "smoke", "--benches", "t1")
+        p = self.regress("--sim", "vcs", "--rid", "f1", *items)
+        self.assertEqual(p.returncode, 0, p.stdout + p.stderr)
+        p = self.regress("--sim", "vcs", "--rid", "f1", *items, FAKE_BUILD_FAIL="vcs-t1-1x512-sp64")
+        self.assertEqual(p.returncode, 1, p.stdout + p.stderr)
+        self.assertIn("vcs-t1-1x512-sp64: build failed", p.stdout)
+        self.assertIn("Result: FAIL", p.stdout)
+
     def test_bad_options(self):
         self.assertNotEqual(self.regress("--rid", "a b", "--dry-run").returncode, 0)
         self.assertNotEqual(self.regress("--cov-mem", "16000", "--dry-run").returncode, 0)

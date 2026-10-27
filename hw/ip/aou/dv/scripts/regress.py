@@ -493,8 +493,10 @@ def summary(args, units, notes, state, regdir):
         sec = dict.fromkeys(total, 0)
         for u in us:
             rows = read_rows(args.out_root, u.build, args.rid)
-            if not rows:
-                rc = state.get("builds", {}).get(u.build)
+            rc = state.get("builds", {}).get(u.build)
+            if not rows or rc not in (None, 0):
+                # A failed rebuild's runs were skipped: results already under this RID are
+                # from the build before it, so they don't count.
                 why = (f"build failed (rc={rc}, {os.path.join(regdir, 'logs', 'build-' + u.label + '.log')})"
                        if rc not in (None, 0) else
                        f"no results for rid {args.rid} (see {os.path.join(regdir, 'logs', 'run-' + u.label + '.log')})")
