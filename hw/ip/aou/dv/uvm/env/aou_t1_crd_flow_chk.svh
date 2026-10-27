@@ -72,13 +72,17 @@
 //          correct, not fast, so those cycles do not count. This also covers a
 //          remote request the DUT splits into several M-port bursts: between
 //          pieces no M-port transaction of the ID is open, so its response
-//          looks owed while the next piece's AW or AR waits for READY. Any
-//          other cycle pauses the wait; a message of class c the DUT sends on
+//          looks owed while the next piece's AW or AR waits for READY. The
+//          same holds while an M-port ID mismatch is reported and not cleared:
+//          the DUT then holds all credited traffic on purpose (PR #26, see
+//          aou_t1_crd_block_chk). Any other cycle pauses the wait; a message of class c the DUT sends on
 //          x's wire RP, a reset, DISABLED or a new activation restarts it.
 //          A wait that reaches
 //          starve_cycles (env cfg crd_starve_cycles) is reported once. The wait
 //          covers sharing the TX with the other RPs and classes; the bound
 //          catches an RP that is passed over, not slow service.
+typedef class aou_t1_crd_block_chk;
+
 class aou_t1_crd_flow_chk extends uvm_component;
   `uvm_component_utils(aou_t1_crd_flow_chk)
 
@@ -91,6 +95,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
   aou_axi_vif_t   m_vif[];
   virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
   virtual aou_fdi_lsm_if lsm_vif;
+  aou_t1_crd_block_chk blk;   // the ID-mismatch hold; null: none
   bit             enable = 1'b1;
   int unsigned    block_cycles = 256;
   int unsigned    idle_cycles = 4096;
@@ -542,7 +547,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
     bit    st[AOU_RP_MAX];
     string why[AOU_RP_MAX];
     bit    any_st = 1'b0;
-    bit    held = held_back();
+    bit    held = held_back() || (blk != null && blk.blocked());
     for (int unsigned x = 0; x < cfg.n_rp; x++) begin
       st[x] = starved(x, why[x]);
       if (st[x]) any_st = 1'b1;

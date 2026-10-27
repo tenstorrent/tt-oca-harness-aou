@@ -194,6 +194,7 @@ class aou_t1_env extends uvm_env;
     l3.ap_rx_msg.connect(crd_blk.rx_msg_imp);
     apb.mon.ap.connect(crd_blk.apb_imp);
     crd_blk.rm = regs.model;
+    crd_chk.blk = crd_blk;
     l3.ap_rx_msg.connect(wr_order.rx_msg_imp);
     wr_order.model = l3.model;
     // After l3's own subscription, so the model has taken the header's credit.

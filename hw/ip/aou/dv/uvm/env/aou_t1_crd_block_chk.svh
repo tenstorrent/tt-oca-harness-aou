@@ -11,7 +11,9 @@
 // The checker knows the error is set from what software can see: the
 // INT_MI0_ID_MISMATCH pin rising, or an APB read of ERROR_INFO_RPn returning a
 // mismatch bit set. A write of 1 to the bit (the clear) ends it; a reset ends
-// everything. Messages already on their way when the block began may still
+// everything. The pin is the OR of every RP's errors, so if it is still high
+// rearm_cycles after a clear, another RP's error remains and the hold resumes.
+// With the interrupt masked the pin stays low and only a read reveals the error. Messages already on their way when the block began may still
 // leave: up to slack_granules of credited messages (a few flits of TX
 // pipeline) after the block is known, nothing after that.
 `uvm_analysis_imp_decl(_apb)
@@ -27,6 +29,8 @@ class aou_t1_crd_block_chk extends uvm_component;
   virtual aou_irq_if vif;
   bit                enable = 1'b1;
   int unsigned       slack_granules = 240;
+  // Core cycles for a clear to reach the pin: the APB crossing, with margin.
+  int unsigned       rearm_cycles = 256;
 
   // Per RP, the mismatch bits software has seen set (bit 0 BID, bit 1 RID).
   protected bit [1:0]    seen[AOU_RP_MAX];
@@ -36,6 +40,7 @@ class aou_t1_crd_block_chk extends uvm_component;
   protected bit          in_force;
   protected int unsigned since;     // granules of credited messages since the block began
   protected bit          reported;
+  protected int unsigned rearm_wait;  // cycles until a still-high pin re-arms the hold
   protected uvm_reg      err_reg[AOU_RP_MAX];
   protected uvm_reg_field f_bid[AOU_RP_MAX];
   protected uvm_reg_field f_rid[AOU_RP_MAX];
@@ -72,6 +77,7 @@ class aou_t1_crd_block_chk extends uvm_component;
     foreach (seen[r]) seen[r] = '0;
     pin_set = 1'b0;
     pin_prev = 1'b0;
+    rearm_wait = 0;
     update();
   endfunction
 
@@ -88,6 +94,11 @@ class aou_t1_crd_block_chk extends uvm_component;
     in_force = now;
   endfunction
 
+  // The DUT is holding credited traffic because of a reported mismatch.
+  function bit blocked();
+    return enable && in_force;
+  endfunction
+
   protected function bit bit_of(uvm_reg_field f, bit [31:0] d);
     return f != null && d[f.get_lsb_pos()];
   endfunction
@@ -100,7 +111,10 @@ class aou_t1_crd_block_chk extends uvm_component;
         // Write 1 clears: the block ends with it.
         if (bit_of(f_bid[r], it.data)) seen[r][0] = 1'b0;
         if (bit_of(f_rid[r], it.data)) seen[r][1] = 1'b0;
-        if (bit_of(f_bid[r], it.data) || bit_of(f_rid[r], it.data)) pin_set = 1'b0;
+        if (bit_of(f_bid[r], it.data) || bit_of(f_rid[r], it.data)) begin
+          pin_set = 1'b0;
+          rearm_wait = rearm_cycles;
+        end
       end else if (!it.slverr) begin
         seen[r][0] = bit_of(f_bid[r], it.data);
         seen[r][1] = bit_of(f_rid[r], it.data);
@@ -134,10 +148,12 @@ class aou_t1_crd_block_chk extends uvm_component;
       @(vif.mon_cb);
       if (vif.mon_cb.rst_n !== 1'b1) begin
         pin_prev = 1'b0;
+        rearm_wait = 0;
         continue;
       end
       p = vif.mon_cb.int_mi0_id_mismatch === 1'b1;
-      if (p && !pin_prev) begin
+      if (rearm_wait > 0) rearm_wait--;
+      if (p && !pin_set && (!pin_prev || rearm_wait == 0)) begin
         pin_set = 1'b1;
         update();
       end
