@@ -8,7 +8,10 @@
 // work of class c for x at its TX input, from the AXI pins:
 //   WREQ   an S-port AW accepted and not yet sent as a WriteReq (matched by
 //          ID), its write data accepted or presented; or an AW and W presented
-//          while x has no write in flight (no outstanding limit can apply);
+//          while x has no write in flight (no outstanding limit can apply). A
+//          write answered early is still in flight: with EARLY_BRESP_EN set it
+//          holds an early-table entry until the remote die's actual B, and
+//          with the table full the DUT takes no AW (MAS 3.7.5);
 //   RREQ   an S-port AR accepted and not yet sent as a ReadReq; or an AR
 //          presented while x has no read in flight;
 //   WDATA  S-port W presented and not accepted, owed to a write whose
@@ -84,6 +87,7 @@
 //          covers sharing the TX with the other RPs and classes; the bound
 //          catches an RP that is passed over, not slow service.
 typedef class aou_t1_crd_block_chk;
+typedef class aou_t1_early_tbl_chk;
 
 class aou_t1_crd_flow_chk extends uvm_component;
   `uvm_component_utils(aou_t1_crd_flow_chk)
@@ -98,6 +102,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
   virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
   virtual aou_fdi_lsm_if lsm_vif;
   aou_t1_crd_block_chk blk;   // the ID-mismatch hold; null: none
+  aou_t1_early_tbl_chk early; // early-table occupancy; null: none
   bit             enable = 1'b1;
   int unsigned    block_cycles = 256;
   int unsigned    idle_cycles = 4096;
@@ -225,7 +230,8 @@ class aou_t1_crd_flow_chk extends uvm_component;
                ((aw_pend[x].size() != 0 &&
                  (w_got[x] >= w_need[x] || s_vif[x].mon_cb.wvalid === 1'b1)) ||
                 (s_vif[x].mon_cb.awvalid === 1'b1 && s_vif[x].mon_cb.awready !== 1'b1 &&
-                 s_vif[x].mon_cb.wvalid === 1'b1 && wr_fly[x] == 0));
+                 s_vif[x].mon_cb.wvalid === 1'b1 && wr_fly[x] == 0 &&
+                 (early == null || early.held(x) == 0)));
       AOU_CC_RREQ:
         return ar_pend[x].size() != 0 ||
                (s_vif[x].mon_cb.arvalid === 1'b1 && s_vif[x].mon_cb.arready !== 1'b1 &&

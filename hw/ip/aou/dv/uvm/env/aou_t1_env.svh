@@ -208,6 +208,7 @@ class aou_t1_env extends uvm_env;
     wdt_chk.rm = regs.model;
     early_tbl.vif = new[cfg.n_rp];
     foreach (s_mgr[r]) early_tbl.vif[r] = s_mgr[r].cfg.vif;
+    crd_chk.early = early_tbl;
     if (fdi_chk != null) fdi_chk.l3_cfg = cfg.l3_cfg;
     lsm.mon.ap.connect(axi4pc.lsm_imp);
     axi4pc.m_drv = new[cfg.n_rp];
