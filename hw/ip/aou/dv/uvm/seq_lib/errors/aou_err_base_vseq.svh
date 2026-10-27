@@ -144,11 +144,12 @@ class aou_err_base_vseq extends aou_link_base_vseq;
     end
   endtask
 
-  // The remote die reads the head entry.
-  task fifo_read(int unsigned rp);
+  // The remote die reads the head entry (alt: with another ID, so it may
+  // complete before a debug read still in flight).
+  task fifo_read(int unsigned rp, bit alt = 1'b0);
     aou_txn_list_seq s = aou_txn_list_seq::type_id::create("dbg_rd");
-    s.items.push_back(mk(1'b1, rp, AOU_AXI_RD, 10'h3F0 + 10'(rp), dbg_addr(rp), dbg_len_of(rp),
-                         dbg_cache));
+    s.items.push_back(mk(1'b1, rp, AOU_AXI_RD, (alt ? 10'h3D0 : 10'h3F0) + 10'(rp), dbg_addr(rp),
+                         dbg_len_of(rp), dbg_cache));
     run_dbg(s, rp, "read");
   endtask
 

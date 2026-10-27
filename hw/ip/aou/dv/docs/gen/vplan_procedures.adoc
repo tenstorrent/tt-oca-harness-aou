@@ -2721,6 +2721,21 @@ read returns the entry the pop removed, sampled when the
 read became active.
 
 ----
++read_after_pop=1  with +take_overlap: once the pop has completed, a
+----
+
+second debug read with another ID, issued while the first
+still waits behind the take_flood read's data. It was
+issued after the pop, so it returns the entry behind the
+popped one and tells the checker the head, although the
+first read, which the pop overlapped, is still in flight.
+A section before the pairs pushes a B and an R error
+together and a third error well after them, then takes
+all three: the second read of the first take shows which
+of the pair is left, and that of the second take must not
+return the entry its pop removed.
+
+----
 +pop_lead=G +wresp_crd=N  each take is an OKAY write on the RP, then the
 ----
 
@@ -2755,6 +2770,7 @@ in flight, returns the same entry.
 | `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64 +pair_writes=3` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64` | `+part=fifo +err_len=7 +agg_en=1 +remote_bytes=32 +pair_gap=64` | 1-2 | `4xmix2144-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15 +read_after_pop=1` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64` | `+part=fifo +pop_lead=16 +wresp_crd=1 +crd_delay=256` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32` | `+part=fifo +err_off=32` | 1-2 | `1x256-sp32` | 9.13,9.14
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq` | `+T1_VSEQ=aou_dbg_off_vseq` | 1-2 | `1x512-sp64` | 9.18
