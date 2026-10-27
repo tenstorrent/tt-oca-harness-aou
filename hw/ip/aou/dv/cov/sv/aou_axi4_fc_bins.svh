@@ -48,6 +48,14 @@
   function automatic string fc_burst_name(input logic [1:0] b);
     return (b == 2'b01) ? "incr" : "";
   endfunction
+  // AxCACHE: AXI4 A4.4 (Table A4-5) allows an allocate bit (AxCACHE[3:2]) only on a
+  // modifiable transaction (AxCACHE[1]), so 4, 5, 8, 9, 12 and 13 are never legal.
+  function automatic bit fc_cache_legal(input int c);
+    return (c[3:2] == 2'b00) || c[1];
+  endfunction
+  function automatic string fc_cache_name(input logic [3:0] c);
+    return fc_cache_legal(c) ? $sformatf("val_%0d", c) : "";
+  endfunction
   function automatic string fc_lock_name(input logic l);  return l ? "exclusive" : "normal"; endfunction
   function automatic string fc_last_name(input logic l);  return l ? "last" : "not_last"; endfunction
   function automatic string fc_align_name(input logic [1:0] a);
@@ -123,7 +131,8 @@
     for (int s = 0; s <= MAX_SIZE_CODE; s++) fc_reg($sformatf("%s|%ssize|bytes_%0d", cg, cpp, s));
     foreach (LEN_BINS[i])   fc_reg($sformatf("%s|%slen|%s",        cg, cpp, LEN_BINS[i]));
     fc_reg($sformatf("%s|%sburst|incr", cg, cpp));
-    for (int c = 0; c < 16; c++) fc_reg($sformatf("%s|%scache|val_%0d", cg, cpp, c));
+    for (int c = 0; c < 16; c++)
+      if (fc_cache_legal(c)) fc_reg($sformatf("%s|%scache|val_%0d", cg, cpp, c));
     for (int p = 0; p < 8;  p++) fc_reg($sformatf("%s|%sprot|prot_%0d", cg, cpp, p));
     for (int q = 0; q < 16; q++) fc_reg($sformatf("%s|%sqos|val_%0d",   cg, cpp, q));
     foreach (LOCK_BINS[i])  fc_reg($sformatf("%s|%slock|%s",        cg, cpp, LOCK_BINS[i]));
@@ -169,7 +178,7 @@
       fc_bump($sformatf("cg_aw|cp_aw_size|%s",        sb));
       fc_bump($sformatf("cg_aw|cp_aw_len|%s",         lb));
       fc_bump($sformatf("cg_aw|cp_aw_burst|%s",       bb));
-      fc_bump($sformatf("cg_aw|cp_aw_cache|val_%0d",  aw_cache_r));
+      fc_bump($sformatf("cg_aw|cp_aw_cache|%s",       fc_cache_name(aw_cache_r)));
       fc_bump($sformatf("cg_aw|cp_aw_prot|prot_%0d",  aw_prot_r));
       fc_bump($sformatf("cg_aw|cp_aw_qos|val_%0d",    aw_qos_r));
       fc_bump($sformatf("cg_aw|cp_aw_lock|%s",        fc_lock_name(aw_lock_r)));
@@ -188,7 +197,7 @@
       fc_bump($sformatf("cg_ar|cp_ar_size|%s",        sb));
       fc_bump($sformatf("cg_ar|cp_ar_len|%s",         lb));
       fc_bump($sformatf("cg_ar|cp_ar_burst|%s",       bb));
-      fc_bump($sformatf("cg_ar|cp_ar_cache|val_%0d",  ar_cache_r));
+      fc_bump($sformatf("cg_ar|cp_ar_cache|%s",       fc_cache_name(ar_cache_r)));
       fc_bump($sformatf("cg_ar|cp_ar_prot|prot_%0d",  ar_prot_r));
       fc_bump($sformatf("cg_ar|cp_ar_qos|val_%0d",    ar_qos_r));
       fc_bump($sformatf("cg_ar|cp_ar_lock|%s",        fc_lock_name(ar_lock_r)));

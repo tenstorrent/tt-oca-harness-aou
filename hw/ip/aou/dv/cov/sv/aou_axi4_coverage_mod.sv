@@ -434,8 +434,10 @@ module aou_axi4_coverage_mod #(
       illegal_bins rsvd = {2'b11};
     }
 
+    // AXI4 A4.4: an allocate bit (AxCACHE[3:2]) needs Modifiable (AxCACHE[1]).
     cp_aw_cache: coverpoint aw_cache_r iff (aw_vld_r) {
       bins val[] = {[0:15]};
+      ignore_bins axi4_illegal = {4'd4, 4'd5, 4'd8, 4'd9, 4'd12, 4'd13};
     }
 
     cp_aw_prot: coverpoint aw_prot_r iff (aw_vld_r);
@@ -528,8 +530,10 @@ module aou_axi4_coverage_mod #(
       illegal_bins rsvd = {2'b11};
     }
 
+    // AXI4 A4.4: an allocate bit (AxCACHE[3:2]) needs Modifiable (AxCACHE[1]).
     cp_ar_cache: coverpoint ar_cache_r iff (ar_vld_r) {
       bins val[] = {[0:15]};
+      ignore_bins axi4_illegal = {4'd4, 4'd5, 4'd8, 4'd9, 4'd12, 4'd13};
     }
 
     cp_ar_prot: coverpoint ar_prot_r iff (ar_vld_r);
