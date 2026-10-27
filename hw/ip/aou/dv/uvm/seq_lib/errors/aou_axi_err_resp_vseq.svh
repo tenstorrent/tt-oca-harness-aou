@@ -201,6 +201,7 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
     end
     program_feat();
     link_up();
+    check_crd_knobs();
     if (arg_int("rdata_crd", -1) >= 0 || arg_int("wresp_crd", -1) >= 0) begin
       if (arg_int("rdata_crd", -1) >= 0) begin
         cfg.l3_cfg.rx_depth[AOU_CC_RDATA] = arg_int("rdata_crd", 0);
@@ -228,6 +229,30 @@ class aou_axi_err_resp_vseq extends aou_err_base_vseq;
     check_traffic(num_txns);
     sw_deactivate();
   endtask
+
+  // +rdata_crd and +wresp_crd size the remote die's receive buffer, so each
+  // must hold at least one whole message of its kind. Credits are consumed in
+  // full at a message's start (AoU v0.8 flow control), so with fewer the DUT
+  // can never send one and every read or write on the RP hangs. A ReadData
+  // message is as wide as the remote die's beat on that RP: 8, 14 or 27
+  // granules for 256, 512 or 1024 bits; a WriteResp is one granule.
+  function void check_crd_knobs();
+    int rd = arg_int("rdata_crd", -1);
+    int wr = arg_int("wresp_crd", -1);
+    for (int unsigned r = 0; r < cfg.n_rp; r++) begin
+      int unsigned bb = cfg.remote_bytes_of(r);
+      bit [1:0] dl = (bb <= 32) ? 2'd0 : (bb == 64) ? 2'd1 : 2'd2;
+      int unsigned need = aou_data_len(AOU_MT_RDATA, dl);
+      if (rd >= 0 && rd < int'(need))
+        `uvm_fatal(get_type_name(), $sformatf(
+            {"+rdata_crd=%0d is less than one ReadData message on RP%0d (%0d granules ",
+             "for a %0d-byte remote beat): the DUT could never send read data"},
+            rd, r, need, bb))
+    end
+    if (wr == 0)
+      `uvm_fatal(get_type_name(),
+                 "+wresp_crd=0 grants no WriteResp credit: the DUT could never send a B")
+  endfunction
 
   // ---------------------------------------------------------------------
   // A failing remote transaction of the fifo part (err_len, err_cache, err_off).
