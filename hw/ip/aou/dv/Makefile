@@ -76,6 +76,9 @@ COV_HIER = $(UVM_ROOT)/cov/config/vcs/cov_$(TB).hier+$(UVM_ROOT)/cov/config/vcs/
 # COV_EXCLUDE_PREVIEW=1 applies cov/config/vcs/cov_exclude.hier in cov_report too (urg -hier). Preview
 # only, for databases built before an exclusion was added; a fresh COV=1 build needs none.
 COV_EXCLUDE_PREVIEW ?= 0
+# Line and branch items no stimulus can reach (dead code), each with its reason, excluded at report
+# time (urg -elfile; DECISIONS.md D10). COV_EL= reports without them.
+COV_EL ?= $(UVM_ROOT)/cov/config/vcs/cov_exclude.el
 # VCS FSM coverage leaves out transitions that only an asynchronous reset makes
 # (cov/config/vcs/cov_fsm_reset.filter, DECISIONS.md D10); reset correctness is checked with
 # XPROP instead. COV_FSM_RESET=1 keeps them, in a -fsmrst build.
@@ -318,7 +321,7 @@ RUN_CMD = $(SIMV) +UVM_TESTNAME=$(TEST) +ntb_random_seed=$(SEED) -covg_cont_on_e
 define COV_REPORT_CMD
 $(PASSING) --names --prefix $(COV_DIR)/simv.vdb/ > $(REPORT_DIR)/tests.txt
 $(if $(COV_WITH_OUT),$(PASSING_WITH) --names --prefix $(COV_WITH_VDB)/ >> $(REPORT_DIR)/tests.txt)
-urg -full64 -dir $(COV_DIR)/simv.vdb $(if $(COV_WITH_OUT),$(COV_WITH_VDB) -map $(COV_MAP_MODULE)) -tests $(REPORT_DIR)/tests.txt $(if $(filter 1,$(COV_EXCLUDE_PREVIEW)),-hier $(UVM_ROOT)/cov/config/vcs/cov_exclude.hier) -format both -report $(REPORT_DIR)/urg -log $(REPORT_DIR)/urg.log
+urg -full64 -dir $(COV_DIR)/simv.vdb $(if $(COV_WITH_OUT),$(COV_WITH_VDB) -map $(COV_MAP_MODULE)) -tests $(REPORT_DIR)/tests.txt $(if $(filter 1,$(COV_EXCLUDE_PREVIEW)),-hier $(UVM_ROOT)/cov/config/vcs/cov_exclude.hier) $(addprefix -elfile ,$(COV_EL)) -format both -report $(REPORT_DIR)/urg -log $(REPORT_DIR)/urg.log
 sed -n '/^Total Module Definition Coverage Summary/,/^---/p' $(REPORT_DIR)/urg/dashboard.txt | tee $(REPORT_DIR)/summary.txt
 endef
 endif

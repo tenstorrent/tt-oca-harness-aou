@@ -464,6 +464,9 @@ buffer; integration guide 8.7), listed with their reasons in `cov/config/vcs/cov
 and passed to `-cm_hier` with the bench's own scope file, so the exclusion takes
 effect on the next `COV=1` build. For databases built before an entry was added,
 `make cov_report COV_EXCLUDE_PREVIEW=1` applies the same list with `urg -hier`.
+Dead code (single lines and branches no stimulus can reach) is excluded at report
+time instead: `cov/config/vcs/cov_exclude.el`, each item with its reason, goes to
+`urg -elfile` (`COV_EL=` leaves it out; DECISIONS.md D10).
 
 | SIM | Metrics | Report |
 |---|---|---|

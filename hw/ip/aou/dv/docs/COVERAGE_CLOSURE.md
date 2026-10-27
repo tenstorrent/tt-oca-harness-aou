@@ -443,8 +443,10 @@ for 512→1024).
 | D8 | FDI cond L228 | 1 | needs a UCIe-violating adapter | `.el`, or keep as a robustness target (e) |
 | D9 | ADDRGEN L53/70, AGGREGATOR L358 (size 7) in 256/512 builds | 2-3 per build | 128-B transfers are illegal on narrower buses | per-config `.el` |
 
-D10 currently allows only whole-module `-moduletree` exclusions. D1-D9 need a reviewed
-`cov/cov_exclude.el` (`urg -elfile`) or `-cm_noconst`, which is a D10 amendment (decision D5).
+D10 now allows reviewed line and branch items in `cov/config/vcs/cov_exclude.el` (`urg
+-elfile`, applied by `make cov_report`) for dead code; its first entries are the six
+`AOU_ACTIVATION_CTRL` time-out arms that #108's abort pre-empts. D1-D9 still need the owner's
+review before they join it, or `-cm_noconst` (decision D5).
 
 ---
 

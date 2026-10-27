@@ -666,6 +666,14 @@ twice.
   (integration guide 8.7 and 3.13.1), and the behavioural two-port SRAM model
   (`AOU_TPSRAM`, a stand-in for a compiled macro; the controllers around it stay
   in). IP-specific logic, including the asynchronous APB bridge, stays in.
+- **Dead code is excluded item by item at report time.** Line and branch items
+  that no stimulus can reach, because a higher-priority arm always takes the
+  case, go in `cov/config/vcs/cov_exclude.el`, which `make cov_report` passes to
+  `urg -elfile` (`COV_EL=` reports without it). Each item carries its reason;
+  URG's checksums drop an item whose RTL has changed, so it is reviewed again.
+  Code reachable only by illegal stimulus stays a hole: illegal stimulus is out
+  of scope, not dead code. First entries: the six time-out arms of
+  `AOU_ACTIVATION_CTRL` that #108's abort pre-empts.
 - **Reset-only FSM transitions are excluded (user decision).** VCS FSM coverage
   filters out transitions that only an asynchronous reset in the middle of a
   state makes (`-cm_fsmresetfilter`, `cov/config/vcs/cov_fsm_reset.filter`;

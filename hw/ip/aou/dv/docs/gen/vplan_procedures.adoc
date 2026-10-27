@@ -386,8 +386,8 @@ Class `aou_t1_link_event_test` extends `aou_base_test` (`uvm/tests/aou_t1_link_e
 
 FDI link events with AoU traffic: Adapter-initiated Retrain while traffic
 runs both ways, then L1 entry/exit and a clk_req wake on an idle link, then
-more traffic. What the core does on these events is unspecified (BUGS/015);
-the interim expectation is that ENABLED and every transaction survive.
+more traffic. Retrain and L1 are transparent to AOU_CORE (MAS 7.3.7): ENABLED
+and every transaction survive.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -790,7 +790,7 @@ inband_pres (aou_link_event_vseq).
 *Procedure.* Virtual sequence `aou_link_event_vseq` (`uvm/seq_lib/lifecycle/aou_link_event_vseq.svh`):
 
 Adapter-initiated FDI link events while AoU is ENABLED and traffic runs.
-AoU's reaction is unspecified (BUGS/015); the interim expectations are:
+The expectations follow MAS 7.3.6 and 7.3.7:
 retrain, clk_wake  transparent: AoU stays ENABLED, no interrupt, every
 transaction completes with correct data;
 l1                 software deactivates first (MAS §7.3.6), the adapter
@@ -870,7 +870,7 @@ sw_disable, l1_act, retrain_act or l1_traffic) +link_down_mask +loops +T1_TXN.
 * 11.11: Assert reset mid-transaction
 * 11.18: Regression on a build with the RTL's embedded ASSERTION_ON checks
 * 18.10: Verify correct FDI valid/ready protocol
-* 18.13: Retrain while ENABLED with traffic is transparent to AoU (interim expectation)
+* 18.13: Retrain while ENABLED with traffic is transparent to AoU
 * 18.14: LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery
 * 18.15: L1 entry and exit with the MAS power-management sequence, including the clk_req wake
 * 18.17: LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask
@@ -1929,7 +1929,12 @@ Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
 
 ----
 +deact_who=... +busy=0|1 (-1 random)
-+T1_TXN=<per RP and direction> +force=0|1.
++T1_TXN=<per RP and direction>. Forced deactivation (DEACTIVATE_FORCE) has its
+----
+
+own test, aou_link_force_deact_vseq.
+
+----
 +early_act=1 (plan 1.11; MAS 7.3.2): every activation is software's
 ----
 
@@ -1985,13 +1990,30 @@ keeps the Adapter from bringing the link up after reset.
 ===== 40. `aou_link_force_deact_test`
 Class `aou_link_force_deact_test` extends `aou_base_test` (`uvm/tests/link/aou_link_force_deact_test.svh`).
 
-*Purpose.* Forced deactivation through DEACTIVATE_FORCE (aou_link_force_deact_vseq).
+*Purpose.* Forced deactivation through DEACTIVATE_FORCE, each ended by a software reset
+(aou_link_force_deact_vseq).
 
 *Procedure.* Virtual sequence `aou_link_force_deact_vseq` (`uvm/seq_lib/link/aou_link_force_deact_vseq.svh`):
 
-aou_link_act_deact_vseq with every deactivation forced through
-AOU_CON0.DEACTIVATE_FORCE (plan 2.7). The DUT then sends DeactivateReq
-with PropertyReq=1, which the spec does not allow (BUGS/010).
+Forced deactivation through AOU_CON0.DEACTIVATE_FORCE (plan 2.7; MAS
+software-operation 7.1). The force is an implementation-defined escape hatch
+for a deactivation that is not completing: nothing is promised after it and
+software resets the device. Each loop activates, carries traffic (drained,
+or with +busy=1 still in flight), writes DEACTIVATE_FORCE and waits for the
+DUT's DeactivateReq, which aou_t1_force_deact_chk times against the write
+(T1-L52). The remote die does not answer it, as when the deactivation is not
+completing, so the two dies exchange nothing after the force. The loop then
+ends with the reset software would apply (sw_reset(): the Adapter's
+LinkReset, AOU_SW_RESET, the link back up) instead of checking anything the
+DUT does after the force. After the last loop both dies activate again and
+traffic must pass.
+Knobs: +loops +who=apb|remote|both|rand +order=dut|remote|simul|rand
+
+----
++busy=0|1 (default -1: random per loop) +T1_TXN=<per RP and direction>.
+----
+
+*Rules named.* `T1-L52`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2000,7 +2022,7 @@ with PropertyReq=1, which the spec does not allow (BUGS/010).
 [cols="3,2,1,1,3",options="header"]
 |===
 | Scenario | Arguments | Seeds | Target | Plan items
-| `aou_link_force_deact_test` |  | 1-2 |  | 2.7
+| `aou_link_force_deact_test` |  | 1-4 |  | 2.7
 |===
 
 *Plan items.*
@@ -2151,6 +2173,39 @@ queued.
 
 exactly k requests and the remote die returns none of it until released,
 with more than k requests queued per RP.
+
+----
++limit=<k> with +credit=wdata: WDATA credit for k WriteData messages of the
+----
+
+widest RP, none returned until released, and every write at least k+1 beats
+long: the DUT commits each RP's first WriteReq and then runs out of WDATA
+credit with that write's data still owed, by a known number of beats.
+
+----
++hold_wreq_rp=<r>: remote-to-DUT writes on every RP; for +hold cycles the
+----
+
+remote die sends no WriteReq on RP r while that RP's WriteData still goes on
+WDATA credit, so the data of several writes waits in the DUT's RX W FIFO
+ahead of their WriteReqs (AoU v0.8 5.7 does not order them). Then the
+WriteReqs go and every write completes with correct data.
+
+----
++fair=1: DUT TX write fairness. Local writes only, the managers presenting
+----
+
+with no gaps: RP +fair_short (default 0) issues single-beat writes only,
+RP +fair_long (default 1) bursts of AWLEN +fair_min..+fair_max (31..63);
+
+----
++fair_short_n and +fair_long_n writes (400 and 40).
+----
+
+A burst the DUT has committed must not be held open by the stream of short
+writes. aou_t1_wr_order_chk checks that it keeps making progress while it
+holds credit (DP-R11); it does not bound how long the short writes may slow
+a burst that still trickles.
 aou_t1_crd_flow_chk judges both in every test: an RP with credit and queued
 work keeps sending while another RP has none (T1-C01), the DUT uses all the
 credit it holds (T1-C02), never more (AOU-R16, the L3 model).
@@ -2165,7 +2220,7 @@ cycles later. Messages waiting for credit remain to be transmitted (MAS
 AOU-R33 in the L3 model), responses to the remote die before DISABLED, and
 every transaction completes (scoreboard).
 
-*Rules named.* `AOU-R16`, `AOU-R33`, `AOU-R34`, `T1-C01`, `T1-C02`
+*Rules named.* `AOU-R16`, `AOU-R33`, `AOU-R34`, `DP-R11`, `T1-C01`, `T1-C02`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -2190,6 +2245,13 @@ every transaction completes (scoreboard).
 | `aou_zero_credit_test.credit-wreq.limit-12` | `+credit=wreq +limit=12` | 1-2 |  | 8.3
 | `aou_zero_credit_test.credit-rreq.limit-4` | `+credit=rreq +limit=4` | 1-3 |  | 8.6
 | `aou_zero_credit_test.credit-rreq.limit-12` | `+credit=rreq +limit=12` | 1-2 |  | 8.6
+| `aou_zero_credit_test.credit-wdata.limit-2` | `+credit=wdata +limit=2` | 1-3 |  | 3.10,3.13
+| `aou_zero_credit_test.credit-wdata.limit-6` | `+credit=wdata +limit=6` | 1-2 |  | 3.10,3.13
+| `aou_zero_credit_test.hold_wreq_rp-0` | `+hold_wreq_rp=0` | 1-3 |  | 4.32
+| `aou_zero_credit_test.hold_wreq_rp-2.hold_max_len-31.4x512-sp64` | `+hold_wreq_rp=2 +hold_max_len=31` | 1-2 | `4x512-sp64` | 4.32
+| `aou_zero_credit_test.fair-1.4x512-sp64` | `+fair=1` | 1-3 | `4x512-sp64` | 12.21
+| `aou_zero_credit_test.fair-1.4xmix4211-sp128` | `+fair=1` | 1-2 | `4xmix4211-sp128` | 12.21
+| `aou_zero_credit_test.fair-1.fair_short-3.fair_long-0.4xmix4211-sp128` | `+fair=1 +fair_short=3 +fair_long=0` | 1-2 | `4xmix4211-sp128` | 12.21
 | `aou_zero_credit_test.credit-wreq.deact-1` | `+credit=wreq +deact=1` | 1-2 |  | 2.5
 | `aou_zero_credit_test.credit-rreq.deact-1` | `+credit=rreq +deact=1` | 1-2 |  | 2.5
 | `aou_zero_credit_test.credit-wdata.deact-1` | `+credit=wdata +deact=1` | 1-2 |  | 2.5
@@ -2209,8 +2271,10 @@ every transaction completes (scoreboard).
 * 3.13: A message is packed only when credit for the whole message is available (never on partial credit), and queued messages drain when credits return
 * 3.15: Verify independent credit tracking across resource planes RP0-RP3
 * 3.16: Exhaust each credit type independently; verify only affected message type is queued
+* 4.32: Remote WriteData sent ahead of its WriteReq (one message to the whole burst, on several RPs at once) is held and written once the WriteReq arrives
 * 8.3: Send maximum outstanding writes per credit limit
 * 8.6: Send maximum outstanding reads per credit limit
+* 12.21: A write burst the DUT has committed is not held open by back-to-back single-beat writes on another RP (both managers saturating, AWLEN 0 against AWLEN 31-63)
 
 [[aou-proc-aou_act_rx_drain_test]]
 ===== 44. `aou_act_rx_drain_test`
@@ -2315,7 +2379,7 @@ DeactivateReq has to wait out the 2^(v+3)-cycle quiet window behind it
 aou_t1_rx_fifo_chk checks the window on every DeactivateReq (T1-L46).
 
 ----
-+mode=property (plan 2.10; BUGS/010, which covers the bit too): the remote
++mode=property (plan 2.10; MAS 7.1 AOU_INIT.INT_DEACTIVATE_PROPERTY): the remote
 ----
 
 die deactivates with PropertyReq 0, the only value it may send (the bit is
@@ -2729,6 +2793,21 @@ read returns the entry the pop removed, sampled when the
 read became active.
 
 ----
++read_after_pop=1  with +take_overlap: once the pop has completed, a
+----
+
+second debug read with another ID, issued while the first
+still waits behind the take_flood read's data. It was
+issued after the pop, so it returns the entry behind the
+popped one and tells the checker the head, although the
+first read, which the pop overlapped, is still in flight.
+A section before the pairs pushes a B and an R error
+together and a third error well after them, then takes
+all three: the second read of the first take shows which
+of the pair is left, and that of the second take must not
+return the entry its pop removed.
+
+----
 +take_pair=1    two takes at once wherever the fifo part takes two or
 ----
 
@@ -2784,6 +2863,7 @@ in flight, returns the same entry.
 | `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.pair_writes-3.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64 +pair_writes=3` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-7.agg_en-1.remote_bytes-32.pair_gap-64.4xmix2144-sp64` | `+part=fifo +err_len=7 +agg_en=1 +remote_bytes=32 +pair_gap=64` | 1-2 | `4xmix2144-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64` | `+part=fifo +take_overlap=4 +take_flood=15 +read_after_pop=1` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64` | `+part=fifo +pop_lead=16 +wresp_crd=1 +crd_delay=256` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32` | `+part=fifo +err_off=32` | 1-2 | `1x256-sp32` | 9.13,9.14
 | `aou_axi_err_resp_test.T1_VSEQ-aou_dbg_off_vseq` | `+T1_VSEQ=aou_dbg_off_vseq` | 1-2 | `1x512-sp64` | 9.18
@@ -2893,7 +2973,20 @@ clears the error, its INFO and the interrupt.
 
 interrupt and mask, then always ends the scenario with a hard reset instead
 of the write-1 clear and more traffic.
-Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1.
+Before the write-1 clear (or the reset) that ends an M-port mismatch, traffic
+is started and left +blk_hold cycles (default 1000) with the error still set,
+so aou_t1_crd_block_chk (T1-E20) sees credited messages waiting on the block;
+they complete after the clear, or end with the reset. Before a clear the
+orphan has been taken and traffic runs both ways; before a reset the orphan
+may still be presented, so only the local managers issue. +blk_txns (default 8 per RP and direction,
+0: none) sets the amount.
+Knobs: +side=all|mgr|sub +kind=all|b|r +mask=0|1 +slv_en=0|1 +detect_only=0|1
+
+----
++blk_hold=<cycles> +blk_txns=<n>.
+----
+
+*Rules named.* `T1-E20`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -3977,7 +4070,7 @@ Class `aou_axi_sb_reset_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_ax
 fed to the scoreboard directly. A reset_outstanding write is lost or landed
 whatever its response, and the bytes it addresses may then hold their old
 value or the write's, until a checked write; a reset_outstanding read may
-end with SLVERR beats (BUGS/015 interim); anything else is still an error.
+end with SLVERR beats (MAS 7.3.6 defines no response for it); anything else is still an error.
 Each step expects an exact set of errors.
 
 *Procedure.* The class's own `run_phase` (see the file).
