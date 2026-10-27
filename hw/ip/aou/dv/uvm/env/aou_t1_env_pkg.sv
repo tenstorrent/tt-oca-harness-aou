@@ -100,6 +100,20 @@ package aou_t1_env_pkg;
       '{4{'{44, 44, AOU_T1_RX_WR_DEPTH, AOU_T1_RX_WR_DEPTH, 44}}};
   localparam int AOU_T1_RX_RS_EN = 1;
 `endif
+  // Outstanding limits the top builds AOU_TOP with (integration guide section 2;
+  // the defaults unless a build defines AOU_M_MO_CNT or AOU_S_MO_CNT). M_RD_MO_CNT
+  // and M_WR_MO_CNT size each RP's M-port pending-ID tables, S_WR_MO_CNT its
+  // early-response table; the checkers take their limits from here.
+`ifdef AOU_M_MO_CNT
+  localparam int AOU_T1_M_MO_CNT = `AOU_M_MO_CNT;
+`else
+  localparam int AOU_T1_M_MO_CNT = 32;
+`endif
+`ifdef AOU_S_MO_CNT
+  localparam int AOU_T1_S_MO_CNT = `AOU_S_MO_CNT;
+`else
+  localparam int AOU_T1_S_MO_CNT = 32;
+`endif
 
   // FDI beat bytes per PHY for each FDI_CONFIG (integrator guide §3.10)
   localparam int AOU_T1_BEAT0 = (AOU_T1_FDI_CONFIG == 0 || AOU_T1_FDI_CONFIG == 3) ? 32 :

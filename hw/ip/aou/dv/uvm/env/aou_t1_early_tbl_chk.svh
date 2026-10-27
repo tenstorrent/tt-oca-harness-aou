@@ -26,7 +26,7 @@ class aou_t1_early_tbl_chk extends uvm_component;
   aou_t1_env_cfg cfg;
   aou_core       rm;
   aou_axi_vif_t  vif[];
-  int unsigned   wr_mo_cnt = 32;
+  int unsigned   wr_mo_cnt = AOU_T1_S_MO_CNT;   // S_WR_MO_CNT
   int unsigned   free_bound = 1000;
   bit            over_chk = 1'b0;
 
