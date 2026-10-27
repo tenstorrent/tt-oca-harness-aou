@@ -14,14 +14,6 @@
 # regular expression) limits an entry to runs whose log matches it, such as one
 # CONFIG or active PHY of aou_perf_test (its PERF_GATE lines carry the key).
 
-# AoU v0.8 4.4 puts an Activation message
-# alone in its flit (v0.7.1 asks only for G0). On every activation the DUT sends its initial
-# CrdtGrant in the flit of its ActivateAck, so with +v0p8 the L3 model reports AOU-R6 in every
-# T1 test; `test: '*'` applies the entry to all of them, and `when_re` to +v0p8 runs only.
-# Only two layouts are covered: the ActivateAck with the CrdtGrant, and a
-# DeactivateReq followed only by responses. Any other message beside an Activation still
-# fails the run.
-
 - test: aou_reg_bit_bash_test
   bug: BUGS/004
   check: 'Writing a 1 in bit #2 of register "aou_core.aou_con0"'
@@ -49,20 +41,6 @@
   note: >-
     the same DeactivateReq seen by AOU_FDI_CHECKER; two-PHY builds (tp configs) have no
     AOU_FDI_CHECKER, so only the L3 model's entry above matches there
-
-- test: aou_act_after_deact_test
-  bug: BUGS/020
-  check: 'AOU-R6: DUT->remote'
-  seed_dependent: true
-  note: >-
-    ActivateReq co-packed with the DUT's DeactivateAck (the second trigger path BUGS/020
-    names); not seen on T1 1x512-sp64 (VCS, Verilator), kept so a hit is tied to the bug
-
-- test: aou_act_after_deact_test
-  bug: BUGS/020
-  check: 'AOU-R6: AOU_FDI_CHECKER VIOL_MISC_PLACEMENT'
-  seed_dependent: true
-  note: the same flit seen by AOU_FDI_CHECKER
 
 # Each bug has bug-specific checks; the generic symptoms it causes (traffic stalls,
 # scoreboard mismatches, failed handshakes) carry `requires:` and only count when
@@ -103,7 +81,7 @@
   bug: BUGS/046
   check_re: 'T1-P02: 4xmix4211-sp128\|0\|S[123]\|\w+\|l2r below target'
   when_re: 'PERF_GATE 4xmix4211-sp128\|0\|S[123]\|'
-  note: FDI_PACK_WD 1024 at a 128 B FDI: the DUT TX link caps at 64 B/cycle (58-75% of the model)
+  note: 'FDI_PACK_WD 1024 at a 128 B FDI: the DUT TX link caps at 64 B/cycle (58-75% of the model)'
 - test: aou_perf_test
   bug: BUGS/046
   check_re: 'T1-P02: 4xmix4211-sp128\|0\|S[12]\|\w+\|r2l below target'
@@ -119,6 +97,14 @@
     reads both ways: the DUT TX link carries remote read data at 97.0-97.8% of the model, just
     above the gate (bw_rd l2r: 1x512 0.9704, 3x512 0.9735, 4x512 0.9773, 2x512-tp32_64 0.9780 and
     0.9735; the same on every seed), so it does not fire today; kept for when it dips below
+
+# AoU v0.8 4.4 puts an Activation message
+# alone in its flit (v0.7.1 asks only for G0). On every activation the DUT sends its initial
+# CrdtGrant in the flit of its ActivateAck, so with +v0p8 the L3 model reports AOU-R6 in every
+# T1 test; `test: '*'` applies the entry to all of them, and `when_re` to +v0p8 runs only.
+# Only two layouts are covered: the ActivateAck with the CrdtGrant, and a
+# DeactivateReq followed only by responses. Any other message beside an Activation still
+# fails the run.
 
 - test: '*'
   bug: BUGS/059
