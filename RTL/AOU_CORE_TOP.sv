@@ -459,7 +459,7 @@ import packet_def_pkg::*;
     logic [RP_COUNT-1:0]                    w_aou_rx_axi_s_rvalid;
     logic [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    w_rd_data_fifo_mdata;
     AOU_SOC_BUF dft_persistent_buf_scan_resetn_sw (
-        .I_A   ( 1'b0                       ),
+        .I_A   ( 1'b1                       ),
         .O_Y   ( w_aou_sw_reset_scan_buf    )
     );
 
