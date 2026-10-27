@@ -119,6 +119,7 @@ class Regress(unittest.TestCase):
         self.assertIn("TB=l3_unit COV=0", p.stdout)
         self.assertIn("cov_report SIM=vcs TB=t1 COV=1 CONFIG=1x512-sp64 COV_RID=d2", p.stdout)
         self.assertIn("--union", p.stdout)
+        self.assertIn("COV_EL=cov/config/vcs/cov_exclude.el", p.stdout)
 
     def test_items_skip_benches_without_them(self):
         p = self.regress("--sim", "vcs", "--rid", "d3", "--items", "smoke", "--dry-run")

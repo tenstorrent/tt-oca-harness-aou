@@ -516,7 +516,7 @@ regress:
 	  $(if $(filter-out default file,$(origin RID)),--rid '$(RID)') $(if $(RTL_PATCH),--rtl-patch '$(RTL_PATCH)') \
 	  $(if $(CONFIGS),--configs '$(CONFIGS)') $(if $(BENCHES),--benches '$(BENCHES)') \
 	  $(if $(ITEMS),--items '$(ITEMS)') $(if $(RUN_JOBS),-j $(RUN_JOBS)) $(if $(STEPS),--steps '$(STEPS)') \
-	  $(if $(RERUN_FAILED),--rerun-failed '$(RERUN_FAILED)') --cov-mem $(COV_MEM) \
+	  $(if $(RERUN_FAILED),--rerun-failed '$(RERUN_FAILED)') --cov-mem $(COV_MEM) --cov-el '$(COV_EL)' \
 	  $(if $(filter 1,$(DRY_RUN)),--dry-run)
 
 # For scripts/regress.py: the bsub line of the jobs make does not submit itself (coverage).
