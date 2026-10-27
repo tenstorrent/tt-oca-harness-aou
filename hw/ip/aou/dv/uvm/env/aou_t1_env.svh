@@ -249,6 +249,8 @@ class aou_t1_env extends uvm_env;
     force_chk.rm = regs.model;
     force_chk.status = status;
     force_chk.l3_cfg = cfg.l3_cfg;
+    force_chk.cfg = cfg;
+    foreach (fdi[p]) force_chk.mb_vif[p] = fdi[p].vif;
     l3.ap_rx_msg.connect(force_chk.dut_imp);
     rx_align.rst_vif = rst.vif;
     if (rx_fifo_chk != null) begin

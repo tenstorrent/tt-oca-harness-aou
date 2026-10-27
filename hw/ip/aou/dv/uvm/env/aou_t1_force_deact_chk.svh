@@ -17,7 +17,9 @@
 // controller then queues the DeactivateReq on the next cycle, and the TX core
 // takes it at the next flit boundary, a few cycles more plus the Adapter's
 // pl_trdy back-pressure. Allowing BOUND_PCLKS PCLK periods and BOUND_CLKS core
-// cycles leaves several times that.
+// cycles leaves several times that. Core cycles in which the Adapter holds
+// pl_trdy low do not count: they extend both the deadline and the PropertyReq
+// window below, since FDI backpressure is a stress case, not the DUT's delay.
 //
 // The RTL marks the forced DeactivateReq with PropertyReq=1, a bit v0.7 keeps
 // for ActivateReq and v0.8 reserves. The bench accepts that mark on a DUT
@@ -38,6 +40,8 @@ class aou_t1_force_deact_chk extends uvm_component;
   virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb_vif;
   virtual aou_rst_if     rst_vif;   // core clock and core reset
   virtual aou_fdi_lsm_if lsm_vif;
+  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
+  aou_t1_env_cfg         cfg;
   aou_core               rm;
   aou_t1_status          status;
   aou_l3_cfg             l3_cfg;
@@ -49,6 +53,8 @@ class aou_t1_force_deact_chk extends uvm_component;
 
   protected bit      owed;          // a forced DeactivateReq is expected
   protected realtime t_write;
+  protected realtime t_held;        // FDI backpressure since the write
+  protected realtime tc;            // core clock period
   protected bit      dut_deact_sent; // the DUT's DeactivateReq of this session went out
   protected bit      was_enabled;   // the DUT reached ENABLED since it was last DISABLED
 
@@ -70,7 +76,7 @@ class aou_t1_force_deact_chk extends uvm_component;
   endfunction
 
   task run_phase(uvm_phase phase);
-    realtime tp, tc;
+    realtime tp;
     if (apb_vif == null || rst_vif == null || rm == null || status == null || l3_cfg == null)
       return;
     // Clock periods, for the bound in time.
@@ -109,7 +115,9 @@ class aou_t1_force_deact_chk extends uvm_component;
       end
       owed = 1'b1;
       t_write = $realtime;
+      t_held = 0;
       l3_cfg.force_deact_t = t_write;
+      l3_cfg.force_deact_win = bound;
       `uvm_info(get_type_name(), "DEACTIVATE_FORCE written: DeactivateReq owed", UVM_MEDIUM)
     end
   endtask
@@ -132,17 +140,27 @@ class aou_t1_force_deact_chk extends uvm_component;
         owed = 1'b0;
         continue;
       end
-      if ($realtime - t_write > bound) begin
+      if (fdi_held()) begin
+        t_held += tc;
+        l3_cfg.force_deact_win = bound + t_held;
+      end
+      if ($realtime - t_write - t_held > bound) begin
         owed = 1'b0;
         n_late++;
         aou_rule_log::check("T1-L52", get_type_name());
         aou_rule_log::fire("T1-L52", get_type_name());
         `uvm_error(get_type_name(), $sformatf(
-            {"T1-L52: no DUT DeactivateReq within %0t of the DEACTIVATE_FORCE write at %0t ",
-             "(bound from the RTL path, with margin)"}, bound, t_write))
+            {"T1-L52: no DUT DeactivateReq within %0t of the DEACTIVATE_FORCE write at %0t, ",
+             "FDI backpressure excluded (bound from the RTL path, with margin)"}, bound, t_write))
       end
     end
   endtask
+
+  // The Adapter holds pl_trdy low on the active PHY.
+  protected function bit fdi_held();
+    int unsigned p = (cfg == null) ? 0 : cfg.lsm_cfg.active_phy;
+    return p < AOU_T1_N_PHY && mb_vif[p] != null && mb_vif[p].mon_cb.pl_trdy !== 1'b1;
+  endfunction
 
   function void write(aou_msg m);
     aou_msg_act a;
@@ -153,13 +171,13 @@ class aou_t1_force_deact_chk extends uvm_component;
     dut_deact_sent = 1'b1;
     if (!owed) return;
     owed = 1'b0;
-    lat = $realtime - t_write;
+    lat = $realtime - t_write - t_held;
     n_forced++;
     if (lat > max_latency) max_latency = lat;
     aou_rule_log::check("T1-L52", get_type_name());
     `uvm_info(get_type_name(), $sformatf(
-        "forced DeactivateReq (PropertyReq mark %0b) %0t after the DEACTIVATE_FORCE write",
-        a.forced_deact_mark(), lat), UVM_LOW)
+        {"forced DeactivateReq (PropertyReq mark %0b) %0t after the DEACTIVATE_FORCE write, ",
+         "FDI backpressure excluded"}, a.forced_deact_mark(), lat), UVM_LOW)
   endfunction
 
   function void report_phase(uvm_phase phase);
