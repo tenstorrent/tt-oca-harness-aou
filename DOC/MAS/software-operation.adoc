@@ -30,7 +30,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |IP_VERSION |0x0000 | | | |0x00010000
 | |　 |MAJOR_VERSION |[31:16] |RO |0x0001
 | |　 |MINOR_VERSION |[15:0] |RO |0x0000
-|AOU_CON0 |0x0004 | | | |0x00004008
+|AOU_CON0 |0x0004 | | | |0x00004000
 | | |Rsvd |[31:28] |RO |0x0
 | | |RP3_ERROR_INFO_ACCESS_EN |[27] |RW |0x0
 | | |RP2_ERROR_INFO_ACCESS_EN |[26] |RW |0x0
@@ -44,7 +44,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |TX_LP_MODE |[11] |RW |0x0
 | | |Rsvd |[10:5] |RO |0x0
 | | |AOU_SW_RESET |[4] |WO |0x0
-| | |CREDIT_MANAGE |[3] |RW |0x1
+| | |Rsvd |[3] |RO |0x0
 | | |AXI_SPLIT_TR_EN |[2] |RW |0x0
 | | |Rsvd |[1] |RO |0x0
 | | |DEACTIVATE_FORCE |[0] |WO |0x0
@@ -259,7 +259,7 @@ For details on the ACTIVATE and DEACTIVATE SFRs, please refer to xref:aou-73-act
 
 * AOU_CORE must exchange both DeactivateReq and DeactivateAck messages before the UCIe Core transitions to the Link Down state.
 * The DEACTIVATE_START field in AOU_INIT initiates deactivation. A DeactivateReq is issued only after both conditions below are satisfied:
-1.  All outstanding responses to remote die requests have been completed.
+1.  Every request the local die has sent to the remote die has received its response (SLV_TR_COMPLETE = 1). Responses the local die still owes the remote die do not hold the DeactivateReq back; they are sent after it (AoU v0.8 section 8.4, xref:aou-731-deactivation-credit-rules[Section 7.3.1]).
 2.  The TX path has had nothing to transmit for a window of *2^(DEACTIVATE_TIME_OUT_VALUE + 3)* core clock cycles.
 * *AOU_INIT.DEACTIVATE_TIME_OUT_VALUE* [6:4] is the length of that window. The field is 3 bits wide. A value v encodes *2^(v + 3)* cycles: 8, 16, 32, 64, 128, 256, 512 or 1024. The reset value 0 selects 8 cycles.
 * The window runs while the activation FSM is ENABLED or DEACTIVATE, and it restarts from zero whenever the TX path has a message to send: a message waiting in a TX FIFO, a flit granule still being packed, or an AXI beat accepted into the TX path. The counter is held at zero while the FSM is DISABLED or ACTIVATE, so the window starts when the FSM enters ENABLED. The window is already running before software writes DEACTIVATE_START, and it may already have elapsed. When the TX path has been quiet for the whole window, this condition is already satisfied and the DeactivateReq follows the write at once, still subject to condition 1. A message still in the TX path, or one accepted after the write, holds the DeactivateReq until that traffic has been gone for the full window.
@@ -467,23 +467,18 @@ image::image23.png[Figure 24. Independent Activation Flow]
 
 A die sends an ActivateAck in response to an ActivateReq from the other die while its own activation FSM is [.monospaced]#++DISABLED++# or [.monospaced]#++ACTIVATE++#. If the local activation FSM is [.monospaced]#++ENABLED++#, or is in [.monospaced]#++DEACTIVATE++#, that ActivateReq is [.monospaced]#++INVALID_ACTMSG++# (see xref:aou-723-linkreset-error-reporting[Section 7.2.3]) and is not answered: AoU specification v0.8 treats it as an inconsistent Req/Ack that moves the interface to its error state, in which nothing is transmitted (sections 8.3.3 and 8.4). It means the remote die has lost the activation state, for example because of a bug or a local reset. The local die requests LinkReset. Software resets AOU_CORE and both dies run activation again so they share one state.
 
-[[aou-731-credit-management-type]]
-==== 7.3.1. Credit Management Type
+[[aou-731-deactivation-credit-rules]]
+==== 7.3.1. Credits and credited messages during deactivation
 
-There are two types of Credit Management Type. Since current AOU_SPEC cannot resolve pending AXI response without Activate again. When Credit Management type is set to 1, During Deactivate state, AOU_CORE can resolve pending AXI response itself. It can be configured through AOU_CON0.CREDIT_MANAGE, and the default value is 1.
+AOU_CORE follows the DEACTIVATE rules of AoU specification v0.8 section 8.4. It manages request-related messages (WriteReq, ReadReq, WriteData) and response-related messages (ReadData, WriteResp) separately, so a deactivating link still drains the responses it owes and no re-activation is needed to complete them:
 
-* 0 Based on AoU v0.5
-** After deactivation, if a new request is received from the remote die, no response message can be sent.
-** To deliver the corresponding response, the system must go through activation again after deactivation.
-** Credit management and transmission availability for both Request-related messages and Response-related message are controlled together.
-** Credited messages must not be sent, after the DeactivateReq message is sent.
-** Credits must not be sent after the DeactivateAck message is sent.
-** The Activate Interrupt and Deactivate Interrupt that occur in the process of resuming the exchange of response messages impose mandatory requirement to set Activate and Deactivate SFR.
-* 1 (default) Proposal by BOS.
-** When the AoU Activity state is DEACTIVATE, manage Request-related messages(WERQ, RREQ, WDATA) and Response-related messages(RDATA, WRESP) separately.
-** RDATA, WRESP Credited messages can be sent, after the DeactivateReq message is sent.
-** Credits for RDATA, WRESP messages must be sent after the DeactivateAck message is sent.
-** The Deactivate interrupt only provides a hint indicating that the remote die has started activate/deactivate.
+* Request messages are not sent after the local DeactivateReq. A request a local manager issues after it stays in AOU_CORE; once the FSM is DISABLED it raises INT_ACTIVATE_START (xref:aou-735-activationdeactivation-interrupt[Section 7.3.5]) and is sent after the next activation.
+* ReadData and WriteResp are still sent after the local DeactivateReq, including the responses to requests the remote die sends after it, until the remote die's DeactivateReq arrives. The remote die sends its DeactivateReq only once every request it issued has been answered.
+* Request credits (WriteReq, ReadReq, WriteData) are advertised until the remote die's DeactivateReq arrives, so the remote die can keep issuing requests after the local DeactivateReq. A request credit already committed to the TX path when that DeactivateReq arrives may still be sent with the DeactivateAck; AoU v0.8 permits request credits after DeactivateAck.
+* ReadData and WriteResp credits are advertised until the local DeactivateReq is sent, also after the local DeactivateAck: the local die's own requests may still be open then, and their responses need credit. After the local DeactivateReq no local request is open, so none are needed.
+* In DISABLED both dies discard the credits they hold; the next activation advertises the full RX FIFO depth again (xref:aou-734-deactivation-sequence-flow[Section 7.3.4]).
+
+*Header credits.* The MsgCredit field of a flit header is not a message, and its byte position does not order it among the flit's messages. Its credits are consumed when the flit, or the half flit that carries the header, is consumed: once it has passed the D2D adapter's flit-cancel window ([.monospaced]#++pl_flit_cancel++#) without being cancelled. A cancelled flit carries no credit. Header credits in the flit that carries a DeactivateAck are permitted by the rules above. When that DeactivateAck completes the deactivation, its flit's header credits are consumed as the interface reaches DISABLED and are discarded with the other credits; they are not an error.
 
 [[aou-732-activation-start]]
 ==== 7.3.2. Activation start
@@ -518,34 +513,28 @@ image::image24.png[Figure 25. Deactivation sequence with DEACTIVATE_START]
 [[aou-734-deactivation-sequence-flow]]
 ==== 7.3.4. Deactivation Sequence Flow
 
-Once the local die issues a DeactivateReq, it can no longer provide responses to transactions initiated by the remote die. If the remote die continues to send requests or waits for responses without being notified, it may enter a hang state. To manage this safely, the remote die must take explicit action upon receiving a DeactivateReq: 1. Immediately generate an interrupt to the CPU to inform the system software that a DeactivateReq has been received and that it must set the DEACTIVATE_START SFR.
+Each die deactivates on its own: it sends its DeactivateReq once its own requests have completed, and it answers the other die's DeactivateReq with a DeactivateAck. The interface reaches DISABLED when both DeactivateAcks have been exchanged (AoU specification v0.8 section 8.4). Between the two DeactivateReqs the die that deactivated first still answers the other die's requests, and the other die keeps granting the response credits those answers need (xref:aou-731-deactivation-credit-rules[Section 7.3.1]). Nothing has to be re-activated to complete them.
 
-Although deactivation of the local die and the remote die operate independently, it is essential at the system level to communicate the deactivation & activation state through interrupts. This ensures that system software is explicitly informed of deactivation events and prevents the remote die from continuing to expect response that will never arrive, thereby avoiding hang conditions. This approach guarantees that once deactivation is initiated, both dies can coordinate the transition into safe and consistent DISABLED state.
+A DeactivateReq received from the remote die raises INT_DEACTIVATE_START. It is a hint: local managers may keep issuing requests. Software sets DEACTIVATE_START once the local managers have stopped, and the DeactivateReq follows when the requests already issued have completed (xref:aou-71-sfr-setting[Section 7.1]). Software that never sets DEACTIVATE_START leaves the remote die in DEACTIVATE, unable to issue requests again.
 
-If the software on both dies can explicitly coordinate to guarantee that all outstanding transactions have been completed and that no new transactions will be issued, then such an complicated implementation would not be necessary.
-
-xref:figure-25[Figure 25] illustrates the current activate/deactivate implementation of AOU_CORE.
+xref:figure-25[Figure 25] shows the activation controller's signals during a deactivation. xref:figure-26[Figure 26] and xref:figure-27[Figure 27] show the message exchange when the local die deactivates first and when the remote die does.
 
 [caption=""]
-.Figure 26. CREDIT_MANAGE 1 Deactivate sequence flow
+.Figure 26. Deactivation started by the local die
 [[figure-26]]
-image::image25.png[Figure 26. CREDIT_MANAGE 1 Deactivate sequence flow]
+image::deactivate-local-first.svg[Figure 26. Deactivation started by the local die]
 
 [caption=""]
-.Figure 27. CREDIT_MANAGE 0 Deactivate sequence flow
+.Figure 27. Deactivation started by the remote die
 [[figure-27]]
-image::image26.png[Figure 27. CREDIT_MANAGE 0 Deactivate sequence flow]
+image::deactivate-remote-first.svg[Figure 27. Deactivation started by the remote die]
 
 This system provides a bus cleany mechanism, tracked inside AOU_CORE and reported in AOU_INIT:
 
 * SLV_TR_COMPLETE (subordinate bus cleanly) indicates whether the local die has received all responses to the requests it sent to the remote die. Writes that received an early B response count until their actual B response arrives (WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE = 1 on every RP), so deactivation waits for them.
 * MST_TR_COMPLETE (manager bus cleanly) indicates whether the remote die has received all responses to the requests it sent to the local die.
 
-After the local die sends a DeactivateReq, if the remote die issues a new request and expects a response, the system must re-enter the activation sequence before any response can be provided.
-
-Before sending a new ActivateReq, the Rx FIFO must be completely emptied - that is, all messages must be popped. After deactivation, the credit count is reset, and during the subsequent activation process, credits are advertised based on the RX FIFO depth. Therefore, before sending an ActivateReq, the local die must confirm, as described in the local diepass:[']s sequence 10.1, that all messages in the RX FIFO have been popped.
-
-To meet satisfy the condition in the local diepass:[']s sequence 10.1, no backpressure must occur on the local diepass:[']s MI AW/AR/W channels.
+Before sending a new ActivateReq, the Rx FIFO must be completely emptied - that is, all messages must be popped. After deactivation, the credit count is reset, and during the subsequent activation process, credits are advertised based on the RX FIFO depth. Therefore, before sending an ActivateReq, the local die must confirm that all messages in the RX FIFO have been popped. To satisfy that condition, no backpressure must occur on the local diepass:[']s MI AW/AR/W channels.
 
 [[aou-735-activationdeactivation-interrupt]]
 ==== 7.3.5. Activation/Deactivation Interrupt
@@ -555,17 +544,13 @@ To meet satisfy the condition in the local diepass:[']s sequence 10.1, no backpr
 * When this interrupt is detected, AOU_INIT.ACTIVATE_START SFR must be set to 1.
 * When AOU_INIT.ACTIVATE_STATE_ENABLED becomes 1, write 1 to clear the AOU_INIT.INT_ACTIVATE_START W1C SFR.
 * An interrupt occurs when AOU_INIT.ACTIVATE_START SFR is not set and any of the following conditions are met:
-1.  There is a message to send
-** When AOU_CON0.CREDIT_MANAGE = 0, if a new request arrives from the remote die after the local die has sent a DeactivateReq, this interrupt is asserted because the local die must return a response.
-** When AOU_CON0.CREDIT_MANAGE = 1, this interrupt can also be asserted if a new request arrives after the remote die has sent a DeactivateReq.
+1.  There is a message to send: a local manager issued a request after the local DeactivateReq (xref:aou-731-deactivation-credit-rules[Section 7.3.1]).
 2.  There is a response to be received: the local die has sent requests to the remote die whose responses have not yet arrived (AOU_INIT.SLV_TR_COMPLETE == 0)
-** When AOU_CON0.CREDIT_MANAGE = 0, this interrupt can be asserted if the local die issues new AXI requests after the remote die has sent a DeactivateReq.
 3.  An ActivateReq message is received from the remote die, and the activation handshake has not yet completed (the FSM is DISABLED or ACTIVATE). An ActivateReq received while ENABLED is [.monospaced]#++INVALID_ACTMSG++# and requests LinkReset (xref:aou-723-linkreset-error-reporting[Section 7.2.3]), not this interrupt.
 
 *INT_DEACTIVATE_START*
 
-* When AOU_CON0.CREDIT_MANAGE = 0: if the interrupt is detected, the manager IP must stop sending new request messages and AOU_INIT.DEACTIVATE_START SFR must be set to 1.
-* When AOU_CON0.CREDIT_MANAGE = 1: if the interrupt is detected, this serves only as a hint that the remote die intends to deactivate. The local die can continue sending request messages. Once all messages have been sent, AOU_INIT.DEACTIVATE_START SFR must be set. Otherwise, the remote die may end up in a state where it can never send requests again.
+* The interrupt is a hint that the remote die intends to deactivate. The local die can continue sending request messages. Once all messages have been sent, AOU_INIT.DEACTIVATE_START SFR must be set. Otherwise, the remote die may end up in a state where it can never send requests again.
 * When AOU_INIT.ACTIVATE_STATE_DISABLED becomes 1, write 1 to clear the AOU_INIT.INT_DEACTIVATE_START W1C SFR.
 * An interrupt is asserted when AOU_INIT.DEACTIVATE_START SFR is not set and the local die receives a DeactivateReq message from the remote die.
 
@@ -574,34 +559,28 @@ To meet satisfy the condition in the local diepass:[']s sequence 10.1, no backpr
 
 For PM entry / LinkReset / LinkDisable entry sequence, UCIE_CORE check AOU_CORE state and try to change state. For this sequence, resolving pending AXI transactions is necessary.
 
-Since current AOU SPEC has no way to send AXI response after sending DeactiveReq. CREDIT_MANAGE = 0 (Type 0) is matched with current AOU_SPEC. For this case, SW need to check whether there is pending AXI transaction.
+Responses owed in either direction are delivered during the deactivation itself (xref:aou-731-deactivation-credit-rules[Section 7.3.1]). An AXI transaction can still be pending once AOU_CORE is DISABLED only when a local manager issued a request after the local DeactivateReq; AOU_CORE then raises INT_ACTIVATE_START, and SW activates again to complete it.
 
 * *PM entry SW sequence*
 
-. Write AOU_INIT.DEACTIVATE_START to 1.
+. Stop the local managers from issuing requests, then write AOU_INIT.DEACTIVATE_START to 1.
 . Polling AOU_INIT.ACTIVATE_STATE_DISABLED and AOU_INIT.SLV_TR_COMPLETE & AOU_INIT.MST_TR_COMPLETE.
-.. Although AOU_CORE state becomes DISABLED, there may have pending AXI transaction.
-.. AOU_CORE issue Interrupt for resolving pending AXI transactions.
-.. Activate AOU_CORE and resolve pending AXI transactions.
-.. Deactivate AOU_CORE
+.. If INT_ACTIVATE_START is raised, an AXI transaction is still pending: activate AOU_CORE, let it complete, and deactivate AOU_CORE again.
 . Polling AOU_INIT.ACTIVATE_STATE_DISABLED and AOU_INIT.SLV_TR_COMPLETE & AOU_INIT.MST_TR_COMPLETE.
 . Do PM Entry Sequence on UCIE_CORE.
 
 [caption=""]
 .Figure 28. PM Entry Sequence
 [[figure-28]]
-image::image27.png[Figure 28. PM Entry Sequence]
+image::pm-entry-sequence.svg[Figure 28. PM Entry Sequence]
 
 * *LinkDisable SW sequence*
 
 Same as PM entry, before doing UCIE state transition, AOU_CORE need to Disabled properly.
 
-. Write AOU_INIT.DEACTIVATE_START to 1.
+. Stop the local managers from issuing requests, then write AOU_INIT.DEACTIVATE_START to 1.
 . Polling AOU_INIT.ACTIVATE_STATE_DISABLED and AOU_INIT.SLV_TR_COMPLETE & AOU_INIT.MST_TR_COMPLETE.
-.. Although AOU_CORE state becomes DISABLED, there may have pending AXI transaction.
-.. AOU_CORE issue Interrupt for resolving pending AXI transactions.
-.. Activate AOU_CORE and resolve pending AXI transactions.
-.. Deactivate AOU_CORE
+.. If INT_ACTIVATE_START is raised, an AXI transaction is still pending: activate AOU_CORE, let it complete, and deactivate AOU_CORE again.
 . Polling AOU_INIT.ACTIVATE_STATE_DISABLED and AOU_INIT.SLV_TR_COMPLETE & AOU_INIT.MST_TR_COMPLETE.
 . Do LinkReset/LinkDisabled Sequence on UCIE_CORE.
 

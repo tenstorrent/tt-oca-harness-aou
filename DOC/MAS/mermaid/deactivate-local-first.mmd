@@ -1,0 +1,23 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant LSW as Local SW
+    participant L as Local AOU_CORE
+    participant R as Remote AOU_CORE
+    participant RSW as Remote SW
+    Note over L,R: ENABLED
+    LSW->>L: local managers stop issuing, then DEACTIVATE_START = 1
+    Note over L: waits for SLV_TR_COMPLETE = 1 (every local request answered) and the DEACTIVATE_TIME_OUT_VALUE quiet window
+    L->>R: DeactivateReq
+    Note over L,R: DEACTIVATE
+    R->>RSW: INT_DEACTIVATE_START (a hint: remote managers may keep issuing)
+    R->>L: DeactivateAck
+    R->>L: AW/AR/W requests still issued by the remote managers
+    L->>R: R/B responses, sent after the local DeactivateReq
+    Note over L: keeps granting request credits until the remote DeactivateReq arrives
+    Note over R: keeps granting R/B credits after its DeactivateAck while its requests are open
+    RSW->>R: remote managers stop issuing, then DEACTIVATE_START = 1
+    Note over R: waits for its SLV_TR_COMPLETE = 1 and its quiet window
+    R->>L: DeactivateReq
+    L->>R: DeactivateAck
+    Note over L,R: DISABLED: both dies discard the credits they hold

@@ -634,7 +634,6 @@ import packet_def_pkg::*;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bready_1024     ;
 
     wire                                    w_deactivate_property           ;
-    logic                                   w_credit_manage                 ;
     logic [3:0][AXI_LEN_WD-1:0]             w_axi_split_tr_max_awburstlen   ;
     logic [3:0][AXI_LEN_WD-1:0]             w_axi_split_tr_max_arburstlen   ;
     logic [7:0]                             w_tx_lp_mode_threshold          ;
@@ -748,7 +747,6 @@ import packet_def_pkg::*;
         .I_IP_VERSION_MAJOR_VERSION                                     ( 16'd1                                 ),
         .I_IP_VERSION_MINOR_VERSION                                     ( 16'b0                                 ),
 
-        .O_AOU_CON0_CREDIT_MANAGE                                       ( w_credit_manage                       ),
         .O_AOU_CON0_AOU_SW_RESET                                        ( O_SW_RESET                            ),
         .O_AOU_CON0_DEACTIVATE_FORCE                                    ( w_deactivate_force                    ),
         .I_AOU_INIT_INT_DEACTIVATE_PROPERTY                             ( w_deactivate_property                 ),
@@ -1124,16 +1122,13 @@ import packet_def_pkg::*;
         .I_DEACTIVATE_FORCE                ( w_deactivate_force             ),
         .I_TX_PENDING                      ( w_tx_pending                   ),
         .I_TX_AXI_TR_PENDING               ( w_tx_axi_tr_pending            ),
-        .I_MST_BUS_CLEANY_COMPLETE         ( O_MST_TR_COMPLETE              ),
         .I_SLV_BUS_CLEANY_COMPLETE         ( O_SLV_TR_COMPLETE              ),
-        .I_AOU_RX_NEW_TR_HS                ( (|O_RD_REQ_FIFO_SVALID) | (|O_WR_REQ_FIFO_SVALID)  ),
         .I_AOU_RX_FIFO_PENDING             ( w_aou_rx_fifo_pending          ),
 
         .I_CRDTGRANT_VALID                 ( |w_rxcore_crdtgrant_valid      ),
 
         .I_ACK_TIME_OUT_VALUE              (  w_ack_time_out_value          ),
         .I_MSGCREDIT_TIME_OUT_VALUE        (  w_msgcredit_time_out_value    ),
-        .I_CREDIT_MANAGE_TYPE              (  w_credit_manage               ),
 
         .O_ACT_ACK_ERR                     (  w_act_ack_err_set             ),
         .O_DEACT_ACK_ERR                   (  w_deact_ack_err_set           ),

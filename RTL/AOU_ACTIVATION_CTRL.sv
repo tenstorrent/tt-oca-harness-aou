@@ -51,17 +51,13 @@ module AOU_ACTIVATION_CTRL
     input           I_TX_PENDING                    ,//and check tx fifo count and ring buffer valid
     input           I_TX_AXI_TR_PENDING             ,
 
-    input           I_MST_BUS_CLEANY_COMPLETE       ,//from bus cleany
-    input           I_SLV_BUS_CLEANY_COMPLETE       ,
-    input           I_AOU_RX_NEW_TR_HS              ,
+    input           I_SLV_BUS_CLEANY_COMPLETE       ,//from bus cleany
     input           I_AOU_RX_FIFO_PENDING           ,        
     
     input           I_CRDTGRANT_VALID               ,
 
     input   [2:0]   I_ACK_TIME_OUT_VALUE            ,
     input   [2:0]   I_MSGCREDIT_TIME_OUT_VALUE      ,
-
-    input           I_CREDIT_MANAGE_TYPE            ,//0: based on v0.5 / 1: manage request-related message and response-related message separately
 
     output          O_ACT_ACK_ERR                   ,
     output          O_DEACT_ACK_ERR                 ,
@@ -111,9 +107,6 @@ logic       w_deactivate_start_rising_edge_detect;
 logic       r_deactivate_force_1d;
 logic       w_deactivate_force_rising_edge_detect;
 
-logic       r_axi_mst_rsp_completed_1d;
-logic       w_axi_mst_rsp_completed_falling_edge_detect;
-
 logic       r_tx_deactivate_req;
 logic       r_tx_deactivate_ack;
 logic       r_rx_deactivate_req;
@@ -144,9 +137,6 @@ logic [11:0]r_time_out;
 logic       w_time_out_done;
 
 logic [11:0]w_time_out_value;
-logic       w_axi_rsp_completed_safe_base;
-logic       w_axi_rsp_completed_safe;
-logic       r_deactivate_block;
 
 logic       w_activate_en;
 logic       w_deactivate_en;
@@ -163,19 +153,6 @@ assign      w_activate_en   = ((r_cur_st == DISABLED) | (r_cur_st == ACTIVATE  )
 assign      w_deactivate_en = ((r_cur_st == ENABLED)  | (r_cur_st == DEACTIVATE)) & ~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID));
 
 
-//-------------------------------------------------------------
-always_ff @ (posedge I_CLK or negedge I_RESETN) begin
-    if(~I_RESETN) begin
-        r_deactivate_block <= 1'b0;
-    end else if (I_MST_BUS_CLEANY_COMPLETE && I_AOU_RX_NEW_TR_HS) begin
-        r_deactivate_block <= 1'b1;
-    end else if (w_axi_mst_rsp_completed_falling_edge_detect) begin
-        r_deactivate_block <= 1'b0;
-    end
-end
-//-------------------------------------------------------------
-assign w_axi_rsp_completed_safe_base = I_MST_BUS_CLEANY_COMPLETE;
-assign w_axi_rsp_completed_safe = w_axi_rsp_completed_safe_base & ~r_deactivate_block;
 //-------------------------------------------------------------
 always_comb begin
     case(I_DEACTIVATE_TIME_OUT_VALUE)
@@ -204,15 +181,14 @@ assign  w_activate_start_rising_edge_detect  =   ~r_activate_start_1d & (I_ACTIV
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN)begin
         r_deactivate_start_1d <= 1'b0;
-    end else if (I_CREDIT_MANAGE_TYPE) begin
-        r_deactivate_start_1d <= I_DEACTIVATE_START & w_time_out_done & w_deactivate_en & I_SLV_BUS_CLEANY_COMPLETE;        
     end else begin
-        r_deactivate_start_1d <= I_DEACTIVATE_START & w_axi_rsp_completed_safe & w_time_out_done & w_deactivate_en & ((~r_rx_deactivate_req & I_SLV_BUS_CLEANY_COMPLETE) | (r_rx_deactivate_req));
+        r_deactivate_start_1d <= I_DEACTIVATE_START & w_time_out_done & w_deactivate_en & I_SLV_BUS_CLEANY_COMPLETE;        
     end
 end
 
-assign  w_deactivate_start_rising_edge_detect   = I_CREDIT_MANAGE_TYPE ? ~r_deactivate_start_1d & (I_DEACTIVATE_START & w_time_out_done & w_deactivate_en & I_SLV_BUS_CLEANY_COMPLETE) :
-                                                  ~r_deactivate_start_1d & (I_DEACTIVATE_START & w_axi_rsp_completed_safe & w_time_out_done & w_deactivate_en & ((~r_rx_deactivate_req & I_SLV_BUS_CLEANY_COMPLETE) | (r_rx_deactivate_req)));
+// AoU v0.8 8.4: DeactivateReq only once this die's own requests have completed.
+// Responses this die still owes may follow it, so they do not hold it back.
+assign  w_deactivate_start_rising_edge_detect   = ~r_deactivate_start_1d & (I_DEACTIVATE_START & w_time_out_done & w_deactivate_en & I_SLV_BUS_CLEANY_COMPLETE);
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
@@ -224,16 +200,6 @@ end
 
 assign w_deactivate_force_rising_edge_detect = ~r_deactivate_force_1d & (I_DEACTIVATE_FORCE & w_deactivate_en);
 
-
-always_ff @ (posedge I_CLK or negedge I_RESETN) begin
-    if(~I_RESETN)begin
-        r_axi_mst_rsp_completed_1d <= 1'b0;
-    end else begin
-        r_axi_mst_rsp_completed_1d <= I_MST_BUS_CLEANY_COMPLETE;
-    end
-end
-
-assign  w_axi_mst_rsp_completed_falling_edge_detect  = r_axi_mst_rsp_completed_1d & ~I_MST_BUS_CLEANY_COMPLETE;
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
@@ -500,12 +466,15 @@ assign O_TX_REQ_CREDITED_MESSAGE_EN = ((r_cur_st == ACTIVATE) & (r_tx_activate_r
                                   | ((r_cur_st == DEACTIVATE) & (~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID & I_ACTMSG_READY))));
 
 //Read Data, Write response message
-assign O_RSP_CRD_ADVERTISE_EN       = I_CREDIT_MANAGE_TYPE ? ((r_cur_st == ACTIVATE) & (r_rx_activate_ack | (((O_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & O_ACTMSG_VALID & I_ACTMSG_READY))))
-                                  | (((r_cur_st == DEACTIVATE) | (r_cur_st == ENABLED)) & ~(r_tx_deactivate_req)) : O_REQ_CRD_ADVERTISE_EN;
+//AoU v0.8 8.4: responses are still sent after this die's DeactivateReq, and
+//their credits are still advertised after its DeactivateAck while its own
+//requests are outstanding; both stop once no further response can be owed.
+assign O_RSP_CRD_ADVERTISE_EN       = ((r_cur_st == ACTIVATE) & (r_rx_activate_ack | (((O_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & O_ACTMSG_VALID & I_ACTMSG_READY))))
+                                  | (((r_cur_st == DEACTIVATE) | (r_cur_st == ENABLED)) & ~(r_tx_deactivate_req));
 
-assign O_TX_RSP_CREDITED_MESSAGE_EN = I_CREDIT_MANAGE_TYPE ? ((r_cur_st == ACTIVATE) & (r_tx_activate_req & r_rx_activate_ack & r_rx_activate_req & (((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID)|r_tx_activate_ack)))
+assign O_TX_RSP_CREDITED_MESSAGE_EN = ((r_cur_st == ACTIVATE) & (r_tx_activate_req & r_rx_activate_ack & r_rx_activate_req & (((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID)|r_tx_activate_ack)))
                                   | ((r_cur_st == ENABLED) & (~(r_rx_deactivate_req | ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID))))
-                                  | ((r_cur_st == DEACTIVATE) & (~(r_rx_deactivate_req | ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID)))) : O_TX_REQ_CREDITED_MESSAGE_EN;                                  
+                                  | ((r_cur_st == DEACTIVATE) & (~(r_rx_deactivate_req | ((I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID))));
 
 assign O_STATUS_DISABLED        = (r_cur_st == DISABLED);
 assign O_STATUS_ENABLED         = (r_cur_st == ENABLED);

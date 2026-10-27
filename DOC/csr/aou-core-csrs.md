@@ -83,7 +83,7 @@ Don't override. Generated from: aou_core
 |  0  |    deactivate_force    |   w  | 0x0 |  — |
 |  1  |       reserved_1       |   r  | 0x0 |  — |
 |  2  |     axi_split_tr_en    |  rw  | 0x0 |  — |
-|  3  |      credit_manage     |  rw  | 0x1 |  — |
+|  3  |       reserved_3       |   r  | 0x0 |  — |
 |  4  |      aou_sw_reset      |   w  | 0x0 |  — |
 | 10:5|      reserved_10_5     |   r  | 0x0 |  — |
 |  11 |       tx_lp_mode       |  rw  | 0x0 |  — |
@@ -105,10 +105,6 @@ Don't override. Generated from: aou_core
 #### axi_split_tr_en field
 
 <p>Global enable for AXI split transaction feature.</p>
-
-#### credit_manage field
-
-<p>Credit management type. 0: per AoU v0.5, request and response credits are managed together; credited messages must not be sent after DeactivateReq, and re-activation is required to resolve pending AXI responses. 1 (default): request-related (WREQ/RREQ/WDATA) and response-related (RDATA/WRESP) credits are managed separately during DEACTIVATE state, allowing response messages to be sent after DeactivateReq.</p>
 
 #### aou_sw_reset field
 

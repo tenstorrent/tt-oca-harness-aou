@@ -59,7 +59,6 @@ module AOU_CORE_SFR #(
     output      [7:0]       O_AOU_CON0_TX_LP_MODE_THRESHOLD,
     output                  O_AOU_CON0_TX_LP_MODE,
     output                  O_AOU_CON0_AOU_SW_RESET,
-    output                  O_AOU_CON0_CREDIT_MANAGE,
     output                  O_AOU_CON0_DEACTIVATE_FORCE,
     input                   I_AOU_INIT_INT_DEACTIVATE_PROPERTY,    
     input                   I_AOU_INIT_MST_TR_COMPLETE,
@@ -306,7 +305,6 @@ reg                 r_aou_con0_rp0_axi_aggregator_en;
 reg [7:0]           r_aou_con0_tx_lp_mode_threshold;
 reg                 r_aou_con0_tx_lp_mode;
 reg                 r_aou_con0_aou_sw_reset;
-reg                 r_aou_con0_credit_manage;
 reg                 r_aou_con0_deactivate_force;
 reg                 r_aou_init_int_fdi_link_down;
 reg                 r_aou_init_int_activate_start;
@@ -472,14 +470,6 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         r_aou_con0_aou_sw_reset <= 1'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_CON0_ADDR)) begin
         r_aou_con0_aou_sw_reset <= I_PWDATA[4];
-    end
-end
-
-always @(posedge I_PCLK or negedge I_PRESETN) begin
-    if (!I_PRESETN) begin
-        r_aou_con0_credit_manage <= 1'h1;
-    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_CON0_ADDR)) begin
-        r_aou_con0_credit_manage <= I_PWDATA[3];
     end
 end
 
@@ -1540,7 +1530,7 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         SFR_IP_VERSION_ADDR : 
             r_rdata <= {I_IP_VERSION_MAJOR_VERSION, I_IP_VERSION_MINOR_VERSION};
         SFR_AOU_CON0_ADDR : 
-            r_rdata <= { 4'd0, r_aou_con0_rp3_error_info_access_en, r_aou_con0_rp2_error_info_access_en, r_aou_con0_rp1_error_info_access_en, r_aou_con0_rp0_error_info_access_en, r_aou_con0_rp3_axi_aggregator_en, r_aou_con0_rp2_axi_aggregator_en, r_aou_con0_rp1_axi_aggregator_en, r_aou_con0_rp0_axi_aggregator_en, r_aou_con0_tx_lp_mode_threshold, r_aou_con0_tx_lp_mode,  6'd0, r_aou_con0_aou_sw_reset, r_aou_con0_credit_manage, 1'b0, 1'b0,  1'd0};
+            r_rdata <= { 4'd0, r_aou_con0_rp3_error_info_access_en, r_aou_con0_rp2_error_info_access_en, r_aou_con0_rp1_error_info_access_en, r_aou_con0_rp0_error_info_access_en, r_aou_con0_rp3_axi_aggregator_en, r_aou_con0_rp2_axi_aggregator_en, r_aou_con0_rp1_axi_aggregator_en, r_aou_con0_rp0_axi_aggregator_en, r_aou_con0_tx_lp_mode_threshold, r_aou_con0_tx_lp_mode,  6'd0, r_aou_con0_aou_sw_reset, 1'b0, 1'b0, 1'b0,  1'd0};
         SFR_AOU_INIT_ADDR : 
             r_rdata <= { 19'd0, r_aou_init_int_fdi_link_down, I_AOU_INIT_INT_DEACTIVATE_PROPERTY, I_AOU_INIT_MST_TR_COMPLETE, I_AOU_INIT_SLV_TR_COMPLETE, r_aou_init_int_activate_start, r_aou_init_int_deactivate_start, r_aou_init_deactivate_time_out_value, I_AOU_INIT_ACTIVATE_STATE_DISABLED, I_AOU_INIT_ACTIVATE_STATE_ENABLED, r_aou_init_deactivate_start, r_aou_init_activate_start};
         SFR_AOU_INTERRUPT_MASK_ADDR : 
@@ -1620,7 +1610,6 @@ assign O_AOU_CON0_RP0_AXI_AGGREGATOR_EN = r_aou_con0_rp0_axi_aggregator_en;
 assign O_AOU_CON0_TX_LP_MODE_THRESHOLD = r_aou_con0_tx_lp_mode_threshold;
 assign O_AOU_CON0_TX_LP_MODE = r_aou_con0_tx_lp_mode;
 assign O_AOU_CON0_AOU_SW_RESET = r_aou_con0_aou_sw_reset;
-assign O_AOU_CON0_CREDIT_MANAGE = r_aou_con0_credit_manage;
 assign O_AOU_CON0_DEACTIVATE_FORCE = r_aou_con0_deactivate_force;
 assign O_AOU_INIT_DEACTIVATE_TIME_OUT_VALUE = r_aou_init_deactivate_time_out_value;
 assign O_AOU_INIT_DEACTIVATE_START = r_aou_init_deactivate_start;

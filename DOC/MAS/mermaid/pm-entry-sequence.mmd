@@ -1,0 +1,17 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%%{init: {'theme': 'neutral'}}%%
+sequenceDiagram
+    participant SW as Local SW
+    participant L as Local AOU_CORE
+    participant R as Remote die
+    participant UC as UCIe controller
+    SW->>L: local managers stop issuing, then DEACTIVATE_START = 1
+    L->>R: DeactivateReq / DeactivateAck exchange (Section 7.3.4)
+    SW->>L: poll ACTIVATE_STATE_DISABLED, SLV_TR_COMPLETE, MST_TR_COMPLETE
+    alt a local request was accepted after the DeactivateReq, or an ActivateReq arrived
+        L->>SW: INT_ACTIVATE_START
+        SW->>L: ACTIVATE_START = 1, and the request completes
+        SW->>L: DEACTIVATE_START = 1, then poll again
+    end
+    Note over L: DISABLED, SLV_TR_COMPLETE = 1, MST_TR_COMPLETE = 1
+    SW->>UC: PM entry (L1/L2) or LinkDisable
