@@ -142,6 +142,7 @@ logic       w_activate_en;
 logic       w_deactivate_en;
 
 logic       w_lp_linkerror_start;
+logic       r_lp_linkerror_pending;
 
 logic       r_ucie_init_done_1d;
 logic       w_fdi_link_fell;
@@ -149,8 +150,30 @@ logic       w_act_req_pending;
 logic       w_fdi_link_lost;
 logic       w_fsm_abort;
 
-assign      w_activate_en   = ((r_cur_st == DISABLED) | (r_cur_st == ACTIVATE  )) & ~(r_tx_activate_req | ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID));
+assign      w_activate_en   = ((r_cur_st == DISABLED) | (r_cur_st == ACTIVATE  )) & ~(r_tx_activate_req | ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID))
+                            & ~(r_lp_linkerror_pending | w_lp_linkerror_start);
 assign      w_deactivate_en = ((r_cur_st == ENABLED)  | (r_cur_st == DEACTIVATE)) & ~(r_tx_deactivate_req | ((O_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & O_ACTMSG_VALID));
+
+//-------------------------------------------------------------
+//After a LinkReset request no new activation starts until software resets
+//AOU_CORE (MAS 7.2.3, 7.3.6). The LinkReset condition is a one-cycle pulse that
+//returns the FSM to DISABLED and clears the outstanding-request flag; with
+//ACTIVATE_START still set, the start edge detector would otherwise see the
+//enable return and send a second ActivateReq. This flag holds the activation
+//enable (the start edge and INT_ACTIVATE_START) and the entry into ACTIVATE
+//until the core reset, in the direction of the AoU v0.8 ERROR state (8.3.3,
+//8.4). The enable also drops in the cycle of the condition itself: the
+//invalid-message pulse is combinational from the received message, so a start
+//edge in that cycle would otherwise queue an ActivateReq that nothing clears.
+//Every LinkReset source is a detected partner error (time-out or invalid
+//activation message), so a compliant partner never sets it.
+always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+    if(~I_RESETN) begin
+        r_lp_linkerror_pending <= 1'b0;
+    end else if (w_lp_linkerror_start) begin
+        r_lp_linkerror_pending <= 1'b1;
+    end
+end
 
 
 //-------------------------------------------------------------
@@ -371,12 +394,13 @@ end
 //the handshake registers are cleared by it (and not set in that cycle), so
 //the state must not advance on them. In DISABLED it cancels a pending entry
 //to ACTIVATE: the request that asked for it is cleared in the same cycle.
+//After a LinkReset request the FSM stays in DISABLED until the core reset.
 always_comb begin
     case(r_cur_st)
         DISABLED:begin
             if (w_fsm_abort) begin
                 w_nxt_st = DISABLED;
-            end else if(r_tx_activate_req | r_rx_activate_req)  begin
+            end else if((r_tx_activate_req | r_rx_activate_req) & ~r_lp_linkerror_pending)  begin
                 w_nxt_st = ACTIVATE;
             end else begin
                 w_nxt_st = DISABLED;
