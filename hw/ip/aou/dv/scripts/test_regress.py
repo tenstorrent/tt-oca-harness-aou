@@ -69,7 +69,7 @@ class Regress(unittest.TestCase):
         path = os.path.join(self.bin, "make")
         with open(path, "w", encoding="utf-8") as fh:
             fh.write(FAKE_MAKE)
-        os.chmod(path, 0o755)
+        os.chmod(path, 0o700)
         self.out = os.path.join(self.dir, "out")
         self.log = os.path.join(self.dir, "make.log")
         self.env = {k: v for k, v in os.environ.items() if k not in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL", "LSF")}
