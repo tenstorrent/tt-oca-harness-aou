@@ -24,7 +24,8 @@
 // (MAS 7.3.6), including one already acknowledged early (7.2.5), so the write
 // may have landed or not. The bytes such a write addresses may hold their old
 // value or the write's value until a checked write defines them again. A
-// reset_outstanding read's SLVERR beats are not checked (BUGS/015 interim); its
+// reset_outstanding read's SLVERR beats are not checked (MAS 7.3.6 loses the read
+// and defines no response; the SLVERR is taken from the RTL); its
 // OKAY beats, every other response and every later transaction are checked as
 // above.
 class aou_scoreboard extends uvm_scoreboard;

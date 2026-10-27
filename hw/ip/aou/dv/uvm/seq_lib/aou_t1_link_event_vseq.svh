@@ -3,8 +3,8 @@
 
 // FDI link events with AoU traffic: Adapter-initiated Retrain while traffic
 // runs both ways, then L1 entry/exit and a clk_req wake on an idle link, then
-// more traffic. What the core does on these events is unspecified (BUGS/015);
-// the interim expectation is that ENABLED and every transaction survive.
+// more traffic. Retrain and L1 are transparent to AOU_CORE (MAS 7.3.7): ENABLED
+// and every transaction survive.
 class aou_t1_link_event_vseq extends aou_base_test_seq;
   `uvm_object_utils(aou_t1_link_event_vseq)
 

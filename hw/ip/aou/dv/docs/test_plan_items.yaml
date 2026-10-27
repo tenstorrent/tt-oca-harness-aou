@@ -2647,9 +2647,9 @@
 - id: '18.13'
   section: '2.18'
   section_title: UCIe FDI Interface Tests
-  title: Retrain while ENABLED with traffic is transparent to AoU (interim expectation)
+  title: Retrain while ENABLED with traffic is transparent to AoU
   priority: P2
-  added: UCIe r1.1 8.3.3.4; BUGS/015
+  added: UCIe r1.1 8.3.3.4; MAS software-operation 7.3.7
   note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
 
 - id: '18.14'

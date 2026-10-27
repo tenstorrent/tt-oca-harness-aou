@@ -311,7 +311,8 @@ class aou_t1_env extends uvm_env;
   // request to the core reset. The local managers' transactions on the bus in
   // the window are marked reset_outstanding: a write that completes before the
   // reset is lost or landed (the scoreboard allows either), a read may end with
-  // SLVERR (BUGS/015 interim). The rest are aborted by reset_flush() at the
+  // SLVERR (MAS 7.3.6 says the reset loses it and defines no response; the
+  // SLVERR is taken from the RTL). The rest are aborted by reset_flush() at the
   // core reset, as are the remote die's, which cannot complete with the link down.
   function void sw_reset_window(bit open);
     foreach (s_mgr[r]) if (s_mgr[r].mon != null) s_mgr[r].mon.sw_reset_window(open);

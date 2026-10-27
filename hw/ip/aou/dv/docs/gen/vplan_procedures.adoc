@@ -325,8 +325,8 @@ Class `aou_t1_link_event_test` extends `aou_base_test` (`uvm/tests/aou_t1_link_e
 
 FDI link events with AoU traffic: Adapter-initiated Retrain while traffic
 runs both ways, then L1 entry/exit and a clk_req wake on an idle link, then
-more traffic. What the core does on these events is unspecified (BUGS/015);
-the interim expectation is that ENABLED and every transaction survive.
+more traffic. Retrain and L1 are transparent to AOU_CORE (MAS 7.3.7): ENABLED
+and every transaction survive.
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -727,7 +727,7 @@ inband_pres (aou_link_event_vseq).
 *Procedure.* Virtual sequence `aou_link_event_vseq` (`uvm/seq_lib/lifecycle/aou_link_event_vseq.svh`):
 
 Adapter-initiated FDI link events while AoU is ENABLED and traffic runs.
-AoU's reaction is unspecified (BUGS/015); the interim expectations are:
+The expectations follow MAS 7.3.6 and 7.3.7:
 retrain, clk_wake  transparent: AoU stays ENABLED, no interrupt, every
 transaction completes with correct data;
 l1                 software deactivates first (MAS §7.3.6), the adapter
@@ -799,7 +799,7 @@ l1_act or retrain_act) +link_down_mask +loops +T1_TXN.
 * 11.11: Assert reset mid-transaction
 * 11.18: Regression on a build with the RTL's embedded ASSERTION_ON checks
 * 18.10: Verify correct FDI valid/ready protocol
-* 18.13: Retrain while ENABLED with traffic is transparent to AoU (interim expectation)
+* 18.13: Retrain while ENABLED with traffic is transparent to AoU
 * 18.14: LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery
 * 18.15: L1 entry and exit with the MAS power-management sequence, including the clk_req wake
 * 18.17: LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask
@@ -3884,7 +3884,7 @@ Class `aou_axi_sb_reset_test` extends `uvm_test` (`uvm/tests/axi_selftest/aou_ax
 fed to the scoreboard directly. A reset_outstanding write is lost or landed
 whatever its response, and the bytes it addresses may then hold their old
 value or the write's, until a checked write; a reset_outstanding read may
-end with SLVERR beats (BUGS/015 interim); anything else is still an error.
+end with SLVERR beats (MAS 7.3.6 defines no response for it); anything else is still an error.
 Each step expects an exact set of errors.
 
 *Procedure.* The class's own `run_phase` (see the file).

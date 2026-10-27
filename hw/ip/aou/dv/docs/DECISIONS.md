@@ -1119,7 +1119,7 @@ request, and must a flit already in its TX path be dropped?
   the drivers idle their outputs and restart once the reset is over.
 - The scoreboard treats a write on the bus at the AOU_SW_RESET request
   (`reset_outstanding`) as lost or landed whatever its response; a read in the
-  same window may end with SLVERR (BUGS/015 interim).
+  same window may end with SLVERR (MAS 7.3.6 defines no response for it).
 - No check judges the AXI protocol across the software reset on the DUT's
   ports: T1-L28 (S-port handshakes inside the reset pulse) and T1-L26 (an M-port
   response presented before the reset and not accepted after it) are retired,

@@ -436,7 +436,7 @@
 | 18.10 | Verify correct FDI valid/ready protocol | P0 | `aou_fdi_t1_bringup_test`, `aou_link_act_deact_test`, `aou_link_event_test.event-retrain`, `aou_t1_link_event_test`, `aou_t1_slice_test`
 | 18.11 | Verify `r_phase` increments correctly across chunks | P1 | `aou_t1_slice_test`
 | 18.12 | Verify `AOU_RX_FDI_IF` staging buffer operation | P1 | `aou_t1_slice_test`
-| 18.13 | Retrain while ENABLED with traffic is transparent to AoU (interim expectation) | P2 | `aou_link_event_test.event-retrain`, `aou_link_event_test.event-retrain_act`
+| 18.13 | Retrain while ENABLED with traffic is transparent to AoU | P2 | `aou_link_event_test.event-retrain`, `aou_link_event_test.event-retrain_act`
 | 18.14 | LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery | P2 | `aou_link_event_test.event-linkerror`
 | 18.15 | L1 entry and exit with the MAS power-management sequence, including the clk_req wake | P2 | `aou_link_event_test.event-clk_wake`, `aou_link_event_test.event-l1`, `aou_link_event_test.event-l1_act`
 | 18.16 | L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested | P2 | `aou_fdi_t1_link_stress_test`, `aou_fdi_t1_link_stress_test.fdi_rx_early-40`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100`, `aou_fdi_t1_link_stress_test.le_mid_flit_pct-100.fdi_rx_early-40`

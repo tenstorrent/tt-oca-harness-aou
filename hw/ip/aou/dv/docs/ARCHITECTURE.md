@@ -164,7 +164,7 @@ mark every transaction on the bus in the window `reset_outstanding`; a write tha
 completes in it is lost or landed whatever its response (the reset loses writes
 queued in the core, early-acknowledged ones included, 7.2.5), so the scoreboard
 treats it like an aborted write, and a read that ends with SLVERR counts as aborted
-too (BUGS/015 interim; any other response is checked as usual, and SLVERR on any
+too (MAS 7.3.6 loses the read and defines no response, so the SLVERR is taken from the RTL; any other response is checked as usual, and SLVERR on any
 later transaction is still an error). The DUT sends no response for a
 transaction the reset lost (its RX FIFOs reset with the core), but the managers
 tolerate one: for `stale_window` (10 us) a response on an ID with an aborted

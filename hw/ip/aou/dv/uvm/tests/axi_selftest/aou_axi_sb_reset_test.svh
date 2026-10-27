@@ -5,7 +5,7 @@
 // fed to the scoreboard directly. A reset_outstanding write is lost or landed
 // whatever its response, and the bytes it addresses may then hold their old
 // value or the write's, until a checked write; a reset_outstanding read may
-// end with SLVERR beats (BUGS/015 interim); anything else is still an error.
+// end with SLVERR beats (MAS 7.3.6 defines no response for it); anything else is still an error.
 // Each step expects an exact set of errors.
 class aou_axi_sb_reset_test extends uvm_test;
   `uvm_component_utils(aou_axi_sb_reset_test)

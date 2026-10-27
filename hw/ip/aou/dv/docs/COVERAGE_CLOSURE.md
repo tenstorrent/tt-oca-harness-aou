@@ -10,7 +10,9 @@ functional coverage stand, why each hole is open, which test-plan items lack
 evidence, and the work packages that close them. It was written against the
 bench at `a4bf59a` and reviewed by the owner on 2026-10-14; the owner's answers
 are in [Decisions](#decisions) and bind the work packages in §6. The coverage
-policy itself is DECISIONS D10.
+policy itself is DECISIONS D10. Sections 1-5 are the analysis as written; what has
+changed since is in the Status column of §6 (updated through PR #121), and fixes
+that landed since are noted where they change a hole's class.
 
 | | |
 |---|---|
@@ -33,7 +35,7 @@ The owner's answers to §7, 2026-10-14:
 | D5 | **Line and branch exclusions are deferred** to the end of closure. |
 | D6 | **Closure is measured on the all-configurations union.** |
 | D7 | **UCIe r2.0 is deferred** to the RTL/architecture review. |
-| D8 | **The BUGS/029 "detect, then hard reset" variant is a test option** (`aou_id_mismatch_test +detect_only=1`), documented as weakening the 500-cycle acceptance check; the default runs keep it. |
+| D8 | **The ID-mismatch "detect, then hard reset" variant is a test option** (`aou_id_mismatch_test +detect_only=1`), documented as dropping the check that the DUT takes the stray response within 500 cycles; the default runs keep it. A response that answers no request is illegal AXI (AXI4 A5), and MAS 7.2.2 defines only its detection, which is all the test checks. |
 | D9 | **Plan changes approved:** drop 9.8, 22.5, 1.4 and 12.13 (2.7/2.10 stay until the spec drops PropertyReq); add the 51 items of §4.3 (the r2.0 ones are deferred with D7); retitle 9.5. |
 
 **Hole classes** used throughout:
@@ -66,7 +68,7 @@ Work-package progress since this snapshot is in the Status column of §6, which 
 | 2xmix-tp64_128 | 218 | 184 | 34 | 0 |
 | 2x512-tp32_64 (new) | 214 | 183 | 31 | 0 |
 | **T1 total** | **1657** | **1395** | **260** | **2** |
-| reg bench (7 × 12) | 84 | 28 | 56 (BUGS/003, 004, 007) | 0 |
+| reg bench (7 × 12) | 84 | 28 | 56 (three register findings; two fixed since by PR #118 and PR #113) | 0 |
 
 The untriaged mix4, w256 and tp2 failures from `d04b2da` are gone (`err_resp`, `credit_return`,
 `pack crossflit`, `lp_mode_traffic`, `int early`, `invalid_actmsg` on mix4); those tests now pass or
@@ -79,31 +81,26 @@ XFAIL. There are two new failures, not triaged here:
   on the RP1 (256-bit) M port. This looks like tenstorrent/tt-oca-harness-aou#90 with a signature `expected_fail.yaml`
   doesn't match. No `verdict.txt` was written.
 
-**XFAIL runs per bug.** Each of these runs is coverage the merge loses.
+**XFAIL runs per finding.** Each of these runs is coverage the merge loses. Findings fixed or
+retired since are marked with the PR that did it.
 
-| Bug | Runs | Tests |
+| Finding | Runs | Tests |
 |---|---|---|
-| 023 | 49 | `aou_invalid_actmsg_test` |
-| 003 | 42 | reg bench |
-| 004 | 42 | reg bench |
-| 019 | 42 | `invalid_actmsg` 28, `linkreset_timeout` 14 |
-| 021 | 42 | `link_event` 28, `reset` 14 |
-| 029 | 35 | `aou_id_mismatch_test` (every run) |
-| 009 | 33 | `act_after_deact`, `credit_return`, `link_act_deact`, `reset`, … |
-| 024 | 30 | `link_event`, `reset` |
-| 007 | 28 | reg bench |
-| 013 | 23 | `invalid_actmsg` |
-| 001 | 21 | `fdi_t1_{bringup,linkdown,linkerror}_spec` |
-| 038 | 14 | linkdown and linkerror spec tests |
-| 010 | 14 | `link_force_deact` |
-| 002 | 14 | linkerror spec test |
-| 025 | 8 | `dw_down1024` 5, `pack` 3 |
-| 030 | 7 | `credit_violation` |
-| 035 | 6 | `err_resp` (debug FIFO through a narrow RP) |
-| 020 | 6 | |
-| 034 | 5 | |
-| 031 | 5 | |
-| 033 | 3 | |
+| Activation messages out of step: late ActivateReq, re-sent ActivateReq, which messages are invalid | 49 + 42 + 23 | `aou_invalid_actmsg_test`, `linkreset_timeout` |
+| Reserved bit 22 of the ID-mismatch error register is an enable (PR #118) | 42 | reg bench |
+| AXI_SPLIT_TR_EN has no storage | 42 | reg bench |
+| AOU_SW_RESET during traffic truncates bursts and strands beats (PR #113) | 42 + 30 | `link_event`, `reset` |
+| A response that answers no request (illegal stimulus; detection-only checks since PR #117) | 35 | `aou_id_mismatch_test` (every run) |
+| Credits after DeactivateAck, and a MsgCredit in its flit | 33 + 3 | `act_after_deact`, `credit_return`, `link_act_deact`, `reset`, … |
+| AOU_SW_RESET behaviour undocumented (PR #113) | 28 | reg bench |
+| FDI bring-up does not follow UCIe, no `lp_linkerror`, no restart after link-down (PR #108) | 21 + 14 + 14 | `fdi_t1_{bringup,linkdown,linkerror}_spec` |
+| DEACTIVATE_FORCE sends PropertyReq on a DeactivateReq | 14 | `link_force_deact` |
+| 1024-to-256-bit downsizer misplaces unaligned writes (#90, PR #89) | 8 | `dw_down1024` 5, `pack` 3 |
+| Remote RX credit overrun (illegal stimulus; test removed) | 7 | `credit_violation` |
+| Debug window through a narrow RP (PR #111) | 6 | `err_resp` |
+| Two Activation messages in a flit | 6 | |
+| LP mode switched while active (static configuration, PR #105/#106) | 5 | |
+| Asymmetric DEST_RP (illegal configuration; test removed) | 5 | |
 
 A run can name several bugs.
 
@@ -204,10 +201,10 @@ with no new run.
   - 1.3, 1.8, 1.9 (BUGS/019/013/020/023)
   - 2.7 (BUGS/010)
   - 9.5 (a remote RX credit overrun: illegal peer stimulus, test since removed)
-  - 9.9, 9.10, 19.8 (BUGS/029)
+  - 9.9, 9.10, 19.8 (a response that answers no request: illegal stimulus, detection-only checks since PR #117)
   - 12.13 (an asymmetric DEST_RP: illegal configuration, test since removed)
   - 14.5 (tenstorrent/tt-oca-harness-aou#90)
-  - 20.4, 20.10, 20.12, 20.13, 20.15, 20.16 (reg bench, BUGS/003/004/007)
+  - 20.4, 20.10, 20.12, 20.13, 20.15, 20.16 (reg bench: AXI_SPLIT_TR_EN; the reserved enable bit and AOU_SW_RESET were fixed by PR #118 and PR #113)
 - **blocked (1):** 9.8.
 - **not covered (40), all "no run-list entry":**
   - Activation, deactivation and credits: 1.4, 2.5, 2.10, 3.15, 3.19, 3.20
@@ -255,22 +252,22 @@ They match the d04b2da analysis to within a few items, so that analysis carries 
 | Module | 1x512 | 4x512 | 3x512 | 4xmix | 1x256 | 2xmix-tp | 2x512-tp | union | Main class / action |
 |---|---|---|---|---|---|---|---|---|---|
 | AOU_AGGREGATOR | 5/17/6/1 | 39/120/40/4 | 39/120/40/4 | 117/366/120/4 | 40/122/40/4 | 77/244/80/4 | 39/120/40/4 | 6/29/44/1 | c: unpin `aou_aggregator_test` (WP1); HALT→IDLE is reset-only (§2.3) |
-| AOU_CORE_SFR | 66/177/80 | 27/99/35 | 49/141/62 | 47/144/59 | 71/188/86 | 59/161/73 | 59/161/73 | 27/99/35 | b: reg bench XFAILs on 003/004/007 → skip-known-bugs variant (WP3); b: 029 error-info regs → check-then-reset (WP3); e: constant RO bits |
+| AOU_CORE_SFR | 66/177/80 | 27/99/35 | 49/141/62 | 47/144/59 | 71/188/86 | 59/161/73 | 59/161/73 | 27/99/35 | b: reg bench XFAILs on AXI_SPLIT_TR_EN (the other two register findings are fixed) → skip-known-bugs variant (WP3); a: error-info regs → `+detect_only` (WP3); e: constant RO bits |
 | AOU_AGGREGATOR_INFO | 0/4/0 | 34/40/21 | 34/40/21 | 102/130/63 | 32/45/19 | 70/85/44 | 34/40/21 | 24/4/24 | c: as AGGREGATOR |
 | AOU_TX_CRD_CTRL | 35/37/26 | 35/2/26 | 45/7/30 | 80/2/44 | 36/37/26 | 50/22/32 | 50/22/32 | 30/2/24 | a/e: 20 lines saturate the received credit at `RP*_MAX_CREDIT`=2048 (L476-548), so an L3 over-grant past 2048 is needed; check reachability first. c: `I_RP_DEST_RP` arms (L572-610) → full DEST_RP permutation on the multi-RP configs |
 | AOU_ERROR_INFO | 4/15/3 | 4/14/3 | 4/14/3 | 28/55/25 | 28/55/25 | 4/14/3 | 4/14/3 | 4/14/3 | b: on 4xmix and 1x256 the debug FIFO path was empty while the window could not answer a width-converted read (fixed) → rerun `err_resp` there. a: B+R error in one cycle with one slot left |
 | AOU_RX_CORE | 14/11/14 | 14/19/14 | 14/19/14 | 23/57/21 | 25/6/17 | 23/25/21 | 14/7/14 | 13/46/35 | d per config: `PHY_TYPE` arms in `always_comb` (L750-809). a: write-data mask continuation across chunks (L344-387, crossflit layouts); 7+ WriteResp per chunk (cond L1163, `+pk=wresp48` on more configs) |
-| AOU_AXI4MUX_3X1_TOP / _256 | 0/0/0 | 0/4/0 | 0/4/0 | 0/94+64/24 | 6/45+64/25 | 0/49/0 | 0/4/0 | 0/9/0 | b: CH2 (1024-bit remote slot) on 256-bit RPs is only reached by tenstorrent/tt-oca-harness-aou#90 runs → 025-avoiding variant (WP3) |
+| AOU_AXI4MUX_3X1_TOP / _256 | 0/0/0 | 0/4/0 | 0/4/0 | 0/94+64/24 | 6/45+64/25 | 0/49/0 | 0/4/0 | 0/9/0 | a: CH2 (1024-bit remote slot) on 256-bit RPs was reached only by tenstorrent/tt-oca-harness-aou#90 runs; #90 is fixed (PR #89), so a rerun of `aou_dw_test` covers it |
 | AOU_ACTIVATION_CTRL | 16/51/17/1 | 16/53/17/1 | 16/51/17/1 | 11/42/12/1 | 11/49/12/1 | 13/47/14/1 | 15/48/16/1 | 9/38/10/1 | b: ACTIVATE→DISABLED and invalid-op lines (019/013/023) → check-then-hard-reset variant. a: `DEACTIVATE_TIME_OUT_VALUE` 2,4-7; remote DeactivateReq with PropertyReq=1; ACTMSG_READY back-pressure |
 | AOU_SYNC_FIFO_REG | 0/24/0 | 15/63/0 | … | 15/63/0 | 15/63/0 | 15/63/0 | 15/63/0 | 0/0/0 | c: aggregator W FIFO, as AGGREGATOR |
-| AOU_SLV_AXI_INFO | 9/44/4 | 0/10/0 | 5/12/3 | 4/8/2 | 16/52/8 | 5/19/3 | 5/14/3 | 0/7/0 | a: reads with `slv_id_mismatch_en=1` on every config; b: 029 for the R-mismatch path |
-| AOU_AXI_DOWN | 0/4/0 | 0/10/0 | 0/4/0 | 0/63/13 | 0/59/13 | 0/5/0 | 0/4/0 | 0/26/8 | b: dn_1024_256 empty (tenstorrent/tt-oca-harness-aou#90) → variant; a: AW FIFO full and AR table full (deep outstanding) |
+| AOU_SLV_AXI_INFO | 9/44/4 | 0/10/0 | 5/12/3 | 4/8/2 | 16/52/8 | 5/19/3 | 5/14/3 | 0/7/0 | a: reads with `slv_id_mismatch_en=1` on every config; a: `aou_id_mismatch_test +kind=r` for the R-mismatch path |
+| AOU_AXI_DOWN | 0/4/0 | 0/10/0 | 0/4/0 | 0/63/13 | 0/59/13 | 0/5/0 | 0/4/0 | 0/26/8 | a: dn_1024_256 empty (tenstorrent/tt-oca-harness-aou#90, fixed by PR #89) → rerun; a: AW FIFO full and AR table full (deep outstanding) |
 | AOU_RX_CRD_CTRL | 13/31/25 | 2/1/0 | 1/6/5 | 1/1/0 | 15/31/25 | 6/16/15 | 7/16/15 | 0/1/0 | c/d per config: multi-RP MsgCredit select is unreachable with 1 RP; the union covers it |
 | AOU_EARLY_TABLE | 1/8/1 | 19/35/9 | 19/35/9 | 19/35/9 | 19/35/9 | 19/35/9 | 19/35/9 | 1/8/1 | c: unpin `aou_early_bresp_test`. a: same-ID back-to-back bufferable (L151) |
 | AOU_FDI_BRINGUP_CTRL | 17/9/17/**18** | same | same | same | same | same | same | same | a: §2.3 (14 functional transitions), 4 reset-only |
 | AOU_AXI_SPLIT_TR / ADDRGEN | 6/13/6, 4/-/4 | | | 7/23/13 | 10/26/16 | | | 4/12/4, 2/-/2 | a: MAX_ARBURSTLEN 0/3 and MAX_AWBURSTLEN 0/1/31 never programmed; c: size 7 only on 1024-bit RPs; d: ADDRGEN `default` |
-| AOU_CORE_RP | 6/15/3 | 6/8/3 | 6/9/3 | 4/9/2 | 6/33/3 | 6/9/3 | 6/9/3 | 4/8/2 | b: 029 RID-mismatch mux; a: 1024-wide B/R with ready low |
-| AOU_AXIMUX_1XN_SS | 0/11/0 | 0/12/0 | 0/12/0 | 0/41/0 | 0/41/0 | 0/12/0 | 0/12/0 | 0/11/0 | b: 029 `*_sel_err_info`; a: back-pressure |
+| AOU_CORE_RP | 6/15/3 | 6/8/3 | 6/9/3 | 4/9/2 | 6/33/3 | 6/9/3 | 6/9/3 | 4/8/2 | a: RID-mismatch mux (`aou_id_mismatch_test`); a: 1024-wide B/R with ready low |
+| AOU_AXIMUX_1XN_SS | 0/11/0 | 0/12/0 | 0/12/0 | 0/41/0 | 0/41/0 | 0/12/0 | 0/12/0 | 0/11/0 | a: `*_sel_err_info` (`aou_id_mismatch_test`); a: back-pressure |
 | AOU_DATA_R/W_FIFO_NS1M_TPSRAM | 8/12/3 | 8/12/3 | 8/12/3 | 0/2/0 | 16/16/6 | 0/8/0 | 8/12/3 | 0/2/0 | a: multi-request decode chunks (back-to-back 256-bit read data, `+pk=full`) |
 | AOU_4X1_RR_ARBITER / 3X1_RR | 4/-/5 | 0/-/1 | 4/-/5 | 0/-/1 | 14/-/12 | 4/-/5 | 4/-/5 | 0/-/1 | c: absent requesters with fewer RPs; a: 3X1_RR needs three remote widths contending on one RP |
 | AOU_AXI_UP | 0/1/6 | 0/1/6 | 0/1/6 | 4/0/15 | n/a | 4/0/15 | 0/1/6 | 2/0/14 | d: §2.5 (every branch hole is dead); a: three cond (back-pressure) |
@@ -362,14 +359,14 @@ The filter option name still needs confirming on X-2025.06. The choice is decisi
 
 | Bug | Code held back | Variant now? |
 |---|---|---|
-| 003/004/007 | SFR: ~35 lines, ~80 cond, ~45 branches, ~1.5k toggle bits per config | **Yes.** `+reg_skip_known_bugs`: `NO_CHECK`/`NO_REG_BIT_BASH_TEST` on exactly `axi_slv_id_mismatch_err_rp*[22]`, `aou_con0.axi_split_tr_en` and `aou_con0.aou_sw_reset`, run as extra PASS entries. Keep the strict XFAIL entries. |
-| 019/013/023/020 | ACTIVATION FSM 1, ~10 lines, ~15 cond | **Yes:** check, then hard reset. |
-| 029 | SFR error-info set/info registers (24 lines), CORE_RP and AXIMUX mismatch muxes, SLV_AXI_INFO R path | **Partly.** Inject one unknown-ID B/R, check ERR/INFO/IRQ/mask, then `hard_reset()`. It drops the "not accepted in 500 cycles" check that 029 is about, so it weakens the check (decision D8). |
-| 025 | dn_1024_256 (empty), its RDATA_ORDER, AXI4MUX_3X1_256 CH2: ~6 lines, ~120 cond, ~37 branches and ~60k toggle bits per config | **Yes.** 025 needs AWSIZE=6, unaligned, in the upper 32 B. Run `aou_dw_test +remote_bytes=128 +dp_align=aligned` (and a size list without 6) on 1x256-sp32 and the 4xmix 256-bit RPs. **Done for the 4xmix builds (WP10):** the aligned entries on `4xmix4211-sp128` (RP2/RP3) and `4xmix2144-sp64` (RP1). |
-| 035 | ERROR_INFO debug FIFO on 4xmix and 1x256 | **Yes:** `err_resp` with the remote width equal to each RP's width. |
-| 021/024 | LinkReset, LinkError and inband drop in `link_event` with traffic | **Yes:** a quiet variant (no AXI traffic, no SW reset) gives the cg_link_state LinkReset/Disabled bins. |
-| 001/002/038 | linkerror and linkdown spec tests (bringup linkdown bins, SW-inject conds) | **Landed (main #108).** 002 and 038 were merged into 001; the DUT follows the UCIe encodings, drives `lp_linkerror`, and software restarts the link after a link-down (038 was ruled not a bug). The spec tests pass in both FDI encodings and nothing is held back. |
-| 030, 031, 010, 034 | small | 030: none (it's the bug itself). 031: undefined behaviour. 010: spec decision. 034: none (LP mode is static configuration; the tests program it only while DISABLED). |
+| Register model: AXI_SPLIT_TR_EN (the reserved enable bit and AOU_SW_RESET were fixed by PR #118 and PR #113) | SFR: ~35 lines, ~80 cond, ~45 branches, ~1.5k toggle bits per config | **Yes.** `+reg_skip_known_bugs`: `NO_CHECK`/`NO_REG_BIT_BASH_TEST` on `aou_con0.axi_split_tr_en`, run as extra PASS entries. Keep the strict XFAIL entries. |
+| Activation messages out of step (BUGS/019, 013) | ACTIVATION FSM 1, ~10 lines, ~15 cond | **Yes:** check, then hard reset. |
+| A response that answers no request | SFR error-info set/info registers (24 lines), CORE_RP and AXIMUX mismatch muxes, SLV_AXI_INFO R path | **Done.** The stimulus is illegal AXI and MAS 7.2.2 defines only the detection, so the test checks the detection and, where the DUT holds the stray response, ends with a hard reset (`+detect_only=1`, decision D8). |
+| 1024-to-256-bit downsizer (tenstorrent/tt-oca-harness-aou#90, fixed by PR #89) | dn_1024_256, its RDATA_ORDER, AXI4MUX_3X1_256 CH2: ~6 lines, ~120 cond, ~37 branches and ~60k toggle bits per config | **Not needed now.** The aligned `aou_dw_test +remote_bytes=128 +dp_align=aligned` entries on `4xmix4211-sp128` (RP2/RP3) and `4xmix2144-sp64` (RP1) were added as the variant (WP10); with the fix every `aou_dw_test` run counts. |
+| Debug window through a narrow RP (fixed by PR #111) | ERROR_INFO debug FIFO on 4xmix and 1x256 | **Not needed now:** `err_resp` passes there. |
+| AOU_SW_RESET during traffic (fixed by PR #113) | LinkReset, LinkError and inband drop in `link_event` with traffic | **Not needed now:** the `link_event` and `reset` families pass with traffic. |
+| FDI bring-up (fixed by PR #108) | linkerror and linkdown spec tests (bringup linkdown bins, SW-inject conds) | **Not needed now.** The DUT follows the UCIe encodings, drives `lp_linkerror`, and software restarts the link after a link-down. The spec tests pass in both FDI encodings. |
+| Small items | | A remote RX credit overrun and an asymmetric DEST_RP are illegal stimulus (tests removed). DEACTIVATE_FORCE's PropertyReq is an owner question. LP mode is static configuration (PR #105/#106); the tests program it only while DISABLED. |
 
 The rerun gains when fixes land are in §6, WP13.
 
@@ -388,8 +385,8 @@ for 512→1024).
   mix configs.
 
 **Downsizer `AOU_AXI_DOWN`.**
-- **dn_1024_256** (4xmix4121 RP1/RP3 and 1x256): no transaction ever passes. Class **b**: use the
-  025-avoiding variant (§2.4).
+- **dn_1024_256** (4xmix4121 RP1/RP3 and 1x256): no transaction passed in cov3 (tenstorrent/tt-oca-harness-aou#90).
+  #90 is fixed (PR #89), so this is class **a** now (§2.4).
 - **dn_1024_512 and dn_512_256:** line and branch are complete. The only holes are AW FIFO full
   (depth 8) and AR reorder table full (32). Class **a**: `+dp_batch≥32` through the downsizer,
   with M-port W/R back-pressure.
@@ -573,7 +570,7 @@ The full gap tables were kept with the review notes; this section summarises the
 - 14.5: yes, the aligned `aou_dw_test` entries (WP10).
 - 20.4, 20.10, 20.12: yes, with the reg skip-known-bugs entry.
 - 20.13, 20.15, 20.16: partly.
-- 9.9, 9.10, 19.8: partly, but it weakens the 029 check (decision D8).
+- 9.9, 9.10, 19.8: done, with the `+detect_only` entries (decision D8).
 
 **Wait for a fix or a spec answer:**
 - 1.3, 1.8, 1.9 (BUGS/019; fix verified on `bugfix/BUGS-019-activation-linkreset-hold`)
@@ -626,14 +623,14 @@ the item and a `plan_ids` entry), 36 have a checker, and 11 have an FC bin.
 
 | Area | New items (examples; full list in `gaps.md` §C) | Cites |
 |---|---|---|
-| Activation and deactivation (8) | 1.10 activation waits for the RX FIFO to drain; 1.11 ACTIVATE_START before FDI Active; 1.12 each INT_ACTIVATE_START source; 1.13 reserved ACTIVATIONOP received; 2.11 no credit in DISABLED or after DeactivateAck; 2.12 DEACTIVATE_TIME_OUT_VALUE sweep; 2.13 no DeactivateReq with own requests outstanding; 2.14 responses still sent in DEACTIVATE | AoU §8.2-8.4, Table 27; MAS 7.1, 7.3.2-7.3.5; BUGS/009, 012, 032, 033 |
+| Activation and deactivation (8) | 1.10 activation waits for the RX FIFO to drain; 1.11 ACTIVATE_START before FDI Active; 1.12 each INT_ACTIVATE_START source; 1.13 reserved ACTIVATIONOP received; 2.11 no credit in DISABLED or after DeactivateAck; 2.12 DEACTIVATE_TIME_OUT_VALUE sweep; 2.13 no DeactivateReq with own requests outstanding; 2.14 responses still sent in DEACTIVATE | AoU §8.2-8.4, Table 27; MAS 7.1, 7.3.2-7.3.5; BUGS/009, 032, 033 |
 | Credits (4) | 3.22 TX saturation on over-grant; 3.23 credit returned at dequeue only; 3.24 initial CrdtGrant covers every class and RP; 3.25 non-default RX FIFO depths and RS_EN=0 | AoU v0.7.1 §6.4, §6.4.3; MAS 3.4, 3.9 |
 | AXI (2) | 4.30 FLEX/USER carriage; 4.31 W before AW | AoU §5.2; AXI4 A3.3.1 |
-| Errors and debug (8) | 9.15 RP ≥ RP_COUNT received; 9.16 reserved MISCOP/DLENGTH/RsvdZero/stray MsgStart; 9.17-9.19 debug FIFO depth, disable and narrow-RP read; 9.20 M-port tables full; 9.21 ReadData wider than the remote; 9.22 subordinate ID-check enable | AoU Table 15, §4.4, §6.4.1; MAS 7.2.2, 7.2.4, §2.1; BUGS/003, 012, 028, 035 |
+| Errors and debug (8) | 9.15 RP ≥ RP_COUNT received; 9.16 reserved MISCOP/DLENGTH/RsvdZero/stray MsgStart; 9.17-9.19 debug FIFO depth, disable and narrow-RP read; 9.20 M-port tables full; 9.21 ReadData wider than the remote; 9.22 subordinate ID-check enable | AoU Table 15, §4.4, §6.4.1; MAS 7.2.2, 7.2.4, §2.1 |
 | Performance (2) | 10.14 numeric bounds; 10.15 back-pressure per channel | MAS PPA tables 8/9; AXI4 A3.2.1; UCIe r1.1 §8.2.4 |
 | Reset, CDC, build (4) | 11.16 independent I_RESETN/I_PRESETN; 11.17 PCLK:CLK ratios; 11.18 an ASSERTION_ON build; 11.19 DFT scan mode (drop candidate) | integration guide 3.1.1, 8.7, 3.13.1 |
 | RP, QoS, width, early (6) | 12.20 local and remote RP count differ; 13.19-13.22 reserved ARB_MODE, PRIOR=0, HP≤NP misconfiguration, timer extremes; 14.17 peer max width < 1024 (dropped: PR #96 fixed the width at 1024); 16.17 write kept waiting at the early-response limit (O_PENDING_CNT_OVER, removed by PR #89) | MAS 3.2.1, 3.7.5, 3.10.1; AoU §6.2 |
-| UCIe FDI (14) | 18.13 Retrain with traffic; 18.14 LinkError; 18.15 L1 with the MAS PM sequence; 18.16 L2 (unsupported: drop or document); 18.17 LinkReset; 18.18 Disabled; 18.19 rx_active; 18.20 wake; 18.21 inband_pres drop; 18.22 stall corners; 18.23 state leaves Active mid-flit; 18.24 cancel corners; 18.25 two-PHY with PHY1 active (`+active_phy` exists, and no entry uses it); 18.26 flit-header fields | UCIe r1.1 §8.2.3-8.2.9, §8.3.2-8.3.3, Table 8-2; BUGS/014, 015 |
+| UCIe FDI (14) | 18.13 Retrain with traffic; 18.14 LinkError; 18.15 L1 with the MAS PM sequence; 18.16 L2 (unsupported: drop or document); 18.17 LinkReset; 18.18 Disabled; 18.19 rx_active; 18.20 wake; 18.21 inband_pres drop; 18.22 stall corners; 18.23 state leaves Active mid-flit; 18.24 cancel corners; 18.25 two-PHY with PHY1 active (`+active_phy` exists, and no entry uses it); 18.26 flit-header fields | UCIe r1.1 §8.2.3-8.2.9, §8.3.2-8.3.3, Table 8-2; MAS 7.3.6, 7.3.7; BUGS/014 |
 | Bringup (2) | 22.6 every AOU_FDI_BRINGUP_CTRL transition (this ties the FSM work to the plan); 22.7 restart after link-down needs NOP→Active | integration guide 6.6; UCIe r1.1 §8.3.3.8 |
 
 The r2.0 items in §5 add four more if adopted: reset values (R20-01), NOP-flit discard (R20-04),
@@ -701,11 +698,11 @@ They fold into WP5.
 The packages are ordered by yield over cost. The gains are estimates: union FC, and per-config
 code coverage where it differs.
 
-| # | Package | Scope | Expected gain | Depends on | Size | Decision | Status (upstream main `8ef393c`, 2026-10-19) |
+| # | Package | Scope | Expected gain | Depends on | Size | Decision | Status (upstream main `8ef393c`, 2026-10-19; WP3 and WP13 updated through PR #121) |
 |---|---|---|---|---|---|---|---|
 | **WP1** | **Bench hygiene and unpinning** | (1) `plan_status.py`: add `aou_fc_json=` to `INFRA_ARG`. (2) Unpin the `datapath.toml` and `features.toml` entries (aggregator, early_bresp, split, qos, lp_mode, dest_rp) so they run on every config, with per-RP `data_bytes` in the aggregator checker. (3) Add plan IDs for 4.23, 4.24, 5.21, 5.22, 14.5, 18.1, 18.3, 18.4, 18.5, 18.11, 18.12, 20.10, 20.12, 20.13 to existing passing entries, and drop 9.7 from the run list. (4) Triage the two new FAILs (4x512 `act_after_deact` AOU-R26; 4xmix `pack crossflit` AXI-R10) and match their signatures. | Plan: 259 → ~270 covered. Code per non-1x512 config: +34-117 lines, +120-366 cond, +40-120 branches (aggregator, agg_info, early_table, split, regfifo). FSM 31 → **34/58 on every config**. Union: the 1024- and 256-bit aggregators (~30 lines, ~35 cond, ~70 branches). | none | **S** | none | Done: `aou_fc_json=` is in `INFRA_ARG`, the data-path and feature entries run on every config, the plan IDs are on passing entries and 9.7 is gone. |
 | **WP2** | **FC2 covergroup fixes** | Every row of §3.1: `x_txn` and `cx_size_x_len` AXI-illegal ignores; explicit `x_sts_req`; drop `l1_active`; v0.7 `cg_act_fsm` bins; `cg_act_op` inject sampling; re-homed `cg_credit` with DUT-side events; `cg_msg` Misc without RP; g1 multi_flit. Tag v0.8 bins (a `spec` field in `fc.json`). | Union FC **77.6% → ~82.7%** (−286 / +18 bins) with no new run | none | **S-M** | approve the bin removals (D2) | Done: every §3.1 fix is in the bins tables, and the v0.8 bins carry a `spec` tag. |
-| **WP3** | **Bug-avoiding variants** | (1) Reg bench `+reg_skip_known_bugs` entries. (2) tenstorrent/tt-oca-harness-aou#90-avoiding `aou_dw_test` (aligned, or size ≠ 6) on 1x256 and 4xmix. (3) Check-then-hard-reset variants of `invalid_actmsg` (per state and op) and the `act_ack` timeout. (4) Same for `id_mismatch` (029), if D8 allows. (5) A quiet `link_event` (`link_reset`, `inband_drop`, `linkerror`) without traffic or SW reset (021/024). (6) `err_resp` at matching remote widths (035). | Code per config: SFR ~35 lines, ~80 cond, ~45 branches, ~1.5k bits; ACTIVATION FSM +1; dn_1024_256 and 3X1_256 CH2 ~6 lines, ~120 cond, ~37 branches, ~60k bits; ERROR_INFO 24 lines on 4xmix and 1x256; SFR/CORE_RP/SLV_AXI_INFO ~40 lines (029). FC: `cg_link_state` LinkReset/Disabled (~8 bins), `cg_act_op tx,illegal` (5). Plan: 20.4, 20.10, 20.12, 20.15, 20.16 (and 9.9, 9.10, 19.8 with D8). | WP2 for the act_op bins | **M** | D8 (weakened 029 check) | Partly: `+detect_only` (029) and the aligned `aou_dw_test` on both 4xmix builds are done; the reg skip-known-bugs entries, check-then-hard-reset `invalid_actmsg`/`act_ack`, a quiet `link_event`, matching-width `err_resp` and a 1x256 aligned entry are missing. |
+| **WP3** | **Bug-avoiding variants** | (1) Reg bench `+reg_skip_known_bugs` entries. (2) tenstorrent/tt-oca-harness-aou#90-avoiding `aou_dw_test` (aligned, or size ≠ 6) on 1x256 and 4xmix. (3) Check-then-hard-reset variants of `invalid_actmsg` (per state and op) and the `act_ack` timeout. (4) Same for `id_mismatch` (stray responses), if D8 allows. (5) A quiet `link_event` (`link_reset`, `inband_drop`, `linkerror`) without traffic or SW reset. (6) `err_resp` at matching remote widths. | Code per config: SFR ~35 lines, ~80 cond, ~45 branches, ~1.5k bits; ACTIVATION FSM +1; dn_1024_256 and 3X1_256 CH2 ~6 lines, ~120 cond, ~37 branches, ~60k bits; ERROR_INFO 24 lines on 4xmix and 1x256; SFR/CORE_RP/SLV_AXI_INFO ~40 lines (stray responses). FC: `cg_link_state` LinkReset/Disabled (~8 bins), `cg_act_op tx,illegal` (5). Plan: 20.4, 20.10, 20.12, 20.15, 20.16 (and 9.9, 9.10, 19.8 with D8). | WP2 for the act_op bins | **M** | D8 (weakened stray-response check) | Mostly done or no longer needed: `+detect_only` and the aligned `aou_dw_test` on both 4xmix builds are done; PR #113 (link events and resets pass with traffic), PR #111 (debug window on narrow RPs) and PR #89 (#90) removed the need for the quiet `link_event`, matching-width `err_resp` and 1x256 aligned variants. Missing: a reg skip-known-bugs entry for AXI_SPLIT_TR_EN and check-then-hard-reset `invalid_actmsg`/`act_ack`. |
 | **WP4** | **AXI stimulus knobs** | `+lock_pct` and remote EXOKAY for exclusive pairs; `+max_len=255`; `+max_id=1023`; a low address window per RP; programming MAX_AWBURSTLEN/ARBURSTLEN=255 for long M-port bursts; deep outstanding and long back-pressure at max outstanding (`+dp_batch=64`, slow remote B/R, `cyc_gt_1k`); narrow and unaligned through converters on every config; `+fixed_pct/+wrap_pct` **only after D1**. New AXI-S06 attribute check. | FC: about 168 AXI4 attribute and OS/BP bins and most of the 288 legal `cx_size_x_len` cells; `txn_cg` legal FIXED/WRAP (106) after D1. Code: upsizer and downsizer back-pressure cond, AXI4MUX AW FIFO full, RDATA_ORDER, and pending-table toggles. Plan: 4.25-4.28, 5.23-5.26, 8.3, 8.6, 8.14 (and 4.16/4.17 after D1). | D1 for FIXED/WRAP | **M** | D1 | Partly: exclusives with EXOKAY, the attribute check (`aou_attr_test`), W-first and R-interleave, high IDs and 64-deep M-port tables are done; `+max_len`/`+max_id` for random traffic, a low address window per RP and back-pressure over 1k cycles are missing (FIXED/WRAP dropped by D1). |
 | **WP5** | **FDI corner stimulus and r2.0 adopt items (FC3)** | `aou_fdi_t1_bringup_corner_test` with the three LSM extensions (event-at-state, wake_ack delay, LP-initiated L1 exit); `pulse_sw` retrain; second-half and repeated flit cancel; stall hold and latency knobs; the nine r2.0 adopt items (NOP flit R20-04, stall sequences R20-02/03, LinkError hold R20-09, remote link-down R20-11, reset-zero R20-01, inband rule R20-07, re-cites); `+active_phy=1` entries on the TP configs. | FSM **34 → 48/58**; `cg_bringup_fsm` +2; `cg_link_state` ~6; `l1.cg_fdi_cancel` +5 and `cg_fdi_stall` +6; new r2.0 bins (~25); plan 18.4/18.5 PHY1, new 18.13-18.25 | D7 (r2.0 asks) | **M-L** | D7 | Partly: second-half and repeated flit cancels, stall knobs, PHY1 entries and plan 18.13-18.26 are done; `aou_fdi_t1_bringup_corner_test`, its LSM extensions and a SW retrain pulse are missing, and the r2.0 items are blocked on D7. |
 | **WP6** | **Reset-in-state** | `aou_reset_test +when=retrain/apb_access/agg_halt` and the cycle-exact WAKE_ASSERT/DEACTIVATE/L1_CLK_WAKE/MI resets, **or** `-cm_fsmresetfilter` | FSM +9 (58/58), or denominator 49 | D4 | **S** (filter) / **M** (tests) | D4 | Done by the filter (D4): COV=1 builds pass `-cm_fsmresetfilter` (`COV_FSM_RESET=1` keeps the transitions), and an `XPROP` build checks reset behaviour. |
@@ -715,7 +712,7 @@ code coverage where it differs.
 | **WP10** | **Config-dependent leftovers** | DEST_RP full permutations on 4x512, 3x512 and 4xmix; split MAX_AxBURSTLEN 0/1/3/31 and split on 1024-bit RPs; credit over-grant past 2048 (confirm reachability first, otherwise e); B+R error same cycle with the debug FIFO at depth−1; `cg_msg` rp2/rp3 1024 (a new config or a waiver, D6). **RP-width part done:** `4xmix4211-sp128` retuned and `4xmix2144-sp64` added (DECISIONS D9), so every RP is built at every local width | TX_CRD_CTRL 15-36 lines per config, plus 20 saturation lines; SPLIT_TR and ADDRGEN ~8; ERROR_INFO 4; `cg_msg` 8 | D6 | **M** | D6 | Partly: the RP-width configs, split limits 0/1/3 and split on 1024-bit RPs, and same-cycle B+R debug-FIFO errors have entries; a full DEST_RP permutation sweep and the over-grant past 2048 are missing. |
 | **WP11** | **v0.8 coverage** | Per D3: a `+spec_rev` plusarg, an `l3_unit` loopback FC report section, and the v0.8 bins (FLEX, profile, ReadData variant, DEACTIVATE credits) | 56 existing plus ~10 new bins, reported separately | D3 | **M** | D3 | Not started: no `+spec_rev` plusarg, loopback FC section or new v0.8 bins; the existing v0.8 bins are tagged (WP2). |
 | **WP12** | **Remaining a-class FC** | L3 packer knob for a CrdtGrant at G47; a dense WriteResp flit to the model; model-side zero_stall on wreq/rreq/wresp; `misc_half1 over` per decision D2 | `cg_flit_layout` +2, `cg_flit_occ` +1-2, `cg_credit` +3 | WP2 | **S** | the `over` bin (D2) | Not started: no CrdtGrant-at-G47 entry, `+pk=wresp48` still runs only on 4x512-sp64 and there is no model-side zero-stall stimulus; `misc_half1 over` stays a v0.7 target (D2). |
-| **WP13** | **Rerun when the RTL fixes land** | Merge each fix branch into a coverage build and rerun the full regression | 019: ACTIVATION FSM, plan 1.3/1.8/1.9. 029: 9.9/9.10/19.8 at full strength. 025: 14.5 and down1024. 001/002/038: the spec tests, the three bringup linkdown bins, the linkerror and linkdown FDI paths. 021/024: `link_event` and `reset` with traffic (~70 runs). 003/004/007: the full reg bench. 009/033: `credit_return` and `link_act_deact`. | the RTL owners | **S** per fix | none | Blocked: none of the fixes for 001, 019, 021, 025, 029 or 033 is on main, 003/004/007/009 have none yet, and `expected_fail.yaml` still lists them all. |
+| **WP13** | **Rerun when the RTL fixes land** | Merge each fix branch into a coverage build and rerun the full regression | Activation messages out of step: ACTIVATION FSM, plan 1.3/1.8/1.9. AXI_SPLIT_TR_EN: the rest of the reg bench. Credits after deactivation: `credit_return` and `link_act_deact`. | the RTL owners | **S** per fix | none | Partly: the FDI bring-up (PR #108), AOU_SW_RESET (PR #113), the downsizer (PR #89), the debug window (PR #111) and the reserved enable bit (PR #118) fixes are on main and in the coverage runs; stray responses were ruled illegal stimulus. The activation-message, AXI_SPLIT_TR_EN and credit-after-deactivation findings are still open. |
 
 **Suggested order:**
 1. WP1 + WP2, in parallel: both cheap. Together they take FC to ~83% and FSM to 34/58 on every
@@ -773,8 +770,8 @@ from the owner.
    - Adopt the 9 rows marked adopt (R20-01 to -07, -09, -11)?
    - R20-10: answered: restarting the link after a link-down is software's (owner decision).
    - R20-19: do the 32 B FDI configs (1x256-sp32, 2x512-tp32_64) stay in closure scope?
-8. **D8: weakened-check variants.** Allow the BUGS/029 "detect, then hard reset" variant for
-   9.9, 9.10 and 19.8? It drops the 500-cycle acceptance check that 029 is about.
+8. **D8: weakened-check variants.** Allow the ID-mismatch "detect, then hard reset" variant for
+   9.9, 9.10 and 19.8? It drops the check that the DUT takes the stray response within 500 cycles.
 9. **D9: the plan itself.**
    - Approve the drops: 9.8, 22.5, 1.4, 12.13 (and 2.7/2.10 if PropertyReq goes).
    - Add the 51 new items (and 4 from r2.0)?

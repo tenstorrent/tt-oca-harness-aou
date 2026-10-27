@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Adapter-initiated FDI link events while AoU is ENABLED and traffic runs.
-// AoU's reaction is unspecified (BUGS/015); the interim expectations are:
+// The expectations follow MAS 7.3.6 and 7.3.7:
 //   retrain, clk_wake  transparent: AoU stays ENABLED, no interrupt, every
 //                      transaction completes with correct data;
 //   l1                 software deactivates first (MAS §7.3.6), the adapter
@@ -86,7 +86,7 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     wait_traffic();
     drain();
     check_field(p_sequencer.regs.aou_init.activate_state_enabled, 1, "T1-L19",
-                {ev.name(), " is transparent to AoU (BUGS/015 interim)"});
+                {ev.name(), " is transparent to AoU (MAS 7.3.7)"});
   endtask
 
   task l1_cycle();
@@ -178,8 +178,9 @@ class aou_link_event_vseq extends aou_link_base_vseq;
   task link_down(aou_lsm_ev_e ev, bit inband_drop);
     n_down++;
     expect_event("INT_REQ_LINKRESET", 0, n_down);
-    // The DUT can lose track of local M-port transactions when the link
-    // drops under them (BUGS/015 interim). Software clears the error
+    // The reset after a link loss drops the local M ports' transactions
+    // (MAS 7.3.6), so a beat the subordinate still presents answers no
+    // request and reads as an ID mismatch (MAS 7.2.2). Software clears the error
     // each time (aou_t1_sw_isr, MAS 7.2.2), so every orphan beat left on an M
     // port can raise it again: no upper bound.
     expect_event("INT_MI0_ID_MISMATCH", 0, 0);

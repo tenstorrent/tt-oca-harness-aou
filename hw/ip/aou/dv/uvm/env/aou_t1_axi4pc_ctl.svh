@@ -6,7 +6,7 @@
 // Retrain for Reset, LinkError, LinkReset or Disabled, outside I_RESETN) strands
 // every transaction then in flight, and any the S ports accept before software resets
 // the core: they never complete, so the DUT's AXI ports break AXI4 until their reset
-// (BUGS/015 interim; the reset itself loses them, MAS 7.3.6). On that event every
+// (MAS 7.3.6: the link loss forces DISABLED, and the reset that follows loses them). On that event every
 // port's checker is held in reset (tb/aou_axi4pc_gate.sv) until its port's next
 // reset and then until the bench side of the port is idle; with no port reset it
 // stays off to the end of the test. Each hold and release is logged.
@@ -23,7 +23,7 @@
 // port never went idle: a transaction did not complete, and the checker ran on with
 // the stale entry), and so is a checker still held with no link event behind it (the
 // bench side of the port never went idle after a port reset, so Axi4PC was off). Holds
-// a link event caused are logged as before (BUGS/015).
+// a link event caused are logged as before.
 class aou_t1_axi4pc_ctl extends uvm_component;
   `uvm_component_utils(aou_t1_axi4pc_ctl)
 
@@ -72,7 +72,7 @@ class aou_t1_axi4pc_ctl extends uvm_component;
     pending = 1'b1;
     `uvm_info(get_type_name(), $sformatf({"Axi4PC held on every port: FDI link lost (%s) with ",
               "AoU not DISABLED; transactions in flight cannot complete until the ports' ",
-              "reset (BUGS/015)"}, o.sts.name()), UVM_LOW)
+              "reset (MAS 7.3.6)"}, o.sts.name()), UVM_LOW)
   endfunction
 
   task run_phase(uvm_phase phase);
