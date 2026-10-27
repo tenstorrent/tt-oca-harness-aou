@@ -15,6 +15,23 @@
 // +limit=<k> with +credit=wreq|rreq (plan 8.3/8.6): every RP gets credit for
 // exactly k requests and the remote die returns none of it until released,
 // with more than k requests queued per RP.
+// +limit=<k> with +credit=wdata: WDATA credit for k WriteData messages of the
+// widest RP, none returned until released, and every write at least k+1 beats
+// long: the DUT commits each RP's first WriteReq and then runs out of WDATA
+// credit with that write's data still owed, by a known number of beats.
+// +hold_wreq_rp=<r>: remote-to-DUT writes on every RP; for +hold cycles the
+// remote die sends no WriteReq on RP r while that RP's WriteData still goes on
+// WDATA credit, so the data of several writes waits in the DUT's RX W FIFO
+// ahead of their WriteReqs (AoU v0.8 5.7 does not order them). Then the
+// WriteReqs go and every write completes with correct data.
+// +fair=1: DUT TX write fairness. Local writes only, the managers presenting
+// with no gaps: RP +fair_short (default 0) issues single-beat writes only,
+// RP +fair_long (default 1) bursts of AWLEN +fair_min..+fair_max (31..63);
+// +fair_short_n and +fair_long_n writes (400 and 40).
+// A burst the DUT has committed must not be held open by the stream of short
+// writes. aou_t1_wr_order_chk checks that it keeps making progress while it
+// holds credit (DP-R11); it does not bound how long the short writes may slow
+// a burst that still trickles.
 // aou_t1_crd_flow_chk judges both in every test: an RP with credit and queued
 // work keeps sending while another RP has none (T1-C01), the DUT uses all the
 // credit it holds (T1-C02), never more (AOU-R16, the L3 model).
@@ -42,6 +59,15 @@ class aou_zero_credit_vseq extends aou_link_base_vseq;
     aou_cred_class_e c = class_of(arg_str("credit", names[$urandom_range(4)]));
     int starve = arg_int("starve_rp", -1);
     int unsigned limit = arg_int("limit", 0);
+    int hold_rp = arg_int("hold_wreq_rp", -1);
+    if (arg_int("fair", 0) != 0) begin
+      fair_bursts();
+      return;
+    end
+    if (hold_rp >= 0) begin
+      hold_wreq(hold_rp);
+      return;
+    end
     if (starve >= 0) begin
       starve_one(c, starve);
       return;
@@ -128,21 +154,41 @@ class aou_zero_credit_vseq extends aou_link_base_vseq;
     sw_deactivate();
   endtask
 
+  // Granules of a full-width WriteData the DUT sends for local RP r (Tables 5-7).
+  function int unsigned wdata_granules(int unsigned r);
+    return cfg.rp_bytes[r] <= 32 ? 8 : cfg.rp_bytes[r] <= 64 ? 15 : 30;
+  endfunction
+
   task credit_limit(aou_cred_class_e c, int unsigned k);
     int unsigned hold = arg_int("hold", 3000);
     aou_t1_traffic_cfg p = profile_for(c);
     aou_cred_ret_e ret = cfg.l3_cfg.ret_policy[c];
     int unsigned n = num_txns;
-    if (!(c inside {AOU_CC_WREQ, AOU_CC_RREQ}))
-      `uvm_fatal(get_type_name(), "+limit needs +credit=wreq or +credit=rreq")
-    // Every RP must queue more requests than its credit covers.
-    if (n < k + 4) n = k + 4;
-    p.num_slots = n;
-    p.max_len = 0;
-    `uvm_info(get_type_name(), $sformatf("%s credit for %0d requests per RP, %0d queued per RP",
-                                         aou_cc_name(c), k, n), UVM_LOW)
+    int unsigned unit = REQ_GRANULES;
+    int unsigned used[AOU_RP_MAX];
+    if (!(c inside {AOU_CC_WREQ, AOU_CC_RREQ, AOU_CC_WDATA}))
+      `uvm_fatal(get_type_name(), "+limit needs +credit=wreq, +credit=rreq or +credit=wdata")
+    if (c == AOU_CC_WDATA) begin
+      // Credit for k WriteData messages of the widest RP; every write is longer.
+      for (int unsigned r = 0; r < cfg.n_rp; r++)
+        if (wdata_granules(r) > unit) unit = wdata_granules(r);
+      p.min_len = 8'(k);
+      p.max_len = 8'(k + 8);
+      p.wr_pct = 100;
+      if (n < 8) n = 8;
+      p.num_slots = n;
+    end else begin
+      // Every RP must queue more requests than its credit covers.
+      if (n < k + 4) n = k + 4;
+      p.num_slots = n;
+      p.max_len = 0;
+    end
+    `uvm_info(get_type_name(), $sformatf("%s credit for %0d messages (%0d granules) per RP, %0d %s",
+                                         aou_cc_name(c), k, k * unit, n,
+                                         c == AOU_CC_WDATA ? "writes of more beats per RP" :
+                                         "queued per RP"), UVM_LOW)
     link_up();
-    cfg.l3_cfg.rx_depth[c] = k * REQ_GRANULES;
+    cfg.l3_cfg.rx_depth[c] = k * unit;
     cfg.l3_cfg.ret_policy[c] = AOU_RET_WITHHELD;
     env.l3.model.crd.reset_link();
     sw_activate();
@@ -150,16 +196,86 @@ class aou_zero_credit_vseq extends aou_link_base_vseq;
     wait_cycles(hold);
     for (int unsigned r = 0; r < cfg.n_rp; r++) begin
       int unsigned left = env.l3.model.crd.rx_outstanding[r][c];
-      `uvm_info(get_type_name(), $sformatf("RP%0d: %0d of %0d %s sent on credit, %0d credits left",
-                                           r, (k * REQ_GRANULES - left) / REQ_GRANULES, k,
-                                           aou_cc_name(c), left), UVM_LOW)
+      used[r] = k * unit - left;
+      `uvm_info(get_type_name(), $sformatf(
+                "RP%0d: %0d of %0d granules of %s credit used, %0d left", r, used[r], k * unit,
+                aou_cc_name(c), left), UVM_LOW)
     end
     if (n_traffic == 0)
       `uvm_error(get_type_name(), $sformatf("T1-L11: traffic completed on %0d %s credits",
                                             k, aou_cc_name(c)))
     cfg.l3_cfg.ret_policy[c] = ret;
     env.l3.model.release_withheld();
+    // The model frees a write's WDATA credit only once the whole write has
+    // arrived, which these writes cannot do on k messages: return what was
+    // used, as a die that frees each beat on receipt would have.
+    if (c == AOU_CC_WDATA)
+      for (int unsigned r = 0; r < cfg.n_rp; r++) if (used[r] != 0) grant_rp(c, r, used[r]);
     wait_traffic();
+    drain();
+    sw_deactivate();
+  endtask
+
+  task hold_wreq(int unsigned hr);
+    int unsigned hold = arg_int("hold", 3000);
+    aou_t1_traffic_cfg p = aou_t1_traffic_cfg::named("short");
+    bit [AOU_RP_MAX-1:0] hold0 = cfg.l3_cfg.pol.hold_wreq_rps;
+    int unsigned n = num_txns;
+    if (hr >= cfg.n_rp)
+      `uvm_fatal(get_type_name(), $sformatf("+hold_wreq_rp=%0d, build has %0d RPs", hr, cfg.n_rp))
+    p.wr_pct = 100;
+    p.max_len = 8'(arg_int("hold_max_len", 7));
+    if (n < 16) n = 16;
+    `uvm_info(get_type_name(), $sformatf(
+              "remote WriteReqs on RP%0d held for %0d cycles while their WriteData goes", hr,
+              hold), UVM_LOW)
+    link_up();
+    sw_activate();
+    cfg.l3_cfg.pol.hold_wreq_rps[cfg.l3_cfg.dest_rp[hr]] = 1'b1;
+    traffic_nb(AOU_T1_R2L, n, p);
+    wait_cycles(hold);
+    if (n_traffic == 0)
+      `uvm_error(get_type_name(), $sformatf(
+                 "T1-L11: remote writes on RP%0d completed with their WriteReqs held", hr))
+    cfg.l3_cfg.pol.hold_wreq_rps = hold0;
+    env.l3.model.kick();
+    wait_traffic();
+    drain();
+    sw_deactivate();
+  endtask
+
+  task fair_bursts();
+    int unsigned rs = arg_int("fair_short", 0);
+    int unsigned rl = arg_int("fair_long", 1);
+    int unsigned lo = arg_int("fair_min", 31);
+    int unsigned hi = arg_int("fair_max", 63);
+    aou_t1_traffic_cfg ps = aou_t1_traffic_cfg::named("rand");
+    aou_t1_traffic_cfg pl = aou_t1_traffic_cfg::named("rand");
+    if (cfg.n_rp < 2) `uvm_fatal(get_type_name(), "+fair needs a build with several RPs")
+    if (rs >= cfg.n_rp || rl >= cfg.n_rp || rs == rl)
+      `uvm_fatal(get_type_name(), $sformatf("+fair_short=%0d +fair_long=%0d on %0d RPs", rs, rl,
+                                            cfg.n_rp))
+    ps.wr_pct = 100;
+    ps.max_len = 0;
+    ps.num_slots = 32;
+    ps.rp_mask = 4'(1 << rs);
+    pl.wr_pct = 100;
+    pl.min_len = 8'(lo);
+    pl.max_len = 8'(hi);
+    pl.num_slots = 8;
+    pl.rp_mask = 4'(1 << rl);
+    `uvm_info(get_type_name(), $sformatf(
+              "write fairness: RP%0d single-beat writes, RP%0d bursts of AWLEN %0d..%0d", rs, rl,
+              lo, hi), UVM_LOW)
+    link_up();
+    sw_activate();
+    // The managers present every beat at once and take responses at once,
+    // for both streams together (a profile's own timing ends with its stream).
+    apply_timing(AOU_AXI_TIMING_ZERO, 0);
+    traffic_nb(AOU_T1_L2R, arg_int("fair_short_n", 400), ps);
+    traffic_nb(AOU_T1_L2R, arg_int("fair_long_n", 40), pl);
+    wait_traffic();
+    apply_timing(cfg.local_timing, cfg.remote_lat_max);
     drain();
     sw_deactivate();
   endtask

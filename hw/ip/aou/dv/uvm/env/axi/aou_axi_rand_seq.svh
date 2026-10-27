@@ -27,6 +27,8 @@ class aou_axi_rand_seq extends aou_axi_base_seq;
   int unsigned wrap_pct  = 15;
   bit [9:0]    max_id    = 10'd7;
   bit [7:0]    max_len   = 8'd255;
+  // Ordinary requests are at least min_len+1 beats (at most max_len+1 wins).
+  bit [7:0]    min_len   = 8'd0;
   aou_axi_strb_e strb_mode = AOU_AXI_STRB_MIXED;
   int unsigned small_size_pct  = 0;
   int unsigned small_size_wt[5] = '{2, 4, 45, 45, 4};
@@ -172,8 +174,13 @@ class aou_axi_rand_seq extends aou_axi_base_seq;
     end
     if (b == AOU_AXI_FIXED && lmax > 15) lmax = 15;
     if (lmax > max_len) lmax = max_len;
+    if (b != AOU_AXI_WRAP && lmin < min_len) lmin = min_len;
+    if (lmax < lmin) lmax = lmin;
+    if (lmax > max_len) lmax = max_len;
     if (lmin > lmax) lmin = lmax;
     full_size = ($urandom_range(1) == 1);
+    // A long burst at the full bus width may not fit in 4 KB (AXI4 A3.4.1).
+    if (((int'(lmin) + 1) << msz) > 4096) full_size = 1'b0;
     is_small = pick_small(ssz, sln) && !l;
     mn = (msz < 3'd5) ? msz : 3'd5;   // a bus under 32 bytes has no ordinary size
     if (is_small) begin

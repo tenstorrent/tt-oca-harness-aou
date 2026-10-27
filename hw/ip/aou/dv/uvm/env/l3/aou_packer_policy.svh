@@ -59,6 +59,12 @@ class aou_packer_policy extends uvm_object;
   // WriteData messages sent ahead of the held WriteReq: 0 picks 1 to the
   // whole burst per write; N sends N, or the whole burst when shorter.
   int unsigned      wdata_first_beats;
+  // Stimulus: no WriteReq goes on these RPs (bit r: RP field r), as if the
+  // model had no WREQ credit there, while their WriteData still goes on WDATA
+  // credit. The data of several writes then waits at the receiver ahead of
+  // every WriteReq, up to the WDATA credit it advertised. The caller clears
+  // the mask and kicks the model to let the WriteReqs go.
+  bit [AOU_RP_MAX-1:0] hold_wreq_rps;
 
   function new(string name = "aou_packer_policy");
     super.new(name);
@@ -79,6 +85,7 @@ class aou_packer_policy extends uvm_object;
     best_fit = 1'b0;
     wdata_first_pct = 5;
     wdata_first_beats = 0;
+    hold_wreq_rps = '0;
   endfunction
 
   function void set_sparse();
@@ -115,10 +122,10 @@ class aou_packer_policy extends uvm_object;
   virtual function string convert2string();
     return $sformatf({"max_msgs=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
                       "cred_only=%0d empty=%0d%% cred=%0d misc_half=%0d hold=%0d ",
-                      "prof=%0d%% zero_grants=%0d best_fit=%0d wdata_first=%0d%%/%0d"},
+                      "prof=%0d%% zero_grants=%0d best_fit=%0d wdata_first=%0d%%/%0d hold_wreq=%b"},
                      max_msgs_per_flit, hole_pct, max_hole, start_granule, split_at,
                      allow_span, random_order, credit_only_flits, empty_flit_pct,
                      cred_method, misc_per_half_max, hold_credited, prof_pct,
-                     zero_grants, best_fit, wdata_first_pct, wdata_first_beats);
+                     zero_grants, best_fit, wdata_first_pct, wdata_first_beats, hold_wreq_rps);
   endfunction
 endclass

@@ -283,6 +283,80 @@ tags = ["link"]
 run_modes = ["link"]
 args = ["+credit=rreq", "+limit=12"]
 
+# 3.10/3.13: WDATA credit for k WriteData messages of the widest RP, none returned
+# until released, every write longer than k beats: each RP's committed write runs
+# out of WDATA credit with its data still owed.
+[[tests]]
+name = "aou_zero_credit_test.credit-wdata.limit-2"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wdata", "+limit=2"]
+
+[[tests]]
+name = "aou_zero_credit_test.credit-wdata.limit-6"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+credit=wdata", "+limit=6"]
+
+# 4.32: the remote die holds its WriteReqs on one RP while their WriteData goes, so
+# the data of several writes waits in the DUT's RX W FIFO ahead of every WriteReq.
+[[tests]]
+name = "aou_zero_credit_test.hold_wreq_rp-0"
+module = { uvm = "aou_zero_credit_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+hold_wreq_rp=0"]
+
+[[tests]]
+name = "aou_zero_credit_test.hold_wreq_rp-2.hold_max_len-31.4x512-sp64"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+hold_wreq_rp=2", "+hold_max_len=31"]
+
+# 12.21: DUT TX write fairness, single-beat writes on one RP against bursts of
+# AWLEN 31-63 on another, both managers saturating (aou_t1_wr_order_chk DP-R11).
+[[tests]]
+name = "aou_zero_credit_test.fair-1.4x512-sp64"
+module = { uvm = "aou_zero_credit_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+fair=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.fair-1.4xmix4211-sp128"
+module = { uvm = "aou_zero_credit_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+fair=1"]
+
+[[tests]]
+name = "aou_zero_credit_test.fair-1.fair_short-3.fair_long-0.4xmix4211-sp128"
+module = { uvm = "aou_zero_credit_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+fair=1", "+fair_short=3", "+fair_long=0"]
+
 # 1.11: ACTIVATE_START written while the FDI link is down; activation starts on link-up.
 [[tests]]
 name = "aou_link_act_deact_test.early_act-1"
@@ -436,7 +510,7 @@ args = ["+mode=deact_rsp", "+v0p8"]
 
 [[groups]]
 name = "link"
-expected_count = 43
+expected_count = 50
 tests = [
   "aou_link_act_deact_test",
   "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0",
@@ -467,6 +541,13 @@ tests = [
   "aou_zero_credit_test.credit-wreq.limit-12",
   "aou_zero_credit_test.credit-rreq.limit-4",
   "aou_zero_credit_test.credit-rreq.limit-12",
+  "aou_zero_credit_test.credit-wdata.limit-2",
+  "aou_zero_credit_test.credit-wdata.limit-6",
+  "aou_zero_credit_test.hold_wreq_rp-0",
+  "aou_zero_credit_test.hold_wreq_rp-2.hold_max_len-31.4x512-sp64",
+  "aou_zero_credit_test.fair-1.4x512-sp64",
+  "aou_zero_credit_test.fair-1.4xmix4211-sp128",
+  "aou_zero_credit_test.fair-1.fair_short-3.fair_long-0.4xmix4211-sp128",
   "aou_link_act_deact_test.early_act-1",
   "aou_act_rx_drain_test",
   "aou_rx_credit_test",

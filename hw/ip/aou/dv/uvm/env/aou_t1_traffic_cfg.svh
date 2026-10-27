@@ -17,6 +17,7 @@ class aou_t1_traffic_cfg extends uvm_object;
   int unsigned   num_slots = 16;
   bit [9:0]      max_id    = 10'd7;
   bit [7:0]      max_len   = 8'd63;
+  bit [7:0]      min_len   = 8'd0;
   aou_axi_strb_e strb_mode = AOU_AXI_STRB_MIXED;
   // Address window per RP and direction: base + rp * rp_stride, span bytes.
   bit [63:0]     base      = 64'h0000_0001_0000_0000;
@@ -60,8 +61,8 @@ class aou_t1_traffic_cfg extends uvm_object;
   endfunction
 
   function string convert2string();
-    return $sformatf("%s wr=%0d%% lock=%0d%% max_len=%0d max_id=%0d base=%0h rps=%4b timing=%s",
-                     kind.name(), wr_pct, lock_pct, max_len, max_id, base, rp_mask,
+    return $sformatf("%s wr=%0d%% lock=%0d%% len=%0d..%0d max_id=%0d base=%0h rps=%4b timing=%s",
+                     kind.name(), wr_pct, lock_pct, min_len, max_len, max_id, base, rp_mask,
                      keep_timing ? "kept" : timing.name());
   endfunction
 endclass

@@ -429,6 +429,7 @@ class aou_base_test_seq extends ocah_sequence;
         s.wrap_pct = p.wrap_pct;
         s.max_id = p.max_id;
         s.max_len = p.max_len;
+        s.min_len = p.min_len;
         s.strb_mode = p.strb_mode;
         s.start(sqr);
       end

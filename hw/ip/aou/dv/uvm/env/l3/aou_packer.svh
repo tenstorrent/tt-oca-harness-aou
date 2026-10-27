@@ -85,12 +85,14 @@ class aou_packer extends uvm_object;
   // now. Once that data can't go (no WDATA credit, nothing queued) the
   // WriteReq goes, so the order never waits on credit the DUT returns only
   // after the WriteReq has arrived (its RX W FIFO holds the early data).
+  // A WriteReq on an RP of pol.hold_wreq_rps is held whatever its data does.
   function bit held(int i);
     int unsigned rp;
     int unsigned d;
     int unsigned own;
-    if (wf_tgt[i].size() == 0 || wf_tgt[i][0] == 0) return 1'b0;
     rp = i / AOU_CC_NUM;
+    if (i % AOU_CC_NUM == int'(AOU_CC_WREQ) && cfg.pol.hold_wreq_rps[rp]) return 1'b1;
+    if (wf_tgt[i].size() == 0 || wf_tgt[i][0] == 0) return 1'b0;
     d = rp * AOU_CC_NUM + int'(AOU_CC_WDATA);
     own = (wd_placed[rp] > wd_owed[rp]) ? wd_placed[rp] - wd_owed[rp] : 0;
     return own < wf_tgt[i][0] && q[d].size() > 0 && eligible(q[d][0]);
@@ -140,7 +142,7 @@ class aou_packer extends uvm_object;
     if (cfg.pol.credit_only_flits &&
         crd.rx_has_pending(lnk.can_advertise(1'b0), lnk.can_advertise(1'b1))) return 1'b1;
     if (misc_q.size() > 0 && eligible(misc_q[0])) return 1'b1;
-    foreach (q[i]) if (q[i].size() > 0 && eligible(q[i][0])) return 1'b1;
+    foreach (q[i]) if (q[i].size() > 0 && eligible(q[i][0]) && !held(i)) return 1'b1;
     return 1'b0;
   endfunction
 

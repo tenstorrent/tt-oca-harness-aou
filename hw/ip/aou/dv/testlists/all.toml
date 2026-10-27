@@ -88,7 +88,7 @@ tests = [
 # Functional areas (no stress, matrix, perf or assertion builds)
 [[groups]]
 name = "functional"
-expected_count = 246
+expected_count = 253
 tests = [
   "aou_t1_slice_test",
   "aou_t1_deact_test",
@@ -226,6 +226,13 @@ tests = [
   "aou_zero_credit_test.credit-wreq.limit-12",
   "aou_zero_credit_test.credit-rreq.limit-4",
   "aou_zero_credit_test.credit-rreq.limit-12",
+  "aou_zero_credit_test.credit-wdata.limit-2",
+  "aou_zero_credit_test.credit-wdata.limit-6",
+  "aou_zero_credit_test.hold_wreq_rp-0",
+  "aou_zero_credit_test.hold_wreq_rp-2.hold_max_len-31.4x512-sp64",
+  "aou_zero_credit_test.fair-1.4x512-sp64",
+  "aou_zero_credit_test.fair-1.4xmix4211-sp128",
+  "aou_zero_credit_test.fair-1.fair_short-3.fair_long-0.4xmix4211-sp128",
   "aou_link_act_deact_test.early_act-1",
   "aou_act_rx_drain_test",
   "aou_rx_credit_test",
@@ -341,7 +348,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 461
+expected_count = 468
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -545,6 +552,13 @@ tests = [
   "aou_zero_credit_test.credit-wreq.limit-12",
   "aou_zero_credit_test.credit-rreq.limit-4",
   "aou_zero_credit_test.credit-rreq.limit-12",
+  "aou_zero_credit_test.credit-wdata.limit-2",
+  "aou_zero_credit_test.credit-wdata.limit-6",
+  "aou_zero_credit_test.hold_wreq_rp-0",
+  "aou_zero_credit_test.hold_wreq_rp-2.hold_max_len-31.4x512-sp64",
+  "aou_zero_credit_test.fair-1.4x512-sp64",
+  "aou_zero_credit_test.fair-1.4xmix4211-sp128",
+  "aou_zero_credit_test.fair-1.fair_short-3.fair_long-0.4xmix4211-sp128",
   "aou_link_act_deact_test.early_act-1",
   "aou_act_rx_drain_test",
   "aou_rx_credit_test",
