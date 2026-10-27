@@ -859,6 +859,7 @@ sw_disable, l1_act, retrain_act or l1_traffic) +link_down_mask +loops +T1_TXN.
 | `aou_link_event_test.event-link_reset.link_down_mask-1` | `+event=link_reset +link_down_mask=1` | 1 |  | 22.1,22.4,11.11,18.17
 | `aou_link_event_test.event-l1_act` | `+event=l1_act` | 1-2 |  | 22.1,2.4,18.15
 | `aou_link_event_test.event-retrain_act` | `+event=retrain_act` | 1-2 |  | 22.1,18.13
+| `aou_link_event_test.event-l1_traffic` | `+event=l1_traffic` | 1-2 |  | 22.1,2.4,18.15,18.20
 | `aou_link_event_test` |  | 1-2 |  | 22.1,22.4,22.6
 | `aou_link_event_test.event-retrain.rtl_asserts-1` | `+event=retrain +rtl_asserts=1` | 1 | `1x512-sp64-assert` | 11.18
 |===
@@ -874,6 +875,7 @@ sw_disable, l1_act, retrain_act or l1_traffic) +link_down_mask +loops +T1_TXN.
 * 18.15: L1 entry and exit with the MAS power-management sequence, including the clk_req wake
 * 18.17: LinkReset: Adapter state and the DUT's request, O_AOU_REQ_LINKRESET and its mask
 * 18.18: Disabled: Adapter-initiated entry and exit
+* 18.20: wake_req/wake_ack handshake
 * 18.21: pl_inband_pres drop
 * 18.23: pl_state_sts leaves Active mid-flit
 * 18.25: Two-PHY I_PHY_TYPE selection with PHY1 active: state and stall muxing for the second PHY

@@ -31,13 +31,20 @@
 //   retrain_act        software deactivates and writes ACTIVATE_START while
 //                      the Adapter holds the link in Retrain: the handshake
 //                      completes once the link is Active again (T1-L50).
+//   l1_traffic         software deactivates (ACTIVATE_START clear), the
+//                      adapter enters L1, and local AXI traffic arrives: its
+//                      INT_ACTIVATE_START is an activation request in L1, so
+//                      the DUT wakes the link itself (lp_wake_req; UCIe r1.1
+//                      8.2.9, integrator guide 6.6), the Adapter answers with
+//                      Retrain and Active, and the activation runs on the
+//                      interrupt; the traffic then completes.
 // A link loss with AoU in use (linkerror, link_reset, inband_drop, disabled)
 // raises INT_FDI_LINK_DOWN once and the DUT disables itself (T1-L48/L49,
 // aou_base_test_seq); with +link_down_mask=1 the pin stays low and the
 // sticky bit is checked instead.
 // Knobs: +event=retrain|clk_wake|l1|linkerror|link_reset|inband_drop|disabled|
-// sw_disable|l1_act|retrain_act|rand (rand never picks disabled, sw_disable,
-// l1_act or retrain_act) +link_down_mask +loops +T1_TXN.
+// sw_disable|l1_act|retrain_act|l1_traffic|rand (rand never picks disabled,
+// sw_disable, l1_act, retrain_act or l1_traffic) +link_down_mask +loops +T1_TXN.
 class aou_link_event_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_link_event_vseq)
 
@@ -72,6 +79,7 @@ class aou_link_event_vseq extends aou_link_base_vseq;
         "sw_disable": sw_disable();
         "l1_act": l1_act();
         "retrain_act": retrain_act();
+        "l1_traffic": l1_traffic();
         default: `uvm_fatal(get_type_name(), {"unknown link event ", ev})
       endcase
     end
@@ -173,6 +181,25 @@ class aou_link_event_vseq extends aou_link_base_vseq;
       end
     join
     wait_enabled("in Retrain");
+  endtask
+
+  task l1_traffic();
+    check_traffic(num_txns);
+    sw_deactivate(AOU_T1_BY_APB);
+    link_event(LSM_EV_L1_ENTRY);
+    wait_cycles($urandom_range(400, 20));
+    `uvm_info(get_type_name(), "local traffic with the link in L1", UVM_LOW)
+    traffic_nb(AOU_T1_L2R, num_txns);
+    fork
+      wait_l3(AOU_LS_ENABLED, cfg.act_timeout);
+      env.status.wait_act_state(1'b1, cfg.act_timeout);
+    join
+    if (!l3_ok || !env.status.act_ok)
+      `uvm_error(get_type_name(), "T1-L50: not ENABLED after local traffic in L1")
+    if (!link_is_up())
+      `uvm_error(get_type_name(), "T1-L50: FDI link not Active after local traffic in L1")
+    wait_traffic();
+    drain();
   endtask
 
   task link_down(aou_lsm_ev_e ev, bit inband_drop);

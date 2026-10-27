@@ -92,6 +92,18 @@ tags = ["lifecycle"]
 run_modes = ["lifecycle"]
 args = ["+event=retrain_act"]
 
+# Local AXI traffic with the link in L1 and ACTIVATE_START clear: the DUT wakes
+# the link itself on INT_ACTIVATE_START (lp_wake_req in L1), the Adapter's PM exit
+# answers, the activation runs on the interrupt and the traffic completes (T1-L50).
+[[tests]]
+name = "aou_link_event_test.event-l1_traffic"
+module = { uvm = "aou_link_event_test" }
+seed = 1
+reseed = 2
+tags = ["lifecycle"]
+run_modes = ["lifecycle"]
+args = ["+event=l1_traffic"]
+
 [[tests]]
 name = "aou_link_event_test"
 module = { uvm = "aou_link_event_test" }
@@ -301,7 +313,7 @@ run_modes = ["lifecycle"]
 
 [[groups]]
 name = "lifecycle"
-expected_count = 34
+expected_count = 35
 tests = [
   "aou_link_event_test.event-retrain",
   "aou_link_event_test.event-clk_wake",
@@ -312,6 +324,7 @@ tests = [
   "aou_link_event_test.event-link_reset.link_down_mask-1",
   "aou_link_event_test.event-l1_act",
   "aou_link_event_test.event-retrain_act",
+  "aou_link_event_test.event-l1_traffic",
   "aou_link_event_test",
   "aou_lp_mode_traffic_test.threshold-0",
   "aou_lp_mode_traffic_test",
