@@ -2203,9 +2203,9 @@ RP +fair_long (default 1) bursts of AWLEN +fair_min..+fair_max (31..63);
 ----
 
 A burst the DUT has committed must not be held open by the stream of short
-writes. aou_t1_wr_order_chk checks that it keeps making progress while it
-holds credit (DP-R11); it does not bound how long the short writes may slow
-a burst that still trickles.
+writes. aou_t1_crd_flow_chk checks that it keeps making progress while it
+holds credit and is next in write-data order (T1-C43); it does not bound how
+long the short writes may slow a burst that still trickles.
 aou_t1_crd_flow_chk judges both in every test: an RP with credit and queued
 work keeps sending while another RP has none (T1-C01), the DUT uses all the
 credit it holds (T1-C02), never more (AOU-R16, the L3 model).
@@ -2220,7 +2220,7 @@ cycles later. Messages waiting for credit remain to be transmitted (MAS
 AOU-R33 in the L3 model), responses to the remote die before DISABLED, and
 every transaction completes (scoreboard).
 
-*Rules named.* `AOU-R16`, `AOU-R33`, `AOU-R34`, `DP-R11`, `T1-C01`, `T1-C02`
+*Rules named.* `AOU-R16`, `AOU-R33`, `AOU-R34`, `T1-C01`, `T1-C02`, `T1-C43`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 

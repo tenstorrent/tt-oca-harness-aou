@@ -45,6 +45,40 @@
 // Each is reported once per stall. The bounds come from the env config
 // (crd_block_cycles, crd_idle_cycles); report_phase prints the longest stall
 // seen, the margin to tune them by.
+//
+// Neither notices one RP starving while the same class keeps flowing on the
+// others, so each RP and class also has its own wait:
+//   T1-C43 (per-RP forward progress): no RP's messages of a class starve while
+//          the RP holds credit for them and is next in that class's order.
+//          The wait of RP x for class c counts the cycles the Adapter takes a
+//          beat on an open link (as above), no AXI port holds the DUT back,
+//          and x is eligible for c and at the head of c's order:
+//            WDATA  write data follows the order in which the DUT granted the
+//                   writes' requests, on a W path the RPs share (MAS 3.2.1):
+//                   every WriteReq the DUT sent before x's oldest write still
+//                   owing data, on any RP, has had all its WriteData sent. The
+//                   DUT's own WriteReq order on the wire is taken as the grant
+//                   order.
+//            WREQ   no write the DUT has sent, on any RP, still owes WriteData.
+//                   Taken from the RTL (PR #98): the S-port aligner lets open
+//                   bursts go ahead of a new AW and sends an AW together with
+//                   its first W beat, so a WriteReq waits for the data of every
+//                   earlier write. MAS 3.2.1 says only that W follows the
+//                   granted AW order.
+//            others no documented order between RPs; eligibility alone.
+//          The DUT is held back when, on any RP, one of its M-port AW, W or AR
+//          channels or its S-port R or B channel has VALID high and READY low.
+//          Sustained backpressure is a stress case in which the DUT must stay
+//          correct, not fast, so those cycles do not count. This also covers a
+//          remote request the DUT splits into several M-port bursts: between
+//          pieces no M-port transaction of the ID is open, so its response
+//          looks owed while the next piece's AW or AR waits for READY. Any
+//          other cycle pauses the wait; a message of class c the DUT sends on
+//          x's wire RP, a reset, DISABLED or a new activation restarts it.
+//          A wait that reaches
+//          starve_cycles (env cfg crd_starve_cycles) is reported once. The wait
+//          covers sharing the TX with the other RPs and classes; the bound
+//          catches an RP that is passed over, not slow service.
 class aou_t1_crd_flow_chk extends uvm_component;
   `uvm_component_utils(aou_t1_crd_flow_chk)
 
@@ -60,6 +94,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
   bit             enable = 1'b1;
   int unsigned    block_cycles = 256;
   int unsigned    idle_cycles = 4096;
+  int unsigned    starve_cycles = 500;
   // Two flits on the narrowest (32-byte) FDI path.
   int unsigned    busy_cycles = 16;
 
@@ -80,6 +115,11 @@ class aou_t1_crd_flow_chk extends uvm_component;
   int unsigned longest[AOU_CC_NUM];
   int unsigned n_c01;
   int unsigned n_c02;
+  int unsigned n_c43;
+  // Longest per-RP wait per class (T1-C43) and the local RP that had it.
+  int unsigned longest_rp_wait[AOU_CC_NUM];
+  int unsigned longest_rp[AOU_CC_NUM];
+  time         longest_at[AOU_CC_NUM];
 
   // S-port requests accepted and not yet sent, then sent and not yet answered.
   protected bit [9:0]    aw_pend[AOU_RP_MAX][$];
@@ -103,6 +143,15 @@ class aou_t1_crd_flow_chk extends uvm_component;
   protected bit          rep[AOU_CC_NUM];
   protected bit          was_starved[AOU_RP_MAX][AOU_CC_NUM];
   protected bit          was_beside[AOU_RP_MAX][AOU_CC_NUM];
+  // T1-C43: each RP's wait per class and whether it was reported.
+  protected int unsigned rp_wait[AOU_RP_MAX][AOU_CC_NUM];
+  protected bit          rp_rep[AOU_RP_MAX][AOU_CC_NUM];
+  // The writes the DUT has sent whose WriteData is still owed, in the order
+  // of their WriteReqs on the wire: wire RP and beats owed. Bounded by the
+  // writes the DUT has outstanding.
+  protected int unsigned w_ord_rp[$];
+  protected int unsigned w_ord_owed[$];
+  protected int unsigned epoch;
 
   function new(string name, uvm_component parent);
     aou_fc_db db;
@@ -126,6 +175,8 @@ class aou_t1_crd_flow_chk extends uvm_component;
     idle_cycles = cfg.crd_idle_cycles;
     void'($value$plusargs("crd_block_cycles=%d", block_cycles));
     void'($value$plusargs("crd_idle_cycles=%d", idle_cycles));
+    starve_cycles = cfg.crd_starve_cycles;
+    void'($value$plusargs("crd_starve_cycles=%d", starve_cycles));
   endfunction
 
   // The wire RP local RP x's messages carry (DEST_RP, register mirror).
@@ -215,6 +266,29 @@ class aou_t1_crd_flow_chk extends uvm_component;
     return c != AOU_CC_WREQ || cred(x, AOU_CC_WDATA);
   endfunction
 
+  // x is next in c's order (T1-C43). Write data: x's oldest write still owing
+  // data is the oldest the DUT has sent. A WriteReq: no write the DUT has sent
+  // still owes data (from the RTL's aligner, see the header).
+  function bit at_head(int unsigned x, aou_cred_class_e c);
+    if (c == AOU_CC_WREQ) return w_ord_rp.size() == 0;
+    if (c != AOU_CC_WDATA) return 1'b1;
+    return w_ord_rp.size() != 0 && w_ord_rp[0] == wire_of(x);
+  endfunction
+
+  // Some AXI port holds the DUT back on this edge: an M-port AW, W or AR, or an
+  // S-port R or B, the DUT presents and the other side does not take.
+  function bit held_back();
+    for (int unsigned x = 0; x < cfg.n_rp; x++) begin
+      if (m_vif[x].mon_cb.awvalid === 1'b1 && m_vif[x].mon_cb.awready !== 1'b1 ||
+          m_vif[x].mon_cb.wvalid === 1'b1 && m_vif[x].mon_cb.wready !== 1'b1 ||
+          m_vif[x].mon_cb.arvalid === 1'b1 && m_vif[x].mon_cb.arready !== 1'b1 ||
+          s_vif[x].mon_cb.rvalid === 1'b1 && s_vif[x].mon_cb.rready !== 1'b1 ||
+          s_vif[x].mon_cb.bvalid === 1'b1 && s_vif[x].mon_cb.bready !== 1'b1)
+        return 1'b1;
+    end
+    return 1'b0;
+  endfunction
+
   // x has work of some class it has no credit for; names it in why.
   function bit starved(int unsigned x, output string why);
     why = "";
@@ -237,8 +311,12 @@ class aou_t1_crd_flow_chk extends uvm_component;
     if (c == AOU_CC_NONE) return;
     sent[c] = 1'b1;
     last_msg[c] = cyc;
+    if (model != null) link_check();
+    w_order(m);
     for (int unsigned x = 0; x < cfg.n_rp; x++) begin
       if (wire_of(x) != int'(m.rp)) continue;
+      rp_wait[x][c] = 0;
+      rp_rep[x][c] = 1'b0;
       if ($cast(q, m)) begin
         if (c == AOU_CC_WREQ && drop_id(aw_pend[x], q.id)) begin
           aw_sent[x].push_back(q.id);
@@ -254,6 +332,45 @@ class aou_t1_crd_flow_chk extends uvm_component;
         drop_all(r_pend[x], d.id);
       end
     end
+  endfunction
+
+  // The W order: a WriteReq joins it, each WriteData pays one beat of the
+  // oldest write still owing data on its RP (DP-R10 checks there is one).
+  protected function void w_order(aou_msg m);
+    aou_msg_req q;
+    if (m.msg_type == AOU_MT_WREQ && $cast(q, m)) begin
+      w_ord_rp.push_back(int'(m.rp));
+      w_ord_owed.push_back(int'(q.len) + 1);
+      return;
+    end
+    if (m.cred_class() != AOU_CC_WDATA) return;
+    for (int i = 0; i < w_ord_rp.size(); i++) begin
+      if (w_ord_rp[i] != int'(m.rp)) continue;
+      w_ord_owed[i]--;
+      if (w_ord_owed[i] == 0) begin
+        w_ord_rp.delete(i);
+        w_ord_owed.delete(i);
+      end
+      return;
+    end
+  endfunction
+
+  // Every per-RP wait and the W order restart.
+  protected function void forget_waits();
+    w_ord_rp.delete();
+    w_ord_owed.delete();
+    foreach (rp_wait[x, c]) begin
+      rp_wait[x][c] = 0;
+      rp_rep[x][c] = 1'b0;
+    end
+  endfunction
+
+  // DISABLED or a new activation ends every open write and every wait. Called
+  // from both the message path and the sampling loop, whichever sees it first.
+  protected function void link_check();
+    if (model.lnk.epoch == epoch && model.lnk.state != AOU_LS_DISABLED) return;
+    forget_waits();
+    epoch = model.lnk.epoch;
   endfunction
 
   static function void drop_all(ref bit [9:0] ids[$], input bit [9:0] id);
@@ -300,6 +417,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
       stall[c] = 0;
       rep[c] = 1'b0;
     end
+    forget_waits();
   endfunction
 
   // The handshakes of local RP x on this edge.
@@ -399,6 +517,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
       @(s_vif[0].mon_cb);
       cyc++;
       for (int unsigned x = 0; x < cfg.n_rp; x++) track(x);
+      link_check();
       if (!link_open()) begin
         for (int unsigned x = 0; x < cfg.n_rp; x++) begin
           forget(x);
@@ -423,6 +542,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
     bit    st[AOU_RP_MAX];
     string why[AOU_RP_MAX];
     bit    any_st = 1'b0;
+    bit    held = held_back();
     for (int unsigned x = 0; x < cfg.n_rp; x++) begin
       st[x] = starved(x, why[x]);
       if (st[x]) any_st = 1'b1;
@@ -446,7 +566,30 @@ class aou_t1_crd_flow_chk extends uvm_component;
         if (!rep[c] && stall[c] >= idle_cycles) report_c02(c, el[c]);
       end
       sent[c] = 1'b0;
+      if (!held) for (int unsigned x = 0; x < cfg.n_rp; x++) rp_progress(x, c);
     end
+  endfunction
+
+  // One counted cycle of RP x and class c (T1-C43).
+  protected function void rp_progress(int unsigned x, int c);
+    string cn;
+    if (!eligible(x, aou_cred_class_e'(c)) || !at_head(x, aou_cred_class_e'(c))) return;
+    if (rp_wait[x][c] == 0) aou_rule_log::check("T1-C43", get_type_name());
+    rp_wait[x][c]++;
+    if (rp_wait[x][c] > longest_rp_wait[c]) begin
+      longest_rp_wait[c] = rp_wait[x][c];
+      longest_rp[c] = x;
+      longest_at[c] = $time;
+    end
+    if (rp_rep[x][c] || rp_wait[x][c] < starve_cycles) return;
+    cn = aou_cc_name(aou_cred_class_e'(c));
+    rp_rep[x][c] = 1'b1;
+    n_c43++;
+    aou_rule_log::fire("T1-C43", get_type_name());
+    `uvm_error(get_type_name(), $sformatf(
+        {"T1-C43: RP%0d has credit (%0d granules) and a queued %s%s, but the DUT sent no %s ",
+         "on it for %0d such cycles"}, x, model.crd.rx_outstanding[wire_of(x)][c], cn,
+        c == AOU_CC_WDATA ? " and is next in write order" : "", cn, rp_wait[x][c]))
   endfunction
 
   // The DUT sent a message of another class within the last busy_cycles:
@@ -486,5 +629,14 @@ class aou_t1_crd_flow_chk extends uvm_component;
     `uvm_info(get_type_name(), $sformatf(
         {"longest eligible stall per class (cycles; WREQ RREQ WDATA RDATA WRESP): %p; ",
          "T1-C01 %0d, T1-C02 %0d"}, longest, n_c01, n_c02), UVM_LOW)
+    `uvm_info(get_type_name(), $sformatf(
+        {"longest per-RP wait per class (cycles; WREQ RREQ WDATA RDATA WRESP): ",
+         "%0d %0d %0d %0d %0d on RPs %0d %0d %0d %0d %0d; ",
+         "T1-C43 %0d (bound %0d)"}, longest_rp_wait[0], longest_rp_wait[1], longest_rp_wait[2],
+        longest_rp_wait[3], longest_rp_wait[4], longest_rp[0], longest_rp[1], longest_rp[2],
+        longest_rp[3], longest_rp[4], n_c43, starve_cycles), UVM_LOW)
+    `uvm_info(get_type_name(), $sformatf(
+        "longest per-RP wait per class ended at (WREQ RREQ WDATA RDATA WRESP): %0t %0t %0t %0t %0t",
+        longest_at[0], longest_at[1], longest_at[2], longest_at[3], longest_at[4]), UVM_LOW)
   endfunction
 endclass

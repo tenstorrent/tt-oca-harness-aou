@@ -80,6 +80,14 @@ class aou_t1_env_cfg extends uvm_object;
   // all (T1-C02). +crd_block_cycles / +crd_idle_cycles override them.
   int unsigned   crd_block_cycles = 256;
   int unsigned   crd_idle_cycles = 4096;
+  // The per-RP wait of a class (T1-C43): cycles the Adapter takes a beat and
+  // no AXI port holds the DUT back, in which an RP holds credit and work for
+  // the class and is next in its order, without a message of the class on
+  // that RP. The longest wait seen over the stress, link and datapath lists on
+  // every config, with extra seeds of the long-burst and backpressure
+  // scenarios, was about 250 cycles (a WriteResp); most classes stay under 50.
+  // +crd_starve_cycles overrides it.
+  int unsigned   crd_starve_cycles = 500;
 
   // Time-outs in core clock cycles
   int unsigned   link_timeout = 20000;

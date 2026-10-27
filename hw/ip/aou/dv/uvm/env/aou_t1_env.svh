@@ -123,7 +123,6 @@ class aou_t1_env extends uvm_env;
     crd_blk = aou_t1_crd_block_chk::type_id::create("crd_blk", this);
     crd_blk.cfg = cfg;
     wr_order = aou_t1_wr_order_chk::type_id::create("wr_order", this);
-    wr_order.cfg = cfg;
     rx_align = aou_t1_rx_align_chk::type_id::create("rx_align", this);
     early_tbl = aou_t1_early_tbl_chk::type_id::create("early_tbl", this);
     early_tbl.cfg = cfg;
@@ -197,9 +196,6 @@ class aou_t1_env extends uvm_env;
     crd_blk.rm = regs.model;
     l3.ap_rx_msg.connect(wr_order.rx_msg_imp);
     wr_order.model = l3.model;
-    wr_order.rm = regs.model;
-    wr_order.s_vif = new[cfg.n_rp];
-    foreach (s_mgr[r]) wr_order.s_vif[r] = s_mgr[r].cfg.vif;
     // After l3's own subscription, so the model has taken the header's credit.
     bridge.ap.connect(crd_rr.dut_flit_imp);
     crd_rr.crd = l3.model.crd;

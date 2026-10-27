@@ -364,7 +364,7 @@ this API goes through the integrator, because every ported test depends on it.
 | `dbg_chk` | `aou_t1_dbg_fifo_chk`: predicts each RP's response error debug FIFO and checks every debug-window read and pop |
 | `crd_rr`, `early_tbl` | `aou_t1_crd_rr_chk`: round-robin MsgCredit order in a window a test opens (T1-C03); `aou_t1_early_tbl_chk`: early-table backpressure on RPs with EARLY_BRESP_EN (FEAT-R15/R16) |
 | `wdt_chk` | `aou_t1_wdt_chk`: the write-transaction watchdog of every RP, from a model of its count (FEAT-R23 to R28) |
-| `crd_chk` | `aou_t1_crd_flow_chk`: an RP with credit and queued work is not held back by another RP without credit (T1-C01), and the DUT uses the credit it holds (T1-C02) |
+| `crd_chk` | `aou_t1_crd_flow_chk`: an RP with credit and queued work is not held back by another RP without credit (T1-C01), the DUT uses the credit it holds (T1-C02), and no RP with credit that is next in a class's order waits too long for its message (T1-C43) |
 | `vseqr` | `aou_t1_vseqr`: sequencer handles for all of the above, plus `env` |
 
 ### Base virtual sequence (`aou_base_test_seq`)

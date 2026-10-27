@@ -384,7 +384,7 @@
   added: 'MAS 3.2.1; PR #98'
   priority: P1
   title: 'A write burst the DUT has committed is not held open by back-to-back single-beat writes on another RP (both managers saturating, AWLEN 0 against AWLEN 31-63)'
-  note: 'Found missing by the PR #98 review: a stream of short writes starved an open burst in an early version of the TX aligner. DP-R11 checks in every test that a committed write keeps making progress; it does not bound how long the short writes delay a burst that still trickles.'
+  note: 'Found missing by the PR #98 review: a stream of short writes starved an open burst in an early version of the TX aligner. T1-C43 checks in every test that a committed write keeps making progress while it is next in write-data order; it does not bound how long the short writes delay a burst that still trickles.'
 - id: '13.19'
   added: 'RDL ARB_MODE; MAS 3.2.1'
   priority: P2

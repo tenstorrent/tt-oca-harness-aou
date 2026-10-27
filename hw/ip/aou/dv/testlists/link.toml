@@ -326,7 +326,7 @@ run_modes = ["link"]
 args = ["+hold_wreq_rp=2", "+hold_max_len=31"]
 
 # 12.21: DUT TX write fairness, single-beat writes on one RP against bursts of
-# AWLEN 31-63 on another, both managers saturating (aou_t1_wr_order_chk DP-R11).
+# AWLEN 31-63 on another, both managers saturating (aou_t1_crd_flow_chk T1-C43).
 [[tests]]
 name = "aou_zero_credit_test.fair-1.4x512-sp64"
 module = { uvm = "aou_zero_credit_test" }

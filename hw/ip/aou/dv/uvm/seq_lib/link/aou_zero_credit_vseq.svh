@@ -29,9 +29,9 @@
 // RP +fair_long (default 1) bursts of AWLEN +fair_min..+fair_max (31..63);
 // +fair_short_n and +fair_long_n writes (400 and 40).
 // A burst the DUT has committed must not be held open by the stream of short
-// writes. aou_t1_wr_order_chk checks that it keeps making progress while it
-// holds credit (DP-R11); it does not bound how long the short writes may slow
-// a burst that still trickles.
+// writes. aou_t1_crd_flow_chk checks that it keeps making progress while it
+// holds credit and is next in write-data order (T1-C43); it does not bound how
+// long the short writes may slow a burst that still trickles.
 // aou_t1_crd_flow_chk judges both in every test: an RP with credit and queued
 // work keeps sending while another RP has none (T1-C01), the DUT uses all the
 // credit it holds (T1-C02), never more (AOU-R16, the L3 model).
