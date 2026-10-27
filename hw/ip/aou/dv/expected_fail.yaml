@@ -76,15 +76,6 @@
   when_re: 'PERF_GATE 4xmix4211-sp128\|0\|S[12]\|'
   requires: BUGS/046
   note: the DUT RX link in mixed and both-sides windows, held to the capped TX link's rate
-- test: aou_perf_test
-  bug: BUGS/047
-  check_re: 'T1-P02: (1x512-sp64|4x512-sp64|3x512-sp64|2x512-tp32_64)\|\d\|S1\|bw_(rd|mix)\|l2r below target'
-  when_re: 'PERF_GATE (1x512-sp64|4x512-sp64|3x512-sp64|2x512-tp32_64)\|\d\|S1\|'
-  seed_dependent: true
-  note: >-
-    reads both ways: the DUT TX link carries remote read data at 97.0-97.8% of the model, just
-    above the gate (bw_rd l2r: 1x512 0.9704, 3x512 0.9735, 4x512 0.9773, 2x512-tp32_64 0.9780 and
-    0.9735; the same on every seed), so it does not fire today; kept for when it dips below
 
 # AoU 4.4 as the v0.9 draft words it (+v0p9draft): an Activation message shares its flit
 # only with one CrdtGrant after an ActivateReq/Ack or with responses after a DeactivateReq.
