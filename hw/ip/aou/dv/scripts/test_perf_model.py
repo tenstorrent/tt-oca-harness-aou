@@ -115,22 +115,18 @@ class ModelTest(unittest.TestCase):
         r = pm.model_run(perf)["bw_wr"]
         self.assertEqual(r["r2l"]["msgs"]["WriteData512"], r["r2l"]["msgs"]["WriteDataFull512"])
 
-    def test_dut_split_rate(self):
-        """With split enabled, 32-beat local writes go out as two 16-beat WriteReqs; the
-        remote's are not split. Both sides keep their byte rate (one period, common gcd)."""
-        loc = pm.dut_split(("W", 2048, 0, 64, 64, False, 1), 16)
-        self.assertEqual(loc, [("W", 1024, 0, 64, 64, False, 2)])
-        rem = [("W", 2048, 0, 64, 64, False, 1)]
-        r = pm.model_window(64, loc, rem)
-        self.assertEqual(r["l2r"]["msgs"], {"WriteReq": 2, "WriteDataFull512": 32, "WriteResp": 1})
-        self.assertAlmostEqual(r["l2r"]["bpc"], r["r2l"]["bpc"], delta=0.6)
+    def test_local_bursts_whole(self):
+        """A 32-beat local write crosses the link as one WriteReq whatever the DUT's
+        AXI_SPLIT_TR_RPn holds: the splitter acts on received requests, at the manager
+        port, not on what the subordinate port sends."""
+        loc = [("W", 2048, 0, 64, 64, False, 1)]
+        r = pm.model_window(64, loc, [])
+        self.assertEqual(r["l2r"]["msgs"], {"WriteReq": 1, "WriteDataFull512": 32})
         b = {"beat_bytes": 64, "rp_bytes": [64], "remote_bytes": [64], "max_awlen": [15],
              "max_arlen": [15]}
         w = {"txn_hist": [{"init": "l2r", "kind": "W", "rp": 0, "bytes": 2048, "beat_bytes": 64,
                            "offset_mod_4k": 0, "full_strb": True, "count": 4}]}
         self.assertEqual(pm.run_sides(b, w)[0], [("W", 2048, 0, 64, 64, False, 4)])
-        b["split_en"] = True
-        self.assertEqual(pm.run_sides(b, w)[0], [("W", 1024, 0, 64, 64, False, 8)])
 
     def test_narrow_axsize(self):
         """256 beats within 4 KB on a 64 B bus: 16 B AxSIZE, one 256-bit message per beat,

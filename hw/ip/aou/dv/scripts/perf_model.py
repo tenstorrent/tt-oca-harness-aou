@@ -51,7 +51,6 @@ SIM_CFG = os.path.join(UVM_ROOT, "aou_sim_cfg.toml")
 DEFAULT_TOL = 0.03          # gate: measured >= (1 - tol) x model
 EPS_BYTES = 256             # above-model margin: one flit per window (quantization only)
 REMOTE_BYTES_DEFAULT = 64   # aou_t1_env_cfg.remote_bytes
-DUT_SPLIT_BEATS = 0         # AOU_CON0.AXI_SPLIT_TR_EN resets to 0: the DUT does not split
 AXI_4K = 4096
 FDI_PHY_BYTES = {0: [32], 1: [64], 2: [128], 3: [32, 64], 4: [64, 128]}   # FDI_CONFIG -> PHY widths
 DIRS = ("l2r", "r2l")
@@ -98,30 +97,16 @@ def _txns(m, side, g=None):
     return out
 
 
-def dut_split(ent, max_beats):
-    """A local (DUT S-port) burst as the DUT sends it: split into bursts of at most
-    max_beats beats (AXI_SPLIT_TR_RPn). Aligned transfers only."""
-    kind, size, offset, width, beat, partial, count = ent
-    piece = max_beats * beat
-    if size <= piece or offset % beat:
-        return [ent]
-    n, rest = divmod(size, piece)
-    out = [(kind, piece, offset, width, beat, partial, count * n)]
-    if rest:
-        out.append((kind, rest, offset, width, beat, partial, count))
-    return out
-
-
 def model_window(fdi_bytes, local, remote):
     """Saturated model of a window. local/remote: the traffic each side puts on the
     link as [(kind 'R'|'W', bytes, offset, port bytes, AxSIZE bytes, partial strobes,
-    count)] (local bursts already split as the DUT splits them, dut_split); empty
-    when that side issues nothing. Returns {dir: {bpc, eff, duty, msgs}}."""
+    count)]; empty when that side issues nothing. Bursts travel the link whole: the
+    DUT's transaction splitter acts on the requests it receives, at its manager port,
+    not on what its subordinate port sends. Returns {dir: {bpc, eff, duty, msgs}}."""
     m = model()
     cfg = m.Config(fdi_bytes=fdi_bytes, fdi_ghz=1.0)
     # One period for both sides together: the model issues both lists at the same
-    # rate, so the sides keep their transaction-count ratio (the DUT split makes
-    # more, smaller local transactions).
+    # rate, so the sides keep their transaction-count ratio.
     g = reduce(math.gcd, [e[-1] for e in local + remote if e[-1] > 0], 0) or 1
     lt, rt = _txns(m, local, g), _txns(m, remote, g)
     if not lt and not rt:
@@ -214,7 +199,7 @@ def window_sides(w, conf):
     offset = int(w.get("offset", 0))
     partial = w.get("strb", "full") == "partial"
 
-    def side(widths, split):
+    def side(widths):
         out = []
         for r in rps:
             if "bytes" in w:
@@ -228,10 +213,10 @@ def window_sides(w, conf):
                 cnt = int(share[r] * f * den)
                 if cnt:
                     e = (k, size, offset, widths[r], beat, partial and k == "W", cnt)
-                    out += dut_split(e, split) if split else [e]
+                    out.append(e)
         return out
 
-    loc, rem_side = side(conf["rp_bytes"], DUT_SPLIT_BEATS), side(rem, 0)
+    loc, rem_side = side(conf["rp_bytes"]), side(rem)
     if loc is None or rem_side is None:
         return None
     td = w.get("traffic_dir", "both")
@@ -451,9 +436,7 @@ def read_svh(path=TARGETS):
 # Runs
 # -----------------------------------------------------------------------------
 def run_sides(build, win):
-    """(local, remote) traffic of a perf.json window on the link, from txn_hist: local
-    bursts split as the DUT splits them when build.split_en is set (build.max_awlen /
-    max_arlen)."""
+    """(local, remote) traffic of a perf.json window on the link, from txn_hist."""
     full_pct = int(build.get("remote_full_pct", 100))
     rpb = build.get("rp_bytes") or []
     rmb = build.get("remote_bytes") or []
@@ -464,13 +447,8 @@ def run_sides(build, win):
         beat = int(h["beat_bytes"])
         if h["init"] == "l2r":
             width = int(rpb[rp]) if rp < len(rpb) else beat
-            ent = (k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), width, beat, partial,
-                   int(h["count"]))
-            ml = build.get("max_awlen" if k == "W" else "max_arlen") or []
-            if build.get("split_en") and rp < len(ml):
-                local += dut_split(ent, int(ml[rp]) + 1)
-            else:
-                local.append(ent)
+            local.append((k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), width, beat,
+                          partial, int(h["count"])))
             continue
         width = int(rmb[rp]) if rp < len(rmb) else beat
         ent = (k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), width, beat, partial,

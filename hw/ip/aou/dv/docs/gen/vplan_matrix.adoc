@@ -474,9 +474,9 @@
 |===
 | Item | Requirement | Priority | Scenarios
 | 20.1 | Read-only version register | P0 | `aou_reg_hw_reset_test`
-| 20.2 | Read/write control register 0 (AXI_SPLIT_TR_EN has no storage and reads 0, tenstorrent/tt-oca-harness-aou#119) | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`, `aou_reg_feature_seq_test`
+| 20.2 | Read/write control register 0 (bits [3:1] are reserved; the splitter has no enable) | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`, `aou_reg_feature_seq_test`
 | 20.3 | Read/write activation control | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`, `aou_reg_feature_seq_test`
-| 20.4 | Read/write interrupt masks | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test` (expected failure only)
+| 20.4 | Read/write interrupt masks | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`
 | 20.5 | Read/write/write-1-clear fields | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`, `aou_reg_feature_seq_test`
 | 20.6 | Read/write RP destination mapping | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`, `aou_reg_feature_seq_test`
 | 20.7 | Read/write QoS configuration | P0 | `aou_reg_access_test`, `aou_reg_bit_bash_test`, `aou_reg_feature_seq_test`

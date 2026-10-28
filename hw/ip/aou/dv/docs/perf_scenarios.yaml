@@ -33,9 +33,9 @@
 # message with strobes. A `bytes` window that would cross 4 KB on some
 # issuing side is not generated for that config.
 #
-# AOU_CON0.AXI_SPLIT_TR_EN resets to 0, so the DUT sends every burst whole and
-# so does the model (a run with split enabled echoes build.split_en, and the
-# per-run model then splits at AXI_SPLIT_TR_RPn, perf_model.py dut_split).
+# Every burst crosses the link whole, in the DUT's runs and in the model: the
+# DUT's transaction splitter (AXI_SPLIT_TR_RPn) divides the requests it receives,
+# at its manager port, not what its subordinate port sends.
 #
 # The perf sequence (+perf_scn=<scenario>) issues, per RP and issuing side, a
 # whole number of periods of the window's pattern (perf_model.py rp_weights),

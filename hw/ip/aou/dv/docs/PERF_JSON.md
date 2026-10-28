@@ -72,7 +72,6 @@ unchanged. Schema version: 1.
     "remote_bytes": [64],
     "max_awlen": [15],
     "max_arlen": [15],
-    "split_en": false,
     "writefull": true,
     "remote_full_pct": 100,
     "l3_rx_depth": {"WREQ": 64, "RREQ": 64, "WDATA": 256, "RDATA": 256, "WRESP": 32},
@@ -130,8 +129,7 @@ unchanged. Schema version: 1.
 | `beat_bytes` | FDI data bytes per cycle on the active PHY; peak flit rate is `beat_bytes / 256`. |
 | `rp_count`, `rp_bytes[]` | DUT AXI data bytes per RP. |
 | `remote_bytes[]` | Remote die's AXI data bytes per RP (its WriteData/ReadData DLENGTH). |
-| `max_awlen[]`, `max_arlen[]` | The DUT's split-transaction maximum AxLEN per RP, read from the RAL mirror (`AXI_SPLIT_TR_RPn`) when the window opens. |
-| `split_en` | `AOU_CON0.AXI_SPLIT_TR_EN` from the RAL mirror: the DUT splits S-port bursts at `max_*len` + 1 beats only when set (reset 0). |
+| `max_awlen[]`, `max_arlen[]` | The DUT's split-transaction maximum AxLEN per RP, read from the RAL mirror (`AXI_SPLIT_TR_RPn`) when the window opens. The splitter divides the requests the DUT receives, at its manager port; bursts cross the link whole. |
 | `writefull` | True when the windows' writes use full strobes, so WriteDataFull is the expected data message. |
 | `remote_full_pct` | Percentage of the remote die's full-strobe write beats sent as WriteDataFull (the rest as WriteData). Perf runs use 100. |
 | `l3_rx_depth` | Credits (granules) the remote-die model advertises per credit class and RP; the bench must not be the limit. |
