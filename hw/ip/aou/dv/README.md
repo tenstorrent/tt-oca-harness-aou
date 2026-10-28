@@ -186,7 +186,7 @@ re-vendored without harness-side work beyond the pin.
 | --- | --- |
 | [docs/AOU_TB_ARCH.adoc](docs/AOU_TB_ARCH.adoc) | Testbench hierarchy, model ownership, environment components, clock and reset, stimulus, checking and coverage strategies, the SV-UVM realization and its differences from the harness pattern, adding a scenario |
 | [docs/AOU_VPLAN.adoc](docs/AOU_VPLAN.adoc) | Verification strategy, naming rules, scope, the requirement-to-test matrix, the scenario summary and test procedures (generated from the testlists and class headers), regression groups, known limitations |
-| [docs/AOU_FCOV.adoc](docs/AOU_FCOV.adoc) | Functional coverage goals, the covergroup inventory, closure policy, VPLAN-to-FCOV traceability |
+| [docs/AOU_FCOV.adoc](docs/AOU_FCOV.adoc) | Functional coverage: summary and real holes, every group in plain terms with its report name, gaps against the spec, plan traceability, goals and closure policy |
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The stream contracts and API names the layers were built against |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Decision records |
 | [docs/COVERAGE_CLOSURE.md](docs/COVERAGE_CLOSURE.md) | Coverage closure plan, hole analysis, owner decisions |
