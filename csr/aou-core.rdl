@@ -39,7 +39,7 @@ addrmap aou_core {
     reg {
         regwidth = 32;
         name = "AOU Control 0";
-        desc = "Core control: error access, AXI aggregator, LP mode, reset, credit, split. Note: bits [1:0] read as 0 in RTL (deactivate_force is not read back).";
+        desc = "Core control: error access, AXI aggregator, LP mode, reset. The AXI transaction splitter has no enable: it is always active, bounded per RP by AXI_SPLIT_TR_RPn (MAS 3.6). Note: bits [1:0] read as 0 in RTL (deactivate_force is not read back).";
         field { sw = r; } reserved_31_28[31:28] = 0;
         field { sw = rw; desc = "Enable error information access for Resource Plane 3."; } rp3_error_info_access_en[27:27] = 0;
         field { sw = rw; desc = "Enable error information access for Resource Plane 2."; } rp2_error_info_access_en[26:26] = 0;
@@ -53,9 +53,7 @@ addrmap aou_core {
         field { sw = rw; desc = "TX low-power mode enable. When set to 1, AOU_CORE only sends payload to FDI when there are remaining AXI messages to send. Credit-only flit behavior is gated by tx_lp_mode_threshold: non-zero threshold preserves the legacy heartbeat (a partially-filled flit every threshold+1 cycles while the link is active); a zero threshold disables the heartbeat entirely so the TX only emits flits when AXI traffic is pending or credits need to be returned. When 0 (default), AOU_CORE always sends messages to FDI for lowest latency. Static configuration: program it only while the activation FSM is DISABLED (ACTIVATE_STATE_DISABLED = 1), before ACTIVATE_START or after a deactivation has completed. It must not be changed while the link is activating, ENABLED or deactivating: the TX core may be mid-flit, and the flit is not preserved across a change of mode."; } tx_lp_mode[11:11] = 0;
         field { sw = r; } reserved_10_5[10:5] = 0;
         field { sw = w; hw = rw; desc = "Software reset of AOU_CORE. Writing 1 resets AOU_CORE the way I_RESETN does: every SFR (this bit included) returns to its reset value, the activation FSM returns to DISABLED, the RX FIFOs of every RP are emptied and the AXI port logic is cleared; a transaction in flight or queued is lost and gets no response. Write-only; reads return 0 (the reset clears the bit itself, so the reset lasts one I_CLK cycle). Use it only as part of the LinkReset handling sequence (MAS 7.3.6), with the FDI link down: in LinkError (the AOU_TOP bringup controller holds the link there until this reset is written), LinkReset, Disabled or Reset, never Active."; } aou_sw_reset[4:4] = 0;
-        field { sw = r; } reserved_3[3:3] = 0;
-        field { sw = rw; desc = "Global enable for AXI split transaction feature."; } axi_split_tr_en[2:2] = 0;
-        field { sw = r; } reserved_1[1:1] = 0;
+        field { sw = r; } reserved_3_1[3:1] = 0;
         field { sw = w; hw = rw; desc = "Force deactivation of the AoU protocol interface. Write-only; reads return 0. Self-clears when activate_state_disabled asserts."; } deactivate_force[0:0] = 0;
     } aou_con0 @ 0x0004;
 

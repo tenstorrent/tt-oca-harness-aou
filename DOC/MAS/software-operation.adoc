@@ -44,9 +44,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |TX_LP_MODE |[11] |RW |0x0
 | | |Rsvd |[10:5] |RO |0x0
 | | |AOU_SW_RESET |[4] |WO |0x0
-| | |Rsvd |[3] |RO |0x0
-| | |AXI_SPLIT_TR_EN |[2] |RW |0x0
-| | |Rsvd |[1] |RO |0x0
+| | |Rsvd |[3:1] |RO |0x0
 | | |DEACTIVATE_FORCE |[0] |WO |0x0
 |AOU_INIT |0x0008 | | | |0x00000608
 | | |Rsvd |[31:13] |RO |0x0
@@ -275,6 +273,7 @@ For details on the ACTIVATE and DEACTIVATE SFRs, please refer to xref:aou-73-act
 * The *MAX_AWBURSTLEN* and *MAX_ARBURSTLEN* register fields define the maximum burst length that the splitter may issue to the local bus.
 * The splitter inside *AOU_CORE* issues AXI transfers with burst lengths less than or equal to the configured values (*MAX_AWBURSTLEN*, *MAX_ARBURSTLEN*).
 * If *AOU_CORE* receives a larger burst length from the remote die, the splitter divides it into smaller bursts based on MAX_AxBURSTLEN.
+* The splitter has no enable bit and is always active; MAX_AxBURSTLEN is its only control. A burst no longer than MAX_AxBURSTLEN + 1 beats passes through whole.
 * Since the splitter only supports maximum burst lengths of the form 2^n - 1, the field must be configured with one of the following: 0, 1, 3, 7, 15, 31, 63, 127 or 255. The SFR stores 15 if any other value is written; read the field back to confirm the accepted value.
 * A transaction addressed to the R/B response error debug address (xref:aou-724-rb-response-error-debug-fifo[Section 7.2.4]) is never split, whatever MAX_AxBURSTLEN holds: it reaches the debug FIFO whole.
 

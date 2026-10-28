@@ -204,7 +204,7 @@ Even if the burst length increases as a result of data-width conversion, the AXI
 The splitter ([.monospaced]#++AOU_AXI_SPLIT_TR++#) sits between the 3:1 arbitration mux and the xref:aou-38-axi-aggregator[AXI Aggregator] inside [.monospaced]#++AOU_AXI4MUX_3X1_TOP++#. One instance exists per RP, and the maximum burst length can be configured independently for each RP through the [.monospaced]#++AOU_SPLIT_TR_RPn++# SFRs.
 
 ______________________________________________________________________________________________________________________________________________________________________________________________
-*Note:* The [.monospaced]#++AOU_CON0.AXI_SPLIT_TR_EN++# field exists in the SFR but is currently tied to [.monospaced]#++1'b0++# in [.monospaced]#++AOU_CORE_RP++#, making the splitter always active. The enable bit is reserved for future use.
+*Note:* The splitter has no enable bit: it is always active, and the per-RP [.monospaced]#++MAX_AxBURSTLEN++# fields are its only control. A burst no longer than [.monospaced]#++MAX_AxBURSTLEN + 1++# beats passes through whole.
 ______________________________________________________________________________________________________________________________________________________________________________________________
 
 [[aou-362-burst-splitting]]
@@ -249,7 +249,6 @@ The [.monospaced]#++MAX_AxBURSTLEN++# value must be of the form 2^n - 1. Legal v
 [width="100%",cols="34%,33%,33%",options="header",]
 |======================================================================================
 |SFR |Field |Description
-|[.monospaced]#++AOU_CON0++# |[.monospaced]#++AXI_SPLIT_TR_EN++# |Global enable (reserved, tied inactive in current RTL)
 |[.monospaced]#++AOU_SPLIT_TR_RP0++# |[.monospaced]#++MAX_AWBURSTLEN++# |Max write burst length for RP0 (must be 2^n - 1)
 |[.monospaced]#++AOU_SPLIT_TR_RP0++# |[.monospaced]#++MAX_ARBURSTLEN++# |Max read burst length for RP0 (must be 2^n - 1)
 |[.monospaced]#++AOU_SPLIT_TR_RP1++# |[.monospaced]#++MAX_AWBURSTLEN++# / [.monospaced]#++MAX_ARBURSTLEN++# |Same for RP1

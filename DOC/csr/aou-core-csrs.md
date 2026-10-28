@@ -76,14 +76,12 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x4
 - Size: 0x4
 
-<p>Core control: error access, AXI aggregator, LP mode, reset, credit, split. Note: bits [1:0] read as 0 in RTL (deactivate_force is not read back).</p>
+<p>Core control: error access, AXI aggregator, LP mode, reset. The AXI transaction splitter has no enable: it is always active, bounded per RP by AXI_SPLIT_TR_RPn (MAS 3.6). Note: bits [1:0] read as 0 in RTL (deactivate_force is not read back).</p>
 
 | Bits|       Identifier       |Access|Reset|Name|
 |-----|------------------------|------|-----|----|
 |  0  |    deactivate_force    |   w  | 0x0 |  — |
-|  1  |       reserved_1       |   r  | 0x0 |  — |
-|  2  |     axi_split_tr_en    |  rw  | 0x0 |  — |
-|  3  |       reserved_3       |   r  | 0x0 |  — |
+| 3:1 |      reserved_3_1      |   r  | 0x0 |  — |
 |  4  |      aou_sw_reset      |   w  | 0x0 |  — |
 | 10:5|      reserved_10_5     |   r  | 0x0 |  — |
 |  11 |       tx_lp_mode       |  rw  | 0x0 |  — |
@@ -101,10 +99,6 @@ Don't override. Generated from: aou_core
 #### deactivate_force field
 
 <p>Force deactivation of the AoU protocol interface. Write-only; reads return 0. Self-clears when activate_state_disabled asserts.</p>
-
-#### axi_split_tr_en field
-
-<p>Global enable for AXI split transaction feature.</p>
 
 #### aou_sw_reset field
 
