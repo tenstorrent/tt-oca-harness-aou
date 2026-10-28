@@ -171,6 +171,7 @@ import packet_def_pkg::*;
     input       [RP_COUNT-1:0]                  I_AOU_TX_WREQVALID,
     input       [RP_COUNT-1:0]                  I_AOU_TX_RREQVALID,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WDATAVALID,
+    input       [RP_COUNT-1:0][1:0]             I_AOU_TX_WDATA_DLENGTH,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WFDATA,
     input       [RP_COUNT-1:0]                  I_AOU_TX_RDATAVALID,
     input       [RP_COUNT-1:0][1:0]             I_AOU_TX_RDATA_DLENGTH,
@@ -344,6 +345,7 @@ AOU_TX_CRD_CTRL #(
                                                                
     .I_AOU_TX_WREQVALID             (I_AOU_TX_WREQVALID             ),
     .I_AOU_TX_RREQVALID             (I_AOU_TX_RREQVALID             ),
+    .I_AOU_TX_WDATA_DLENGTH         (I_AOU_TX_WDATA_DLENGTH         ),
     .I_AOU_TX_WDATAVALID            (I_AOU_TX_WDATAVALID            ),
     .I_AOU_TX_WFDATA                (I_AOU_TX_WFDATA                ),
     .I_AOU_TX_RDATAVALID            (I_AOU_TX_RDATAVALID            ),

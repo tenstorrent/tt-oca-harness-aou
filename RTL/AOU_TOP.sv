@@ -112,15 +112,29 @@ import packet_def_pkg::*;
     parameter   APB_ADDR_WD                 = 32,
     parameter   APB_DATA_WD                 = 32,
 
-    parameter   S_RD_MO_CNT                 = 32,
-    parameter   S_WR_MO_CNT                 = 32,
+    parameter   RP0_S_RD_MO_CNT             = 32,
+    parameter   RP0_S_WR_MO_CNT             = 32,
+    parameter   RP0_M_RD_MO_CNT             = 32,
+    parameter   RP0_M_WR_MO_CNT             = 32,
+
+    parameter   RP1_S_RD_MO_CNT             = 32,
+    parameter   RP1_S_WR_MO_CNT             = 32,
+    parameter   RP1_M_RD_MO_CNT             = 32,
+    parameter   RP1_M_WR_MO_CNT             = 32,
+
+    parameter   RP2_S_RD_MO_CNT             = 32,
+    parameter   RP2_S_WR_MO_CNT             = 32,
+    parameter   RP2_M_RD_MO_CNT             = 32,
+    parameter   RP2_M_WR_MO_CNT             = 32,
+
+    parameter   RP3_S_RD_MO_CNT             = 32,
+    parameter   RP3_S_WR_MO_CNT             = 32,
+    parameter   RP3_M_RD_MO_CNT             = 32,
+    parameter   RP3_M_WR_MO_CNT             = 32,
 
     // TX flit packer output stage: 0 combinational (current state),
     // 1 registered from the look-ahead state. See AOU_TX_CORE.
     parameter   TX_NXT_PACKING_EN           = 0,
-
-    parameter   M_RD_MO_CNT                 = 32,
-    parameter   M_WR_MO_CNT                 = 32,
 
     localparam  RP_AXI_DATA_WD_MAX          = max4(RP0_AXI_DATA_WD, RP1_AXI_DATA_WD, RP2_AXI_DATA_WD, RP3_AXI_DATA_WD),
     localparam  RP_AXI_STRB_WD_MAX          = RP_AXI_DATA_WD_MAX / 8,
@@ -430,13 +444,28 @@ import packet_def_pkg::*;
         .APB_ADDR_WD               ( APB_ADDR_WD                  ),
         .APB_DATA_WD               ( APB_DATA_WD                  ),
 
-        .S_RD_MO_CNT               ( S_RD_MO_CNT                  ),
-        .S_WR_MO_CNT               ( S_WR_MO_CNT                  ),
+        .RP0_S_RD_MO_CNT           ( RP0_S_RD_MO_CNT              ),
+        .RP0_S_WR_MO_CNT           ( RP0_S_WR_MO_CNT              ),
+        .RP0_M_RD_MO_CNT           ( RP0_M_RD_MO_CNT              ),
+        .RP0_M_WR_MO_CNT           ( RP0_M_WR_MO_CNT              ),
 
-        .TX_NXT_PACKING_EN         ( TX_NXT_PACKING_EN            ),
+        .RP1_S_RD_MO_CNT           ( RP1_S_RD_MO_CNT              ),
+        .RP1_S_WR_MO_CNT           ( RP1_S_WR_MO_CNT              ),
+        .RP1_M_RD_MO_CNT           ( RP1_M_RD_MO_CNT              ),
+        .RP1_M_WR_MO_CNT           ( RP1_M_WR_MO_CNT              ),
 
-        .M_RD_MO_CNT               ( M_RD_MO_CNT                  ),
-        .M_WR_MO_CNT               ( M_WR_MO_CNT                  )
+        .RP2_S_RD_MO_CNT           ( RP2_S_RD_MO_CNT              ),
+        .RP2_S_WR_MO_CNT           ( RP2_S_WR_MO_CNT              ),
+        .RP2_M_RD_MO_CNT           ( RP2_M_RD_MO_CNT              ),
+        .RP2_M_WR_MO_CNT           ( RP2_M_WR_MO_CNT              ),
+
+        .RP3_S_RD_MO_CNT           ( RP3_S_RD_MO_CNT              ),
+        .RP3_S_WR_MO_CNT           ( RP3_S_WR_MO_CNT              ),
+        .RP3_M_RD_MO_CNT           ( RP3_M_RD_MO_CNT              ),
+        .RP3_M_WR_MO_CNT           ( RP3_M_WR_MO_CNT              ),
+
+        .TX_NXT_PACKING_EN         ( TX_NXT_PACKING_EN            )
+
     ) u_aou_core_top (
         .I_CLK                      ( I_CLK                         ),
         .I_RESETN                   ( I_RESETN                      ),

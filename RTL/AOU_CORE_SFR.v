@@ -184,7 +184,13 @@ module AOU_CORE_SFR #(
     output                  O_AXI_SLV_ID_MISMATCH_RP0_EN,            
     output                  O_AXI_SLV_ID_MISMATCH_RP1_EN, 
     output                  O_AXI_SLV_ID_MISMATCH_RP2_EN, 
-    output                  O_AXI_SLV_ID_MISMATCH_RP3_EN, 
+    output                  O_AXI_SLV_ID_MISMATCH_RP3_EN,
+    output      [1:0]       O_RP0_TX_RP_SEL,
+    output      [1:0]       O_RP1_TX_RP_SEL,
+    output      [1:0]       O_RP2_TX_RP_SEL,
+    output      [1:0]       O_RP3_TX_RP_SEL,
+    output                  O_ASYMMETRIC_RP_EN,
+
     //Manual input, output
 
     output                  O_RID_MISMATCH_ERROR,
@@ -239,6 +245,7 @@ localparam SFR_AXI_ERROR_INFO0_RP3_ADDR             = 16'h0074;
 localparam SFR_AXI_ERROR_INFO1_RP3_ADDR             = 16'h0078;
 localparam SFR_AXI_SLV_ID_MISMATCH_ERR_RP3_ADDR     = 16'h007C;
 localparam SFR_WRITE_EARLY_RESPONSE_WDT_CTL_ADDR    = 16'h0080;
+localparam SFR_ASYMMETRIC_RP_PROC_CON_ADDR          = 16'h0084;
 
 //Error set
 reg [9:0]           r_error_info_rp0_split_mismatch_bid;
@@ -384,6 +391,11 @@ reg [31:0]          r_axi_error_info0_rp3_debug_upper_addr;
 reg [31:7]          r_axi_error_info1_rp3_debug_lower_addr;
 reg                 r_axi_slv_id_mismatch_err_rp3_axi_slv_bid_mismatch_err;
 reg                 r_axi_slv_id_mismatch_err_rp3_axi_slv_rid_mismatch_err;
+reg                 r_asymmetric_rp_proc_con_asymmetric_rp_en;
+reg [1:0]           r_asymmetric_rp_proc_con_rp0_tx_rp_sel;
+reg [1:0]           r_asymmetric_rp_proc_con_rp1_tx_rp_sel;
+reg [1:0]           r_asymmetric_rp_proc_con_rp2_tx_rp_sel;
+reg [1:0]           r_asymmetric_rp_proc_con_rp3_tx_rp_sel;
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
@@ -662,9 +674,9 @@ end
 always @ (posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_lp_linkreset_invalid_actmsg_info <= 4'b0;
-    end else if ((~r_lp_linkreset_invalid_actmsg_err) && I_LP_LINKRESET_INVALID_ACTMSG_ERR_SET) begin
+    end else if (I_LP_LINKRESET_INVALID_ACTMSG_ERR_SET) begin
         r_lp_linkreset_invalid_actmsg_info <= I_LP_LINKRESET_INVALID_ACTMSG_INFO;
-    end else if (~r_lp_linkreset_invalid_actmsg_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_LP_LINKRESET_ADDR) & I_PWDATA[1]) begin
         r_lp_linkreset_invalid_actmsg_info <= 4'b0;
     end    
 end
@@ -819,9 +831,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp0_split_mismatch_bid <= 10'b0;
-    end else if ((~r_error_info_rp0_split_bid_mismatch_err) && I_ERROR_INFO_RP0_SPLIT_BID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP0_SPLIT_BID_MISMATCH_ERR_SET) begin
         r_error_info_rp0_split_mismatch_bid <= I_ERROR_INFO_RP0_SPLIT_BID_MISMATCH_INFO;
-    end else if (~r_error_info_rp0_split_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP0_ADDR) & I_PWDATA[1]) begin
         r_error_info_rp0_split_mismatch_bid <= 10'b0;
     end
 end
@@ -829,9 +841,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp0_mismatch_rid <= 10'b0;
-    end else if ((~r_error_info_rp0_rid_mismatch_err) && I_ERROR_INFO_RP0_RID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP0_RID_MISMATCH_ERR_SET) begin
         r_error_info_rp0_mismatch_rid <= I_ERROR_INFO_RP0_RID_MISMATCH_INFO;
-    end else if (~r_error_info_rp0_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP0_ADDR) & I_PWDATA[0]) begin
         r_error_info_rp0_mismatch_rid <= 10'b0;
     end
 end
@@ -896,10 +908,10 @@ always @ (posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_write_early_response_rp0_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp0_write_resp_err_type_info <= 2'b0;
-    end else if ((~r_write_early_response_rp0_write_resp_err) && I_WRITE_EARLY_RESPONSE_RP0_WRITE_RESP_ERR_SET) begin
+    end else if (I_WRITE_EARLY_RESPONSE_RP0_WRITE_RESP_ERR_SET) begin
         r_write_early_response_rp0_write_resp_err_id_info <= I_WRITE_EARLY_RESPONSE_RP0_WRITE_RESP_ERR_ID_INFO;
         r_write_early_response_rp0_write_resp_err_type_info <= I_WRITE_EARLY_RESPONSE_RP0_WRITE_RESP_ERR_TYPE_INFO;
-    end else if (~r_write_early_response_rp0_write_resp_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_WRITE_EARLY_RESPONSE_RP0_ADDR) & I_PWDATA[13]) begin
         r_write_early_response_rp0_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp0_write_resp_err_type_info <= 2'b0;
     end    
@@ -960,9 +972,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp0_bid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp0_axi_slv_bid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP0_AXI_SLV_BID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP0_AXI_SLV_BID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp0_bid <= I_AXI_SLV_ID_MISMATCH_ERR_RP0_AXI_SLV_BID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp0_axi_slv_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP0_ADDR) & I_PWDATA[1]) begin
         r_axi_slv_id_mismatch_err_rp0_bid <= 10'b0;
     end
 end
@@ -970,9 +982,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp0_rid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp0_axi_slv_rid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP0_AXI_SLV_RID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP0_AXI_SLV_RID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp0_rid <= I_AXI_SLV_ID_MISMATCH_ERR_RP0_AXI_SLV_RID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp0_axi_slv_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP0_ADDR) & I_PWDATA[0]) begin
         r_axi_slv_id_mismatch_err_rp0_rid <= 10'b0;
     end
 end
@@ -996,9 +1008,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp1_split_mismatch_bid <= 10'b0;
-    end else if ((~r_error_info_rp1_split_bid_mismatch_err) && I_ERROR_INFO_RP1_SPLIT_BID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP1_SPLIT_BID_MISMATCH_ERR_SET) begin
         r_error_info_rp1_split_mismatch_bid <= I_ERROR_INFO_RP1_SPLIT_BID_MISMATCH_INFO;
-    end else if (~r_error_info_rp1_split_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP1_ADDR) & I_PWDATA[1]) begin
         r_error_info_rp1_split_mismatch_bid <= 10'b0;
     end
 end
@@ -1006,9 +1018,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp1_mismatch_rid <= 10'b0;
-    end else if ((~r_error_info_rp1_rid_mismatch_err) && I_ERROR_INFO_RP1_RID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP1_RID_MISMATCH_ERR_SET) begin
         r_error_info_rp1_mismatch_rid <= I_ERROR_INFO_RP1_RID_MISMATCH_INFO;
-    end else if (~r_error_info_rp1_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP1_ADDR) & I_PWDATA[0]) begin
         r_error_info_rp1_mismatch_rid <= 10'b0;
     end
 end
@@ -1073,10 +1085,10 @@ always @ (posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_write_early_response_rp1_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp1_write_resp_err_type_info <= 2'b0;
-    end else if ((~r_write_early_response_rp1_write_resp_err) && I_WRITE_EARLY_RESPONSE_RP1_WRITE_RESP_ERR_SET) begin
+    end else if (I_WRITE_EARLY_RESPONSE_RP1_WRITE_RESP_ERR_SET) begin
         r_write_early_response_rp1_write_resp_err_id_info <= I_WRITE_EARLY_RESPONSE_RP1_WRITE_RESP_ERR_ID_INFO;
         r_write_early_response_rp1_write_resp_err_type_info <= I_WRITE_EARLY_RESPONSE_RP1_WRITE_RESP_ERR_TYPE_INFO;
-    end else if (~r_write_early_response_rp1_write_resp_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_WRITE_EARLY_RESPONSE_RP1_ADDR) & I_PWDATA[13]) begin
         r_write_early_response_rp1_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp1_write_resp_err_type_info <= 2'b0;
     end    
@@ -1137,9 +1149,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp1_bid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp1_axi_slv_bid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP1_AXI_SLV_BID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP1_AXI_SLV_BID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp1_bid <= I_AXI_SLV_ID_MISMATCH_ERR_RP1_AXI_SLV_BID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp1_axi_slv_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP1_ADDR) & I_PWDATA[1]) begin
         r_axi_slv_id_mismatch_err_rp1_bid <= 10'b0;
     end
 end
@@ -1147,9 +1159,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp1_rid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp1_axi_slv_rid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP1_AXI_SLV_RID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP1_AXI_SLV_RID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp1_rid <= I_AXI_SLV_ID_MISMATCH_ERR_RP1_AXI_SLV_RID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp1_axi_slv_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP1_ADDR) & I_PWDATA[0]) begin
         r_axi_slv_id_mismatch_err_rp1_rid <= 10'b0;
     end
 end
@@ -1173,9 +1185,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp2_split_mismatch_bid <= 10'b0;
-    end else if ((~r_error_info_rp2_split_bid_mismatch_err) && I_ERROR_INFO_RP2_SPLIT_BID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP2_SPLIT_BID_MISMATCH_ERR_SET) begin
         r_error_info_rp2_split_mismatch_bid <= I_ERROR_INFO_RP2_SPLIT_BID_MISMATCH_INFO;
-    end else if (~r_error_info_rp2_split_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP2_ADDR) & I_PWDATA[1]) begin
         r_error_info_rp2_split_mismatch_bid <= 10'b0;
     end
 end
@@ -1183,9 +1195,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp2_mismatch_rid <= 10'b0;
-    end else if ((~r_error_info_rp2_rid_mismatch_err) && I_ERROR_INFO_RP2_RID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP2_RID_MISMATCH_ERR_SET) begin
         r_error_info_rp2_mismatch_rid <= I_ERROR_INFO_RP2_RID_MISMATCH_INFO;
-    end else if (~r_error_info_rp2_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP2_ADDR) & I_PWDATA[0]) begin
         r_error_info_rp2_mismatch_rid <= 10'b0;
     end
 end
@@ -1250,10 +1262,10 @@ always @ (posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_write_early_response_rp2_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp2_write_resp_err_type_info <= 2'b0;
-    end else if ((~r_write_early_response_rp2_write_resp_err) && I_WRITE_EARLY_RESPONSE_RP2_WRITE_RESP_ERR_SET) begin
+    end else if (I_WRITE_EARLY_RESPONSE_RP2_WRITE_RESP_ERR_SET) begin
         r_write_early_response_rp2_write_resp_err_id_info <= I_WRITE_EARLY_RESPONSE_RP2_WRITE_RESP_ERR_ID_INFO;
         r_write_early_response_rp2_write_resp_err_type_info <= I_WRITE_EARLY_RESPONSE_RP2_WRITE_RESP_ERR_TYPE_INFO;
-    end else if (~r_write_early_response_rp2_write_resp_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_WRITE_EARLY_RESPONSE_RP2_ADDR) & I_PWDATA[13]) begin
         r_write_early_response_rp2_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp2_write_resp_err_type_info <= 2'b0;
     end    
@@ -1314,9 +1326,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp2_bid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp2_axi_slv_bid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP2_AXI_SLV_BID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP2_AXI_SLV_BID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp2_bid <= I_AXI_SLV_ID_MISMATCH_ERR_RP2_AXI_SLV_BID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp2_axi_slv_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP2_ADDR) & I_PWDATA[1]) begin
         r_axi_slv_id_mismatch_err_rp2_bid <= 10'b0;
     end
 end
@@ -1324,9 +1336,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp2_rid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp2_axi_slv_rid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP2_AXI_SLV_RID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP2_AXI_SLV_RID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp2_rid <= I_AXI_SLV_ID_MISMATCH_ERR_RP2_AXI_SLV_RID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp2_axi_slv_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP2_ADDR) & I_PWDATA[0]) begin
         r_axi_slv_id_mismatch_err_rp2_rid <= 10'b0;
     end
 end
@@ -1350,9 +1362,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp3_split_mismatch_bid <= 10'b0;
-    end else if ((~r_error_info_rp3_split_bid_mismatch_err) && I_ERROR_INFO_RP3_SPLIT_BID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP3_SPLIT_BID_MISMATCH_ERR_SET) begin
         r_error_info_rp3_split_mismatch_bid <= I_ERROR_INFO_RP3_SPLIT_BID_MISMATCH_INFO;
-    end else if (~r_error_info_rp3_split_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP3_ADDR) & I_PWDATA[1]) begin
         r_error_info_rp3_split_mismatch_bid <= 10'b0;
     end
 end
@@ -1360,9 +1372,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_error_info_rp3_mismatch_rid <= 10'b0;
-    end else if ((~r_error_info_rp3_rid_mismatch_err) && I_ERROR_INFO_RP3_RID_MISMATCH_ERR_SET) begin
+    end else if (I_ERROR_INFO_RP3_RID_MISMATCH_ERR_SET) begin
         r_error_info_rp3_mismatch_rid <= I_ERROR_INFO_RP3_RID_MISMATCH_INFO;
-    end else if (~r_error_info_rp3_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ERROR_INFO_RP3_ADDR) & I_PWDATA[0]) begin
         r_error_info_rp3_mismatch_rid <= 10'b0;
     end
 end
@@ -1427,10 +1439,10 @@ always @ (posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_write_early_response_rp3_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp3_write_resp_err_type_info <= 2'b0;
-    end else if ((~r_write_early_response_rp3_write_resp_err) && I_WRITE_EARLY_RESPONSE_RP3_WRITE_RESP_ERR_SET) begin
+    end else if (I_WRITE_EARLY_RESPONSE_RP3_WRITE_RESP_ERR_SET) begin
         r_write_early_response_rp3_write_resp_err_id_info <= I_WRITE_EARLY_RESPONSE_RP3_WRITE_RESP_ERR_ID_INFO;
         r_write_early_response_rp3_write_resp_err_type_info <= I_WRITE_EARLY_RESPONSE_RP3_WRITE_RESP_ERR_TYPE_INFO;
-    end else if (~r_write_early_response_rp3_write_resp_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_WRITE_EARLY_RESPONSE_RP3_ADDR) & I_PWDATA[13]) begin
         r_write_early_response_rp3_write_resp_err_id_info <= 10'b0;
         r_write_early_response_rp3_write_resp_err_type_info <= 2'b0;
     end    
@@ -1491,9 +1503,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp3_bid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp3_axi_slv_bid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP3_AXI_SLV_BID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP3_AXI_SLV_BID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp3_bid <= I_AXI_SLV_ID_MISMATCH_ERR_RP3_AXI_SLV_BID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp3_axi_slv_bid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP3_ADDR) & I_PWDATA[1]) begin
         r_axi_slv_id_mismatch_err_rp3_bid <= 10'b0;
     end
 end
@@ -1501,9 +1513,9 @@ end
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
         r_axi_slv_id_mismatch_err_rp3_rid <= 10'b0;
-    end else if ((~r_axi_slv_id_mismatch_err_rp3_axi_slv_rid_mismatch_err) && I_AXI_SLV_ID_MISMATCH_ERR_RP3_AXI_SLV_RID_MISMATCH_ERR_SET) begin
+    end else if (I_AXI_SLV_ID_MISMATCH_ERR_RP3_AXI_SLV_RID_MISMATCH_ERR_SET) begin
         r_axi_slv_id_mismatch_err_rp3_rid <= I_AXI_SLV_ID_MISMATCH_ERR_RP3_AXI_SLV_RID_MISMATCH_INFO;
-    end else if (~r_axi_slv_id_mismatch_err_rp3_axi_slv_rid_mismatch_err) begin
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AXI_SLV_ID_MISMATCH_ERR_RP3_ADDR) & I_PWDATA[0]) begin
         r_axi_slv_id_mismatch_err_rp3_rid <= 10'b0;
     end
 end
@@ -1513,6 +1525,46 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
         r_write_early_response_wdt_ctl_wdt_threshold <= 32'hc3500;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_WRITE_EARLY_RESPONSE_WDT_CTL_ADDR)) begin
         r_write_early_response_wdt_ctl_wdt_threshold <= I_PWDATA[31:0];
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+       r_asymmetric_rp_proc_con_asymmetric_rp_en  <= 1'h0;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ASYMMETRIC_RP_PROC_CON_ADDR)) begin
+       r_asymmetric_rp_proc_con_asymmetric_rp_en  <= I_PWDATA[0];
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+       r_asymmetric_rp_proc_con_rp0_tx_rp_sel  <= 2'h0;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ASYMMETRIC_RP_PROC_CON_ADDR)) begin
+       r_asymmetric_rp_proc_con_rp0_tx_rp_sel  <= I_PWDATA[2:1];
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+       r_asymmetric_rp_proc_con_rp1_tx_rp_sel  <= 2'h1;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ASYMMETRIC_RP_PROC_CON_ADDR)) begin
+       r_asymmetric_rp_proc_con_rp1_tx_rp_sel  <= I_PWDATA[4:3];
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+       r_asymmetric_rp_proc_con_rp2_tx_rp_sel  <= 2'h2;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ASYMMETRIC_RP_PROC_CON_ADDR)) begin
+       r_asymmetric_rp_proc_con_rp2_tx_rp_sel  <= I_PWDATA[6:5];
+    end
+end
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+       r_asymmetric_rp_proc_con_rp3_tx_rp_sel  <= 2'h3;
+    end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_ASYMMETRIC_RP_PROC_CON_ADDR)) begin
+       r_asymmetric_rp_proc_con_rp3_tx_rp_sel  <= I_PWDATA[8:7];
     end
 end
 
@@ -1593,6 +1645,8 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
             r_rdata <= { 9'd0, r_axi_slv_id_mismatch_rp3_en, r_axi_slv_id_mismatch_err_rp3_bid, r_axi_slv_id_mismatch_err_rp3_rid, r_axi_slv_id_mismatch_err_rp3_axi_slv_bid_mismatch_err, r_axi_slv_id_mismatch_err_rp3_axi_slv_rid_mismatch_err};
         SFR_WRITE_EARLY_RESPONSE_WDT_CTL_ADDR :
             r_rdata <= { r_write_early_response_wdt_ctl_wdt_threshold};
+        SFR_ASYMMETRIC_RP_PROC_CON_ADDR :
+            r_rdata <= { 23'd0, r_asymmetric_rp_proc_con_rp3_tx_rp_sel, r_asymmetric_rp_proc_con_rp2_tx_rp_sel, r_asymmetric_rp_proc_con_rp1_tx_rp_sel, r_asymmetric_rp_proc_con_rp0_tx_rp_sel, r_asymmetric_rp_proc_con_asymmetric_rp_en};        
         default:
             r_rdata <= 32'd0;
         endcase
@@ -1671,6 +1725,11 @@ assign O_AXI_SLV_ID_MISMATCH_RP0_EN = r_axi_slv_id_mismatch_rp0_en;
 assign O_AXI_SLV_ID_MISMATCH_RP1_EN = r_axi_slv_id_mismatch_rp1_en;
 assign O_AXI_SLV_ID_MISMATCH_RP2_EN = r_axi_slv_id_mismatch_rp2_en;
 assign O_AXI_SLV_ID_MISMATCH_RP3_EN = r_axi_slv_id_mismatch_rp3_en;
+assign O_RP0_TX_RP_SEL = r_asymmetric_rp_proc_con_rp0_tx_rp_sel;
+assign O_RP1_TX_RP_SEL = r_asymmetric_rp_proc_con_rp1_tx_rp_sel;
+assign O_RP2_TX_RP_SEL = r_asymmetric_rp_proc_con_rp2_tx_rp_sel;
+assign O_RP3_TX_RP_SEL = r_asymmetric_rp_proc_con_rp3_tx_rp_sel;
+assign O_ASYMMETRIC_RP_EN = r_asymmetric_rp_proc_con_asymmetric_rp_en;
 
 assign O_SPLIT_BID_MISMATCH_ERROR = r_error_info_rp0_split_bid_mismatch_err | r_error_info_rp1_split_bid_mismatch_err | r_error_info_rp2_split_bid_mismatch_err | r_error_info_rp3_split_bid_mismatch_err;
 assign O_RID_MISMATCH_ERROR = r_error_info_rp0_rid_mismatch_err | r_error_info_rp1_rid_mismatch_err | r_error_info_rp2_rid_mismatch_err | r_error_info_rp3_rid_mismatch_err;

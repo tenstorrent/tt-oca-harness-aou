@@ -434,4 +434,19 @@ addrmap aou_core {
         desc = "Threshold of the early-response write-transaction watchdog, shared by all RPs. Each RP's watchdog is enabled by write_early_response_rpN.wdt_en and reports through write_early_response_rpN.wdt_trans_timeout_err.";
         field { sw = rw; desc = "Watchdog threshold in I_CLK cycles. The watchdog counts cycles without an AW or B handshake while writes are outstanding (AW accepted, B from the remote die not yet received) and restarts on either handshake; reaching the threshold sets wdt_trans_timeout_err once per reset. Reset 0xC3500 = 800000 cycles (800 us at 1 GHz)."; } wdt_threshold[31:0] = 0xC3500;
     } write_early_response_wdt_ctl @ 0x0080;
+
+    // -------------------------------------------------------------------------
+    // Asymmetric RP mapping (shared by all RPs)
+    // -------------------------------------------------------------------------
+    reg {
+        regwidth = 32;
+        name = "Asymmetric RP Processing Control";
+        desc = "Software-configured mapping of each local subordinate-port RP to the remote RP its requests are sent on, for dies with different numbers of active RPs. With asymmetric_rp_en clear every RP keeps its own index (RP n to remote RP n) and the rpN_tx_rp_sel fields are ignored. With it set, each RP's requests go to the remote RP in its rpN_tx_rp_sel field; RPs that select the same remote RP are merged onto it, and their AXI IDs are remapped so that the responses return to the originating RP with the original ID restored. Static configuration: program this register before the link is activated and no AXI traffic is outstanding, and leave it unchanged until all outstanding traffic has drained. Each rpN_tx_rp_sel value must be below RP_COUNT. On an RP_COUNT=1 build the register has no effect.";
+        field { sw = r; } reserved_31_9[31:9] = 0;
+        field { sw = rw; desc = "Remote RP that RP3's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 3 (RP3 to RP3)."; } rp3_tx_rp_sel[8:7] = 3;
+        field { sw = rw; desc = "Remote RP that RP2's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 2 (RP2 to RP2)."; } rp2_tx_rp_sel[6:5] = 2;
+        field { sw = rw; desc = "Remote RP that RP1's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 1 (RP1 to RP1)."; } rp1_tx_rp_sel[4:3] = 1;
+        field { sw = rw; desc = "Remote RP that RP0's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 0 (RP0 to RP0)."; } rp0_tx_rp_sel[2:1] = 0;
+        field { sw = rw; desc = "Enable the asymmetric RP mapping. Reset 0: every RP maps to the remote RP of the same index and the rpN_tx_rp_sel fields are ignored. Set to 1 to route each RP's requests to the remote RP in its rpN_tx_rp_sel field, merging the RPs that select the same one. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding."; } asymmetric_rp_en[0:0] = 0;
+    } asymmetric_rp_proc_con @ 0x0084;
 };

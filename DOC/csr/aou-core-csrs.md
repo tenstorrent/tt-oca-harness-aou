@@ -9,7 +9,7 @@ Don't override. Generated from: aou_core
 
 - Absolute Address: 0x0
 - Base Offset: 0x0
-- Size: 0x84
+- Size: 0x88
 
 <p>Register map for AOU_CORE_SFR (APB slave). Addresses match RTL localparams. Fields with sw=r and no reset are driven by module inputs (I_*), connected in AOU_CORE.sv; stored fields (flops) have the stated reset.</p>
 
@@ -48,6 +48,7 @@ Don't override. Generated from: aou_core
 | 0x78 |     axi_error_info1_rp3    |       AXI Error Info1 RP3      |
 | 0x7C | axi_slv_id_mismatch_err_rp3| AXI Slave ID Mismatch Error RP3|
 | 0x80 |write_early_response_wdt_ctl|Write Early Response WDT Control|
+| 0x84 |   asymmetric_rp_proc_con   |Asymmetric RP Processing Control|
 
 ### ip_version register
 
@@ -1143,3 +1144,40 @@ Don't override. Generated from: aou_core
 #### wdt_threshold field
 
 <p>Watchdog threshold in I_CLK cycles. The watchdog counts cycles without an AW or B handshake while writes are outstanding (AW accepted, B from the remote die not yet received) and restarts on either handshake; reaching the threshold sets wdt_trans_timeout_err once per reset. Reset 0xC3500 = 800000 cycles (800 us at 1 GHz).</p>
+
+### asymmetric_rp_proc_con register
+
+- Absolute Address: 0x84
+- Base Offset: 0x84
+- Size: 0x4
+
+<p>Software-configured mapping of each local subordinate-port RP to the remote RP its requests are sent on, for dies with different numbers of active RPs. With asymmetric_rp_en clear every RP keeps its own index (RP n to remote RP n) and the rpN_tx_rp_sel fields are ignored. With it set, each RP's requests go to the remote RP in its rpN_tx_rp_sel field; RPs that select the same remote RP are merged onto it, and their AXI IDs are remapped so that the responses return to the originating RP with the original ID restored. Static configuration: program this register before the link is activated and no AXI traffic is outstanding, and leave it unchanged until all outstanding traffic has drained. Each rpN_tx_rp_sel value must be below RP_COUNT. On an RP_COUNT=1 build the register has no effect.</p>
+
+|Bits|   Identifier   |Access|Reset|Name|
+|----|----------------|------|-----|----|
+|  0 |asymmetric_rp_en|  rw  | 0x0 |  — |
+| 2:1|  rp0_tx_rp_sel |  rw  | 0x0 |  — |
+| 4:3|  rp1_tx_rp_sel |  rw  | 0x1 |  — |
+| 6:5|  rp2_tx_rp_sel |  rw  | 0x2 |  — |
+| 8:7|  rp3_tx_rp_sel |  rw  | 0x3 |  — |
+|31:9|  reserved_31_9 |   r  | 0x0 |  — |
+
+#### asymmetric_rp_en field
+
+<p>Enable the asymmetric RP mapping. Reset 0: every RP maps to the remote RP of the same index and the rpN_tx_rp_sel fields are ignored. Set to 1 to route each RP's requests to the remote RP in its rpN_tx_rp_sel field, merging the RPs that select the same one. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding.</p>
+
+#### rp0_tx_rp_sel field
+
+<p>Remote RP that RP0's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 0 (RP0 to RP0).</p>
+
+#### rp1_tx_rp_sel field
+
+<p>Remote RP that RP1's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 1 (RP1 to RP1).</p>
+
+#### rp2_tx_rp_sel field
+
+<p>Remote RP that RP2's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 2 (RP2 to RP2).</p>
+
+#### rp3_tx_rp_sel field
+
+<p>Remote RP that RP3's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 3 (RP3 to RP3).</p>
