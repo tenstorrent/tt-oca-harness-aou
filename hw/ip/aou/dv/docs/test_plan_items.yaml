@@ -1537,9 +1537,9 @@
 - id: '10.12'
   section: '2.10'
   section_title: Performance Tests
-  title: 'Burst-length sweep (S4) 1 to 256 beats through the DUT splitter, AxSIZE narrowed to stay within 4 KB: at least 97% of the d2d_model bytes/cycle per link, the split visible in the message mix'
+  title: 'Burst-length sweep (S4) 1 to 256 beats, AxSIZE narrowed to stay within 4 KB: at least 97% of the d2d_model bytes/cycle per link; bursts cross the link whole, the DUT dividing the ones it receives at its manager port (MAX_AxBURSTLEN)'
   priority: P2
-  note: New with the perf-targets plan (scenario S4).
+  note: 'New with the perf-targets plan (scenario S4). The criterion first asked for "the split visible in the message mix", which assumed a global splitter enable (AXI_SPLIT_TR_EN) that never existed: the splitter acts on received requests at the manager port and leaves the link''s message mix unchanged.'
 
 - id: '10.13'
   section: '2.10'

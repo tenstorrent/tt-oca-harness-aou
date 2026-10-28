@@ -692,7 +692,7 @@ class aou_perf_mon extends uvm_component;
       `uvm_error(get_type_name(), {"T1-P01: cannot write ", json_name})
       return;
     end
-    $fdisplay(fd, "{\"schema\": 1,\n \"build\": %s,\n \"windows\": [", b);
+    $fdisplay(fd, "{\"schema\": 2,\n \"build\": %s,\n \"windows\": [", b);
     foreach (json_win[i])
       $fdisplay(fd, "  %s%s", json_win[i], (i + 1 < json_win.size()) ? "," : "");
     $fdisplay(fd, " ]}");

@@ -57,7 +57,7 @@ unchanged. Schema version: 1.
 
 ```json
 {
-  "schema": 1,
+  "schema": 2,
   "build": {
     "config": "1x512-sp64",
     "sim": "vcs",

@@ -693,9 +693,10 @@ a checkout. Simulations never need it; they read the committed table.
   the d2d-compare commit it came from. It also regenerates
   `uvm/env/perf/aou_perf_windows.svh`, the windows each CONFIG runs. Commit both
   with the change that caused them. The model is fed the traffic as it
-  crosses the link: whole bursts (the DUT's split is off at reset; a run with
-  it on echoes `split_en` and its own model splits), narrow AxSIZE where a
-  burst would exceed 4 KB (d2d-compare's `Txn.beat`).
+  crosses the link: whole bursts (the DUT's transaction splitter divides the
+  requests it receives, at its manager port, and never changes what crosses
+  the link), narrow AxSIZE where a burst would exceed 4 KB (d2d-compare's
+  `Txn.beat`).
 - `uvm/env/perf/perf_overrides.yaml` widens the tolerance of single targets, each
   with a measured structural reason. It is empty by default.
 - `make perf_check` judges every `out/**/perf.json` (docs/PERF_JSON.md) against
