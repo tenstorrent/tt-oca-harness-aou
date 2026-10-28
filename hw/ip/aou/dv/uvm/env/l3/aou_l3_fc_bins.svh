@@ -46,12 +46,18 @@
   `B``_BIN(g27, 27, 27) `B``_BIN(g30, 30, 30) \
   `B``_TAG("g4", "v0.8")
 `define AOU_L3_FC_SPAN(B) `B``_BIN(one_flit, 0, 0) `B``_BIN(multi_flit, 1, 1)
-// The 4-granule ActivateReq is v0.8 (AoU v0.8 Table 27).
-`define AOU_L3_FC_X_START_SIZE(B) `B``_TAG("*,g4", "v0.8")
+// The 4-granule ActivateReq is v0.8 (AoU v0.8 Table 27). It is the only
+// 4-granule message, and an Activation message always starts at G0 (AoU v0.8
+// 4.4), so it can neither start later nor span flits: those cells are illegal,
+// and the unpacker's Activation placement check (AOU-R6) reports a hit.
+`define AOU_L3_FC_X_START_SIZE(B) \
+  `B``_TAG("*,g4", "v0.8") \
+  `B``_XILL("g[1*]|g[2*]|g[3*]|g[4*]|g[5]|g[6]|g[7]|g[8]|g[9],g4", "")
 // A 1-granule message can't span flits.
 `define AOU_L3_FC_X_SIZE_SPAN(B) \
   `B``_XIGN("g1,multi_flit") \
-  `B``_TAG("g4,*", "v0.8")
+  `B``_TAG("g4,*", "v0.8") \
+  `B``_XILL("g4,multi_flit", "")
 // Messages that span flits, by kind (msg_kind() numbers) and direction
 // (cg_span). A WriteResp is one granule and an Activation starts at G0 and is
 // at most 4 granules, so neither can span; a CrdtGrant can, but it is no
@@ -70,7 +76,10 @@
 `define AOU_L3_FC_NWRESP(B) \
   `B``_BIN(one, 1, 1) `B``_BIN(two, 2, 2) `B``_BIN(few, 3, 4) `B``_BIN(many, 5, 15) \
   `B``_BIN(dense, 16, 47) `B``_BIN(full, 48, 48)
-`define AOU_L3_FC_MISC(B) `B``_VALS(n, 0, 2) `B``_BIN(over, 3, 24)
+// Misc messages other than Activation in one half-flit. AoU v0.8 4.4 allows at
+// most two, so three or more is a violation, not a target: the unpacker's
+// half-flit Misc check (AOU-R7) reports it.
+`define AOU_L3_FC_MISC(B) `B``_VALS(n, 0, 2) `B``_ILL(over, 3, 24, "")
 // A flit that starts an Activation message, by what shares it (cg_act_flit;
 // aou_l3_cov::act_layout()). 4.4 (v0.9 draft) permits one CrdtGrant beside an
 // ActivateReq/Ack and responses beside a DeactivateReq; anything else is
@@ -87,6 +96,9 @@
 `define AOU_L3_FC_CARRY(B) \
   `B``_BIN(none, 0, 0) `B``_BIN(short_carry, 1, 11) `B``_BIN(long_carry, 12, 30)
 `define AOU_L3_FC_CREDIT_ONLY(B) `B``_BIN(no, 0, 0) `B``_BIN(yes, 1, 1)
+// The model's own counter saturating is no target. Sending without credit
+// (inj_overflow, an injection) is none either: AoU v0.8 6.1 defines no
+// receiver reaction to it, so it is undefined stimulus.
 `define AOU_L3_FC_CREDIT_EV(B) \
   `B``_BIN(hdr_grant, EV_HDR_GRANT, EV_HDR_GRANT) \
   `B``_BIN(crdt_grant, EV_CRDT_GRANT, EV_CRDT_GRANT) \
@@ -97,16 +109,15 @@
   `B``_ILL(overflow, EV_OVERFLOW, EV_OVERFLOW, "") \
   `B``_BIN(dut_zero_stall, EV_DUT_ZERO_STALL, EV_DUT_ZERO_STALL) \
   `B``_BIN(dut_saturate, EV_DUT_SATURATE, EV_DUT_SATURATE) \
-  `B``_BIN(inj_overflow, EV_INJ_OVERFLOW, EV_INJ_OVERFLOW) \
+  `B``_IGN(inj_overflow, EV_INJ_OVERFLOW, EV_INJ_OVERFLOW) \
   `B``_BIN(late_adv, EV_LATE_ADV, EV_LATE_ADV)
 // Each event has one direction: the model stalls on DUT credit (tx), the DUT
-// waits for ours (rx), our over-grant (tx), our send without credit (tx), our
-// late advertisement (tx). Only request credits go on past our DeactivateReq.
+// waits for ours (rx), our over-grant (tx), our late advertisement (tx). Only
+// request credits go on past our DeactivateReq.
 `define AOU_L3_FC_X_CREDIT(B) \
   `B``_XIGN("zero_stall,*,rx") \
   `B``_XIGN("dut_zero_stall,*,tx") \
   `B``_XIGN("dut_saturate,*,rx") \
-  `B``_XIGN("inj_overflow,*,rx") \
   `B``_XIGN("late_adv,*,rx") \
   `B``_XIGN("late_adv,c[3]|c[4],*")
 `define AOU_L3_FC_CLS(B) `B``_VALS(c, 0, 4)
