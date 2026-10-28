@@ -118,6 +118,13 @@ work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix2144-sp64"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=256",
            "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1"]
 
+[targets.2xmix41-sp128]
+description = "Two RPs, 1024 and 256 bits, on one 128-byte FDI (single PHY)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix41-sp128"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix41-sp128"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=2"]
+
 [targets.1x256-sp32]
 description = "Narrowest RP and FDI (the RTL default FDI_CONFIG)"
 build_dir = "hw/ip/aou/dv/build/uvm_reg/1x256-sp32"

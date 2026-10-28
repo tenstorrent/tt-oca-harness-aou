@@ -3618,6 +3618,7 @@ the DUT; then one grant per RP releases them (10.7)
 | `aou_perf_test.perf_scn-S1.3x512-sp64` | `+perf_scn=S1 +aou_config=3x512-sp64` | 1 | `3x512-sp64` | 10.1,10.2,10.3,10.6,10.8
 | `aou_perf_test.perf_scn-S1.4xmix4211-sp128` | `+perf_scn=S1 +aou_config=4xmix4211-sp128` | 1 | `4xmix4211-sp128` | 10.1,10.2,10.3,10.6,10.8,18.3
 | `aou_perf_test.perf_scn-S1.4xmix2144-sp64` | `+perf_scn=S1 +aou_config=4xmix2144-sp64` | 1 | `4xmix2144-sp64` | 10.1,10.2,10.3,10.6,10.8
+| `aou_perf_test.perf_scn-S1.2xmix41-sp128` | `+perf_scn=S1 +aou_config=2xmix41-sp128` | 1 | `2xmix41-sp128` | 10.1,10.2,10.3,10.6,10.8
 | `aou_perf_test.perf_scn-S1.1x256-sp32` | `+perf_scn=S1 +aou_config=1x256-sp32` | 1 | `1x256-sp32` | 10.1,10.2,10.3,10.6,10.8,18.1
 | `aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128` | `+perf_scn=S1 +active_phy=0 +aou_config=2xmix-tp64_128` | 1 | `2xmix-tp64_128` | 10.1,10.2,10.3,10.6,10.8,18.5
 | `aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128` | `+perf_scn=S1 +active_phy=1 +aou_config=2xmix-tp64_128` | 1 | `2xmix-tp64_128` | 10.1,10.2,10.3,10.6,10.8
@@ -3633,6 +3634,7 @@ the DUT; then one grant per RP releases them (10.7)
 | `aou_perf_test.perf_scn-S4.active_phy-1` | `+perf_scn=S4 +active_phy=1 +aou_config=2xmix-tp64_128` | 1 | `2xmix-tp64_128` | 10.12
 | `aou_perf_test.perf_scn-S5.4x512-sp64` | `+perf_scn=S5 +aou_config=4x512-sp64` | 1 | `4x512-sp64` | 10.13
 | `aou_perf_test.perf_scn-S5.4xmix4211-sp128` | `+perf_scn=S5 +aou_config=4xmix4211-sp128` | 1 | `4xmix4211-sp128` | 10.13
+| `aou_perf_test.perf_scn-S5.2xmix41-sp128` | `+perf_scn=S5 +aou_config=2xmix41-sp128` | 1 | `2xmix41-sp128` | 10.13
 | `aou_perf_test.perf_scn-S5.active_phy-0` | `+perf_scn=S5 +active_phy=0 +aou_config=2xmix-tp64_128` | 1 | `2xmix-tp64_128` | 10.13
 | `aou_perf_test.perf_scn-S5.active_phy-1` | `+perf_scn=S5 +active_phy=1 +aou_config=2xmix-tp64_128` | 1 | `2xmix-tp64_128` | 10.13
 | `aou_perf_test.perf_scn-S5.3x512-sp64` | `+perf_scn=S5 +aou_config=3x512-sp64` | 1 | `3x512-sp64` | 10.13

@@ -156,6 +156,7 @@ class ScenarioTest(unittest.TestCase):
         self.assertEqual(c["1x512-sp64"], {"rp_bytes": [64], "phy_bytes": [64]})
         self.assertEqual(c["4xmix4211-sp128"]["rp_bytes"], [128, 64, 32, 32])
         self.assertEqual(c["2xmix-tp64_128"]["phy_bytes"], [64, 128])
+        self.assertEqual(c["2xmix41-sp128"], {"rp_bytes": [128, 32], "phy_bytes": [128]})
 
     def test_scenario_file(self):
         wins = pm.load_scenarios()

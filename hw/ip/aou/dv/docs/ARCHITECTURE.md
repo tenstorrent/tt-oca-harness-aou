@@ -64,6 +64,7 @@ all configurations and the naming legend are in README "Build configurations"
 | 3x512-sp64 | 3 | 512 | SP_64B | an RP count that is not a power of two |
 | 4xmix4211-sp128 | 4 | 1024, 512, 256, 256 | SP_128B | mixed widths, every local width (2.14), 1024-bit FDI |
 | 4xmix2144-sp64 | 4 | 512, 256, 1024, 1024 | SP_64B | mixed widths, RP2/RP3 at 1024; with 4xmix4211, every RP at every local width |
+| 2xmix41-sp128 | 2 | 1024, 256 | SP_128B | a 1024-bit and a 256-bit RP sharing one 128-byte FDI (common product case) |
 | 1x256-sp32 | 1 | 256 | SP_32B | narrowest RP and FDI (the RTL defaults' FDI) |
 | 2xmix-tp64_128 | 2 | 512, 1024 | TP_64B_128B (TWO_PHY) | two-PHY FDI, 2 RPs, mixed widths |
 | 2x512-tp32_64 | 2 | 512 | TP_32B_64B (TWO_PHY) | two-PHY FDI with a 256-bit PHY0, 2 RPs at one width |
