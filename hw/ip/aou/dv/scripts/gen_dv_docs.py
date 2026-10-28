@@ -18,7 +18,8 @@ these files are their rendering and are regenerated, never edited:
                                   with the scenarios that cite it
   docs/gen/vplan_groups.adoc      Regression groups of every testlist
   docs/gen/fcov_groups.adoc       Covergroup inventory: coverpoints and crosses
-                                  per covergroup, with the component it lives in
+                                  per covergroup, with its report name and the
+                                  component it lives in (comments are not read)
 
 `--check` exits 1 when a generated file differs from what the sources give
 (`make lint` runs it).
@@ -267,29 +268,95 @@ def gen_matrix(benches, items):
     return "".join(out)
 
 
+def strip_comments(text):
+    """text with its `//` and `/* */` comments blanked (newlines kept, strings untouched), so
+    prose in a comment is never read as code."""
+    out, i, n = [], 0, len(text)
+    while i < n:
+        c = text[i]
+        if c == '"':
+            j = i + 1
+            while j < n and text[j] not in '"\n':
+                j += 2 if text[j] == "\\" else 1
+            out.append(text[i:j + 1])
+            i = j + 1
+        elif text.startswith("//", i):
+            j = text.find("\n", i)
+            i = n if j < 0 else j
+        elif text.startswith("/*", i):
+            j = text.find("*/", i + 2)
+            j = n if j < 0 else j + 2
+            out.append("\n" * text.count("\n", i, j))
+            i = j
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
+COMP_CG_RE = re.compile(r"^[ \t]*(?:virtual[ \t]+)?(?:class|module)[ \t]+(\w+)|"
+                        r"\bcovergroup[ \t]+(\w+)[^;]*;(.*?)\bendgroup\b", re.S | re.M)
+# The coverage service's group names: db.group("<layer>.<group>") in the env, and the bound
+# AXI4 monitors' "<group>|<point>|<bin>" keys, reported per port as axi4.<port>.<group>.
+SERVICE_GROUP_RE = re.compile(r'\.group\(\s*"([\w.]+)"')
+AXI4_KEY_RE = re.compile(r'"(cg_\w+)\|')
+AXI4_BINS = "cov/sv/aou_axi4_fc_bins.svh"
+
+
+def parse_covergroups(text, rel):
+    """[(group, component class or module, file, [coverpoints], [crosses])] of one source."""
+    out, comp = [], None
+    for m in COMP_CG_RE.finditer(strip_comments(text)):
+        if m.group(1):
+            comp = m.group(1)
+            continue
+        body = m.group(3)
+        out.append((m.group(2), comp or "", rel, re.findall(r"(\w+)\s*:\s*coverpoint\b", body),
+                    re.findall(r"(\w+)\s*:\s*cross\b", body)))
+    return out
+
+
+def service_groups(texts):
+    """{covergroup name: report name} from the coverage service's declarations."""
+    out = {}
+    for rel, text in texts.items():
+        code_only = strip_comments(text)
+        for name in SERVICE_GROUP_RE.findall(code_only):
+            out[name.rsplit(".", 1)[-1]] = name
+        if rel == AXI4_BINS:
+            for cg in AXI4_KEY_RE.findall(code_only):
+                out[cg] = f"axi4.<port>.{cg}"
+    return out
+
+
 def covergroups():
-    """[(group, component class, file, [coverpoints], [crosses])] from the SV sources."""
-    out = []
+    """[(group, report name, component, file, [coverpoints], [crosses])] from the SV sources.
+    A covergroup whose coverage-service group has another name is an error: the plan, the
+    code and the reports must name a group alike."""
+    texts = {}
     for path in sv_files("uvm/env", "cov/sv"):
         with open(path, encoding="utf-8", errors="replace") as fh:
-            text = fh.read()
-        comp = None
-        for m in re.finditer(r"^\s*(?:class|module)\s+(\w+)|covergroup\s+(\w+)[^;]*;(.*?)endgroup", text, re.S | re.M):
-            if m.group(1):
-                comp = m.group(1)
-                continue
-            body = m.group(3)
-            cps = re.findall(r"(\w+)\s*:\s*coverpoint", body)
-            xs = re.findall(r"(\w+)\s*:\s*cross", body)
-            out.append((m.group(2), comp or "", os.path.relpath(path, UVM_ROOT), cps, xs))
+            texts[os.path.relpath(path, UVM_ROOT)] = fh.read()
+    report = service_groups(texts)
+    out, missing = [], []
+    for rel, text in texts.items():
+        for g, comp, path, cps, xs in parse_covergroups(text, rel):
+            if g not in report:
+                missing.append(f"{g} ({path})")
+            out.append((g, report.get(g, ""), comp, path, cps, xs))
+    if missing:
+        raise SystemExit("gen_dv_docs: no coverage-service group named like covergroup "
+                         + ", ".join(missing))
     return out
 
 
 def gen_fcov_groups():
     out = [HEADER, "[[aou-fcov-group-table]]\n",
-           '[cols="2,2,3,3,3",options="header"]\n|===\n| Covergroup | Component | File | Coverpoints | Crosses\n']
-    for g, comp, path, cps, xs in covergroups():
-        out.append(f"| `{g}` | {code(comp)} | `{path}` | {cell(', '.join(f'`{c}`' for c in cps))} | "
+           '[cols="2,3,2,3,3,3",options="header"]\n|===\n'
+           "| Covergroup | Report name | Component | File | Coverpoints | Crosses\n"]
+    for g, rep, comp, path, cps, xs in covergroups():
+        out.append(f"| `{g}` | {code(rep)} | {code(comp)} | `{path}` | "
+                   f"{cell(', '.join(f'`{c}`' for c in cps))} | "
                    f"{cell(', '.join(f'`{x}`' for x in xs)) or '-'}\n")
     out.append("|===\n")
     return "".join(out)
