@@ -44,10 +44,11 @@ so nothing may be added that works only through it.
   be on a shared filesystem, never `/tmp`. Never start a regression on a shared
   login host. Without `bsub` (or with `LSF=0`) builds and runs execute on the
   current host (README "Compute").
-- **The full regression is `make regress`** (`scripts/regress.py`, README "Run
-  everything"): every bench, configuration and testlist, built and run, then one
-  summary that exits non-zero on any FAIL or XPASS. `CONFIGS`, `ITEMS`, `STEPS` and
-  `RERUN_FAILED` narrow, resume or repeat it.
+- **The full regression is `scripts/regress.py`** (README "Run everything";
+  `python3 scripts/regress.py --help` lists every option, and `make regress` is a
+  shorthand for it): every bench, configuration and testlist, built and run, then one
+  summary that exits non-zero on any FAIL or XPASS. `--configs`, `--items`, `--steps`
+  and `--rerun-failed` narrow, resume or repeat it.
 - **Regressions run through `scripts/run_list.py`, which can be steered live.** It
   prints a control file (`out/<build>/<rid>.ctl`). Change `jobs`, `pause`, `drain`,
   `priority`, `queue` or `order` with `scripts/run_ctl.py <ctl> key=value` instead of

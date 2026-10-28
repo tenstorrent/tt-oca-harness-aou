@@ -60,18 +60,22 @@ lists every make target and variable.
 
 ### Run everything
 
-`make regress` is the full regression: it builds every bench the testlists need and
-runs every scenario on it, then prints one summary. It needs the
+`scripts/regress.py` is the full regression: it builds every bench the testlists need
+and runs every scenario on it, then prints one summary. `python3 scripts/regress.py --help`
+lists every option and what each step does; `make regress` is a shorthand that passes
+make variables to it (table below). It needs the
 [prerequisites](#prerequisites) for the simulator you pick, `make setup`, and
 preferably LSF. Without `bsub` (or with `LSF=0`) the builds go one after another on
 the current host and each list runs as many runs at once as it has CPUs, so use a
 machine of your own, never a shared login host.
 
 ```sh
-make regress SIM=vcs RID=full1             # every CONFIG, every bench, every testlist
-make regress SIM=verilator RID=full1v      # the same on Verilator, without the RTL assertions
-make regress SIM=vcs RID=pr1 CONFIGS="1x512-sp64 2x512-tp32_64" ITEMS="smoke ci assertions"
-make regress SIM=vcs RID=full1 DRY_RUN=1   # print the plan and the run counts only
+python3 scripts/regress.py --help                       # every option, every step
+python3 scripts/regress.py --sim vcs --rid full1        # every CONFIG, every bench, every testlist
+python3 scripts/regress.py --sim verilator --rid full1v # the same on Verilator, without the RTL assertions
+python3 scripts/regress.py --sim vcs --rid pr1 --configs "1x512-sp64 2x512-tp32_64" --items "smoke ci assertions"
+python3 scripts/regress.py --sim vcs --rid full1 --dry-run   # the plan and the run counts only
+make regress SIM=vcs RID=full1                          # the same as the second line
 ```
 
 What it does, in steps (`STEPS=build,run,summary`, plus `cov` with `COV=1`):
@@ -84,7 +88,7 @@ What it does, in steps (`STEPS=build,run,summary`, plus `cov` with `COV=1`):
 2. **run**: one `scripts/run_list.py` per build, with `--per-list`: T1 runs every
    testlist `all.toml` includes except `assertions.toml`, which runs on the `-assert`
    builds; the register bench runs `registers.toml` and the unit benches their own
-   lists. That is about 5,130 runs on VCS (4,870 T1, 210 register, 37 assertion, 13 unit).
+   lists. That is about 5,300 runs on VCS (5,040 T1, 210 register, 37 assertion, 13 unit).
 3. **cov** (`COV=1` only): `make cov_report` per configuration for this RID's
    passing runs, the register bench's folded in, then the union over the
    configurations in `out/regress/<RID>/union/`: code coverage (`urg -map AOU_CORE_TOP`
@@ -113,6 +117,9 @@ Logs (one per build and per `run_list.py`), the exact commands (`commands.sh`) a
 (`results_<list>.rid.<RID>.csv`) are where `make run` and `run_list.py` always put
 them, in `out/<build>/`.
 
+`make regress` takes these variables; each is the script option of the same name in lower case
+(`RUN_JOBS` is `-j`, `RERUN_FAILED` is `--rerun-failed`, `DRY_RUN=1` is `--dry-run`).
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `SIM` | `vcs` if on `PATH`, else `verilator` | Simulator |
@@ -128,8 +135,9 @@ them, in `out/<build>/`.
 | `COV_MEM` | `16GB` | LSF memory of each coverage job, always with a unit |
 | `DRY_RUN` | 0 | 1: print the plan, build and run nothing |
 
-Anything else on the command line (`LSF=0`, `LSF_EXTRA_OPTS`, `AXI4PC=0`, ...) reaches
-the `make build` and `make run` calls the regression makes.
+Anything else on the `make regress` command line (`LSF=0`, `LSF_EXTRA_OPTS`, `AXI4PC=0`,
+...) reaches the `make build` and `make run` calls the regression makes; with the script,
+set them in the environment (`LSF_EXTRA_OPTS=... python3 scripts/regress.py ...`).
 
 To **resume** an interrupted regression, repeat it with the same `RID`, leaving out the
 steps already done: `make regress RID=full1 STEPS=run,summary`. A build that already has

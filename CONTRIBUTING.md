@@ -63,7 +63,8 @@ We welcome bug fixes, improvements, and new features via Pull Requests:
 ### Testing Requirements
 
 - A change to `RTL/`, `csr/` or the verification testbench (`hw/ip/aou/dv`) runs the full
-  regression before review: `make regress SIM=vcs` (or `SIM=verilator`) in `hw/ip/aou/dv`, as
+  regression before review: `python3 scripts/regress.py --sim vcs` (or `--sim verilator`, or
+  the shorthand `make regress SIM=vcs`) in `hw/ip/aou/dv`, as
   described in its README under "Run everything". The pull request states the simulator and the
   `Result:` line of the regression's `summary.md`. CI runs only the short `ci` group, so it does not
   replace this run.
