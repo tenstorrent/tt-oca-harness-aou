@@ -156,7 +156,7 @@
 | `aou_wdt_test.wdt_case-multi_rp.4x512-sp64` | `aou_wdt_test` | `+wdt_case=multi_rp` | 1-2 | `4x512-sp64` | 16.18,16.22,16.23 | 
 | `aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128` | `aou_wdt_test` | `+wdt_case=multi_rp` | 1-2 | `4xmix4211-sp128` | 16.18,16.22,16.23 | 
 |===
-===== `testlists/stress.toml` (58 scenarios)
+===== `testlists/stress.toml` (59 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -196,6 +196,7 @@
 | `aou_stress_test.st_bp-all` | `aou_stress_test` | `+st_bp=all` | 1-2 |  | 7.16,10.15 | 
 | `aou_stress_test.st_bp-all.st_stall_max-1500.4x512-sp64` | `aou_stress_test` | `+st_bp=all +st_stall_max=1500` | 1-2 | `4x512-sp64` | 7.16 | 
 | `aou_stress_test.st_bp-fdi` | `aou_stress_test` | `+st_bp=fdi` | 1-2 |  | 7.16,10.15 | 
+| `aou_stress_test.m_b_stall.1x512-sp64` | `aou_stress_test` | `+st_bp=fdi +dp_dir=r2l +dp_wr_pct=100 +dp_n=192 +dp_batch=32 +dp_len=0 +st_require_m_b_stall=1` | 1 | `1x512-sp64` | 10.15 | 
 | `aou_qos_order_test.arb_mode-0` | `aou_qos_order_test` | `+arb_mode=0` | 1-2 | `4x512-sp64` | 13.1,13.2 | 
 | `aou_qos_order_test.arb_mode-1.qos_tiers-eq` | `aou_qos_order_test` | `+arb_mode=1 +qos_tiers=eq` | 1-2 | `4x512-sp64` | 13.1,13.4 | 
 | `aou_qos_order_test.arb_mode-1.qos_tiers-3` | `aou_qos_order_test` | `+arb_mode=1 +qos_tiers=3` | 1-3 | `4x512-sp64` | 13.4,13.5,13.6,13.7,13.16,13.17,13.18 | 

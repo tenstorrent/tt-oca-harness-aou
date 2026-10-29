@@ -623,7 +623,15 @@ in the flits to the DUT); none runs every channel at full rate
 (default 300); over 1000 holds a ready or valid low for longer
 than the DUT's own pipelines ever wait
 
+----
++st_require_m_b_stall=1                   require an observed M-side B
+----
+
+stall, AXI-R03 checking and a completed release without abort
+
 *Procedure.* The base class's virtual sequence `aou_dp_vseq`, configured by this class and its arguments.
+
+*Rules named.* `AXI-R03`
 
 *Pass criteria.* The base test's end-of-test checks: scoreboard drained, every declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.
 
@@ -647,6 +655,7 @@ than the DUT's own pipelines ever wait
 | `aou_stress_test.st_bp-all` | `+st_bp=all` | 1-2 |  | 7.16,10.15
 | `aou_stress_test.st_bp-all.st_stall_max-1500.4x512-sp64` | `+st_bp=all +st_stall_max=1500` | 1-2 | `4x512-sp64` | 7.16
 | `aou_stress_test.st_bp-fdi` | `+st_bp=fdi` | 1-2 |  | 7.16,10.15
+| `aou_stress_test.m_b_stall.1x512-sp64` | `+st_bp=fdi +dp_dir=r2l +dp_wr_pct=100 +dp_n=192 +dp_batch=32 +dp_len=0 +st_require_m_b_stall=1` | 1 | `1x512-sp64` | 10.15
 | `aou_stress_test.st_bp-all.small_size_pct-5` | `+st_bp=all +small_size_pct=5` | 1-2 |  | 4.1,5.1,14.10,14.11
 | `aou_stress_test.st_bp-all.1x512-sp64-nxt` | `+st_bp=all` | 1-2 | `1x512-sp64-nxt` | 7.16,10.15
 | `aou_stress_test.st_bp-all.rtl_asserts-1` | `+st_bp=all +rtl_asserts=1` | 1-2 | `1x512-sp64-assert` | 11.18

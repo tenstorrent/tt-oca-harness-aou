@@ -360,7 +360,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 481
+expected_count = 482
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -520,6 +520,7 @@ tests = [
   "aou_stress_test.st_bp-all",
   "aou_stress_test.st_bp-all.st_stall_max-1500.4x512-sp64",
   "aou_stress_test.st_bp-fdi",
+  "aou_stress_test.m_b_stall.1x512-sp64",
   "aou_qos_order_test.arb_mode-0",
   "aou_qos_order_test.arb_mode-1.qos_tiers-eq",
   "aou_qos_order_test.arb_mode-1.qos_tiers-3",

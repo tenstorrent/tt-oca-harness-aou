@@ -15,6 +15,8 @@
 //   +st_stall_max=N                           longest AXI stall, in cycles
 //            (default 300); over 1000 holds a ready or valid low for longer
 //            than the DUT's own pipelines ever wait
+//   +st_require_m_b_stall=1                   require an observed M-side B
+//            stall, AXI-R03 checking and a completed release without abort
 class aou_stress_test extends aou_dp_base_test;
   `uvm_component_utils(aou_stress_test)
 
@@ -31,6 +33,31 @@ class aou_stress_test extends aou_dp_base_test;
   endfunction
 
   static int unsigned stall_max = 300;
+
+  function void check_phase(uvm_phase phase);
+    bit observed = 1'b0;
+    int unsigned require_stall = 0;
+    string why;
+    super.check_phase(phase);
+    void'($value$plusargs("st_require_m_b_stall=%d", require_stall));
+    if (require_stall == 0) return;
+    foreach (env.m_sub[r]) begin
+      aou_axi_monitor mon = env.m_sub[r].mon;
+      `uvm_info(get_type_name(), $sformatf(
+          {"M_B_STALL rp=%0d entries=%0d cycles=%0d sustained=%0d releases=%0d ",
+           "checks=%0d handshakes=%0d aborts=%0d"},
+          r, mon.n_b_stall_entries, mon.n_b_stall_cycles, mon.n_b_stall_sustained,
+          mon.n_b_stall_releases,
+          mon.n_b_stability_checks, mon.n_b_handshakes, mon.n_b_observation_aborts), UVM_LOW)
+      if (mon.cfg.checks_en && mon.n_b_stall_entries > 0 && mon.n_b_stall_sustained > 0 &&
+          mon.n_b_qualified_releases > 0 && mon.n_b_stability_checks > 0 &&
+          mon.n_b_handshakes > 0 && mon.n_b_observation_aborts == 0 && mon.n_aborted == 0)
+        observed = 1'b1;
+    end
+    if (!observed || env.outstanding(why) != 0)
+      `uvm_error(get_type_name(),
+                 "M_B_STALL_NOT_REACHED: no checked, released M-side B stall or drain")
+  endfunction
 
   static function void stall(aou_axi_delay d);
     d.set_bursty(0, 0, 15, 40, stall_max);
