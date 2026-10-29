@@ -701,7 +701,11 @@ a checkout. Simulations never need it; they read the committed table.
   crosses the link: whole bursts (the DUT's transaction splitter divides the
   requests it receives, at its manager port, and never changes what crosses
   the link), narrow AxSIZE where a burst would exceed 4 KB (d2d-compare's
-  `Txn.beat`).
+  `Txn.beat`). d2d_model packs the link as if the AXI ports could feed it
+  without limit; `perf_model.py` caps that at what the ports can move, one
+  data beat per cycle on each RP's write and read channels at both dies, so a
+  window that loads only narrow RPs (S5 `pl_w0` on 2xmix41-sp128, all on a
+  256-bit RP) expects the ports' rate, not the link's.
 - `uvm/env/perf/perf_overrides.yaml` widens the tolerance of single targets, each
   with a measured structural reason. It is empty by default.
 - `make perf_check` judges every `out/**/perf.json` (docs/PERF_JSON.md) against
