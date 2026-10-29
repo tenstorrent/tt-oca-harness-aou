@@ -11,5 +11,6 @@ package aou_axi_selftest_pkg;
   `include "aou_axi_selftest_catcher.svh"
   `include "aou_axi_selftest_test.svh"
   `include "aou_axi_selftest_neg_test.svh"
+  `include "aou_axi_r03_neg_test.svh"
   `include "aou_axi_sb_reset_test.svh"
 endpackage
