@@ -9,6 +9,8 @@ class aou_axi_selftest_catcher extends uvm_report_catcher;
   int unsigned n_caught;
   int unsigned by_rule[string];   // scoreboard errors per rule (AXI-S01..)
   int unsigned n_proto;
+  int unsigned n_axi_r03;
+  bit r03_control = 1'b0;
 
   function new(string name = "aou_axi_selftest_catcher");
     super.new(name);
@@ -16,18 +18,22 @@ class aou_axi_selftest_catcher extends uvm_report_catcher;
 
   function action_e catch();
     string msg = get_message();
-    if (get_severity() == UVM_ERROR && get_id() == "aou_scoreboard" && msg.len() > 5 &&
+    if (get_severity() == UVM_ERROR && get_id() == "aou_scoreboard" && msg.len() > 6 &&
         msg.substr(0, 4) == "AXI-S") begin
       n_caught++;
       if (by_rule.exists(msg.substr(0, 6))) by_rule[msg.substr(0, 6)]++;
       else by_rule[msg.substr(0, 6)] = 1;
-      set_severity(UVM_INFO);
+      if (!r03_control) set_severity(UVM_INFO);
     end
-    if (get_severity() == UVM_ERROR && get_id() == "aou_axi_monitor" && msg.len() > 7 &&
+    if (!r03_control && get_severity() == UVM_ERROR && get_id() == "aou_axi_monitor" &&
+        msg.len() > 7 &&
         msg.substr(0, 7) == "AXI-R05:") begin
       n_proto++;
       set_severity(UVM_INFO);
     end
+    // Count the real production error without changing its severity.
+    if (get_severity() == UVM_ERROR && get_id() == "aou_axi_monitor" && msg.len() > 7 &&
+        msg.substr(0, 7) == "AXI-R03:") n_axi_r03++;
     return THROW;
   endfunction
 endclass
