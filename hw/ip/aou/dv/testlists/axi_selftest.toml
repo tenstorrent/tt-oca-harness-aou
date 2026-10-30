@@ -30,6 +30,13 @@ seed = 1
 tags = ["axi_selftest"]
 run_modes = ["axi_selftest"]
 
+[[tests]]
+name = "aou_axi_r03_neg_test"
+module = { uvm = "aou_axi_r03_neg_test" }
+seed = 1
+tags = ["blocked", "checker_negative_control"]
+run_modes = ["axi_selftest"]
+
 [[groups]]
 name = "axi_selftest"
 expected_count = 3

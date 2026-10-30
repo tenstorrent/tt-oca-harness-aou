@@ -212,17 +212,26 @@ def gen_procedures(benches, items):
                     out.append("*Procedure.* The class's own `run_phase` (see the file).\n\n")
             if rules:
                 out.append("*Rules named.* " + ", ".join(f"`{r}`" for r in sorted(rules)) + "\n\n")
-            out.append("*Pass criteria.* The base test's end-of-test checks: scoreboard drained, every "
-                       "declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker "
-                       "clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.\n\n")
+            if all(e["blocked"] and "checker_negative_control" in e["tags"] for e in es):
+                out.append("*Expected result.* This blocked checker sensitivity control is excluded "
+                           "from ordinary regression groups and does not itself establish functional plan coverage. "
+                           "Direct execution and its guards are described by the scenario metadata:\n\n")
+                for e in es:
+                    out.append(f"* {code(e['name'])}: {cell(e['blocked'])}\n")
+                out.append("\n")
+            else:
+                out.append("*Pass criteria.* The base test's end-of-test checks: scoreboard drained, every "
+                           "declared expectation met, no unexpected `UVM_ERROR`/`UVM_FATAL`, the FDI checker "
+                           "clean; `scripts/check_run.py` judges the log against `expected_fail.yaml`.\n\n")
             out.append("*Scenarios.*\n\n"
                        '[cols="3,2,1,1,3",options="header"]\n|===\n'
                        "| Scenario | Arguments | Seeds | Target | Plan items\n")
             pids = set()
             for e in es:
                 seeds = f"{e['seeds'][0]}" if len(e["seeds"]) == 1 else f"{e['seeds'][0]}-{e['seeds'][-1]}"
-                out.append(f"| {code(e['name'])} | {code(e['plusargs'])} | {seeds} | {code(e['target'])} | "
-                           f"{cell(e['plan_ids'])}\n")
+                row = (f"| {code(e['name'])} | {code(e['plusargs'])} | {seeds} | {code(e['target'])} | "
+                       f"{cell(e['plan_ids'])}")
+                out.append(row.rstrip() + "\n")
                 pids |= set(testlist.ids(e["plan_ids"]))
             out.append("|===\n\n")
             if pids:
