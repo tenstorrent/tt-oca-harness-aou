@@ -17,6 +17,11 @@ class aou_axi_sub_driver extends uvm_component;
   int unsigned fault_wdrop_pct  = 0;
   int unsigned fault_rvalid_pct = 0;
 
+  // Opt-in checker sensitivity control, applied to one stalled B response.
+  protected bit bresp_stability_fault_armed;
+  int unsigned n_bresp_stall_faults;
+  int unsigned n_bresp_payload_mutations;
+
   // Error injection: inject_orphan() queues a B, or a one-beat R with RLAST,
   // that answers no request (an AXI4 violation the DUT's ID-mismatch logic
   // must catch). It goes out when the channel is idle and is withdrawn if the
@@ -80,6 +85,12 @@ class aou_axi_sub_driver extends uvm_component;
   // Orphans queued or presented on one channel (rd: R, else B).
   function int unsigned orphans_pending_on(bit rd);
     return orph_id[rd].size();
+  endfunction
+
+  function void arm_bresp_stability_fault();
+    bresp_stability_fault_armed = 1'b1;
+    n_bresp_stall_faults = 0;
+    n_bresp_payload_mutations = 0;
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -283,6 +294,7 @@ class aou_axi_sub_driver extends uvm_component;
     bit [1023:0] d;
     bit [1:0] resp;
     int unsigned beat;
+    bit b_started = 1'b0;
 
     aw_rdy = (aw_cnt == 0);
     if (!aw_rdy) aw_cnt--;
@@ -300,11 +312,22 @@ class aou_axi_sub_driver extends uvm_component;
       k = pick(b_q, b_due);
       if (k >= 0) begin
         b_busy = 1'b1;
+        b_started = 1'b1;
         b_idx  = k;
         vif.sub_cb.bid   <= b_q[k].id;
         vif.sub_cb.bresp <= b_q[k].bresp;
       end
       vif.sub_cb.bvalid <= b_busy;
+    end
+
+    // Use the monitor's sampling boundary so the production rule sees a
+    // stalled BVALID cycle before the payload mutation is driven.
+    if (!b_started && b_busy && bresp_stability_fault_armed &&
+        vif.mon_cb.bvalid === 1'b1 && vif.mon_cb.bready === 1'b0) begin
+      bresp_stability_fault_armed = 1'b0;
+      n_bresp_stall_faults++;
+      n_bresp_payload_mutations++;
+      vif.sub_cb.bresp <= b_q[b_idx].bresp ^ 2'b01;
     end
 
     if (!r_busy && r_burst < 0) drive_orphan(1);

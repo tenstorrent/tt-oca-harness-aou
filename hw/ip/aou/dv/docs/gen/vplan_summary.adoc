@@ -600,11 +600,12 @@
 | `aou_l3_unit_env_test` | `aou_l3_unit_env_test` |  | 1 |  |  | 
 |===
 ==== AXI agent self-test bench (no DUT)
-===== `testlists/axi_selftest.toml` (3 scenarios)
+===== `testlists/axi_selftest.toml` (4 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
 | `aou_axi_selftest_test` | `aou_axi_selftest_test` |  | 1 |  |  | 
 | `aou_axi_selftest_neg_test` | `aou_axi_selftest_neg_test` |  | 1 |  |  | 
 | `aou_axi_sb_reset_test` | `aou_axi_sb_reset_test` |  | 1 |  |  | 
+| `aou_axi_r03_neg_test` | `aou_axi_r03_neg_test` |  | 1 |  |  | blocked: Intentional checker sensitivity control: require a sampled BVALID && !BREADY stall and a one-shot BRESP mutation, then require the production AXI-R03 report. A resulting AXI-S01 scoreboard error may also occur. Missing stimulus or AXI-R03 fails the guard. Direct execution is FAIL with errors retaining their severity.
 |===
