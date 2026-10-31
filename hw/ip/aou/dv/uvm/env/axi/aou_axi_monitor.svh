@@ -15,6 +15,11 @@ class aou_axi_monitor extends uvm_monitor;
   int unsigned n_rd;
   int unsigned n_b_zero;  // B valid in the cycle after the write's last AW/W handshake
   int unsigned n_r_zero;  // first R valid in the cycle after the AR handshake
+  int unsigned n_b_stall_entries, n_b_stall_cycles, n_b_stall_sustained, n_b_stall_releases;
+  int unsigned n_b_qualified_releases;
+  int unsigned n_b_stability_checks, n_b_handshakes, n_b_observation_aborts;
+  protected bit b_stall_active;
+  protected bit b_stall_has_sustained;
 
   protected aou_axi_vif_t vif;
   protected longint unsigned cyc;
@@ -173,6 +178,16 @@ class aou_axi_monitor extends uvm_monitor;
   // complete, but may never complete, so the end of test does not count them
   // as missing.
   function void reset_flush(bit bus_reset = 1'b1);
+    if (n_b_stall_entries != 0 || b_stall_active) n_b_observation_aborts++;
+    n_b_stall_entries = 0;
+    n_b_stall_cycles = 0;
+    n_b_stall_sustained = 0;
+    n_b_stall_releases = 0;
+    n_b_qualified_releases = 0;
+    n_b_stability_checks = 0;
+    n_b_handshakes = 0;
+    b_stall_active = 1'b0;
+    b_stall_has_sustained = 1'b0;
     if (!bus_reset) begin
       foreach (aw_q[k]) aw_q[k].txn.aborted = 1'b1;
       foreach (b_q[k]) b_q[k].txn.aborted = 1'b1;
@@ -285,6 +300,26 @@ class aou_axi_monitor extends uvm_monitor;
 
   // Once VALID is high it stays high, with a stable payload, until READY.
   protected function void check_stable();
+    if (p_bvalid === 1'b1 && p_bready === 1'b0) n_b_stability_checks++;
+    if (vif.mon_cb.bvalid === 1'b1 && vif.mon_cb.bready === 1'b0) begin
+      if (!b_stall_active) n_b_stall_entries++;
+      else begin
+        n_b_stall_sustained++;
+        b_stall_has_sustained = 1'b1;
+      end
+      b_stall_active = 1'b1;
+      n_b_stall_cycles++;
+    end else begin
+      if (vif.mon_cb.bvalid === 1'b1 && vif.mon_cb.bready === 1'b1) begin
+        n_b_handshakes++;
+        if (b_stall_active) begin
+          n_b_stall_releases++;
+          if (b_stall_has_sustained) n_b_qualified_releases++;
+        end
+      end
+      b_stall_active = 1'b0;
+      b_stall_has_sustained = 1'b0;
+    end
     if ($isunknown({vif.mon_cb.awvalid, vif.mon_cb.wvalid, vif.mon_cb.bvalid,
                     vif.mon_cb.arvalid, vif.mon_cb.rvalid}))
       `uvm_error(get_type_name(), "AXI-R18: a VALID signal is X or Z out of reset")

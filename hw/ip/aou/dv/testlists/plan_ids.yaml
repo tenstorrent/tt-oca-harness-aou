@@ -163,6 +163,7 @@ plan_ids:
   aou_stress_test.st_bp-all: '7.16,10.15'
   aou_stress_test.st_bp-all.st_stall_max-1500.4x512-sp64: '7.16'
   aou_stress_test.st_bp-fdi: '7.16,10.15'
+  aou_stress_test.m_b_stall.1x512-sp64: '10.15'
   aou_qos_order_test.arb_mode-0: '13.1,13.2'
   aou_qos_order_test.arb_mode-1.qos_tiers-eq: '13.1,13.4'
   aou_qos_order_test.arb_mode-1.qos_tiers-3: '13.4,13.5,13.6,13.7,13.16,13.17,13.18'

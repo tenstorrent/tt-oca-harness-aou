@@ -344,6 +344,16 @@ run_modes = ["stress"]
 args = ["+st_bp=fdi"]
 
 [[tests]]
+name = "aou_stress_test.m_b_stall.1x512-sp64"
+module = { uvm = "aou_stress_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+st_bp=fdi", "+dp_dir=r2l", "+dp_wr_pct=100", "+dp_n=192", "+dp_batch=32",
+        "+dp_len=0", "+st_require_m_b_stall=1"]
+
+[[tests]]
 name = "aou_qos_order_test.arb_mode-0"
 module = { uvm = "aou_qos_order_test" }
 target = "4x512-sp64"
@@ -573,7 +583,7 @@ args = ["+st_bp=all", "+small_size_pct=5"]
 
 [[groups]]
 name = "stress"
-expected_count = 58
+expected_count = 59
 tests = [
   "aou_stress_test.st_bp-all.small_size_pct-5",
   "aou_pack_test.pk-crossflit.remote_bytes-32",
@@ -612,6 +622,7 @@ tests = [
   "aou_stress_test.st_bp-all",
   "aou_stress_test.st_bp-all.st_stall_max-1500.4x512-sp64",
   "aou_stress_test.st_bp-fdi",
+  "aou_stress_test.m_b_stall.1x512-sp64",
   "aou_qos_order_test.arb_mode-0",
   "aou_qos_order_test.arb_mode-1.qos_tiers-eq",
   "aou_qos_order_test.arb_mode-1.qos_tiers-3",
