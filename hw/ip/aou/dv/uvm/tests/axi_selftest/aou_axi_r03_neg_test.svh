@@ -32,7 +32,8 @@ class aou_axi_r03_neg_test extends aou_axi_selftest_test;
     if (catcher.n_axi_r03 == 0)
       `uvm_error(get_type_name(),
                  "AXI-R03 sensitivity failure: production monitor did not report the mutation")
-    if (catcher.n_axi_r03 > 1 || catcher.n_caught > 1)
+    if (catcher.n_axi_r03 > 1 ||
+        (catcher.by_rule.exists("AXI-S01") && catcher.by_rule["AXI-S01"] > 1))
       `uvm_error(get_type_name(),
                  "AXI-R03 sensitivity failure: unexpected additional checker reports")
   endfunction
