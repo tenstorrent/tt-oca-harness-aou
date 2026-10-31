@@ -441,10 +441,11 @@ in the flits to the DUT); none runs every channel at full rate
 than the DUT's own pipelines ever wait
 
 ----
-+st_require_m_b_stall=1                   require an observed M-side B
++st_require_m_b_stall=1                   report the sampled M-side B
 ----
 
-stall, AXI-R03 checking and a completed release without abort
+stall counters (stimulus quality); AXI-R03 stays the oracle and
+coverage cg_bp|cp_b_stall_len records the stall
 
 *Procedure.* The base class's virtual sequence `aou_dp_vseq`, configured by this class and its arguments.
 
