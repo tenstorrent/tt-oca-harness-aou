@@ -202,6 +202,9 @@ import packet_def_pkg::*;
     logic   [NBANK-1:0]                 w_sram_wen;
     logic   [NBANK-1:0][ROW_WD-1:0]     w_sram_waddr;
     logic   [NBANK-1:0][WORD_WD-1:0]    w_sram_wdata;
+    logic   [WR_WORDS-1:0][WORD_WD-1:0] w_stream_w;     // the stream as whole words
+
+    assign w_stream_w = w_stream;
 
     always_comb begin
         w_sram_wen   = '0;
@@ -212,7 +215,7 @@ import packet_def_pkg::*;
                 if (w_wr_en_k[k] && (w_wr_bank_k[k] == BANK_WD'(b))) begin
                     w_sram_wen[b]   = 1'b1;
                     w_sram_waddr[b] = w_wr_row_k[k];
-                    w_sram_wdata[b] = w_stream[k*WG +: WG];
+                    w_sram_wdata[b] = w_stream_w[k];
                 end
     end
 
@@ -392,7 +395,8 @@ import packet_def_pkg::*;
     end
 
     // Reassemble the consecutive words, then align the message to granule 0.
-    logic   [RD_STREAM_G-1:0][G_WD-1:0]     w_rd_stream;
+    logic   [RD_WORDS-1:0][WORD_WD-1:0]     w_rd_stream_w;  // the words read, in order
+    logic   [RD_STREAM_G-1:0][G_WD-1:0]     w_rd_stream;    // the same as granules
     logic   [MAX_MSG_G-1:0][G_WD-1:0]       w_msg_g;
     logic   [MAX_MSG_G*5-1:0][7:0]          w_msg_b;        // message bytes
 
@@ -400,15 +404,16 @@ import packet_def_pkg::*;
     logic   [RD_WORDS-1:0][BANK_WD-1:0]     w_rd_pend_bank_s;
 
     always_comb begin
-        w_rd_stream = '0;
+        w_rd_stream_w = '0;
         for (int s = 0; s < RD_WORDS; s++) begin
             w_rd_sum_s[s]       = {1'b0, r_rd_bank} + (BANK_WD+1)'(s);
             w_rd_pend_bank_s[s] = (w_rd_sum_s[s] >= (BANK_WD+1)'(NBANK)) ?
                                   BANK_WD'(w_rd_sum_s[s] - (BANK_WD+1)'(NBANK)) : BANK_WD'(w_rd_sum_s[s]);
             for (int b = 0; b < NBANK; b++)
                 if (w_rd_pend_bank_s[s] == BANK_WD'(b))
-                    w_rd_stream[s*WG +: WG] = w_sram_rdata[b];
+                    w_rd_stream_w[s] = w_sram_rdata[b];
         end
+        w_rd_stream = w_rd_stream_w;
         for (int m = 0; m < MAX_MSG_G; m++) begin
             w_msg_g[m] = '0;
             for (int o = 0; o < WG; o++)
@@ -419,34 +424,42 @@ import packet_def_pkg::*;
     end
 
     // Field extraction. Data fields are MSB first in the message, so the AXI
-    // vector is the byte reversal of the message bytes.
-    logic   [DATA_WD-1:0]   w_data_256, w_data_512, w_data_1024, w_data;
-    logic   [STRB_WD-1:0]   w_strb_256, w_strb_512, w_strb_1024, w_strb;
+    // vector is the byte reversal of a fixed slice of the message bytes
+    // (constant indices: synthesis need not bound a variable part select).
+    logic   [255:0]         w_data_256;
+    logic   [511:0]         w_data_512;
+    logic   [DATA_WD-1:0]   w_data_1024, w_data;
+    logic   [31:0]          w_strb_256;
+    logic   [63:0]          w_strb_512;
+    logic   [STRB_WD-1:0]   w_strb_1024, w_strb;
     logic   [15:0]          w_flex;
     logic   [9:0]           w_rid;
     logic   [EXT_WD-1:0]    w_ext;
     localparam  DATA_B0 = IS_READ ? 5 : 3;      // first data byte of the message
 
-    always_comb begin
-        w_data_256  = '0;
-        w_data_512  = '0;
-        w_data_1024 = '0;
-        w_strb_256  = '0;
-        w_strb_512  = '0;
-        w_strb_1024 = '0;
-        for (int i = 0; i < 32; i++)   w_data_256[8*i +: 8]  = w_msg_b[DATA_B0 + 31 - i];
-        for (int i = 0; i < 64; i++)   w_data_512[8*i +: 8]  = w_msg_b[DATA_B0 + 63 - i];
-        for (int i = 0; i < 128; i++)  w_data_1024[8*i +: 8] = w_msg_b[DATA_B0 + 127 - i];
-        for (int i = 0; i < 4; i++)    w_strb_256[8*i +: 8]  = w_msg_b[3 + 32 + 3 - i];
-        for (int i = 0; i < 8; i++)    w_strb_512[8*i +: 8]  = w_msg_b[3 + 64 + 7 - i];
-        for (int i = 0; i < 16; i++)   w_strb_1024[8*i +: 8] = w_msg_b[3 + 128 + 15 - i];
+    assign w_data_256  = {<<8{w_msg_b[DATA_B0 +: 32]}};
+    assign w_data_512  = {<<8{w_msg_b[DATA_B0 +: 64]}};
+    assign w_data_1024 = {<<8{w_msg_b[DATA_B0 +: 128]}};
+    assign w_strb_256  = {<<8{w_msg_b[3 + 32 +: 4]}};       // WriteData: strobes follow the data
+    assign w_strb_512  = {<<8{w_msg_b[3 + 64 +: 8]}};
+    assign w_strb_1024 = {<<8{w_msg_b[3 + 128 +: 16]}};
 
+    always_comb begin
         // ReadData narrower than the bus is replicated across it so the beat
         // is valid whichever lanes the address selects (as the previous FIFO).
         case (r_rd_dlen)
-            2'd2:    begin w_data = w_data_1024; w_strb = w_strb_1024; end
-            2'd1:    begin w_data = IS_READ ? {2{w_data_512[511:0]}} : w_data_512;  w_strb = w_strb_512;  end
-            default: begin w_data = IS_READ ? {4{w_data_256[255:0]}} : w_data_256;  w_strb = w_strb_256;  end
+            2'd2:    begin
+                w_data = w_data_1024;
+                w_strb = w_strb_1024;
+            end
+            2'd1:    begin
+                w_data = IS_READ ? {2{w_data_512}} : {{(DATA_WD-512){1'b0}}, w_data_512};
+                w_strb = {{(STRB_WD-64){1'b0}}, w_strb_512};
+            end
+            default: begin
+                w_data = IS_READ ? {4{w_data_256}} : {{(DATA_WD-256){1'b0}}, w_data_256};
+                w_strb = {{(STRB_WD-32){1'b0}}, w_strb_256};
+            end
         endcase
         if (r_rd_wdataf) begin
             w_strb = (r_rd_dlen == 2'd2) ? {STRB_WD{1'b1}} :
