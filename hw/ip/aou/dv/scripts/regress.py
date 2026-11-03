@@ -578,6 +578,9 @@ def summary(args, units, notes, state, regdir):
     # The plan's status page for this regression (the plan carries no hand-kept status).
     ps = os.path.join(regdir, "plan_status.md")
     try:
+        if not counted:
+            # No --build at all would mean every build, stale runs included.
+            raise OSError("no build's results counted")
         subprocess.run([sys.executable, os.path.join(UVM_ROOT, "scripts", "plan_status.py"),
                         "--out-dir", args.out_root, "--rid", args.rid, "-o", ps]
                        # The builds the summary counts, so both reports use the same runs.
