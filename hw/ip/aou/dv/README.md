@@ -605,7 +605,8 @@ count is the number; the simulators' covergroup scores are not used.
 With `COV=1` each run writes `<run>/fc.json`: every group, coverpoint and
 cross, every declared bin with its hit count (zero-hit bins included, so holes
 show), the samples that fell outside every bin, and `spec` and `plan_ids`
-fields. A bin's `spec` names the AoU revision it needs (`v0.8`) and an illegal
+fields. A bin's `spec` is a tag: the spec revision it needs (`v0.8`, or
+`v0.9draft` for a draft rule) or a stimulus note (`rare`). An illegal
 bin carries `"illegal": true`; ignored bins are not written; `plan_ids` is
 empty for now. Without
 `COV=1` nothing is written: the AXI4 monitors exist only in COV builds, so a
@@ -618,9 +619,11 @@ groups `axi4.<interface>.<covergroup>`) into `out/<build>/merged/fc/`:
 bin no passing run hit), `index.html` (the same, self-contained) and
 `fc_merged.json`. It prints the merged/excluded run counts like `cov_report`.
 A group's percentage is its hit bins over all its bins, crosses included.
-Bins tagged `v0.8` stay in every count; the summary adds a column and a total
-for them, and `holes.txt` marks them `[v0.8]`. Illegal bins are not counted,
-and any that a passing run hit are listed.
+Bins tagged with a spec revision (`v0.8`, `v0.9draft`) are left out of every
+total and percentage until the DUT targets that revision; the summary gives
+them their own column and total, and `holes.txt` marks them (`[v0.8]`).
+`rare` bins stay in the totals and get a column too. Illegal bins are not
+counted, and any that a passing run hit are listed.
 The closure target is 100% and there are no waivers: an unreachable bin stays
 a hole until the user agrees to waive it. Closure is measured on the union of
 every configuration; the plan, its status and the owner's decisions are in

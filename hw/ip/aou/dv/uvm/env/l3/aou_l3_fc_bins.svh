@@ -81,8 +81,10 @@
 // half-flit Misc check (AOU-R7) reports it.
 `define AOU_L3_FC_MISC(B) `B``_VALS(n, 0, 2) `B``_ILL(over, 3, 24, "")
 // A flit that starts an Activation message, by what shares it (cg_act_flit;
-// aou_l3_cov::act_layout()). 4.4 (v0.9 draft) permits one CrdtGrant beside an
-// ActivateReq/Ack and responses beside a DeactivateReq; anything else is
+// aou_l3_cov::act_layout()). AoU v0.8 4.4 puts an Activation message alone in
+// its flit. The v0.9 draft of 4.4 permits one CrdtGrant beside an
+// ActivateReq/Ack and responses beside a DeactivateReq, so those layouts carry
+// the tag "v0.9draft" and stay out of the headline figure; anything else is
 // AOU-R6, so it is no coverage goal. The DUT sends its initial CrdtGrant in
 // its ActivateAck's flit every time, so its Ack is never alone and its
 // ActivateReq never carries the grant (rx). Our ActivateReq carries it only
@@ -91,8 +93,11 @@
   `B``_BIN(req_alone, 0, 0) `B``_BIN(req_grant, 1, 1) \
   `B``_BIN(ack_alone, 2, 2) `B``_BIN(ack_grant, 3, 3) \
   `B``_BIN(dreq_alone, 4, 4) `B``_BIN(dreq_rsp, 5, 5) `B``_BIN(dack_alone, 6, 6) \
-  `B``_IGN(forbidden, 7, 7)
-`define AOU_L3_FC_X_ACT_FLIT(B) `B``_XIGN("ack_alone,rx") `B``_XIGN("req_grant,rx")
+  `B``_IGN(forbidden, 7, 7) \
+  `B``_TAG("req_grant|ack_grant|dreq_rsp", "v0.9draft")
+`define AOU_L3_FC_X_ACT_FLIT(B) \
+  `B``_XIGN("ack_alone,rx") `B``_XIGN("req_grant,rx") \
+  `B``_TAG("req_grant|ack_grant|dreq_rsp,*", "v0.9draft")
 `define AOU_L3_FC_CARRY(B) \
   `B``_BIN(none, 0, 0) `B``_BIN(short_carry, 1, 11) `B``_BIN(long_carry, 12, 30)
 `define AOU_L3_FC_CREDIT_ONLY(B) `B``_BIN(no, 0, 0) `B``_BIN(yes, 1, 1)
