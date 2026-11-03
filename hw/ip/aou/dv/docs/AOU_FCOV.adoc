@@ -16,7 +16,7 @@ passing run, so the checkers looked at it.
 
 The model has 31 testbench covergroups and a generic AXI4 monitor bound to
 every S and M port. The full regression of this coverage model (11
-configurations, VCS, 5559 passing T1 runs merged) hit 4447 of the 4479
+configurations, VCS, 5566 passing T1 runs merged) hit 4447 of the 4479
 headline bins (99.3%):
 
 [cols="3,1,1",options="header"]
