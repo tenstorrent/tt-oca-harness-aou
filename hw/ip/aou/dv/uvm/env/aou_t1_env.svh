@@ -260,6 +260,7 @@ class aou_t1_env extends uvm_env;
       rx_fifo_chk.model = l3.model;
       rx_fifo_chk.status = status;
       rx_fifo_chk.rm = regs.model;
+      rx_fifo_chk.dbg = dbg_chk;
       l3.ap_rx_msg.connect(rx_fifo_chk.dut_imp);
     end
     sw_isr.status = status;
