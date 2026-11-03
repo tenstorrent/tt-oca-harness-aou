@@ -166,8 +166,7 @@ import packet_def_pkg::*;
         st_write_req_packet_tmp t;
         logic [63:0] addr;
         t = gr;
-        for (int i = 0; i < 8; i++)
-            addr[(i+1)*8-1 -: 8] = t.awaddr[i];
+        addr = {<<8{t.awaddr}};     // awaddr[0] (the message's first address byte) is AxADDR[7:0]
         f_req_sdata = { {t.awid_1, t.awid_0}, addr, t.awlen, t.awsize, t.awlock, t.awcache, t.awprot, t.awqos,
                         {t.flex_hi, t.flex_lo} };
     endfunction
