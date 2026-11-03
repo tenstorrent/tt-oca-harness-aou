@@ -76,7 +76,10 @@ class aou_axi_monitor extends uvm_monitor;
     x_txn: cross cp_dir, cp_size, cp_len, cp_align;
   endgroup
 
-  // #64: B presented zero cycles after the AW/W handshakes; R likewise after AR.
+  // #64: a response at the minimum legal latency. zero_cycle is B's BVALID
+  // rising in the first cycle after the later of the AW and W handshakes, or
+  // the first R beat in the first cycle after AR: no idle cycle between. A
+  // response in the handshake's own cycle would be illegal AXI.
   covergroup zero_cg;
     cp_dir: coverpoint cv_is_rd {
       `AOU_AXI_FC_DIR(AOU_FC_CG)

@@ -44,13 +44,11 @@ harness pattern.
 
 - **`expected_fail.yaml` versus `expect_fail`.** The bench's grader
   (`check_run.py` with `expected_fail.yaml`) is the verdict in both flows:
-  `judge_run.py` applies it to the harness's leaf logs. The testlists also
-  carry the harness's `expect_fail`/`expect_fail_match` keys for the entries
-  whose expected failure is deterministic across seeds and configurations, so
-  the harness's own grading agrees with the bench's on those; the entries that
-  are per-config, `seed_dependent` or `requires:` conditional have no
-  `expect_fail` and show as FAIL to the harness until the schema can express
-  them. XPASS has no harness equivalent.
+  `judge_run.py` applies it to the harness's leaf logs. No testlist entry
+  carries the harness's `expect_fail`/`expect_fail_match` keys, so the
+  harness's own grading shows a known failure as FAIL until it uses the bench's
+  grader; per-config, `seed_dependent` and `requires:` entries have no
+  `expect_fail` equivalent in its schema. XPASS has no harness equivalent.
 - **Blocked scenarios.** The plan said `module = { uvm = false }` for
   scenarios that cannot run yet; the runner rejects that key, so blocked
   scenarios carry the `blocked` tag and their reason in
@@ -170,9 +168,6 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   pattern. Each needs a wording decision by the owner or an allowed-context
   entry in the binding; none is a leak of site or licensed material
   (`check_public.py` is clean).
-- **`fc.json` plan items.** The functional coverage report's `plan_ids` field
-  is empty: the covergroups are not yet tied to plan items. The VPLAN-to-FCOV
-  table in `docs/AOU_FCOV.adoc` is the hand-maintained mapping meanwhile.
 - **Baseline scope.** The pre-migration baseline the parity check compares
   against is every testlist on every VCS target, the register bench and the
   assertion targets on VCS, the escape suite on VCS (since retired), and the short lists

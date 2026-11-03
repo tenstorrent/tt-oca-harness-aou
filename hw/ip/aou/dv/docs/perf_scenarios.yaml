@@ -7,7 +7,7 @@
 # remote delay, the FDI always ready and full-rate issue on every side that
 # takes part. All values are strings (scripts/listyaml.py).
 #
-#   scenario     S1..S6 (see the perf targets plan)
+#   scenario     S1..S6 (README "Performance targets"; the plan's Performance area)
 #   window       window name, the perf.txt / perf.json prefix
 #   traffic_dir  l2r (local managers only), r2l (remote die only) or both
 #   wr_pct       write share of the transactions, 0..100
@@ -277,7 +277,7 @@
   wr_pct: 50
   beats: 16
   widest_pct: 0
-  configs: [4x512-sp64, 4xmix4211-sp128, 2xmix-tp64_128, 3x512-sp64]
+  configs: [4x512-sp64, 4xmix4211-sp128, 2xmix-tp64_128, 3x512-sp64, 2xmix41-sp128]
   plan_ids: [10.13]
 
 - scenario: S5
@@ -286,7 +286,7 @@
   wr_pct: 50
   beats: 16
   widest_pct: 50
-  configs: [4x512-sp64, 4xmix4211-sp128, 2xmix-tp64_128, 3x512-sp64]
+  configs: [4x512-sp64, 4xmix4211-sp128, 2xmix-tp64_128, 3x512-sp64, 2xmix41-sp128]
   plan_ids: [10.13]
 
 - scenario: S5
@@ -295,7 +295,7 @@
   wr_pct: 50
   beats: 16
   widest_pct: 100
-  configs: [4x512-sp64, 4xmix4211-sp128, 2xmix-tp64_128, 3x512-sp64]
+  configs: [4x512-sp64, 4xmix4211-sp128, 2xmix-tp64_128, 3x512-sp64, 2xmix41-sp128]
   plan_ids: [10.13]
 
 # S6 tiles (optional): fixed sizes, 16-byte aligned.

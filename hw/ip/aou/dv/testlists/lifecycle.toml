@@ -3,9 +3,9 @@
 
 schema_version = 1
 
-# Reset, low-power and link events (stream G).
+# Reset, low-power and link events.
 #
-# Reset, low-power and link-event tests (TB=t1); format as in link.yaml.
+# Reset, low-power and link-event tests (TB=t1); format as in link.toml.
 #
 # Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
 # every list all.toml includes; a name carries the plusargs, target or area only
@@ -179,7 +179,7 @@ tags = ["lifecycle"]
 run_modes = ["lifecycle"]
 
 # PCLK:CLK ratios through the asynchronous APB bridge (plan 11.17), as in
-# registers.yaml: +pclk_ps=40000 (slow), 600 (fast) and 1013 (near-equal); the
+# registers.toml: +pclk_ps=40000 (slow), 600 (fast) and 1013 (near-equal); the
 # software paths that use APB most (interrupt W1C, activation by APB, AOU_SW_RESET,
 # the debug FIFO, I_PRESETN alone during traffic).
 [[tests]]

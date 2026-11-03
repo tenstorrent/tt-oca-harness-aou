@@ -3,10 +3,10 @@
 
 schema_version = 1
 
-# Error and interrupt registers (stream G).
+# Error and interrupt registers.
 #
 # AXI error responses, the response error debug FIFO, ID mismatch, credit
-# violations and interrupts (plan 2.9, 2.19; TB=t1). Format as in link.yaml.
+# violations and interrupts (plan items 9.x, 19.x; TB=t1). Format as in link.toml.
 #
 # Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
 # every list all.toml includes; a name carries the plusargs, target or area only

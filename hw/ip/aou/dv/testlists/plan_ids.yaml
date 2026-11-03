@@ -445,6 +445,7 @@ plan_ids:
   aou_perf_test.perf_scn-S1.3x512-sp64: '10.1,10.2,10.3,10.6,10.8'
   aou_perf_test.perf_scn-S1.4xmix4211-sp128: '10.1,10.2,10.3,10.6,10.8,18.3'
   aou_perf_test.perf_scn-S1.4xmix2144-sp64: '10.1,10.2,10.3,10.6,10.8'
+  aou_perf_test.perf_scn-S1.2xmix41-sp128: '10.1,10.2,10.3,10.6,10.8'
   aou_perf_test.perf_scn-S1.1x256-sp32: '10.1,10.2,10.3,10.6,10.8,18.1'
   aou_perf_test.perf_scn-S1.active_phy-0.2xmix-tp64_128: '10.1,10.2,10.3,10.6,10.8,18.5'
   aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128: '10.1,10.2,10.3,10.6,10.8'
@@ -460,6 +461,7 @@ plan_ids:
   aou_perf_test.perf_scn-S4.active_phy-1: '10.12'
   aou_perf_test.perf_scn-S5.4x512-sp64: '10.13'
   aou_perf_test.perf_scn-S5.4xmix4211-sp128: '10.13'
+  aou_perf_test.perf_scn-S5.2xmix41-sp128: '10.13'
   aou_perf_test.perf_scn-S5.active_phy-0: '10.13'
   aou_perf_test.perf_scn-S5.active_phy-1: '10.13'
   aou_perf_test.perf_scn-S5.3x512-sp64: '10.13'
@@ -506,6 +508,6 @@ plan_ids:
   aou_reg_access_test.pclk_ps-1013: '11.17'
 
 blocked:
-  aou_perf_test.perf_scn-S4: 'narrow-AxSIZE bursts (128/256 beats): WriteData size vs DLENGTH (spec reading or DUT/bench deviation) and a ReadData256 pack-rate cap are under triage'
-  aou_perf_test.perf_scn-S4.active_phy-0: 'narrow-AxSIZE bursts (128/256 beats): WriteData size vs DLENGTH (spec reading or DUT/bench deviation) and a ReadData256 pack-rate cap are under triage'
-  aou_perf_test.perf_scn-S4.active_phy-1: 'narrow-AxSIZE bursts (128/256 beats): WriteData size vs DLENGTH (spec reading or DUT/bench deviation) and a ReadData256 pack-rate cap are under triage'
+  aou_perf_test.perf_scn-S4: 'burst-length sweep held back until the fix for the TX pack rate (#131) lands; it joins the regression then'
+  aou_perf_test.perf_scn-S4.active_phy-0: 'burst-length sweep held back until the fix for the TX pack rate (#131) lands; it joins the regression then'
+  aou_perf_test.perf_scn-S4.active_phy-1: 'burst-length sweep held back until the fix for the TX pack rate (#131) lands; it joins the regression then'

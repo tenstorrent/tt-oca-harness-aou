@@ -29,12 +29,13 @@
 // keeps working, or that it ends in a reported error (LinkReset or interrupt)
 // followed by the documented recovery; no hang, no silent corruption or
 // misdelivery, no unreported divergence from the peer (the scoreboard and the
-// remote die's own checks still judge that). The bins tell which the DUT does:
-// flagged_on_arrival (INT_REQ_LINKRESET or INT_FDI_LINK_DOWN rises while the
+// remote die's own checks still judge that). The endings it tells apart, which
+// the log names and the one bin counts together:
+// flagged on arrival (INT_REQ_LINKRESET or INT_FDI_LINK_DOWN rises while the
 // remote die is still ENABLED, the detect option of AoU v0.8 8.3.3),
-// error_at_deact (it rises during the next deactivation, or within
-// REACT_CYCLES of its end: the remote die DISABLED with nothing left to send),
-// ignored (neither). The window closes there, so a later error the test
+// error at the next deactivation (it rises during the next deactivation, or
+// within REACT_CYCLES of its end: the remote die DISABLED with nothing left to
+// send), ignored (neither). The window closes there, so a later error the test
 // provokes is not counted; a reset before then, or a LinkReset cause masked,
 // records nothing. Cost: a few comparisons per cycle while a window is open.
 typedef class aou_t1_l1_pump_seq;
@@ -186,8 +187,8 @@ class aou_t1_status extends uvm_component;
            (pump == null || !pump.busy);
   endfunction
 
-  // cg_stray_dack outcome (AOU_T1_STRAY_FC_OUTCOME): 0 ignored,
-  // 1 flagged_on_arrival, 2 error_at_deact.
+  // outcome: 0 ignored, 1 flagged on arrival, 2 error at the next deactivation;
+  // cg_stray_dack counts any of them (AOU_T1_STRAY_FC_OUTCOME).
   protected function void judge_stray(int unsigned outcome);
     string nm[3] = '{"ignored", "flagged on arrival", "error at the next deactivation"};
     stray_open = 1'b0;

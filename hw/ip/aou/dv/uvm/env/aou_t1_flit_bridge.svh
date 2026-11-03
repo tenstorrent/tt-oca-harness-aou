@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // L1 -> L3: every flit the DUT sent (L1 monitor ap_tx, after cancel rollback)
-// becomes an aou_l3_flit_item by a byte copy (docs/ARCHITECTURE.md, "L1 <-> L3").
+// becomes an aou_l3_flit_item by a byte copy (docs/AOU_TB_ARCH.adoc, "L1 <-> L3").
 class aou_t1_flit_bridge extends uvm_component;
   `uvm_component_utils(aou_t1_flit_bridge)
 
