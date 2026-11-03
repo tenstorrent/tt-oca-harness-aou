@@ -329,6 +329,16 @@ class PlanStatus(unittest.TestCase):
         self.assertIn("1 XFAIL on 4x512-sp64 (#131)", row)
         self.assertEqual(self.statuses("--rid", "r2")["1.1"], "not covered")
 
+    def test_rid_is_whole_and_builds_filter(self):
+        with open(self.rl, "a") as fh:
+            fh.write('[[tests]]\nname = "t_k"\n')
+        with open(self.pids, "a") as fh:
+            fh.write("plan_ids:\n  t_k: '1.10'\n")
+        make_run(self.out, "vcs-t1-1x512-sp64", "t_k", "", "PASS: log\n", rid="r2.b")
+        self.assertEqual(self.statuses("--rid", "r2")["1.10"], "not covered")
+        self.assertEqual(self.statuses("--rid", "r2.b")["1.10"], "covered")
+        self.assertEqual(self.statuses("--rid", "r2.b", "--build", "vcs-t1-4x512-sp64")["1.10"], "not covered")
+
     def test_judge(self):
         log = "UVM_INFO x\n--- UVM Report Summary ---\n"
         make_run(self.out, "vcs-t1-1x512-sp64", "t_norun", "", None, log=log)

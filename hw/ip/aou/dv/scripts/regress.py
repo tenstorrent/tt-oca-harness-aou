@@ -512,7 +512,8 @@ def summary(args, units, notes, state, regdir):
              f"SIM={args.sim}, {len({u.config for u in units if u.config})} configuration(s), "
              f"{len(units)} build(s); results in out/<build>/results_*.rid.{args.rid}.csv", ""]
     lines += [f"- {n}" for n in notes] + ([""] if notes else [])
-    bad, missing, total = [], [], {"runs": 0, "PASS": 0, "XFAIL": 0, "FAIL": 0, "XPASS": 0}
+    bad, missing, counted = [], [], []
+    total = {"runs": 0, "PASS": 0, "XFAIL": 0, "FAIL": 0, "XPASS": 0}
     for bench in BENCHES:
         us = [u for u in units if u.bench == bench]
         if not us:
@@ -532,6 +533,7 @@ def summary(args, units, notes, state, regdir):
                 missing.append(f"{u.build}: {why}")
                 lines.append(f"| {u.build} | - | - | - | - | - |")
                 continue
+            counted.append(u.build)
             c = dict.fromkeys(total, 0)
             for r in rows:
                 base, xpass = verdict(r.get("status"))
@@ -577,7 +579,9 @@ def summary(args, units, notes, state, regdir):
     ps = os.path.join(regdir, "plan_status.md")
     try:
         subprocess.run([sys.executable, os.path.join(UVM_ROOT, "scripts", "plan_status.py"),
-                        "--out-dir", args.out_root, "--rid", args.rid, "-o", ps],
+                        "--out-dir", args.out_root, "--rid", args.rid, "-o", ps]
+                       # The builds the summary counts, so both reports use the same runs.
+                       + [x for b in counted for x in ("--build", b)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         lines += ["## Test-plan status", "", f"- {ps}", ""]
     except (OSError, subprocess.CalledProcessError) as e:

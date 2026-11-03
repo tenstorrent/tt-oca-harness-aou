@@ -159,11 +159,14 @@ def scan_runs(out_dir, entries, args):
         index[(e["test"], e["tb"], e["config"], e["plusargs"])].append(e)
     runs = Counter()
     unmatched = Counter()
-    pattern = f"*.rid.{args.rid}.*" if args.rid else "*.rid.*"
+    # Whole RID only: "a" must not select "a.b" (the same match as passing_runs.scan()).
+    pattern = f"*.rid.{glob.escape(args.rid)}.seed.*" if args.rid else "*.rid.*"
     for run in sorted(glob.glob(os.path.join(out_dir, "*", pattern))):
         if not os.path.isdir(run):
             continue
         build = os.path.basename(os.path.dirname(run))
+        if args.build and build not in args.build:
+            continue
         test = os.path.basename(run).split(".rid.")[0]
         run_sh = os.path.join(run, "run.sh")
         plusargs = run_plusargs(run_sh) if os.path.exists(run_sh) else None
@@ -343,6 +346,8 @@ def main(argv=None):
     ap.add_argument("--out-dir", default=os.path.join(UVM_ROOT, "out"), help="directory holding <build>/ run dirs")
     ap.add_argument("--expected", default=os.path.join(UVM_ROOT, "expected_fail.yaml"))
     ap.add_argument("--rid", help="only the runs of this regression ID (default: every run)")
+    ap.add_argument("--build", action="append",
+                    help="only the runs under out/<BUILD>/ (repeatable; default: every build)")
     ap.add_argument("--judge", action="store_true", help="judge runs that have no verdict.txt from their sim.log")
     ap.add_argument("--settle", type=float, default=10,
                     help="with --judge: a sim.log without a report summary changed within this many minutes "
