@@ -20,9 +20,12 @@ crosses included; a covergroup's own percentage weights each coverpoint and
 cross equally instead, so the two differ.
 
 Ignored bins never reach fc.json. Illegal bins (marked "illegal") are not
-counted; a hit on one is listed. Bins tagged with a spec revision ("spec":
-"v0.8") stay in every count and are also totalled apart, so the holes only a
-v0.8 partner or DUT can close are visible as such.
+counted; a hit on one is listed. A bin's "spec" tag is either a spec revision
+the RTL doesn't implement yet ("v0.8", "v0.9draft": the tag starts with "v"
+and a digit) or a stimulus note ("rare"). Revision-tagged bins are left out of
+every total and percentage and totalled apart, so the headline figure counts
+only what this RTL can reach; they join it when the DUT targets that revision.
+Other tags stay in the totals and are also totalled apart.
 """
 
 import argparse
@@ -31,6 +34,7 @@ import html
 import io
 import json
 import os
+import re
 import sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -100,16 +104,38 @@ class _Stats(dict):
         return self[key]
 
 
+REVISION_RE = re.compile(r"^v\d")
+
+
+def is_revision(tag):
+    """A tag naming a spec revision the RTL doesn't implement yet (v0.8, v0.9draft)."""
+    return bool(tag and REVISION_RE.match(tag))
+
+
 def counted(p):
     """The bins of a point that count: every bin but the illegal ones."""
     return {n: b for n, b in p["bins"].items() if not b.get("illegal")}
 
 
+def headline(p):
+    """The bins of a point the headline counts: counted, and no revision tag."""
+    return {n: b for n, b in counted(p).items() if not is_revision(b.get("spec"))}
+
+
 def tally(points, spec=None):
-    """(hit, total) over the counted bins; with spec, only bins tagged with it."""
+    """(hit, total) over the counted bins. Without spec, the headline: every counted bin
+    but the revision-tagged ones. With spec, only the bins tagged with it."""
     bins = [b for p in points.values() for b in counted(p).values()
-            if spec is None or b.get("spec") == spec]
+            if (not is_revision(b.get("spec")) if spec is None else b.get("spec") == spec)]
     return sum(1 for b in bins if b["hits"]), len(bins)
+
+
+def tag_line(tag, hit, total, th, tt):
+    """One summary line for a tag's bins: apart from the total, or inside it."""
+    if is_revision(tag):
+        return f"{tag}-tagged bins: {hit}/{total} hit; not in the total above"
+    return (f"{tag}-tagged bins: {hit}/{total} hit, counted in the total; without them "
+            f"{th - hit}/{tt - total} ({pct(th - hit, tt - total):.2f}%)")
 
 
 def specs(db):
@@ -175,9 +201,7 @@ def write_summary(fh, db, counts, build):
     w("%-36s %5d/%-6d %7.2f%%%s\n" % ("TOTAL", th, tt, pct(th, tt),
                                      "".join(" %12s" % f"{st[t][0]}/{st[t][1]}" for t in tags)))
     for t in tags:
-        oh, ot = th - st[t][0], tt - st[t][1]
-        w(f"{t}-tagged bins: {st[t][0]}/{st[t][1]} hit; without them {oh}/{ot} "
-          f"({pct(oh, ot):.2f}%)\n")
+        w(tag_line(t, st[t][0], st[t][1], th, tt) + "\n")
     for g, pn, bn, n in illegal_hits(db):
         w(f"ILLEGAL BIN HIT: {g}.{pn} {bn} ({n} hits)\n")
     w("\n")
@@ -186,7 +210,7 @@ def write_summary(fh, db, counts, build):
         hit, total = tally(g["points"])
         w(f"{name}  {hit}/{total} ({pct(hit, total):.2f}%), {g['samples']} samples\n")
         for pname, p in g["points"].items():
-            cb = counted(p)
+            cb = headline(p)
             ph = sum(1 for b in cb.values() if b["hits"])
             out = f", {p['outside']} outside every bin" if p["outside"] else ""
             w("    %-26s %-10s %4d/%-4d %7.2f%%%s\n" % (pname, p["kind"], ph, len(cb),
@@ -258,9 +282,7 @@ def write_html(fh, db, counts, build):
     out.append(f"<p class=meta>Total {th}/{tt} bins ({pct(th, tt):.2f}%)</p>")
     for t in specs(db):
         sh, stt = (sum(x) for x in zip(*(tally(g["points"], t) for g in db["groups"].values())))
-        out.append(f"<p class=meta>{e(t)}-tagged bins (counted above, holes marked "
-                   f"[{e(t)}]): {sh}/{stt} hit; without them {th - sh}/{tt - stt} "
-                   f"({pct(th - sh, tt - stt):.2f}%)</p>")
+        out.append(f"<p class=meta>{e(tag_line(t, sh, stt, th, tt))} (holes marked [{e(t)}])</p>")
     for g, pn, bn, n in illegal_hits(db):
         out.append(f"<p class=meta>Illegal bin hit: {e(g)}.{e(pn)} {e(bn)} ({n})</p>")
     out.append("<div class=wrap><table><tr><th>Group</th><th>Bins hit</th><th>%</th><th></th>"
@@ -272,10 +294,10 @@ def write_html(fh, db, counts, build):
                    f"({pct(hit, total):.2f}%)</summary><div class=wrap><table><tr><th>Point</th>"
                    f"<th>Kind</th><th>Bins hit</th><th>%</th><th>Outside</th><th>Holes</th></tr>")
         for pn, p in g["points"].items():
-            cb = counted(p)
+            cb = headline(p)
             ph = sum(1 for b in cb.values() if b["hits"])
             holes = " ".join(bn + (f" [{b['spec']}]" if b.get("spec") else "")
-                             for bn, b in cb.items() if not b["hits"])
+                             for bn, b in counted(p).items() if not b["hits"])
             out.append(f"<tr><td>{e(pn)}</td><td>{p['kind']}</td><td class=n>{ph}/"
                        f"{len(cb)}</td><td class=n>{pct(ph, len(cb)):.1f}%</td>"
                        f"<td class=n>{p['outside']}</td><td class=holes>{e(holes)}</td></tr>")

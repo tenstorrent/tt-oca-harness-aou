@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// The only AXI type the scoreboard, sequences and tests see (docs/ARCHITECTURE.md).
+// The only AXI type the scoreboard, sequences and tests see (docs/AOU_TB_ARCH.adoc).
 // data[]/strb[] hold one entry per beat with bus-aligned byte lanes: byte lane L
 // of beat i is data[i][8*L +: 8] and belongs to address beat_base(i) + L.
 class aou_axi_txn extends uvm_sequence_item;

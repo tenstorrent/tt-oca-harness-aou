@@ -29,6 +29,7 @@ class aou_t1_rx_fifo_chk extends uvm_component;
   aou_l3_model   model;
   aou_t1_status  status;
   aou_core       rm;
+  aou_t1_dbg_fifo_chk dbg;                     // debug-window accesses answered (optional)
   int unsigned   slack = 8;                    // messages per RP and class
   int unsigned   tov_slack = 8;                // cycles
 
@@ -36,6 +37,7 @@ class aou_t1_rx_fifo_chk extends uvm_component;
   protected int unsigned     hs[AOU_RP_MAX][2];      // M-port AW, AR handshakes
   protected int unsigned     answered[AOU_RP_MAX][2]; // WriteResp, last ReadData the DUT sent
   protected int unsigned     base[AOU_RP_MAX][2];    // remote granules sent at the last flush
+  protected int unsigned     dbg_base[AOU_RP_MAX][2]; // debug-window answers at the last flush
   protected bit              flagged[AOU_RP_MAX][2];
   protected bit              crd_off;
   protected bit              req_seen;
@@ -47,14 +49,20 @@ class aou_t1_rx_fifo_chk extends uvm_component;
   endfunction
 
   // Requests the remote die sent on RP r (k: 0 WriteReq, 1 ReadReq) whose AW/AR
-  // has not been taken on the M port yet. A request the DUT answered has left
-  // the FIFO even without an M-port handshake (the debug FIFO window answers
-  // inside the DUT).
+  // has not been taken on the M port yet. A request leaves the FIFO either at
+  // its M-port handshake or, for a debug-window access, when the window
+  // answers it inside the DUT; the two add up. A request the DUT answered has
+  // left the FIFO in any case, which covers answers the DUT makes up itself.
   function int unsigned waiting(int unsigned r, int unsigned k);
     aou_cred_class_e c = k == 0 ? AOU_CC_WREQ : AOU_CC_RREQ;
     int unsigned sent = (model.crd.tx_consumed[r][c] - base[r][k]) / 3;
-    int unsigned gone = (answered[r][k] > hs[r][k]) ? answered[r][k] : hs[r][k];
+    int unsigned gone = hs[r][k] + dbg_answered(r, k);
+    if (answered[r][k] > gone) gone = answered[r][k];
     return (sent > gone) ? sent - gone : 0;
+  endfunction
+
+  function int unsigned dbg_answered(int unsigned r, int unsigned k);
+    return (dbg == null) ? 0 : dbg.dbg_done[r][k] - dbg_base[r][k];
   endfunction
 
   function void reset_flush();
@@ -63,6 +71,7 @@ class aou_t1_rx_fifo_chk extends uvm_component;
       hs[r][k] = 0;
       answered[r][k] = 0;
       base[r][k] = model.crd.tx_consumed[r][c];
+      dbg_base[r][k] = (dbg == null) ? 0 : dbg.dbg_done[r][k];
       flagged[r][k] = 1'b0;
     end
     req_seen = 1'b0;

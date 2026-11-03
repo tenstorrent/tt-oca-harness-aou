@@ -4,6 +4,12 @@
 // Bins tables of aou_lsm_cov's covergroups (aou_fc_macros.svh), shared by the
 // covergroups and the service. A transition is prev * 16 + cur.
 `define AOU_LSM_FC_TR(B, n, a, b) `B``_BIN(n, int'(a) * 16 + int'(b), int'(a) * 16 + int'(b))
+// A transition that is no target. Active straight to Reset is one: the UCIe
+// r1.1 Adapter state diagram (8.3.3, Figure 8-17) reaches Reset from
+// LinkReset, Disabled or LinkError, never directly from Active. Only a hard
+// reset without warning while Active gets there; that is no normal scenario to
+// cover, and resets in traffic stay covered through LinkReset and Disabled.
+`define AOU_LSM_FC_TR_IGN(B, n, a, b) `B``_IGN(n, int'(a) * 16 + int'(b), int'(a) * 16 + int'(b))
 `define AOU_LSM_FC_LINK_TR(B) \
   `AOU_LSM_FC_TR(B, reset_active, LSM_RESET, LSM_ACTIVE) \
   `AOU_LSM_FC_TR(B, active_retrain, LSM_ACTIVE, LSM_RETRAIN) \
@@ -13,7 +19,7 @@
   `AOU_LSM_FC_TR(B, linkerror_reset, LSM_LINKERROR, LSM_RESET) \
   `AOU_LSM_FC_TR(B, active_l1, LSM_ACTIVE, LSM_L1) \
   `AOU_LSM_FC_TR(B, l1_retrain, LSM_L1, LSM_RETRAIN) \
-  `AOU_LSM_FC_TR(B, active_reset, LSM_ACTIVE, LSM_RESET) \
+  `AOU_LSM_FC_TR_IGN(B, active_reset, LSM_ACTIVE, LSM_RESET) \
   `AOU_LSM_FC_TR(B, active_linkreset, LSM_ACTIVE, LSM_LINKRESET) \
   `AOU_LSM_FC_TR(B, linkreset_reset, LSM_LINKRESET, LSM_RESET) \
   `AOU_LSM_FC_TR(B, active_disabled, LSM_ACTIVE, LSM_DISABLED) \
@@ -59,7 +65,7 @@
   `AOU_LSM_FC_TR(B, active_linkerror, BRG_ACTIVE, BRG_LINKERROR) \
   `AOU_LSM_FC_TR(B, active_retrain, BRG_ACTIVE, BRG_RETRAIN) \
   `AOU_LSM_FC_TR(B, active_l1, BRG_ACTIVE, BRG_L1) \
-  `AOU_LSM_FC_TR(B, active_reset, BRG_ACTIVE, BRG_RESET) \
+  `AOU_LSM_FC_TR_IGN(B, active_reset, BRG_ACTIVE, BRG_RESET) \
   `AOU_LSM_FC_TR(B, linkerror_reset, BRG_LINKERROR, BRG_RESET) \
   `AOU_LSM_FC_TR(B, retrain_active, BRG_RETRAIN, BRG_ACTIVE) \
   `AOU_LSM_FC_TR(B, retrain_linkerr, BRG_RETRAIN, BRG_LINKERROR) \

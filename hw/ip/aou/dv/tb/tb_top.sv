@@ -9,7 +9,7 @@
 // two-PHY FDI configurations, and
 // AOU_RX_FIFO_ALT for non-default RX FIFO depths with the register slices off
 // (aou_t1_env_pkg::AOU_T1_RX_DEPTH). Every interface is registered in
-// uvm_config_db under scope "*" (docs/ARCHITECTURE.md) by the SV-UVM harness
+// uvm_config_db under scope "*" (docs/AOU_TB_ARCH.adoc) by the SV-UVM harness
 // block at the end (`ifdef UVM), which also compiles the test classes
 // (uvm/tests/aou_tests.sv) and calls run_test().
 

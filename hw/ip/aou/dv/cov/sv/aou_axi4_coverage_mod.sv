@@ -403,7 +403,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 1: Write Address channel (AW)
   //==========================================================================
-  covergroup cg_aw_channel @(posedge clk);
+  covergroup cg_aw @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_aw_channel"};
 
@@ -481,7 +481,7 @@ module aou_axi4_coverage_mod #(
     // Legal field combinations (burst is INCR-only, so size x len is the
     // interesting payload-shape cross).
     // A burst of more than 4KB can't avoid crossing a 4KB boundary (A3.4.1).
-    cx_aw_size_x_len:   cross cp_aw_size, cp_aw_len {
+    cx_size_x_len:   cross cp_aw_size, cp_aw_len {
       ignore_bins over_4k =
           (binsof(cp_aw_size) intersect {7} &&
            (binsof(cp_aw_len.beat_64) || binsof(cp_aw_len.beat_128) || binsof(cp_aw_len.beat_256))) ||
@@ -489,7 +489,7 @@ module aou_axi4_coverage_mod #(
            (binsof(cp_aw_len.beat_128) || binsof(cp_aw_len.beat_256))) ||
           (binsof(cp_aw_size) intersect {5} && binsof(cp_aw_len.beat_256));
     }
-    cx_aw_size_x_align: cross cp_aw_size, cp_aw_addr_align {
+    cx_size_x_align: cross cp_aw_size, cp_aw_addr_align {
       // 1-byte size is never unaligned; full-bus size is never size-aligned-only.
       ignore_bins sz_min_unaligned = binsof(cp_aw_size) intersect {0} && binsof(cp_aw_addr_align.unaligned);
       ignore_bins sz_max_sizeonly  = binsof(cp_aw_size) intersect {MAX_SIZE_CODE} && binsof(cp_aw_addr_align.size_aligned);
@@ -499,7 +499,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 2: Read Address channel (AR)
   //==========================================================================
-  covergroup cg_ar_channel @(posedge clk);
+  covergroup cg_ar @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_ar_channel"};
 
@@ -573,7 +573,7 @@ module aou_axi4_coverage_mod #(
     }
 
     // A burst of more than 4KB can't avoid crossing a 4KB boundary (A3.4.1).
-    cx_ar_size_x_len:   cross cp_ar_size, cp_ar_len {
+    cx_size_x_len:   cross cp_ar_size, cp_ar_len {
       ignore_bins over_4k =
           (binsof(cp_ar_size) intersect {7} &&
            (binsof(cp_ar_len.beat_64) || binsof(cp_ar_len.beat_128) || binsof(cp_ar_len.beat_256))) ||
@@ -581,7 +581,7 @@ module aou_axi4_coverage_mod #(
            (binsof(cp_ar_len.beat_128) || binsof(cp_ar_len.beat_256))) ||
           (binsof(cp_ar_size) intersect {5} && binsof(cp_ar_len.beat_256));
     }
-    cx_ar_size_x_align: cross cp_ar_size, cp_ar_addr_align {
+    cx_size_x_align: cross cp_ar_size, cp_ar_addr_align {
       // 1-byte size is never unaligned; full-bus size is never size-aligned-only.
       ignore_bins sz_min_unaligned = binsof(cp_ar_size) intersect {0} && binsof(cp_ar_addr_align.unaligned);
       ignore_bins sz_max_sizeonly  = binsof(cp_ar_size) intersect {MAX_SIZE_CODE} && binsof(cp_ar_addr_align.size_aligned);
@@ -591,7 +591,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 3: Write Data channel (W) - WSTRB incl. unaligned first beat
   //==========================================================================
-  covergroup cg_w_channel @(posedge clk);
+  covergroup cg_w @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_w_channel"};
 
@@ -621,7 +621,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 4: Read Data channel (R)
   //==========================================================================
-  covergroup cg_r_channel @(posedge clk);
+  covergroup cg_r @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_r_channel"};
 
@@ -641,7 +641,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 5: Write Response channel (B)
   //==========================================================================
-  covergroup cg_b_channel @(posedge clk);
+  covergroup cg_b @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_b_channel"};
 
@@ -667,7 +667,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 7: Outstanding transactions (up to MAX_OUTSTANDING)
   //==========================================================================
-  covergroup cg_outstanding @(posedge clk);
+  covergroup cg_os @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_outstanding"};
 
@@ -691,7 +691,7 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup 8: Backpressure - response-channel stall run-length buckets
   //==========================================================================
-  covergroup cg_backpressure @(posedge clk);
+  covergroup cg_bp @(posedge clk);
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_backpressure"};
 
@@ -723,14 +723,14 @@ module aou_axi4_coverage_mod #(
   //==========================================================================
   // Covergroup instantiation
   //==========================================================================
-  cg_aw_channel   cg_aw_channel_i   = new();
-  cg_ar_channel   cg_ar_channel_i   = new();
-  cg_w_channel    cg_w_channel_i    = new();
-  cg_r_channel    cg_r_channel_i    = new();
-  cg_b_channel    cg_b_channel_i    = new();
-  cg_cmd          cg_cmd_i          = new();
-  cg_outstanding  cg_outstanding_i  = new();
-  cg_backpressure cg_backpressure_i = new();
+  cg_aw  cg_aw_i  = new();
+  cg_ar  cg_ar_i  = new();
+  cg_w   cg_w_i   = new();
+  cg_r   cg_r_i   = new();
+  cg_b   cg_b_i   = new();
+  cg_cmd cg_cmd_i = new();
+  cg_os  cg_os_i  = new();
+  cg_bp  cg_bp_i  = new();
 
   //==========================================================================
   // Per-bin hit tracking mirrors the covergroups so the text reports can be
@@ -754,14 +754,14 @@ module aou_axi4_coverage_mod #(
     string section;
     real   c_aw, c_ar, c_w, c_r, c_b, c_cmd, c_os, c_bp, c_tot;
 
-    c_aw  = cg_aw_channel_i.get_inst_coverage();
-    c_ar  = cg_ar_channel_i.get_inst_coverage();
-    c_w   = cg_w_channel_i.get_inst_coverage();
-    c_r   = cg_r_channel_i.get_inst_coverage();
-    c_b   = cg_b_channel_i.get_inst_coverage();
+    c_aw  = cg_aw_i.get_inst_coverage();
+    c_ar  = cg_ar_i.get_inst_coverage();
+    c_w   = cg_w_i.get_inst_coverage();
+    c_r   = cg_r_i.get_inst_coverage();
+    c_b   = cg_b_i.get_inst_coverage();
     c_cmd = cg_cmd_i.get_inst_coverage();
-    c_os  = cg_outstanding_i.get_inst_coverage();
-    c_bp  = cg_backpressure_i.get_inst_coverage();
+    c_os  = cg_os_i.get_inst_coverage();
+    c_bp  = cg_bp_i.get_inst_coverage();
     c_tot = (c_aw + c_ar + c_w + c_r + c_b + c_cmd + c_os + c_bp) / 8.0;
 
     section = {

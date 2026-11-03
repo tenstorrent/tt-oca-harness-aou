@@ -48,8 +48,11 @@ jobs:
 
   smoke:
     needs: detect
+    # veryl-lang/setup-verilator downloads a prebuilt Verilator named after the runner's
+    # Ubuntu release, and only 22.04 and 24.04 builds are published; ubuntu-latest is
+    # now 26.04, so pin until a 26.04 build exists.
     name: "Verilator + UVM smoke"
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 150
     steps:
       - name: Skip notice

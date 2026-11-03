@@ -3,7 +3,7 @@
 
 // L3: the remote die's AoU protocol layer (messages, flits, packing,
 // credits, activation) and the AOU_FDI_CHECKER adapter.
-// See docs/ARCHITECTURE.md for the L1 and L4a boundaries.
+// See docs/AOU_TB_ARCH.adoc for the L1 and L4a boundaries.
 `timescale 1ns/1ps
 package aou_l3_pkg;
   import uvm_pkg::*;

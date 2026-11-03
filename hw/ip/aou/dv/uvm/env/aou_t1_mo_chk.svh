@@ -95,7 +95,7 @@ class aou_t1_mo_chk extends uvm_component;
     aou_fc_db db = aou_fc_db::get();
     aou_fc_point p;
     bit fresh;
-    fc_mo = db.group("t1.mo_cg", fresh);
+    fc_mo = db.group("env.cg_mo", fresh);
     if (fresh) begin
       p = fc_mo.cp("cp_dir"); `AOU_T1_MO_FC_DIR(AOU_FC_REG)
       p = fc_mo.cp("cp_occ"); `AOU_T1_MO_FC_OCC(AOU_FC_REG)

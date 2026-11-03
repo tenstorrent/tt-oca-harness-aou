@@ -127,10 +127,14 @@ class aou_l3_unit_gen extends uvm_component;
     rd_sent++;
   endtask
 
+  // May run more than once (one run per activation). Each run reads back its
+  // own writes: the write records accumulate, so its reads start past the
+  // earlier runs' entries.
   task run_traffic();
+    int unsigned first = wr_addr.size();
     for (int unsigned i = 0; i < n_txn; i++) do_write(i);
     while (wr_done < wr_sent) rsp_ev.wait_trigger();
-    for (int unsigned i = 0; i < n_txn; i++) do_read(i);
+    for (int unsigned i = 0; i < n_txn; i++) do_read(first + i);
     while (rd_done < rd_sent) rsp_ev.wait_trigger();
   endtask
 endclass

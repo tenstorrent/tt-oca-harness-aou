@@ -59,6 +59,9 @@ class aou_l3_unit_env_test extends aou_l3_unit_base_test;
   function void build_phase(uvm_phase phase);
     int unsigned n = 16;
     super.build_phase(phase);
+    // AOU_FDI_CHECKER decodes the wire format the DUT implements, v0.7's.
+    if (spec_rev != AOU_SPEC_V07)
+      `uvm_fatal(get_type_name(), "+L3_SPEC=v0.8 runs only without AOU_FDI_CHECKER")
     if (!uvm_config_db#(virtual aou_l3_unit_if)::get(this, "", "l3_unit", uvif))
       `uvm_fatal(get_type_name(), "no aou_l3_unit_if")
     void'($value$plusargs("L3_POLICY=%s", policy));

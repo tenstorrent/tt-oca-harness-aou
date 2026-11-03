@@ -5,11 +5,11 @@ schema_version = 1
 
 # FDI L1/L2 against the DUT: bring-up, link error, link down, link stress.
 #
-# FDI corners under AoU traffic (plan 2.18; TB=t1). The L1 knobs
+# FDI corners under AoU traffic (plan items 18.x; TB=t1). The L1 knobs
 # (aou_t1_env_cfg::l1_plusargs) put stalls and flit cancels where the default
 # stimulus does not (the l1.cg_fdi_stall/cancel/abandon bins show they did); the
 # scoreboard, AOU_FDI_CHECKER and the FDI-R rules judge the DUT. Format as in
-# link.yaml.
+# link.toml.
 # Stall corners (18.22): pl_stallreq mid-flit (lp_stallack only at the flit boundary,
 # FDI-R13), with pl_trdy low before the ack (UCIe r1.1 8.3.2 rule 7), and with TX
 # low-power mode; FDI-R57 bounds the ack.
