@@ -40,9 +40,10 @@
 [cols="2,1,6",options="header"]
 |===
 | Group | Scenarios | Members
-| `l3_unit` | 11 | `aou_l3_codec_test`, `aou_l3_credit_test`, `aou_l3_crossflit_test`, `aou_l3_dest_rp_test`, `aou_l3_inject_test`, `aou_l3_inject_test.L3_INJECT-req_after_dreq`, `aou_l3_inject_test.L3_INJECT-crd_in_disabled`, `aou_l3_late_adv_test`, `aou_l3_link_test`, `aou_l3_loopback_test`, `aou_l3_unit_env_test`
+| `l3_unit` | 13 | `aou_l3_codec_test`, `aou_l3_credit_test`, `aou_l3_crossflit_test`, `aou_l3_dest_rp_test`, `aou_l3_inject_test`, `aou_l3_inject_test.L3_INJECT-req_after_dreq`, `aou_l3_inject_test.L3_INJECT-crd_in_disabled`, `aou_l3_late_adv_test`, `aou_l3_link_test`, `aou_l3_credit_test.L3_SPEC-v0.8`, `aou_l3_crossflit_test.L3_SPEC-v0.8`, `aou_l3_loopback_test`, ... (1 more)
+| `v0p8` | 4 | `aou_l3_codec_test`, `aou_l3_link_test`, `aou_l3_credit_test.L3_SPEC-v0.8`, `aou_l3_crossflit_test.L3_SPEC-v0.8`
 | `smoke` | 1 | `aou_l3_codec_test`
-| `all` | 11 | `aou_l3_codec_test`, `aou_l3_credit_test`, `aou_l3_crossflit_test`, `aou_l3_dest_rp_test`, `aou_l3_inject_test`, `aou_l3_inject_test.L3_INJECT-req_after_dreq`, `aou_l3_inject_test.L3_INJECT-crd_in_disabled`, `aou_l3_late_adv_test`, `aou_l3_link_test`, `aou_l3_loopback_test`, `aou_l3_unit_env_test`
+| `all` | 13 | `aou_l3_codec_test`, `aou_l3_credit_test`, `aou_l3_crossflit_test`, `aou_l3_dest_rp_test`, `aou_l3_inject_test`, `aou_l3_inject_test.L3_INJECT-req_after_dreq`, `aou_l3_inject_test.L3_INJECT-crd_in_disabled`, `aou_l3_late_adv_test`, `aou_l3_link_test`, `aou_l3_credit_test.L3_SPEC-v0.8`, `aou_l3_crossflit_test.L3_SPEC-v0.8`, `aou_l3_loopback_test`, ... (1 more)
 |===
 ==== AXI agent self-test bench (no DUT)
 [cols="2,1,6",options="header"]

@@ -3902,6 +3902,7 @@ returns; RP round robin; and an overflow by the peer is AOU-R16.
 |===
 | Scenario | Arguments | Seeds | Target | Plan items
 | `aou_l3_credit_test` |  | 1 |  | 
+| `aou_l3_credit_test.L3_SPEC-v0.8` | `+L3_SPEC=v0.8` | 1 |  | 
 |===
 
 [[aou-proc-aou_l3_crossflit_test]]
@@ -3924,6 +3925,7 @@ exactly at G47 and a continuation followed by a new message.
 |===
 | Scenario | Arguments | Seeds | Target | Plan items
 | `aou_l3_crossflit_test` |  | 1 |  | 
+| `aou_l3_crossflit_test.L3_SPEC-v0.8` | `+L3_SPEC=v0.8` | 1 |  | 
 |===
 
 [[aou-proc-aou_l3_dest_rp_test]]
