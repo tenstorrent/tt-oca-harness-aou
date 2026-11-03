@@ -6,7 +6,7 @@ schema_version = 1
 # Gate G1b: remote activation, link events, low-power.
 #
 # Gate G1b: the UCIe-only bringup scenarios (Retrain exit, protocol-layer
-# LinkError, every link-down). Format as in g1a.yaml.
+# LinkError, every link-down). Format as in g1a.toml.
 #
 # Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
 # every list all.toml includes; a name carries the plusargs, target or area only
