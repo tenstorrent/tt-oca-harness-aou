@@ -225,9 +225,9 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | CONFIG | RPs | RP widths (bits) | FDI_CONFIG | PHYs | For |
 |---|---|---|---|---|---|
 | `1x512-sp64` (default) | 1 | 512 | FDI_CFG_SP_64B | 1 | The default: one RP, the usual data path |
-| `4x512-sp64` | 4 | 512 each | FDI_CFG_SP_64B | 1 | Multi-RP behaviour (plan 2.12) at one width |
+| `4x512-sp64` | 4 | 512 each | FDI_CFG_SP_64B | 1 | Multi-RP behaviour (plan items 12.x) at one width |
 | `3x512-sp64` | 3 | 512 each | FDI_CFG_SP_64B | 1 | An RP count that is not a power of two |
-| `4xmix4211-sp128` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | Mixed widths, every local width (2.14), 128-byte FDI |
+| `4xmix4211-sp128` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | Mixed widths, every local width (plan items 14.x), 128-byte FDI |
 | `4xmix2144-sp64` | 4 | 512, 256, 1024, 1024 | FDI_CFG_SP_64B | 1 | Mixed widths with RP2 and RP3 at 1024 bits; with `4xmix4211-sp128`, every RP at every local width |
 | `2xmix41-sp128` | 2 | 1024, 256 | FDI_CFG_SP_128B | 1 | A 1024-bit and a 256-bit RP sharing one 128-byte FDI (a common product case) |
 | `1x256-sp32` | 1 | 256 | FDI_CFG_SP_32B | 1 | Narrowest RP and FDI (the RTL's default FDI_CONFIG) |

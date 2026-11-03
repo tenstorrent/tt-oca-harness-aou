@@ -15,17 +15,17 @@ DUT; the always-on checkers do. A hit bin means the situation occurred in a
 passing run, so the checkers looked at it.
 
 The model has 31 testbench covergroups and a generic AXI4 monitor bound to
-every S and M port, 4496 target bins over the 10 regression configurations.
-The last full regression (5062 passing runs), recounted under the current
-targets, hit 4452 of them (99.0%); it predates the four bins of late
-request-direction credit after deactivation, so those count as holes here:
+every S and M port. The full regression of this coverage model (11
+configurations, VCS, 5559 passing T1 runs merged) hit 4447 of the 4479
+headline bins (99.3%):
 
 [cols="3,1,1",options="header"]
 |===
 | Part | Bins hit | %
-| AXI4 port monitors (section 9), the generic AXI view of every port | 2782/2800 | 99.4
-| AoU-specific groups (sections 1-8) | 1670/1696 | 98.5
-| of which tagged `v0.8` (need a v0.8 DUT or partner) | 0/7 | -
+| AXI4 port monitors (section 9), the generic AXI view of every port | 2781/2800 | 99.3
+| AoU-specific groups (sections 1-8) | 1666/1679 | 99.2
+| Apart from the headline: tagged `v0.8` (need a v0.8 DUT or partner) | 0/7 | -
+| Apart from the headline: tagged `v0.9draft` (shared Activation-flit layouts) | 8/8 | -
 |===
 
 `make fc_report` prints the live number for a set of runs; these figures are
@@ -302,8 +302,8 @@ has a bin added yet; each is recorded in the verification plan's road-map
   memory model needs a region without it.
 . *AXI4 port limits.* AXI4 `cg_os` writes "at the limit" is a hole on every
   S port; the early response may be returning B before the limit is reached.
-  `cg_bp` "B stall at the limit" is a hole on every port, and "R stall at the
-  limit" on one S port. Two M ports never saw a 32-beat burst at one AxSIZE
+  `cg_bp` "B stall at the limit" is a hole on every port, "R stall at the
+  limit" on one S port, and a B stall over 1000 cycles on one S port. Two M ports never saw a 32-beat burst at one AxSIZE
   (32 B on one, 64 B on the other), a stimulus gap.
 . *FDI stall latency (DUT).* `cg_fdi_stall` has six holes: a request at a
   flit boundary answered in 3 or more cycles, a mid-flit request answered in

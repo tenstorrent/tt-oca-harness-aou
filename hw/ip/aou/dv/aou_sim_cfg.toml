@@ -235,7 +235,7 @@ defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
 
 [targets.4x512-sp64]
-description = "Multi-RP behaviour (2.12) at one width"
+description = "Multi-RP behaviour (plan items 12.x) at one width"
 build_dir = "hw/ip/aou/dv/build/uvm"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
@@ -247,7 +247,7 @@ defines = ["AOU_RP_COUNT=3", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
 
 [targets.4xmix4211-sp128]
-description = "Mixed widths, every local width (2.14), 128-byte FDI"
+description = "Mixed widths, every local width (plan items 14.x), 128-byte FDI"
 build_dir = "hw/ip/aou/dv/build/uvm"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
            "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=2"]

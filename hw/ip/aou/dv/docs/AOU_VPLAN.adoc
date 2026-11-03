@@ -101,7 +101,7 @@ handful of bench additions, and coverage closure.
 |===
 | Item | What it takes | Depends on
 | TX throughput | Rerun the throughput windows and the full regression on the chosen fix; remove the expected-fail entries it closes | The fix for #131
-| *TODO:* burst-length sweep in the regression | The sweep scenarios exist (`aou_perf_test.perf_scn-S4` on `1x512-sp64` and on both PHYs of `2xmix-tp64_128`) and are tagged `blocked`. Land them in the regression (drop the tag, add them to the groups) once #131's fix is merged; no expected-fail entries | The fix for #131
+| *TODO:* burst-length sweep in the regression | The sweep scenarios exist (`aou_perf_test.perf_scn-S4` on `1x512-sp64` and on both PHYs of `2xmix-tp64_128`) and are tagged `blocked`. Land them in the regression (drop the tag, add them to the groups) once #131's fix is merged; no expected-fail entries. A smoke run of all three also shows remote-to-local read-data errors on 256-beat bursts, not yet triaged | The fix for #131; triage of the read-data errors
 | Deactivation credit windows | A check that holds the DUT to the MAS 7.3.1 credit windows during deactivation; since the combined credit mode was removed, item 2.11 passes because nothing can fail it | none
 | Requests in an ActivateAck's flit | Rerun `aou_act_flit_test` on the fix | The fix for #127
 | WLAST-generator assertions | Rerun the assertion builds | The owners' approach to #132
