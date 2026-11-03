@@ -184,12 +184,10 @@ re-vendored without harness-side work beyond the pin.
 
 | Document | What it covers |
 | --- | --- |
-| [docs/AOU_TB_ARCH.adoc](docs/AOU_TB_ARCH.adoc) | Testbench hierarchy, model ownership, environment components, clock and reset, stimulus, checking and coverage strategies, the SV-UVM realization and its differences from the harness pattern, adding a scenario |
-| [docs/AOU_VPLAN.adoc](docs/AOU_VPLAN.adoc) | Verification strategy, naming rules, scope, the requirement-to-test matrix, the scenario summary and test procedures (generated from the testlists and class headers), regression groups, known limitations |
+| [docs/AOU_TB_ARCH.adoc](docs/AOU_TB_ARCH.adoc) | Testbench hierarchy, model ownership, environment components, clock and reset, stimulus, checking and coverage strategies, the SV-UVM realization and its differences from the harness pattern, adding and naming a scenario, and the layer APIs (config_db names, inter-layer APIs, the transaction contract, scoreboard rule, test layer API) |
+| [docs/AOU_VPLAN.adoc](docs/AOU_VPLAN.adoc) | The verification plan: summary and road-map, scope and references, how the bench verifies, the 13 feature areas with their plan items, known limitations, and the generated scenario summary, test procedures and regression groups |
 | [docs/AOU_FCOV.adoc](docs/AOU_FCOV.adoc) | Functional coverage: summary and real holes, every group in plain terms with its report name, gaps against the spec, plan traceability, goals and closure policy |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The stream contracts and API names the layers were built against |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Decision records |
-| [docs/COVERAGE_CLOSURE.md](docs/COVERAGE_CLOSURE.md) | Coverage closure plan, hole analysis, owner decisions |
 | [docs/WAVE_DEBUG.md](docs/WAVE_DEBUG.md), [docs/AXI_OUTSTANDING.md](docs/AXI_OUTSTANDING.md) | Debugging a failure from waves; the outstanding-transaction histogram |
 | [docs/PERF_JSON.md](docs/PERF_JSON.md) | The performance record each `aou_perf_test` run writes |
 | [docs/checker_inventory.md](docs/checker_inventory.md) | Generated: every rule, its checker and the evidence from the runs |
@@ -624,10 +622,12 @@ total and percentage until the DUT targets that revision; the summary gives
 them their own column and total, and `holes.txt` marks them (`[v0.8]`).
 `rare` bins stay in the totals and get a column too. Illegal bins are not
 counted, and any that a passing run hit are listed.
-The closure target is 100% and there are no waivers: an unreachable bin stays
-a hole until the user agrees to waive it. Closure is measured on the union of
-every configuration; the plan, its status and the owner's decisions are in
-[docs/COVERAGE_CLOSURE.md](docs/COVERAGE_CLOSURE.md).
+The closure target is 100% of the headline bins. A bin that turns out to be
+unreachable stays a hole until it is reviewed; it then becomes an ignored bin
+with its reason in the bins table, never a silent waiver. Closure is measured
+on the union of every configuration; the owner's decisions are in
+[docs/DECISIONS.md](docs/DECISIONS.md) D10, and the open coverage work in the
+verification plan's road-map.
 
 ### Reset transitions and X-propagation
 

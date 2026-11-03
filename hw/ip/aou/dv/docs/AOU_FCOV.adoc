@@ -38,8 +38,7 @@ Where the real holes are (details in <<aou-fcov-gaps>>):
   at its write limit.
 * *Some FDI stall-handshake latencies are never seen.* These are the DUT's
   choice and may depend on the FDI width.
-* *The DUT never requests L1 itself,* and no run takes the Adapter straight
-  from Active to Reset, which UCIe r1.1 may not allow at all.
+* *The DUT never requests L1 itself.*
 * *No failed exclusive read.* The memory model supports exclusives
   everywhere, so it never answers one with OKAY.
 * *The DUT's packer never puts 16 or more WriteResps in one flit.*
@@ -63,8 +62,11 @@ interactions between link events and traffic in flight (<<aou-fcov-not-covered>>
   a protocol violation. It isn't counted either, and a hit is reported by the
   checker that owns that rule.
 * *Tags:* `v0.8` marks behaviour AoU v0.8 defines that the RTL doesn't
-  implement yet. `rare` marks stimulus that is deliberately infrequent. Tagged
-  bins stay in the total, and the reports also show them apart.
+  implement yet; `v0.9draft` marks a layout only the v0.9 draft of the AoU
+  flit rules (4.4) allows. Bins with a revision tag are left out of the
+  headline figure until the DUT targets that revision, and the reports total
+  them apart. `rare` marks stimulus that is deliberately infrequent; those bins
+  stay in the headline and are also totalled apart.
 * *Direction:* _tx/rx_ is seen from the remote-die model (tx = model to DUT,
   rx = DUT to model). _l2r/r2l_ is the AXI path: a local manager through the
   DUT to the remote die, or the reverse.
@@ -107,11 +109,15 @@ Code: `uvm/env/fdi/l2/aou_lsm_cov.svh`, bins in `aou_lsm_fc_bins.svh`.
 [cols="2,3,5,2",options="header"]
 |===
 | Group | What it shows | Bins | Report name
-| `cg_link_state` | The Adapter states the DUT lives through, and what it requests in each | Transitions: Reset→Active; Active↔Retrain; Active→L1; L1→Retrain; Active→LinkReset→Reset; Active→Disabled→Reset; Active, Retrain or Reset→LinkError; LinkError→Reset; Active→Reset. The 7 states. DUT requests NOP, Active, L1. Status × request: only the pairs UCIe r1.1 Table 8-3 gives a meaning to (Reset: NOP, Active; Active: Active, L1; L1: L1, Active; Retrain: NOP, Active; LinkError, LinkReset, Disabled: NOP) | `l2.cg_link_state`
-| `cg_bringup_fsm` | The bring-up controller's sequence, in FDI terms | waiting for `pl_inband_pres` and giving up when it drops; the sideband wake handshake; the Active request and Active; Retrain and its return or link error; L1 and its two exits (clock wake, or a wake request); LinkError or link down back to Reset (18 transitions) | `l2.cg_bringup_fsm`
+| `cg_link_state` | The Adapter states the DUT lives through, and what it requests in each | Transitions: Reset→Active; Active↔Retrain; Active→L1; L1→Retrain; Active→LinkReset→Reset; Active→Disabled→Reset; Active, Retrain or Reset→LinkError; LinkError→Reset. The 7 states. DUT requests NOP, Active, L1. Status × request: only the pairs UCIe r1.1 Table 8-3 gives a meaning to (Reset: NOP, Active; Active: Active, L1; L1: L1, Active; Retrain: NOP, Active; LinkError, LinkReset, Disabled: NOP) | `l2.cg_link_state`
+| `cg_bringup_fsm` | The bring-up controller's sequence, in FDI terms | waiting for `pl_inband_pres` and giving up when it drops; the sideband wake handshake; the Active request and Active; Retrain and its return or link error; L1 and its two exits (clock wake, or a wake request); LinkError or link down back to Reset (17 transitions) | `l2.cg_bringup_fsm`
 |===
 
-Excluded: requests for Retrain, LinkReset or Disabled, which this DUT doesn't
+Excluded: Active straight to Reset in both groups. The UCIe r1.1 Adapter
+state diagram (8.3.3, Figure 8-17) reaches Reset from LinkReset, Disabled or
+LinkError; only a hard reset without warning while Active gets there, which is
+no normal scenario, and resets in traffic stay covered through LinkReset and
+Disabled. Requests for Retrain, LinkReset or Disabled, which this DUT doesn't
 make (UCIe r1.1 8.3.3.4: a protocol layer requests Retrain only in Raw Format;
 LinkReset and Disabled are software's, on the UCIe controller). A reserved
 request is illegal.
@@ -127,7 +133,7 @@ Code: `uvm/env/l3/aou_l3_cov.svh`, `uvm/env/aou_t1_status.svh`.
 | Group | What it shows | Bins | Report name
 | `cg_act_fsm` | Every activation-state transition, including losing the link mid-handshake | DISABLED→ACTIVATE→ENABLED→DEACTIVATE→DISABLED; back to DISABLED from ACTIVATE, ENABLED or DEACTIVATE when the FDI link is lost (LinkReset, link down); ACTIVATE, ENABLED or DEACTIVATE→ERROR and ERROR→DISABLED (`v0.8`, the non-orderly shutdown) | `l3.cg_act_fsm`
 | `cg_act_op` | Every Activation message by op, direction and legality in the current state | {ActivateReq, ActivateAck, DeactivateReq, DeactivateAck, reserved op} × tx/rx × legal/illegal | `l3.cg_act_op`
-| `cg_act_flit` | What shares a flit with an Activation message | ActivateReq or ActivateAck alone or with one CrdtGrant; DeactivateReq alone or with responses; DeactivateAck alone; × tx/rx. The shared layouts follow the v0.9 draft rule (AoU v0.8 4.4 puts an Activation message alone in its flit) and count as ordinary targets; whether they get a tag is an open decision | `l3.cg_act_flit`
+| `cg_act_flit` | What shares a flit with an Activation message | ActivateReq or ActivateAck alone or with one CrdtGrant; DeactivateReq alone or with responses; DeactivateAck alone; × tx/rx. AoU v0.8 4.4 puts an Activation message alone in its flit; the shared layouts follow the v0.9 draft of 4.4 and are tagged `v0.9draft`, so they stay out of the headline figure | `l3.cg_act_flit`
 | `cg_stray_dack` (DUT) | An out-of-protocol DeactivateAck in ENABLED reached an accepted ending | one bin: ignored, flagged on arrival, or an error at the next deactivation. Any of them is acceptable and one DUT shows one or two, so the target is that one was reached; the run log names which | `env.cg_stray_dack`
 |===
 
@@ -190,7 +196,7 @@ Code: `uvm/env/axi/aou_axi_monitor.svh`, `uvm/env/aou_t1_xfer_cov.svh`.
 |===
 | Group | What it shows | Bins | Report name
 | `txn_cg` | Request shapes at every port | write/read × AxSIZE 1-128 B × length {1, 2-4, 5-16, 17-256 beats} × start aligned or unaligned to AxSIZE | `axi.txn_cg`
-| `zero_cg` | Responses presented in the same cycle as the request handshake completes | write/read × zero-cycle or later | `axi.zero_cg`
+| `zero_cg` | Responses at the minimum legal latency: BVALID rising in the first cycle after the later of the AW and W handshakes, the first R beat in the first cycle after AR (a response in the handshake's own cycle would be illegal AXI) | write/read × that first cycle (`zero_cycle`, no idle cycle between) or later | `axi.zero_cg`
 | `attr_cg` | Attributes carried unchanged across the link | AxQOS 0-15, AxPROT 0-7, the 10 non-reserved AxCACHE encodings (AXI4 Table A4-5), each × l2r/r2l × write/read | `xfer.attr_cg`
 | `excl_cg` | Exclusive accesses end to end (AXI4 A7.2) | EXOKAY or OKAY × l2r/r2l × write/read | `xfer.excl_cg`
 | `chan_cg` | Orderings AXI4 allows | W presented before its AW at an S port; read data of different IDs interleaved at an M port, in the remote die's ReadData, and at an S port | `xfer.chan_cg`
@@ -263,24 +269,20 @@ QoS arbitration outcomes (`attr_cg` only shows that AxQOS values cross the
 link); DEST_RP remapping; the DUT's own AXI splitter (`split_cg` is the
 bench's) and aggregator; software and core resets during traffic; and
 performance, which the performance tests check against their own targets.
-`docs/COVERAGE_CLOSURE.md` proposes groups for each.
+Groups for them are open work in the verification plan's road-map.
 
 [[aou-fcov-gaps]]
 === Gaps Against the Specification
 
 Spec behaviours with no bin, or holes that point at a real gap. None of them
-has a bin added yet; each is a decision to make.
+has a bin added yet; each is recorded in the verification plan's road-map
+(coverage closure, deferred) for follow-up.
 
 . *DUT-initiated L1 entry.* `cg_link_state` status Active × request L1 is a
   hole: the DUT requests L1 only after the Adapter already reports L1, and
   every L1 entry in the bench is the Adapter model's. Either the bin is wrong
   for this DUT, or power-management entry by the protocol layer (UCIe r1.1
   8.3) is untested. Check against the MAS low-power section.
-. *Active straight to Reset.* `active_reset` in `cg_link_state` and
-  `cg_bringup_fsm` is a hole. UCIe r1.1 (Figure 8-17, 8.3.3) shows no direct
-  Active→Reset arc: Reset follows LinkReset, Disabled, LinkError or L2, or a
-  domain reset, and the bench's Adapter model always passes through
-  LinkReset. The bins are probably unreachable; a decision is pending.
 . *Which ReadData answers a ReadReq.* AoU v0.8 adds a rule for the DLENGTH
   of the ReadData that answers a ReadReq. `cg_msg` counts ReadData sizes and
   `width_cg` counts ARSIZE, but nothing crosses a request's size with the size
@@ -316,37 +318,35 @@ has a bin added yet; each is a decision to make.
   state. This is the riskiest interaction and only directed tests cover it.
 . *Profiles and FLEX/USER fields (AoU v0.8).* No bins. They need a v0.8 DUT,
   like the other `v0.8` items.
+. *Credit encodings.* No bin records which credit encodings (0, 1, 4, ..., 128
+  per class) were sent or received; the credit accounting checks are the only
+  evidence that each one decodes correctly.
 
 [[aou-fcov-trace]]
 === Plan Traceability
 
-Plan sections are those of `docs/test_plan_items.yaml`.
+The feature areas of the verification plan (`AOU_VPLAN.adoc`, Feature
+Areas), with the groups that serve as evidence for their stimulus-shape items.
 
 [cols="3,4",options="header"]
 |===
-| Plan section | Groups
-| 2.1, 2.2 Link activation and deactivation | `cg_act_fsm`, `cg_act_op`, `cg_act_flit`, `cg_stray_dack`
-| 2.3 Credit management | `cg_credit`, `cg_crd`, `cg_crd_rr`
-| 2.4, 2.5 Write and read transactions | `txn_cg`, `zero_cg`, `attr_cg`, `excl_cg`, `chan_cg`, `small_cg`, AXI4 port monitors
-| 2.6 Flit packing | `cg_msg`, `cg_flit_layout`, `cg_span`, `cg_flit_occ`, `cg_wresp_flit`, `cg_wr_order`, `cg_act_flit`
-| 2.7 Data integrity | none of its own: the scoreboard checks every transfer the groups of 2.4 and 2.5 count
-| 2.8 Outstanding transactions | `cg_mo`, AXI4 `cg_os`, `cg_bp`
-| 2.9 Error handling | `cg_act_op` (illegal ops), `cg_stray_dack`, `cg_fdi_abandon`
-| 2.11 Corner cases | `cg_flit_occ`, `cg_fdi_cancel`, `cg_fdi_xfer` (back-to-back and stalled flits)
-| 2.12 Multi-resource plane | `cg_msg` (per RP), `cg_crd`, `cg_crd_rr`, `cg_wr_order` (per RP)
-| 2.13 QoS arbitration | `attr_cg` AxQOS only (no arbitration outcomes)
-| 2.14 Data width converter | `width_cg`, `mwr_cg`, AXI4 AxSIZE bins
-| 2.15 AXI transaction splitter | none for the DUT (`split_cg` is the remote model's)
-| 2.16 Write early response | `cg_early_tbl`, `cg_wdt`
-| 2.18 UCIe FDI interface | `cg_fdi_xfer`, `cg_fdi_cancel`, `cg_fdi_stall`, `cg_fdi_abandon`, `cg_link_state`
-| 2.21 Low power mode | `cg_link_state` (L1), `cg_bringup_fsm` (L1 exits)
-| 2.22 FDI bring-up controller | `cg_bringup_fsm`, `cg_link_state`
-| 2.10, 2.17, 2.19, 2.20 Performance, aggregator, interrupts, registers | none (<<aou-fcov-not-covered>>)
+| Plan area | Groups
+| FDI bring-up and link events | `cg_fdi_xfer`, `cg_fdi_cancel`, `cg_fdi_stall`, `cg_fdi_abandon`, `cg_link_state`, `cg_bringup_fsm`
+| Activation and deactivation | `cg_act_fsm`, `cg_act_op`, `cg_act_flit`, `cg_stray_dack`
+| Credits and flow control | `cg_credit`, `cg_crd`, `cg_crd_rr`
+| Flit packing and message format | `cg_msg`, `cg_flit_layout`, `cg_span`, `cg_flit_occ`, `cg_wresp_flit`, `cg_wr_order`, `cg_act_flit`
+| AXI transactions, ordering and data integrity | `txn_cg`, `zero_cg`, `attr_cg`, `excl_cg`, `chan_cg`, `small_cg`, `cg_mo`, AXI4 port monitors (sizes, lengths, outstanding, back-pressure); data integrity has no group of its own: the scoreboard checks every transfer these count
+| Resource planes, DEST_RP and QoS arbitration | `cg_msg` (per RP), `cg_crd`, `cg_crd_rr`, `cg_wr_order` (per RP), `attr_cg` AxQOS only (no arbitration outcomes)
+| Width conversion, splitting and aggregation | `width_cg`, `mwr_cg`, AXI4 AxSIZE bins; none for the DUT's splitter (`split_cg` is the remote model's) or aggregator
+| Early write response and the write watchdog | `cg_early_tbl`, `cg_wdt`
+| Errors, debug FIFO and interrupts | `cg_act_op` (illegal ops), `cg_stray_dack`, `cg_fdi_abandon`
+| TX low-power mode | `cg_link_state` (L1), `cg_bringup_fsm` (L1 exits)
+| Registers; resets, clocks, DFT and RTL assertions; performance | none (<<aou-fcov-not-covered>>)
 |===
 
 `fc.json` carries a `plan_ids` field per group and bin that is still empty;
-filling it from this table so `fc_report` can report per plan item is an open
-item (`OPEN_ITEMS.md`).
+filling it so `fc_report` can report per plan item is open work in the plan's
+road-map.
 
 === Goals and Closure
 
@@ -366,12 +366,12 @@ item (`OPEN_ITEMS.md`).
   ignored or illegal, with the reason beside it; the change is reviewed as a
   change to the coverage model, and this document changes with it. Until then
   it stays a hole.
-* A `v0.8` bin stays in the total and is reported apart; it closes with a
-  v0.8 DUT or partner.
+* A `v0.8` or `v0.9draft` bin is out of the headline figure and reported
+  apart; it joins the headline when the DUT targets that revision.
 * A bin behind an open DUT bug is closed by the fix, or by a variant that
   avoids the bug, never by removing the bin.
-* `docs/COVERAGE_CLOSURE.md` holds the closure plan, the analysis of each hole
-  and the owner's decisions.
+* The owner's coverage decisions are in `docs/DECISIONS.md` D10; the open
+  closure work is in the verification plan's road-map.
 
 === Details
 
@@ -402,7 +402,8 @@ coverage model or its tooling.
   every bin with its count, zero-hit bins included, samples outside every bin,
   tags and illegal marks) and `aou_axi4_fc.<run-id>.txt`.
   `scripts/fc_report.py` (`--help`) union-merges the passing runs of a build
-  into `summary.txt` (hit/total per group and point, `rare` and `v0.8` totals),
+  into `summary.txt` (hit/total per group and point over the headline bins, and
+  the `rare`, `v0.8` and `v0.9draft` totals apart),
   `holes.txt` (every unhit bin, tagged ones marked), `index.html` and
   `fc_merged.json`, and lists any illegal bin a passing run hit.
   `make fc_report` is a shorthand; `make cov_report COV=1` adds code coverage,

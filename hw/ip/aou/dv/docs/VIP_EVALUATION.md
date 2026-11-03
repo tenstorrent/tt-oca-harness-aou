@@ -31,8 +31,8 @@ provide:
   direction, and W before AW;
 - out-of-order responses across IDs, in order within an ID, and read
   interleaving;
-- per-channel valid/ready timing policies, including B and R zero cycles after
-  the last W or AR handshake;
+- per-channel valid/ready timing policies, including B and R in the first
+  cycle after the last W or AR handshake (no idle cycle);
 - every size and alignment, including unaligned starts, narrow transfers and
   sparse or zero WSTRB;
 - INCR, WRAP and FIXED bursts, exclusive access (AxLOCK), and 4 KB legality;

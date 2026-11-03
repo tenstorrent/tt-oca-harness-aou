@@ -7,7 +7,7 @@
 # remote delay, the FDI always ready and full-rate issue on every side that
 # takes part. All values are strings (scripts/listyaml.py).
 #
-#   scenario     S1..S6 (see the perf targets plan)
+#   scenario     S1..S6 (README "Performance targets"; the plan's Performance area)
 #   window       window name, the perf.txt / perf.json prefix
 #   traffic_dir  l2r (local managers only), r2l (remote die only) or both
 #   wr_pct       write share of the transactions, 0..100

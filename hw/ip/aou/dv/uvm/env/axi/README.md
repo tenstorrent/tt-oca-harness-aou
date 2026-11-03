@@ -29,7 +29,7 @@ cross-checked against pulp's `AXI_BUS_DV` assertion list. No pulp code is copied
 | `aou_axi_mgr_agent` | `sqr` (`aou_axi_sequencer`), `drv`, `mon`, `ap` |
 | `aou_axi_sub_agent` | `drv` (answers from `cfg.mem`), `mon`, `ap` |
 | `aou_axi_monitor` | Rebuilds transactions and publishes them on `ap` (writes after B, reads after RLAST). Checks rules AXI-R01..R18 (`checkers/rules.csv`). Coverage in `txn_cg` and `zero_cg` |
-| `aou_remote_axi_model` | L4a remote subordinate: `execute(req, rsp)`. See ARCHITECTURE.md |
+| `aou_remote_axi_model` | L4a remote subordinate: `execute(req, rsp)`. See AOU_TB_ARCH.adoc |
 | `aou_axi_rand_seq` | Random legal traffic. Each in-flight transaction gets its own 4KB slot |
 | `aou_axi_unaligned_wr_seq` | #56: single-beat writes and reads of every size at every offset |
 | `aou_axi_b_zero_seq` | #64: back-to-back single-beat writes, then reads |

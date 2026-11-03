@@ -15,7 +15,10 @@ these files are their rendering and are regenerated, never edited:
                                   sequence's header), rules it names, its
                                   scenarios and plan items
   docs/gen/vplan_matrix.adoc      Requirement-to-test matrix: every plan item
-                                  with the scenarios that cite it
+                                  with the scenarios that cite it, one table per
+                                  feature area of docs/plan_areas.yaml between
+                                  tag::<area>[] and end::<area>[] lines, so the
+                                  plan includes each table in its area
   docs/gen/vplan_groups.adoc      Regression groups of every testlist
   docs/gen/fcov_groups.adoc       Covergroup inventory: coverpoints and crosses
                                   per covergroup, with its report name and the
@@ -33,6 +36,7 @@ import sys
 UVM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(UVM_ROOT, "scripts"))
 import listyaml  # noqa: E402
+import plan_areas  # noqa: E402
 import sim_cfg  # noqa: E402
 import testlist  # noqa: E402
 
@@ -226,11 +230,10 @@ def gen_procedures(benches, items):
                            f"{cell(e['plan_ids'])}\n")
                 pids |= set(testlist.ids(e["plan_ids"]))
             out.append("|===\n\n")
-            if pids:
-                out.append("*Plan items.*\n\n")
-                for pid in sorted(pids, key=lambda s: [int(x) if x.isdigit() else x for x in s.split(".")]):
-                    out.append(f"* {pid}: {title.get(pid, '(not in docs/test_plan_items.yaml)')}\n")
-                out.append("\n")
+            # The items' titles are in the matrix; an ID the plan lacks is named here.
+            unknown = sorted(p for p in pids if p not in title)
+            if unknown:
+                out.append("*Plan items not in `docs/test_plan_items.yaml`.* " + ", ".join(unknown) + "\n\n")
     return "".join(out)
 
 
@@ -240,12 +243,12 @@ def gen_matrix(benches, items):
         for e in ents:
             for pid in testlist.ids(e["plan_ids"]):
                 covered.setdefault(pid, []).append(e)
-    out = [HEADER, "[[aou-vplan-matrix-table]]\n"]
-    sections = {}
-    for it in items:
-        sections.setdefault((it.get("section", ""), it.get("section_title", "")), []).append(it)
-    for (sec, sec_title), its in sections.items():
-        out.append(f"==== {sec} {sec_title}\n")
+    out = [HEADER]
+    where = plan_areas.assign(items)
+    for area in plan_areas.areas():
+        its = [it for it in items if where[it["id"]] == area["key"]]
+        out.append(f"// tag::{area['key']}[]\n[[aou-vplan-items-{area['key']}]]\n")
+        out.append(f".{area['title']}: plan items\n")
         out.append('[cols="1,5,1,4",options="header"]\n|===\n| Item | Requirement | Priority | Scenarios\n')
         for it in its:
             pid = it["id"]
@@ -264,7 +267,7 @@ def gen_matrix(benches, items):
                 elif xf and len(xf) == len(es):
                     sc += " (expected failure only)"
             out.append(f"| {pid} | {cell(it.get('title', ''))} | {cell(it.get('priority', ''))} | {cell(sc)}\n")
-        out.append("|===\n")
+        out.append(f"|===\n// end::{area['key']}[]\n\n")
     return "".join(out)
 
 

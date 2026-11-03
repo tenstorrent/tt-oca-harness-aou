@@ -34,7 +34,8 @@ given to make regress (LSF_QUEUE, AXI4PC=0, LSF_EXTRA_OPTS, ...) reaches those m
 RTL assertions (the -assert builds) are VCS-only: on Verilator they are skipped with a
 note. The unit benches have no DUT, so they build without coverage under COV=1.
 
-Logs, the exact commands, the state and summary.md go to out/regress/<RID>/; the run
+Logs, the exact commands, the state, summary.md and plan_status.md (the test-plan
+status of this RID's runs, scripts/plan_status.py --rid) go to out/regress/<RID>/; the run
 directories and results CSVs are where make run and run_list.py put them,
 out/<build>/. The exit status is 1 when any run is FAIL or XPASS, when a build
 produced no results or when a step failed, else 0.
@@ -572,6 +573,15 @@ def summary(args, units, notes, state, regdir):
     elif args.cov == "1" and os.path.isdir(os.path.join(regdir, "union")):
         lines += ["## Coverage", "", f"- per configuration: out/<T1 cov build>/merged/; union over "
                                      f"the configurations: {os.path.join(regdir, 'union')}", ""]
+    # The plan's status page for this regression (the plan carries no hand-kept status).
+    ps = os.path.join(regdir, "plan_status.md")
+    try:
+        subprocess.run([sys.executable, os.path.join(UVM_ROOT, "scripts", "plan_status.py"),
+                        "--out-dir", args.out_root, "--rid", args.rid, "-o", ps],
+                       check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        lines += ["## Test-plan status", "", f"- {ps}", ""]
+    except (OSError, subprocess.CalledProcessError) as e:
+        lines += ["## Test-plan status", "", f"- not written: {e}", ""]
     ok = not bad and not missing and not state.get("cov_failed")
     lines.append(f"Result: {'PASS' if ok else 'FAIL'}: {total['runs']} runs, {total['PASS']} PASS, "
                  f"{total['XFAIL']} XFAIL, {total['FAIL']} FAIL, {total['XPASS']} XPASS"

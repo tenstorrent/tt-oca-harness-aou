@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// T1 environment (docs/ARCHITECTURE.md, "Test layer API"). Local side: an AXI
+// T1 environment (docs/AOU_TB_ARCH.adoc, "Test layer API"). Local side: an AXI
 // manager on every S port and a subordinate on every M port, all answering
 // from one local memory; the APB agent with the register model. Remote side:
 // L1 per PHY and L2 at FDI, L3 between L1 and the remote AXI side (the L4a
@@ -289,7 +289,7 @@ class aou_t1_env extends uvm_env;
     join_none
   endtask
 
-  // Reset contract (docs/ARCHITECTURE.md): called on every reset the reset
+  // Reset contract (docs/AOU_TB_ARCH.adoc): called on every reset the reset
   // agent drives and by the vseq once AOU_SW_RESET has put the core in reset,
   // both with bus_reset = 1: the local AXI agents are on the DUT's AXI-port
   // reset (I_RESETN and AOU_SW_RESET), so they drop their transactions and

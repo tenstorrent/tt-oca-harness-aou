@@ -8,7 +8,7 @@ SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 Why the bench at `hw/ip/aou/dv` is built the way it is: the constraints that shaped it, the
 choices made under them, the alternatives that were turned down, and the
 policies the bench enforces. What the code does is in the code, the
-[README](../README.md) and [ARCHITECTURE.md](ARCHITECTURE.md); this document
+[README](../README.md) and [AOU_TB_ARCH.adoc](AOU_TB_ARCH.adoc); this document
 records only the reasons.
 
 ## How to use this document
@@ -241,17 +241,16 @@ and the remote side can't be driven into illegal or unusual traffic.
 *Extending PR 80's minimal FDI peer*: no layering, so no reuse and no
 protocol-level injection.
 
-**Where.** [ARCHITECTURE.md](ARCHITECTURE.md) (topology, inter-layer APIs, the
+**Where.** [AOU_TB_ARCH.adoc](AOU_TB_ARCH.adoc) (hierarchy; appendix: inter-layer APIs, the
 transaction contract, scoreboard rule, reset contract, test layer API);
 `fdi/`, `l3/`, `axi/`, `env/`, `tb/tb_top.sv`.
 
 **Consequences.** The models implement the spec independently of the RTL, so a
 disagreement can come from either side; that is handled by D5 and D7. Every
 component implements `reset_flush()` (the reset contract), because mid-test
-resets are part of the plan. Changes to the test layer API go through the
-integrator, because every test depends on it. The bench was built by parallel
-work streams against the contracts in ARCHITECTURE.md; keep them current when a
-boundary moves.
+resets are part of the plan. Every test depends on the test layer API, so a
+change to it is a change to every test. The layer APIs are in
+AOU_TB_ARCH.adoc's appendix; keep them current when a boundary moves.
 
 ## D4. Rule-based checking with spec-traced IDs
 
@@ -314,11 +313,14 @@ the inventory rather than forgotten.
 
 **Decision.**
 
-- **AoU.** The bench targets AoU v0.7 by default, which is what the RTL
-  implements, and can switch to v0.8, where the RTL is heading. The switch is the
-  `spec_rev` field of the env and L3 configs; v0.8-only rules (message layout,
-  the Activation message's profile fields, the ERROR state) are checked only
-  under v0.8 and appear as such in the inventory.
+- **AoU.** AoU v0.8 decides behaviour. The bench checks the DUT against the
+  v0.7 wire format the RTL implements, and can switch to v0.8, where the RTL is
+  heading. The switch is the `spec_rev` field of the env and L3 configs;
+  v0.8-only rules (message layout, the Activation message's profile fields, the
+  ERROR state) are checked only under v0.8 and appear as such in the inventory.
+  Until the DUT targets v0.8 they run between two L3 models on the L3 unit bench
+  (`+L3_SPEC=v0.8`, group `v0p8`), and v0.8 features the DUT lacks are gaps for
+  the owners.
 - **UCIe.** FDI behaviour follows UCIe r1.1 (chapter 8), written with knowledge
   of r2.0's changes but not modelling them. System management (sideband and
   management transport) is out of scope; the DUT has none.
@@ -513,9 +515,16 @@ to be bench bugs; the draft review step checks that before anything is filed.
   themselves (`testlists/*.toml`) follow the harness schema, which has no plan
   key, so the item lists live in the sidecar `testlists/plan_ids.yaml`, keyed by
   scenario name, together with the reason of every blocked scenario.
-- `make plan_status` matches every judged run under `out/` to its scenario
-  (test class, plusargs, TB and CONFIG) and reports each item as covered (a PASS
-  run), xfail-only, failing, blocked or not covered.
+- `make plan_status` matches every judged run under `out/` (or one regression's,
+  `--rid`) to its scenario (test class, plusargs, TB and CONFIG) and reports
+  each item as covered (PASS runs only), covered with known failures (PASS runs,
+  and XFAIL runs on the configurations it names), covered with failures,
+  xfail-only, failing, blocked or not covered, counted per feature area of the
+  plan (`docs/plan_areas.yaml`). That generated page is the plan's status; the
+  plan itself carries no hand-kept status (user decision, 2026-11-03).
+- A family of items that differ only in a stimulus shape (a size, a length, an
+  encoding, a granule position) is one item whose evidence is its coverage bins;
+  the per-value items are merged into it (user decision, 2026-11-03).
 
 **Why.** The existing plan carries the intent of the features to verify and an
 ID scheme people already use; starting over would lose both. Corrections go in a
@@ -625,7 +634,7 @@ the per-RP widths, and the FDI scheme breaks when two share an FDI.
 
 **Where.** `[targets.<CONFIG>]` in `aou_sim_cfg.toml` and `aou_reg_sim_cfg.toml`
 (`make configs`); README
-"Build configurations"; ARCHITECTURE.md "Build configuration"; `target` in
+"Build configurations"; `target` in
 testlist entries.
 
 A configuration is a sim-config *target*: its defines (`RP_COUNT`,
@@ -685,15 +694,49 @@ twice.
 - **Functional coverage is counted by the bench.** Every testbench covergroup
   feeds a coverage service that counts bins itself and writes `fc.json` per run;
   covergroup and service take their bins from one table macro, so they can't
-  drift. `make fc_report` union-merges passing runs. The closure target is 100%.
-  Any waiver needs explicit review; an unreachable bin stays a hole until then.
-  v0.8 bins are included (tagged `v0.8`, reported apart, not waived), and
-  white-box bins on DUT internal state are allowed. A bin that can't mean what
-  it says (an AXI-illegal cross cell, a field the wire doesn't carry) is a
-  covergroup bug: it is ignored or made illegal in the service, not waived.
+  drift. `make fc_report` union-merges passing runs. The closure target is 100%
+  of the headline bins. An unreachable bin stays a hole until it is reviewed;
+  then it is ignored with its reason in the bins table. White-box bins on DUT
+  internal state are allowed. A bin that can't mean what it says (an
+  AXI-illegal cross cell, a field the wire doesn't carry) is a covergroup bug:
+  it is ignored or made illegal in the service, not waived.
+- **Spec-revision bins are reported apart (user decision, 2026-11-03).** Bins
+  for behaviour of a spec revision the RTL doesn't implement carry its tag
+  (`v0.8`; `v0.9draft` for the shared Activation-flit layouts of the v0.9 draft
+  of AoU 4.4) and stay out of the headline figure until the DUT targets that
+  revision; the reports total them apart. The v0.8 rule set runs on the L3 unit
+  bench (`+L3_SPEC=v0.8`, group `v0p8`), since the DUT implements the v0.7 wire
+  format. `rare` (deliberately infrequent stimulus) stays in the headline.
 - **Closure.** Closure is measured on the union of every configuration. The
-  plan, the gap analysis and the owner's decisions on it are in
-  [COVERAGE_CLOSURE.md](COVERAGE_CLOSURE.md).
+  open closure work is in the verification plan's road-map (`AOU_VPLAN.adoc`).
+- **Owner rulings from the coverage-closure review (2026-10-14).** The review's
+  analysis is retired; its rulings stand:
+  * INCR bursts only. AoU carries no AxBURST, so WRAP and FIXED are out of
+    scope: no burst coverpoint in `axi.txn_cg`, plan items 4.16 and 4.17
+    dropped, the S-port agents INCR-only, and AXI-R19 flags any other burst as
+    a stimulus error (D5).
+  * Bin corrections are covergroup fixes, not waivers, even when they change
+    the denominator.
+  * v0.8 bins are tagged, never waived (made a headline exclusion by the
+    2026-11-03 decision above).
+  * Reset-only FSM transitions are excluded (the filter above).
+  * Line and branch exclusions are item by item and reviewed
+    (`cov/config/vcs/cov_exclude.el`).
+  * Closure is measured on the all-configurations union.
+  * UCIe r2.0 FDI changes are deferred to the RTL and architecture review.
+  * The ID-mismatch "detect, then hard reset" variant is a test option
+    (`+detect_only=1`) that drops the check that the DUT takes the stray
+    response within 500 cycles; the default runs keep it. A response that
+    answers no request is illegal AXI (AXI4 A5), and MAS 7.2.2 defines only
+    its detection.
+  * Plan changes: 9.8, 22.5, 1.4 and 12.13 dropped; the features that had no
+    plan item added; 9.5 retitled (and later dropped, as AoU v0.8 6.1 defines
+    no reaction to a credit overrun).
+- **Active straight to Reset is no target (user decision, 2026-11-03).** The
+  UCIe r1.1 Adapter state diagram (8.3.3) reaches Reset from LinkReset,
+  Disabled or LinkError; only a hard reset without warning while Active does
+  it, which is not a normal scenario. The FDI link-state and bring-up groups
+  ignore that transition.
 
 **Why.**
 
@@ -1150,7 +1193,7 @@ across it reaches an M port) as the one DUT-side check of the software reset.
 (`reset_flush`, `sw_reset_window`), `uvm/env/aou_base_test_seq.svh`
 (`sw_reset_core`), `uvm/env/axi/aou_axi_monitor.svh`, `uvm/env/aou_scoreboard.svh`,
 `uvm/env/aou_t1_sw_reset_chk.svh`, `expected_fail.yaml`, `checkers/rules.csv`;
-[ARCHITECTURE.md](ARCHITECTURE.md) "Reset contract as implemented".
+[AOU_TB_ARCH.adoc](AOU_TB_ARCH.adoc) appendix, "T1 env: where the implementation departs from the test layer API".
 
 **Consequences.** A test that wants the DUT's ports to stay protocol-clean across
 AOU_SW_RESET has no such expectation to lean on. The RX FIFOs (AOU_FIFO_RP) are
@@ -1161,18 +1204,8 @@ the RDL (a write of 1 resets the bit with every other SFR).
 
 ## Open items
 
-- **Functional coverage stages FC2 and FC3.** FC1 (the counting service, every
-  existing covergroup, `make fc_report`) is done, and so are FC2's bin
-  corrections (COVERAGE_CLOSURE.md 3.1). The later stages add the AoU
-  protocol, FDI behaviour and cross-layer groups of the functional coverage plan.
-  FC3 includes listing the concrete FDI rule changes from UCIe r1.1 to r2.0 for
-  the signals this DUT has, so that the owner can decide which to cover (D5).
-- **History squash.** The integration branch is to become the three PR 80
-  commits, kept with their authorship, plus one squashed commit holding the
-  overhaul and this document. `make check-public` then runs over the new range;
-  the squash also drops internal references that earlier commits carried
-  (D13). The old branch is kept for reference.
-- **Stale `simv` warning.** `run_list.py` should warn when the build is older
-  than the testbench or RTL sources it was built from (D12).
+- **Coverage closure.** The open functional-coverage work (groups for features
+  that have none, the coverage gaps against the spec, cross-layer groups,
+  coverage tied to plan items) is in the verification plan's road-map.
 - **Xcelium coverage.** Xcelium builds and runs but has no coverage flow and no
   full-regression matching (D2). Questa's run and coverage are also untested.

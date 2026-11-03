@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Byte-level AXI scoreboard (docs/ARCHITECTURE.md, "Scoreboard rule").
+// Byte-level AXI scoreboard (docs/AOU_TB_ARCH.adoc, "Scoreboard rule").
 //
 // - local_mgr_imp: transactions the local managers completed at the DUT's S
 //   ports. They target the remote memory.
