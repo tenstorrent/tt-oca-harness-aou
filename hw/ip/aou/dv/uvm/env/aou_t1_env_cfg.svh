@@ -258,6 +258,32 @@ class aou_t1_env_cfg extends uvm_object;
     end
     l3_cfg.resp_fork = 1'($urandom_range(1));
     remote_lat_max = $urandom_range(30);
+    fdi_knobs();
+  endfunction
+
+  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r1.1 8.3.2), per
+  // seed on every PHY. HOLES without stalls stays the common case; a fifth of
+  // the seeds take RANDOM or BURSTY pl_trdy (so pl_trdy can also be low at a
+  // flit boundary), and a fifth add stand-alone stalls at a boundary or
+  // mid-flit, with pl_trdy held high or left to its policy during the
+  // handshake. +fdi_trdy and the +fdi_stall_* plusargs override this; a test
+  // that measures performance or depends on the timing sets its own.
+  function void fdi_knobs();
+    aou_fdi_trdy_e pol = AOU_TRDY_HOLES;
+    bit            stalls = ($urandom_range(4) == 0);
+    int unsigned   pct = $urandom_range(5, 1);
+    int unsigned   mid = $urandom_range(90);
+    bit            free = 1'($urandom_range(1));
+    int unsigned   hmin = $urandom_range(1);
+    if ($urandom_range(4) == 0) pol = ($urandom_range(1) == 0) ? AOU_TRDY_RANDOM : AOU_TRDY_BURSTY;
+    foreach (fdi_cfg[p]) begin
+      fdi_cfg[p].trdy_policy = pol;
+      if (!stalls) continue;
+      fdi_cfg[p].stall_pct = pct;
+      fdi_cfg[p].stall_mid_pct = mid;
+      fdi_cfg[p].stall_trdy_free = free;
+      fdi_cfg[p].stall_hold_min = hmin;
+    end
   endfunction
 
   function string convert2string();
