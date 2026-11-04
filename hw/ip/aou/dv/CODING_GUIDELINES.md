@@ -17,7 +17,7 @@ checks the rest.
   listed in a filelist, a sim config or a compile command. No file may depend on
   the order of the files around it for its macros: a macro it needs comes from an
   `` `include`` or a `+define` on the compile.
-- One package per layer: `aou_fdi_pkg` (L1), `aou_lsm_pkg` (L2), `aou_l3_pkg`,
+- One package per layer: `ucie_fdi_pkg` (L1), `ucie_lsm_pkg` (L2), `aou_l3_pkg`,
   `aou_axi_pkg` (L4a/L4b), `aou_env_pkg`, `aou_test_pkg`. A layer imports only
   layers below it.
 - Classes never use hierarchical references. Interfaces reach classes only

@@ -59,7 +59,7 @@ module tb_top;
   endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
   localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
-  localparam int BUS_W      = aou_fdi_pkg::BUS_W;   // widest FDI beat (256 B)
+  localparam int BUS_W      = ucie_fdi_pkg::BUS_W;   // widest FDI beat (256 B)
   localparam int AXI_W      = 1024;
   localparam int WD0 = (FDI_CFG == 0 || FDI_CFG == 3) ? 256 : (FDI_CFG == 2) ? 1024 :
                        (FDI_CFG == 5) ? 2048 : 512;
@@ -177,11 +177,11 @@ module tb_top;
   // ---------------------------------------------------------------------------
   aou_axi_bus_if #(.DATA_W(AXI_W)) s_axi [RP_COUNT] (.clk(clk), .resetn(axi_port_rst_n));
   aou_axi_bus_if #(.DATA_W(AXI_W)) m_axi [RP_COUNT] (.clk(clk), .resetn(axi_port_rst_n));
-  aou_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb0 (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb0 (.clk(clk), .rst_n(rst_n));
 `ifdef TWO_PHY
-  aou_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));
 `endif
-  aou_fdi_lsm_if                   fdi_lsm (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_lsm_if                   fdi_lsm (.clk(clk), .rst_n(rst_n));
   aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb (.pclk(pclk), .presetn(prst_n));
   aou_status_if                    status ();
   aou_irq_if                       irq (.clk(clk));
@@ -741,8 +741,8 @@ module tb_top;
   import ocah_lib_pkg::*;
   import aou_rule_pkg::*;
   import aou_axi_pkg::*;
-  import aou_fdi_pkg::*;
-  import aou_lsm_pkg::*;
+  import ucie_fdi_pkg::*;
+  import ucie_lsm_pkg::*;
   import aou_l3_pkg::*;
   import aou_reg_pkg::*;
   import aou_core_csr_uvm_pkg::*;
@@ -762,11 +762,11 @@ module tb_top;
   end
 
   initial begin
-    uvm_config_db #(virtual aou_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb0", fdi_mb0);
+    uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb0", fdi_mb0);
 `ifdef TWO_PHY
-    uvm_config_db #(virtual aou_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb1", fdi_mb1);
+    uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb1", fdi_mb1);
 `endif
-    uvm_config_db #(virtual aou_fdi_lsm_if)::set(null, "*", "fdi_lsm", fdi_lsm);
+    uvm_config_db #(virtual ucie_fdi_lsm_if)::set(null, "*", "fdi_lsm", fdi_lsm);
     uvm_config_db #(virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)))::set(null, "*", "apb", apb);
     uvm_config_db #(virtual aou_status_if)::set(null, "*", "status", status);
     uvm_config_db #(virtual aou_irq_if)::set(null, "*", "irq", irq);

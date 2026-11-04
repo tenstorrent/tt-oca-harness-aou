@@ -12,11 +12,11 @@
 //   cfg.stall_mid_pct of them.
 // - pl_stallreq rises only with lp_stallack low and falls only with it high
 //   (FDI-R08).
-class aou_fdi_tx_responder extends uvm_component;
-  `uvm_component_utils(aou_fdi_tx_responder)
+class ucie_fdi_tx_responder extends uvm_component;
+  `uvm_component_utils(ucie_fdi_tx_responder)
 
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) vif;
-  aou_fdi_cfg cfg;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) vif;
+  ucie_fdi_cfg cfg;
 
   local bit          trdy_q;
   local bit          stallreq_q;
@@ -77,8 +77,8 @@ class aou_fdi_tx_responder extends uvm_component;
 
   local function bit policy();
     case (cfg.trdy_policy)
-      AOU_TRDY_RANDOM: return $urandom_range(99) < cfg.trdy_pct;
-      AOU_TRDY_BURSTY: begin
+      UCIE_TRDY_RANDOM: return $urandom_range(99) < cfg.trdy_pct;
+      UCIE_TRDY_BURSTY: begin
         if (run_left == 0) begin
           run_val = !run_val;
           run_left = $urandom_range(cfg.burst_max, 1);
@@ -86,7 +86,7 @@ class aou_fdi_tx_responder extends uvm_component;
         run_left--;
         return run_val;
       end
-      AOU_TRDY_HOLES:  return tx_beat == 0 || $urandom_range(99) >= cfg.hole_pct;
+      UCIE_TRDY_HOLES:  return tx_beat == 0 || $urandom_range(99) >= cfg.hole_pct;
       default:         return 1'b1;
     endcase
   endfunction

@@ -9,8 +9,8 @@ package aou_fdi_test_pkg;
   import aou_rule_pkg::*;
   `include "uvm_macros.svh"
   `include "aou_macros.svh"
-  import aou_fdi_pkg::*;
-  import aou_lsm_pkg::*;
+  import ucie_fdi_pkg::*;
+  import ucie_lsm_pkg::*;
   import aou_axi_pkg::*;
   import aou_t1_env_pkg::aou_t1_rx_align_chk;
 

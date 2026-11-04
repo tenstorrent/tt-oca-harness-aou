@@ -15,8 +15,8 @@ class aou_t1_env extends uvm_env;
   aou_t1_env_cfg       cfg;
   aou_axi_mgr_agent    s_mgr[];
   aou_axi_sub_agent    m_sub[];
-  aou_fdi_agent        fdi[AOU_T1_N_PHY];
-  aou_lsm_agent        lsm;
+  ucie_fdi_agent        fdi[AOU_T1_N_PHY];
+  ucie_lsm_agent        lsm;
   aou_l3_agent         l3;
   aou_remote_axi_model remote;
   aou_t1_l4a_adapter   l4a;
@@ -51,7 +51,7 @@ class aou_t1_env extends uvm_env;
   aou_t1_vseqr         vseqr;
   aou_t1_l1_pump_seq   pump;
 
-  virtual aou_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_lsm_if lsm_vif;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -63,7 +63,7 @@ class aou_t1_env extends uvm_env;
       cfg = aou_t1_env_cfg::type_id::create("cfg");
     cfg.finalize();
     `uvm_info(get_type_name(), cfg.convert2string(), UVM_LOW)
-    if (!uvm_config_db #(virtual aou_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
+    if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
       `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
 
     expects = aou_t1_expect::type_id::create("expects", this);
@@ -80,11 +80,11 @@ class aou_t1_env extends uvm_env;
     end
 
     foreach (fdi[p]) begin
-      fdi[p] = aou_fdi_agent::type_id::create($sformatf("fdi%0d", p), this);
+      fdi[p] = ucie_fdi_agent::type_id::create($sformatf("fdi%0d", p), this);
       fdi[p].cfg = cfg.fdi_cfg[p];
       cfg.lsm_cfg.gate.push_back(cfg.fdi_cfg[p].gate);
     end
-    lsm = aou_lsm_agent::type_id::create("lsm", this);
+    lsm = ucie_lsm_agent::type_id::create("lsm", this);
     lsm.cfg = cfg.lsm_cfg;
 
     remote = aou_remote_axi_model::type_id::create("remote", this);

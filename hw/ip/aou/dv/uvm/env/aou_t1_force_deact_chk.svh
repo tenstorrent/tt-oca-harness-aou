@@ -39,8 +39,8 @@ class aou_t1_force_deact_chk extends uvm_component;
 
   virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb_vif;
   virtual aou_rst_if     rst_vif;   // core clock and core reset
-  virtual aou_fdi_lsm_if lsm_vif;
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
+  virtual ucie_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
   aou_t1_env_cfg         cfg;
   aou_core               rm;
   aou_t1_status          status;

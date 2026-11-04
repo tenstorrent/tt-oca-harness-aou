@@ -4,7 +4,7 @@
 // Adapter side of the FDI link state (UCIe r1.1 §8.2.3-8.2.9, §8.3.3):
 // drives pl_state_sts on every PHY, pl_inband_pres, pl_clk_req,
 // pl_wake_ack and pl_rx_active_req, and runs Adapter-initiated events from
-// aou_lsm_item. pl_wake_ack follows lp_wake_req in the background. Before
+// ucie_lsm_item. pl_wake_ack follows lp_wake_req in the background. Before
 // leaving Active it closes the L1 gates (flit boundary in both directions)
 // and lowers rx_active (FDI-R29); every entry to Active repeats the
 // rx_active handshake (FDI-R34). Reset aborts the current event.
@@ -21,7 +21,7 @@
 // trains again by itself, without waiting for a NOP->Active request
 // (§8.3.3.8 allows either trigger).
 //
-// Events can also end another way (aou_lsm_item::to): a Retrain that ends in
+// Events can also end another way (ucie_lsm_item::to): a Retrain that ends in
 // LinkError, LinkReset or Disabled, a LinkReset or Disabled that escalates to
 // LinkError, and LSM_EV_ABORT, a bringup or a PM exit from L1 that the
 // Adapter abandons part-way (do_abort). LinkError may follow any state,
@@ -30,13 +30,13 @@
 // of UCIe r3.0 §10.2.3.2 rules 6 and 7 (r1.1 §8.2.3.2): before a LinkError the
 // request may come before or after the status change, before any other exit
 // it must come first.
-class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
-  `uvm_component_utils(aou_lsm_driver)
+class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
+  `uvm_component_utils(ucie_lsm_driver)
 
-  virtual aou_fdi_lsm_if lsm_vif;
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[2];
-  aou_lsm_cfg     cfg;
-  aou_lsm_state_e state = LSM_RESET;
+  virtual ucie_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[2];
+  ucie_lsm_cfg     cfg;
+  ucie_lsm_state_e state = LSM_RESET;
   bit             link_active;   // Active and the gates are open
   int unsigned    n_le_react;    // LinkErrors entered on the DUT's lp_linkerror (react_loop)
   int unsigned    n_le;          // Adapter-initiated LinkErrors (events)
@@ -50,7 +50,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   local bit       down_reset;    // Reset entered from LinkError/LinkReset/Disabled
   local bit       clk_req_q;
   local bit       wake_ack_q;
-  local bit       wake_ack_hold; // an abort keeps pl_wake_ack low (aou_lsm_item::hold_wake_ack)
+  local bit       wake_ack_hold; // an abort keeps pl_wake_ack low (ucie_lsm_item::hold_wake_ack)
   local bit       rx_req_q;
 
   function new(string name, uvm_component parent);
@@ -158,7 +158,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     end
   endtask
 
-  task execute(aou_lsm_item it);
+  task execute(ucie_lsm_item it);
     int unsigned dwell = it.cycles != 0 ? it.cycles : cfg.dwell();
     if (it.kind != LSM_EV_LINKERROR) le_absorbed = 1'b0;
     case (it.kind)
@@ -179,7 +179,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   // -------------------------------------------------------------------------
   // Signal helpers
   // -------------------------------------------------------------------------
-  task set_state(aou_lsm_state_e s);
+  task set_state(ucie_lsm_state_e s);
     bit ok;
     logic [3:0] code = sts_code(s, ok);
     bit ok_r;
@@ -257,7 +257,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
     end
   endtask
 
-  local task wait_req(aou_lsm_req_e r, string rule);
+  local task wait_req(ucie_lsm_req_e r, string rule);
     wait_dut("lp_state_req", req_code(r), rule);
   endtask
 
@@ -361,7 +361,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   // no clk_req handshake: rules 21/22 cover Reset, LinkReset, Disabled and PM
   // only). A LinkError the DUT raises on lp_linkerror meanwhile is answered as
   // in Active (Table 8-2: LinkError, held while lp_linkerror is 1).
-  task do_retrain(int unsigned dwell, aou_lsm_state_e to = LSM_UNKNOWN);
+  task do_retrain(int unsigned dwell, ucie_lsm_state_e to = LSM_UNKNOWN);
     int unsigned trig = 0;
     int unsigned n = 0;
     if (state != LSM_ACTIVE) begin
@@ -551,7 +551,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   // Reset (LinkReset and Disabled may both move to LinkError, §8.3.3), after
   // the pl_clk_req handshake rule 21 asks for; the request is held until the
   // status has changed.
-  local task link_down(aou_lsm_state_e s, int unsigned dwell, bit escalate = 1'b0);
+  local task link_down(ucie_lsm_state_e s, int unsigned dwell, bit escalate = 1'b0);
     close_gates();
     rx_active(1'b0);
     set_state(s);
@@ -588,7 +588,7 @@ class aou_lsm_driver extends uvm_driver #(aou_lsm_item);
   // DUT already requested Active on it (a request in the same cycle as the
   // status change is not used). After the dwell the
   // Adapter reports Reset and, with cfg.rebringup_after_down, trains again.
-  task do_abort(aou_lsm_item it, int unsigned dwell);
+  task do_abort(ucie_lsm_item it, int unsigned dwell);
     bit linkdown = it.to inside {LSM_LINKRESET, LSM_DISABLED};
     if (!(it.to inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED, LSM_RESET}))
       `uvm_fatal(get_type_name(), {"an abort cannot end in ", it.to.name()})

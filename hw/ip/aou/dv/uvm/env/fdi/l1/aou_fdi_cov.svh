@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// L1 functional coverage, sampled by aou_fdi_monitor. Values are clamped
+// L1 functional coverage, sampled by ucie_fdi_monitor. Values are clamped
 // before sampling so every bin is a plain value or range.
 class aou_fdi_cov extends uvm_object;
   `uvm_object_utils(aou_fdi_cov)
@@ -154,9 +154,9 @@ class aou_fdi_cov extends uvm_object;
     end
   endfunction
 
-  function void sample_xfer(aou_fdi_dir_e dir, int unsigned beat_bytes, int unsigned stall,
+  function void sample_xfer(ucie_fdi_dir_e dir, int unsigned beat_bytes, int unsigned stall,
                             int unsigned gap);
-    x_rx = dir == AOU_FDI_RX;
+    x_rx = dir == UCIE_FDI_RX;
     x_beat_bytes = beat_bytes;
     x_stall = stall > 5 ? 5 : stall;
     x_gap = gap > 4 ? 4 : gap;

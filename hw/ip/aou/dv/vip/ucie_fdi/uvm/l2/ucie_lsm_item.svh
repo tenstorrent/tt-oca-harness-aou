@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// One Adapter-initiated link event for aou_lsm_driver.
-class aou_lsm_item extends uvm_sequence_item;
-  `uvm_object_utils(aou_lsm_item)
+// One Adapter-initiated link event for ucie_lsm_driver.
+class ucie_lsm_item extends uvm_sequence_item;
+  `uvm_object_utils(ucie_lsm_item)
 
-  rand aou_lsm_ev_e kind;
+  rand ucie_lsm_ev_e kind;
   rand int unsigned cycles;  // dwell time; 0 lets the driver pick from cfg
 
   // How the event ends, when not as usual (LSM_UNKNOWN: as usual):
@@ -13,13 +13,13 @@ class aou_lsm_item extends uvm_sequence_item;
   //   LSM_EV_LINK_RESET/DISABLED  LinkError before Reset (an escalation);
   //   LSM_EV_ABORT                LinkError, LinkReset or Disabled, or Reset: the
   //                               Adapter, still in Reset, drops pl_inband_pres.
-  aou_lsm_state_e to = LSM_UNKNOWN;
+  ucie_lsm_state_e to = LSM_UNKNOWN;
   // LSM_EV_ABORT only: where the bringup (or, with in_l1, the PM exit from L1)
   // is abandoned; `gap` cycles after the waking pl_clk_req (LSM_AB_WAKE; 0 sends
   // the status first and the clk_req after, which only a LinkError may do) or
   // after the DUT's Active request (LSM_AB_REQ_ACTIVE); hold_wake_ack keeps
   // pl_wake_ack low until the abort.
-  aou_lsm_abort_e at = LSM_AB_RESET;
+  ucie_lsm_abort_e at = LSM_AB_RESET;
   bit             in_l1 = 1'b0;
   int unsigned    gap = 0;
   bit             hold_wake_ack = 1'b0;
@@ -30,7 +30,7 @@ class aou_lsm_item extends uvm_sequence_item;
     cycles <= 100000;
   }
 
-  function new(string name = "aou_lsm_item");
+  function new(string name = "ucie_lsm_item");
     super.new(name);
   endfunction
 

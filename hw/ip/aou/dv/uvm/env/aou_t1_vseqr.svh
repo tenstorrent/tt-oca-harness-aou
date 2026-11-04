@@ -9,8 +9,8 @@ class aou_t1_vseqr extends uvm_sequencer;
   aou_t1_env                       env;
   aou_axi_sequencer                s_mgr_sqr[];   // local managers, per RP
   aou_axi_sequencer                r_mgr_sqr[];   // remote managers (through L3), per RP
-  uvm_sequencer #(aou_flit_item)   fdi_sqr[AOU_T1_N_PHY];
-  uvm_sequencer #(aou_lsm_item)    lsm_sqr;
+  uvm_sequencer #(ucie_flit_item)   fdi_sqr[AOU_T1_N_PHY];
+  uvm_sequencer #(ucie_lsm_item)    lsm_sqr;
   aou_l3_sequencer                 l3_sqr;
   aou_apb_sequencer                apb_sqr;
   aou_core                         regs;

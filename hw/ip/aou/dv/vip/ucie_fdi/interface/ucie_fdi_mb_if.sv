@@ -5,7 +5,7 @@
 // always DATA_W wide so every PHY shares one virtual-interface type; the
 // agent config holds the real beat width and the top slices the bus.
 
-interface aou_fdi_mb_if #(
+interface ucie_fdi_mb_if #(
     parameter int DATA_W = 1024
 ) (
     input logic clk,

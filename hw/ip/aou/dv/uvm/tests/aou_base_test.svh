@@ -16,7 +16,7 @@
 // N0,N1,.. the remote die's AXI data bytes (all RPs, or per RP); +active_phy=P
 // the PHY the remote die uses in two-PHY builds (default: random per seed);
 // +trdy=always|random|bursty|holes, +trdy_pct=N, +hole_pct=N, +burst_max=N the
-// Adapter's pl_trdy policy on every PHY (aou_fdi_cfg), over what the test sets;
+// Adapter's pl_trdy policy on every PHY (ucie_fdi_cfg), over what the test sets;
 // the L1 stall and cancel knobs of aou_t1_env_cfg::l1_plusargs().
 // +remote_max_burst=2^n the remote die's splitter splits bursts past n beats
 // (default 256); +remote_max_burst_rand=1 re-picks it whenever the remote is idle;
@@ -169,10 +169,10 @@ class aou_base_test extends ocah_test;
     foreach (cfg.fdi_cfg[p]) begin
       if ($value$plusargs("trdy=%s", pol)) begin
         case (pol)
-          "always": cfg.fdi_cfg[p].trdy_policy = aou_fdi_pkg::AOU_TRDY_ALWAYS;
-          "random": cfg.fdi_cfg[p].trdy_policy = aou_fdi_pkg::AOU_TRDY_RANDOM;
-          "bursty": cfg.fdi_cfg[p].trdy_policy = aou_fdi_pkg::AOU_TRDY_BURSTY;
-          "holes":  cfg.fdi_cfg[p].trdy_policy = aou_fdi_pkg::AOU_TRDY_HOLES;
+          "always": cfg.fdi_cfg[p].trdy_policy = ucie_fdi_pkg::UCIE_TRDY_ALWAYS;
+          "random": cfg.fdi_cfg[p].trdy_policy = ucie_fdi_pkg::UCIE_TRDY_RANDOM;
+          "bursty": cfg.fdi_cfg[p].trdy_policy = ucie_fdi_pkg::UCIE_TRDY_BURSTY;
+          "holes":  cfg.fdi_cfg[p].trdy_policy = ucie_fdi_pkg::UCIE_TRDY_HOLES;
           default: `uvm_fatal(get_type_name(), {"+trdy=", pol, ": not always|random|bursty|holes"})
         endcase
       end

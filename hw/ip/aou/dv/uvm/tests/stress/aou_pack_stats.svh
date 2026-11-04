@@ -28,8 +28,8 @@ class aou_pack_stats extends uvm_component;
 
   uvm_tlm_analysis_fifo #(aou_msg) dut_fifo;   // DUT -> model (TX)
   uvm_tlm_analysis_fifo #(aou_msg) tb_fifo;    // model -> DUT (RX)
-  uvm_analysis_imp_l1tx #(aou_flit_item, aou_pack_stats) l1_tx_imp;
-  uvm_analysis_imp_l1rx #(aou_flit_item, aou_pack_stats) l1_rx_imp;
+  uvm_analysis_imp_l1tx #(ucie_flit_item, aou_pack_stats) l1_tx_imp;
+  uvm_analysis_imp_l1rx #(ucie_flit_item, aou_pack_stats) l1_rx_imp;
 
   string       req[$];
   int unsigned cnt[2][string];
@@ -57,17 +57,17 @@ class aou_pack_stats extends uvm_component;
     if (!cnt[d].exists(key) || cnt[d][key] < v) cnt[d][key] = v;
   endfunction
 
-  function void l1(aou_flit_item f, int d);
+  function void l1(ucie_flit_item f, int d);
     if (f.gap_before == 0 && f.n_stall_cycles == 0) run[d]++;
     else run[d] = 1;
     keep_max(d, "b2b_run", run[d]);
   endfunction
 
-  function void write_l1tx(aou_flit_item f);
+  function void write_l1tx(ucie_flit_item f);
     l1(f, 0);
   endfunction
 
-  function void write_l1rx(aou_flit_item f);
+  function void write_l1rx(ucie_flit_item f);
     l1(f, 1);
   endfunction
 

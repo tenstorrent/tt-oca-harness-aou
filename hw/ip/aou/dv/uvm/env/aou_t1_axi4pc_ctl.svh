@@ -27,14 +27,14 @@
 class aou_t1_axi4pc_ctl extends uvm_component;
   `uvm_component_utils(aou_t1_axi4pc_ctl)
 
-  uvm_analysis_imp #(aou_lsm_obs, aou_t1_axi4pc_ctl) lsm_imp;
+  uvm_analysis_imp #(ucie_lsm_obs, aou_t1_axi4pc_ctl) lsm_imp;
   virtual aou_axi4pc_ctl_if vif;
   aou_axi_sub_driver m_drv[];
   int unsigned n_events;
 
   protected bit             pending;
   protected bit             have_prev;
-  protected aou_lsm_state_e prev_sts;
+  protected ucie_lsm_state_e prev_sts;
   protected bit             prev_rst_n;
   protected bit             off_s[8];
   protected bit             off_m[8];
@@ -59,7 +59,7 @@ class aou_t1_axi4pc_ctl extends uvm_component;
     void'(uvm_config_db #(virtual aou_axi4pc_ctl_if)::get(this, "", "axi4pc_ctl", vif));
   endfunction
 
-  function void write(aou_lsm_obs o);
+  function void write(ucie_lsm_obs o);
     bit lost = have_prev && o.rst_n && prev_rst_n &&
                prev_sts inside {LSM_ACTIVE, LSM_RETRAIN} &&
                o.sts inside {LSM_RESET, LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED} &&

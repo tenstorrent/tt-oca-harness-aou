@@ -9,15 +9,15 @@
 //   cycle after a 128B half drops that half (FDI-R05).
 // Reset flushes both directions, and so does a LinkError the Adapter entered
 // mid-flit (gate abort; UCIe r1.1 8.3.3.7): the partial flits are abandoned.
-class aou_fdi_monitor extends uvm_monitor;
-  `uvm_component_utils(aou_fdi_monitor)
+class ucie_fdi_monitor extends uvm_monitor;
+  `uvm_component_utils(ucie_fdi_monitor)
 
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) vif;
-  aou_fdi_cfg cfg;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) vif;
+  ucie_fdi_cfg cfg;
   aou_fdi_cov cov;
 
-  uvm_analysis_port #(aou_flit_item) ap_tx;
-  uvm_analysis_port #(aou_flit_item) ap_rx;
+  uvm_analysis_port #(ucie_flit_item) ap_tx;
+  uvm_analysis_port #(ucie_flit_item) ap_rx;
 
   int unsigned n_tx_flits;
   int unsigned n_rx_flits;
@@ -37,12 +37,12 @@ class aou_fdi_monitor extends uvm_monitor;
   // the seed drew doesn't decide the result.
   int unsigned n_tx_ready;
 
-  local aou_flit_item tx_cur;
+  local ucie_flit_item tx_cur;
   local int unsigned  tx_beat;
   local int unsigned  tx_gap;
   local int unsigned  tx_stall;
 
-  local aou_flit_item rx_cur;
+  local ucie_flit_item rx_cur;
   local int unsigned  rx_beat;
   local int unsigned  rx_gap;
   local int unsigned  rx_bubbles;
@@ -188,8 +188,8 @@ class aou_fdi_monitor extends uvm_monitor;
       return;
     end
     if (tx_beat == 0) begin
-      tx_cur = aou_flit_item::type_id::create("tx_cur");
-      tx_cur.dir = AOU_FDI_TX;
+      tx_cur = ucie_flit_item::type_id::create("tx_cur");
+      tx_cur.dir = UCIE_FDI_TX;
       tx_cur.phy = cfg.phy;
       tx_cur.t_start = $time;
       tx_cur.gap_before = tx_gap;
@@ -207,7 +207,7 @@ class aou_fdi_monitor extends uvm_monitor;
         err("FDI-R45", $sformatf("Adapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
                                  tx_cur.data[0], tx_cur.data[1], tx_cur.data[126],
                                  tx_cur.data[127], tx_cur.data[254], tx_cur.data[255]));
-      if (cov != null) cov.sample_xfer(AOU_FDI_TX, cfg.beat_bytes, tx_stall, tx_cur.gap_before);
+      if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, tx_cur.gap_before);
       n_tx_flits++;
       `uvm_info(get_type_name(), {"DUT TX ", tx_cur.convert2string()}, UVM_HIGH)
       ap_tx.write(tx_cur);
@@ -305,8 +305,8 @@ class aou_fdi_monitor extends uvm_monitor;
       return;
     end
     if (rx_cur == null) begin
-      rx_cur = aou_flit_item::type_id::create("rx_cur");
-      rx_cur.dir = AOU_FDI_RX;
+      rx_cur = ucie_flit_item::type_id::create("rx_cur");
+      rx_cur.dir = UCIE_FDI_RX;
       rx_cur.phy = cfg.phy;
       rx_cur.t_start = $time;
       rx_cur.gap_before = rx_gap;
@@ -323,7 +323,7 @@ class aou_fdi_monitor extends uvm_monitor;
     if (rx_cur.n_cancel_h1 != 0) n_rx_cancel_h1++;
     if (rx_cur.n_cancel_h0 > 1 || rx_cur.n_cancel_h1 > 1) n_rx_cancel_rep++;
     rx_cur.n_stall_cycles = rx_bubbles;
-    if (cov != null) cov.sample_xfer(AOU_FDI_RX, cfg.beat_bytes, rx_bubbles, rx_cur.gap_before);
+    if (cov != null) cov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, rx_cur.gap_before);
     n_rx_flits++;
     `uvm_info(get_type_name(), {"DUT RX ", rx_cur.convert2string()}, UVM_HIGH)
     ap_rx.write(rx_cur);

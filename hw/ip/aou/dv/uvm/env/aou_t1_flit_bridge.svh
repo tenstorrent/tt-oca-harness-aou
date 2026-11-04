@@ -6,7 +6,7 @@
 class aou_t1_flit_bridge extends uvm_component;
   `uvm_component_utils(aou_t1_flit_bridge)
 
-  uvm_analysis_imp #(aou_flit_item, aou_t1_flit_bridge) l1_imp;
+  uvm_analysis_imp #(ucie_flit_item, aou_t1_flit_bridge) l1_imp;
   uvm_analysis_port #(aou_l3_flit_item)                 ap;
   int unsigned                                          n_flits;
   bit                                                   enable = 1'b1;
@@ -17,7 +17,7 @@ class aou_t1_flit_bridge extends uvm_component;
     ap = new("ap", this);
   endfunction
 
-  function void write(aou_flit_item f);
+  function void write(ucie_flit_item f);
     aou_l3_flit_item it;
     if (!enable) return;
     it = aou_l3_flit_item::type_id::create("it");

@@ -4,8 +4,8 @@
 // Shared between L2 and the L1 components of one PHY. L2 opens the gate when
 // the link is Active and closes it before leaving Active; L1 then stops at the
 // next flit boundary in each direction and reports quiet().
-class aou_fdi_gate extends uvm_object;
-  `uvm_object_utils(aou_fdi_gate)
+class ucie_fdi_gate extends uvm_object;
+  `uvm_object_utils(ucie_fdi_gate)
 
   bit open = 1'b0;     // L2: mainband may run
   // L2: only the RX mainband may run, before Active (pl_state_sts still Reset
@@ -22,7 +22,7 @@ class aou_fdi_gate extends uvm_object;
   // contract): a flit the PL driver fetched before is dropped, not sent.
   int unsigned epoch;
 
-  function new(string name = "aou_fdi_gate");
+  function new(string name = "ucie_fdi_gate");
     super.new(name);
   endfunction
 

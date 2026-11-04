@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-class aou_lsm_cfg extends uvm_object;
-  `uvm_object_utils(aou_lsm_cfg)
+class ucie_lsm_cfg extends uvm_object;
+  `uvm_object_utils(ucie_lsm_cfg)
 
   int unsigned  n_phy = 1;
   int unsigned  active_phy = 0;          // drives I_PHY_TYPE
@@ -52,10 +52,10 @@ class aou_lsm_cfg extends uvm_object;
   int unsigned  ref_slack = 3;           // cycles a DUT output may lag the model
 
   // L1 handles of each PHY, set by the environment.
-  aou_fdi_gate         gate[$];
-  aou_fdi_tx_responder rsp[$];
+  ucie_fdi_gate         gate[$];
+  ucie_fdi_tx_responder rsp[$];
 
-  function new(string name = "aou_lsm_cfg");
+  function new(string name = "ucie_lsm_cfg");
     super.new(name);
   endfunction
 

@@ -3,9 +3,9 @@
 //
 // FDI link-state handshakes (shared by both PHYs), the DUT's bringup software
 // pins and its bringup status. pl_state_sts is per PHY and lives on
-// aou_fdi_mb_if.
+// ucie_fdi_mb_if.
 
-interface aou_fdi_lsm_if (
+interface ucie_fdi_lsm_if (
     input logic clk,
     input logic rst_n
 );

@@ -48,7 +48,7 @@
 class aou_bringup_model extends uvm_object;
   `uvm_object_utils(aou_bringup_model)
 
-  aou_lsm_cfg     cfg;
+  ucie_lsm_cfg     cfg;
   aou_lsm_cov     cov;
   aou_brg_state_e st = BRG_RESET;
   int unsigned    n_mismatch;
@@ -69,7 +69,7 @@ class aou_bringup_model extends uvm_object;
     super.new(name);
   endfunction
 
-  function aou_lsm_req_e pred_req();
+  function ucie_lsm_req_e pred_req();
     case (st)
       BRG_REQ_ACTIVE, BRG_ACTIVE: return LSM_REQ_ACTIVE;
       BRG_L1, BRG_L1_CLK_WAKE:    return LSM_REQ_L1;
@@ -81,7 +81,7 @@ class aou_bringup_model extends uvm_object;
     return st inside {BRG_WAKE_ASSERT, BRG_WAKE_WAIT_ACK, BRG_REQ_ACTIVE, BRG_ACTIVE, BRG_RETRAIN};
   endfunction
 
-  function aou_lsm_state_e pred_fsm();
+  function ucie_lsm_state_e pred_fsm();
     case (st)
       BRG_ACTIVE:              return LSM_ACTIVE;
       BRG_LINKERROR:           return LSM_LINKERROR;
@@ -140,7 +140,7 @@ class aou_bringup_model extends uvm_object;
     check_linkerror_raised();
   endfunction
 
-  function void step(aou_lsm_obs o);
+  function void step(ucie_lsm_obs o);
     bit ok;
     bit rx_sts_exp;
     logic [3:0] fsm_code;
@@ -238,7 +238,7 @@ class aou_bringup_model extends uvm_object;
     prev_rx_sts = o.rx_active_sts;
   endfunction
 
-  local function aou_brg_state_e next_state(aou_lsm_obs o);
+  local function aou_brg_state_e next_state(ucie_lsm_obs o);
     bit pl_reset = o.sts == LSM_RESET;
     bit pl_active = o.sts == LSM_ACTIVE;
     bit pl_linkerror = o.sts == LSM_LINKERROR;
