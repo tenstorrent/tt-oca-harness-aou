@@ -14,11 +14,12 @@ attribute at every port, and every RP width pairing. It doesn't judge the
 DUT; the always-on checkers do. A hit bin means the situation occurred in a
 passing run, so the checkers looked at it.
 
-The model has 31 testbench covergroups and a generic AXI4 monitor bound to
+The model has 33 testbench covergroups and a generic AXI4 monitor bound to
 every S and M port. The full regression of the model as it stood at PR #142
 (11 configurations, VCS, 5566 passing T1 runs merged) hit 4447 of the 4479
-headline bins (99.3%); the AXI4 back-pressure group has grown since (AW, W
-and AR stall lengths, both outcomes of a stall at the limit):
+headline bins (99.3%); since then the AXI4 back-pressure group has grown (AW, W
+and AR stall lengths, both outcomes of a stall at the limit) and the two
+asymmetric-RP-mapping groups were added:
 
 [cols="3,1,1",options="header"]
 |===
@@ -172,12 +173,16 @@ target). Illegal: a 4-granule ActivateReq starting after G0 or spanning flits
 (an Activation message always starts at G0, AoU v0.8 4.4), and three or more
 Misc messages in a half-flit (AoU v0.8 4.4 allows two).
 
-==== 5. Credits and Resource Planes (AoU v0.8 chapter 6)
+==== 5. Credits, Resource Planes and RP Mapping (AoU v0.8 chapter 6; MAS 3.10)
 
 Credit is per RP and per class (WriteReq, ReadReq, WriteData, ReadData,
-WriteResp); resource planes are independent.
+WriteResp); resource planes are independent. The asymmetric RP mapping
+(`ASYMMETRIC_RP_PROC_CON`, MAS 3.10.4) routes each S port's requests to a TX
+lane and may merge several ports onto one; the bench programs a random legal
+mapping per seed, and the two `cg_rp_map` groups show which routes and
+mappings carried traffic.
 Code: `uvm/env/l3/aou_l3_cov.svh`, `uvm/env/aou_t1_crd_flow_chk.svh`,
-`uvm/env/aou_t1_crd_rr_chk.svh`.
+`uvm/env/aou_t1_crd_rr_chk.svh`, `uvm/env/aou_t1_rp_map_chk.svh`.
 
 [cols="2,3,5,2",options="header"]
 |===
@@ -185,13 +190,18 @@ Code: `uvm/env/l3/aou_l3_cov.svh`, `uvm/env/aou_t1_crd_flow_chk.svh`,
 | `cg_credit` | Every way credit is granted, used and run out of, each way | class × {credit returned in the flit header; in a CrdtGrant message; both in one flit; a credited message sent} × tx/rx. Model waits on zero DUT credit (tx). DUT sends as soon as a grant ends its zero credit (rx). Model advertises more than its buffer holds, which the DUT must absorb (tx). Model advertises credit for the request-direction classes (WriteReq, ReadReq, WriteData) after its DeactivateReq and DeactivateAck, which may reach a DUT already DISABLED (tx) | `l3.cg_credit`
 | `cg_crd` | Resource-plane independence on the DUT's TX | per class: an RP with work and no credit (starved), and an RP that sent with credit while another RP was starved | `env.cg_crd`
 | `cg_crd_rr` | The DUT's round-robin return of header credit over RPs (MAS 3.9) | RPs owed credit when a test opened a window {2, 3, 4} | `env.cg_crd_rr`
+| `cg_rp_map_req` | The route each request the DUT sent took (MAS 3.10.4) | write/read; the S port it came from × the TX lane it went on (every port to every lane); route: mapping disabled, enabled on the port's own lane, moved to another port's lane alone, merged with other ports; route × direction | `env.cg_rp_map_req`
+| `cg_rp_map_cfg` | Each mapping that carried a request, once per programming or activation | shape: disabled with the lane selects at reset or not, enabled as the identity, moved ports only, one merge group of 2, 3 or 4 ports, two pairs; the DUT's RP count against the remote die's (2-4 × 1-4); merged or not, crossed with that pairing; a merge group of one width or of mixed widths; a port on a lane whose own port is narrower | `env.cg_rp_map_cfg`
 |===
 
 Excluded: the model's own credit counter saturating (no target); the model
 sending without credit, an injection AoU v0.8 6.1 gives no receiver reaction
 for, so the plan doesn't run it as a target; a round-robin window with fewer
-than two RPs owed, which has nothing to order. Illegal: the DUT sending
-without credit (a checker failure).
+than two RPs owed, which has nothing to order; the width points of
+`cg_rp_map_cfg` when no port is merged or none is wider than its lane. Not
+every pairing bin is reachable on every configuration (a 2-RP build has no
+merge of 3); the target is the union over configurations. Illegal: the DUT
+sending without credit (a checker failure).
 
 ==== 6. AXI Transactions Across the Link (AMBA AXI4)
 
@@ -280,7 +290,9 @@ These are verified by checks and directed tests and measured by code coverage,
 with no functional group: register fields and access (the register bench has
 no covergroups); interrupt sources, masking and W1C, beyond the watchdog's;
 QoS arbitration outcomes (`attr_cg` only shows that AxQOS values cross the
-link); DEST_RP remapping; the DUT's own AXI splitter (`split_cg` is the
+link), including the arbitration inside a merge group of the asymmetric RP
+mapping; DEST_RP permutations (the asymmetric mapping has `cg_rp_map_req`
+and `cg_rp_map_cfg`); the DUT's own AXI splitter (`split_cg` is the
 bench's) and aggregator; software and core resets during traffic; and
 performance, which the performance tests check against their own targets.
 Groups for them are open work in the verification plan's road-map.
@@ -344,7 +356,7 @@ Areas), with the groups that serve as evidence for their stimulus-shape items.
 | Credits and flow control | `cg_credit`, `cg_crd`, `cg_crd_rr`
 | Flit packing and message format | `cg_msg`, `cg_flit_layout`, `cg_span`, `cg_flit_occ`, `cg_wresp_flit`, `cg_wr_order`, `cg_act_flit`
 | AXI transactions, ordering and data integrity | `txn_cg`, `zero_cg`, `attr_cg`, `excl_cg`, `chan_cg`, `small_cg`, `cg_mo`, AXI4 port monitors (sizes, lengths, outstanding, back-pressure); data integrity has no group of its own: the scoreboard checks every transfer these count
-| Resource planes, DEST_RP and QoS arbitration | `cg_msg` (per RP), `cg_crd`, `cg_crd_rr`, `cg_wr_order` (per RP), `attr_cg` AxQOS only (no arbitration outcomes)
+| Resource planes, DEST_RP and QoS arbitration | `cg_msg` (per RP), `cg_crd`, `cg_crd_rr`, `cg_wr_order` (per RP), `cg_rp_map_req` and `cg_rp_map_cfg` (asymmetric RP mapping), `attr_cg` AxQOS only (no arbitration outcomes)
 | Width conversion, splitting and aggregation | `width_cg`, `mwr_cg`, AXI4 AxSIZE bins; none for the DUT's splitter (`split_cg` is the remote model's) or aggregator
 | Early write response and the write watchdog | `cg_early_tbl`, `cg_wdt`
 | Errors, debug FIFO and interrupts | `cg_act_op` (illegal ops), `cg_stray_dack`, `cg_fdi_abandon`
