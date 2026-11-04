@@ -216,24 +216,20 @@ assign O_R_WID = wid2nid[MAP_TABLE_IDX_WD'(I_R_NID)].wid;
 `ifdef ASSERTION_ON
 // synopsys translate_off
 
-localparam TOTAL_CNT_WD = MO_CNT_WD + $clog2(MAP_TABLE_ENTRY_NUM);
+// The limits this module enforces are per entry: at most MO_NUM requests
+// outstanding per distinct WID, and a new WID only into a free entry. The
+// total over all entries may exceed MO_NUM when nothing upstream bounds the
+// port's outstanding requests (the subordinate ID checker does so only while
+// AXI_SLV_ID_MISMATCH_EN is set); the table then back-pressures through
+// O_AR_MAP_READY once it is full.
 
-logic [TOTAL_CNT_WD-1:0] w_total_mo_cnt;
-
-always_comb begin
-    w_total_mo_cnt = '0;
-
-    for (int i = 0; i < MAP_TABLE_ENTRY_NUM; i++) begin
-        w_total_mo_cnt = w_total_mo_cnt + TOTAL_CNT_WD'(wid2nid[i].cnt);
-    end
-end
-
-aou_id_remapper_total_mo_assertion:
+aou_id_remapper_new_wid_free_entry_assertion:
     assert property (
         @(posedge I_CLK) disable iff (!I_RESETN)
-        w_total_mo_cnt <= TOTAL_CNT_WD'(MO_NUM)
+        (I_AR_VALID && O_AR_MAP_READY && !r_alloc_blk && !w_hit) |->
+            (w_alloc_found && !wid2nid[w_alloc_nid].vld)
     )
-    else $error("[%0t] %m: Total outstanding count exceeds MO_NUM. total=%0d, MO_NUM=%0d", $time, $sampled(w_total_mo_cnt), MO_NUM);
+    else $error("[%0t] %m: New WID allocated without a free entry.", $time);
 
 aou_id_remapper_hit_onehot_assertion:
     assert property (
@@ -257,6 +253,14 @@ generate
                 wid2nid[ai].vld == (wid2nid[ai].cnt != '0)
             )
             else $error("[%0t] %m: Entry valid/count mismatch.", $time);
+
+        aou_id_remapper_entry_mo_assertion:
+            assert property (
+                @(posedge I_CLK) disable iff (!I_RESETN)
+                wid2nid[ai].cnt <= MO_CNT_WD'(MO_NUM)
+            )
+            else $error("[%0t] %m: Entry outstanding count exceeds MO_NUM. cnt=%0d, MO_NUM=%0d",
+                        $time, $sampled(wid2nid[ai].cnt), MO_NUM);
     end
 endgenerate
 
