@@ -15,9 +15,10 @@ DUT; the always-on checkers do. A hit bin means the situation occurred in a
 passing run, so the checkers looked at it.
 
 The model has 31 testbench covergroups and a generic AXI4 monitor bound to
-every S and M port. The full regression of this coverage model (11
-configurations, VCS, 5566 passing T1 runs merged) hit 4447 of the 4479
-headline bins (99.3%):
+every S and M port. The full regression of the model as it stood at PR #142
+(11 configurations, VCS, 5566 passing T1 runs merged) hit 4447 of the 4479
+headline bins (99.3%); the AXI4 back-pressure group has grown since (AW, W
+and AR stall lengths, both outcomes of a stall at the limit):
 
 [cols="3,1,1",options="header"]
 |===
@@ -33,14 +34,12 @@ only a snapshot.
 
 Where the real holes are (details in <<aou-fcov-gaps>>):
 
-* *The S-port write outstanding limit is never reached,* probably because
-  the early write response returns B first, and no port has B held off while
-  at its write limit.
+* *No M port has a B stall end with its write limit in flight.* The DUT
+  buffers write responses, so its BREADY drops only once the port is below
+  the limit.
 * *Some FDI stall-handshake latencies are never seen.* These are the DUT's
-  choice and may depend on the FDI width.
+  choice, and two of the bins can't occur as defined.
 * *The DUT never requests L1 itself.*
-* *No failed exclusive read.* The memory model supports exclusives
-  everywhere, so it never answers one with OKAY.
 * *The DUT's packer never puts 16 or more WriteResps in one flit.*
 * *The v0.8 behaviour the RTL doesn't implement yet:* the 4-granule
   ActivateReq and the ERROR activation state.
@@ -297,19 +296,25 @@ has a bin added yet; each is recorded in the verification plan's road-map
   only from ACTIVATE, ENABLED and DEACTIVATE.
 . *A reserved Activation op.* `cg_act_op` reserved op × tx × illegal is a
   hole: no passing run injected one.
-. *Failed exclusive reads.* `excl_cg` read × OKAY is a hole on both paths. A
-  subordinate without exclusive support answers OKAY (AXI4 A7.2), so the
-  memory model needs a region without it.
-. *AXI4 port limits.* AXI4 `cg_os` writes "at the limit" is a hole on every
-  S port; the early response may be returning B before the limit is reached.
-  `cg_bp` "B stall at the limit" is a hole on every port, "R stall at the
-  limit" on one S port, and a B stall over 1000 cycles on one S port. Two M ports never saw a 32-beat burst at one AxSIZE
-  (32 B on one, 64 B on the other), a stimulus gap.
+. *M-port B stall at the limit (DUT).* `cg_bp` `cp_b_stall_at_max_os`
+  "at the limit" is a hole on every M port; every B stall the DUT puts on an
+  M port ends below the write limit. Long M-port B stalls come only from
+  tests that hold the DUT's TX: the DUT keeps accepting B into its own
+  buffering while its pending-ID table, full until the WriteResps leave,
+  keeps new AWs out, so the port is below its limit by the time BREADY
+  drops. The bin may be unreachable for this DUT; decide whether it is a
+  target. (An AWREADY stall over 1000 cycles on one M port is a seed-dependent
+  hole of the same group.)
 . *FDI stall latency (DUT).* `cg_fdi_stall` has six holes: a request at a
   flit boundary answered in 3 or more cycles, a mid-flit request answered in
-  2, `pl_trdy` low at a boundary, and an acknowledge held one cycle. They
-  record the DUT's timing and may be unreachable at some FDI widths. Decide
-  per bin whether it is a target.
+  2, `pl_trdy` low at a boundary, and an acknowledge held one cycle. With the
+  `pl_trdy` policy and stand-alone stalls now random per seed (several times
+  the stall samples) none of them moved: the DUT answers a request at a
+  boundary in 2 cycles and one inside a flit in 3 or more. Two can't occur as
+  defined: the monitor records `pl_trdy` low at the request only for a
+  mid-flit request (the UCIe r1.1 8.3.2 rule 7 corner), and `lp_stallack`
+  may not fall while `pl_stallreq` is high, which falls only after the
+  acknowledge is seen, so it is held at least 2 cycles. Exclusion candidates.
 . *DUT WriteResp density (DUT).* `cg_wresp_flit` rx 16-47 and 48 WriteResps
   per flit are holes. The DUT's packer may never build such flits; that is the
   DUT's choice, not a stimulus gap.
