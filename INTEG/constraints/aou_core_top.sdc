@@ -51,13 +51,15 @@ set_clock_uncertainty -hold  $CLK_APB_HOLD_UNCERTAINTY   [get_clocks clk_apb]
 # ------------------------------------------------------------------------------
 set_clock_groups -asynchronous \
     -group [get_clocks clk_core] \
-    -group [get_clocks clk_apb]
+    -group [get_clocks clk_apb] -allow_paths
 
 # ------------------------------------------------------------------------------
-#  4. Asynchronous resets -- false path
+#  4. Reset Recovery/Removal-compliant reset -- ideal_network
 # ------------------------------------------------------------------------------
-set_false_path -from [get_ports I_RESETN]
-set_false_path -from [get_ports I_PRESETN]
+set_ideal_network -no_propagate [get_ports I_CLK]
+set_ideal_network -no_propagate [get_ports I_PCLK]
+set_ideal_network -no_propagate [get_ports I_RESETN]
+set_ideal_network -no_propagate [get_ports I_PRESETN]
 
 # ------------------------------------------------------------------------------
 #  5. DFT -- static in functional mode
@@ -104,8 +106,11 @@ set APB_OUTPUTS {
 }
 
 set_input_delay  -clock clk_apb $APB_REG_INPUT_DELAY  [get_ports $APB_INPUTS]
+# Model reset input arrival at 0 ns relative to its reference clock.
+# Validate this assumption against the integration reset timing budget.
+# Recovery/removal checks are intended to remain enabled.
+set_input_delay  -clock clk_apb 0 [get_ports I_PRESETN]
 set_output_delay -clock clk_apb $APB_REG_OUTPUT_DELAY  [get_ports $APB_OUTPUTS]
-
 # ==============================================================================
 #  8. AXI Slave (TX) -- inputs: wire-to-FIFO (registered budget)
 #                     -- outputs: combinational (50/50 budget)
@@ -148,6 +153,11 @@ set AXI_S_COMB_INPUTS {
 }
 
 set_input_delay -clock clk_core $CORE_COMB_INPUT_DELAY [get_ports $AXI_S_COMB_INPUTS]
+
+# Model reset input arrival at 0 ns relative to its reference clock.
+# Validate this assumption against the integration reset timing budget.
+# Recovery/removal checks are intended to remain enabled.
+set_input_delay -clock clk_core 0 [get_ports I_RESETN]
 
 # --- AXI Slave outputs: all combinational ---
 set AXI_S_OUTPUTS {
@@ -298,3 +308,15 @@ set CTRL_INPUTS {
 }
 
 set_input_delay -clock clk_core $CORE_COMB_INPUT_DELAY [get_ports $CTRL_INPUTS]
+
+# ==============================================================================
+# 14. CDC path set_max_delay
+# ==============================================================================
+set delay_margin_pclk_to_aclk [expr $CLK_APB_PERIOD + $CLK_CORE_PERIOD*2]
+set_max_delay $delay_margin_pclk_to_aclk -from [get_ports I_AOU_APB_SI0_PWRITE] -to [get_clocks clk_core] -ignore_clock_latency
+set_max_delay $delay_margin_pclk_to_aclk -from [get_ports I_AOU_APB_SI0_PADDR*] -to [get_clocks clk_core] -ignore_clock_latency
+set_max_delay $delay_margin_pclk_to_aclk -from [get_ports I_AOU_APB_SI0_PWDATA*] -to [get_clocks clk_core] -ignore_clock_latency
+
+set delay_margin_aclk_to_pclk [expr $CLK_CORE_PERIOD + $CLK_APB_PERIOD*2]
+set_max_delay $delay_margin_aclk_to_pclk -from [get_pins u_async_apb_bridge/u_async_apb_bridge_mi/r_rdata*/clocked_on] -to [get_clocks clk_apb] -ignore_clock_latency
+set_max_delay $delay_margin_aclk_to_pclk -from [get_pins u_async_apb_bridge/u_async_apb_bridge_mi/r_slverr*/clocked_on] -to [get_clocks clk_apb] -ignore_clock_latency
