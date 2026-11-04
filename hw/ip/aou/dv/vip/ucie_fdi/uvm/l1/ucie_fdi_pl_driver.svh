@@ -7,8 +7,12 @@
 // once started it runs to completion, cancels and replays included. A
 // cancel comes in the cycle after the last beat of its 128B half
 // (FDI-R05), either with pl_valid low or with the replay's first beat. On a
-// 256 B FDI the flit is one beat and its cancel covers the whole flit. A
-// LinkError mid-flit (gate abort) abandons the flit at once.
+// 256 B FDI the flit is one beat and its cancel covers the whole flit. On a
+// 512 or 1024 B FDI a transfer carries up to 2 or 4 flits, taken from the
+// sequence as they are ready, on the low lanes with zeros (NOP flits) on the
+// rest; the first flit's cancel plan is the transfer's, and a cancel covers
+// every flit in it (UCIe r3.0 10.3.1). A LinkError mid-flit (gate abort)
+// abandons the flit at once.
 class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
   `uvm_component_utils(ucie_fdi_pl_driver)
 
@@ -20,6 +24,7 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
   // Random bytes for the cancelled copies of a half (cfg.poison_cancelled),
   // refilled for every flit that has a cancel.
   local ucie_flit_item poison;
+  local ucie_flit_item lanes[$];  // the flits of the transfer being driven
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -44,11 +49,44 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
         continue;
       end
       cfg.gate.rx_busy = 1'b1;
-      drive_flit(req);
+      lanes.delete();
+      lanes.push_back(req);
+      if (cfg.fpb() > 1) begin
+        // Several flits per transfer: release each as it is taken so the
+        // sequence can offer the next one in the same cycle.
+        seq_item_port.item_done();
+        fill_lanes();
+      end
+      drive_flit();
       cfg.gate.rx_busy = 1'b0;
+      if (cfg.fpb() == 1) seq_item_port.item_done();
+    end
+  endtask
+
+  // The other lanes of a wide transfer: the flits the sequence has ready now,
+  // fewer with partial_beat_pct.
+  local task fill_lanes();
+    int unsigned n = cfg.fpb();
+    if ($urandom_range(99) < cfg.partial_beat_pct) n = $urandom_range(n - 1, 1);
+    while (lanes.size() < n) begin
+      ucie_flit_item it;
+      seq_item_port.try_next_item(it);
+      if (it == null) break;
+      lanes.push_back(it);
       seq_item_port.item_done();
     end
   endtask
+
+  // Beat idx of the transfer: each lane's flit, or the poison copy for a
+  // cancelled one; lanes without a flit stay zero.
+  local function ucie_fdi_beat_t beat(int unsigned idx, bit poisoned);
+    ucie_fdi_beat_t b = '0;
+    foreach (lanes[l]) begin
+      ucie_flit_item src = poisoned ? poison : lanes[l];
+      b |= src.get_beat(cfg.beat_bytes, idx, l);
+    end
+    return b;
+  endfunction
 
   local task idle_cycle(bit cancel);
     vif.drv_cb.pl_valid <= 1'b0;
@@ -56,21 +94,22 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     @(vif.drv_cb);
   endtask
 
-  local task drive_flit(ucie_flit_item it);
+  local task drive_flit();
+    ucie_flit_item it = lanes[0];  // its plan is the transfer's
     int unsigned seg_half[$];
     ucie_fdi_cancel_e seg_cancel[$];
     int unsigned bph = cfg.bph();
 
     if (!valid_beat_bytes(cfg.beat_bytes))
       `uvm_fatal(get_type_name(), $sformatf("unsupported beat_bytes %0d", cfg.beat_bytes))
-    if (cfg.random_adapter_bytes) it.randomize_adapter_bytes();
+    if (cfg.random_adapter_bytes) foreach (lanes[l]) lanes[l].randomize_adapter_bytes();
     if (it.has_cancel() && cfg.poison_cancelled) begin
       poison.randomize_payload();
       poison.randomize_adapter_bytes();
     end
 
     if (halves_per_flit(cfg.beat_bytes) == 1) begin
-      // 256 B: one cancel unit, the flit. A plan that cancels either half
+      // 256 B and up: one cancel unit, the transfer. A plan that cancels either half
       // cancels the whole flit, cancel_repeat times, in the kind of its first
       // cancelled half; then the flit goes through.
       ucie_fdi_cancel_e kind = it.cancel_h0 != UCIE_CANCEL_NONE ? it.cancel_h0 : it.cancel_h1;
@@ -108,7 +147,7 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     end
 
     repeat (it.pre_gap) idle_cycle(1'b0);
-    it.t_start = $time;
+    foreach (lanes[l]) lanes[l].t_start = $time;
     cancel_next = 1'b0;
     foreach (seg_half[s]) begin
       bit cancelled = seg_cancel[s] != UCIE_CANCEL_NONE;
@@ -119,7 +158,7 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
             $urandom_range(99) < it.beat_gap_pct)
           repeat ($urandom_range(it.max_beat_gap, 1)) idle_cycle(1'b0);
         if (vif.drv_cb.rst_n !== 1'b1 || cfg.gate.abort) begin
-          if (cfg.gate.abort) cfg.gate.n_abandoned++;
+          if (cfg.gate.abort) cfg.gate.n_abandoned += lanes.size();
           `uvm_info(get_type_name(), cfg.gate.abort ? "LinkError during a flit; flit abandoned" :
                                      "reset during a flit; flit dropped", UVM_MEDIUM)
           // A half that failed CRC is still cancelled in the cycle after its last
@@ -130,9 +169,7 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
         end
         vif.drv_cb.pl_valid <= 1'b1;
         vif.drv_cb.pl_flit_cancel <= cancel_next;
-        vif.drv_cb.pl_data <= (cancelled && cfg.poison_cancelled) ?
-                              poison.get_beat(cfg.beat_bytes, idx) :
-                              it.get_beat(cfg.beat_bytes, idx);
+        vif.drv_cb.pl_data <= beat(idx, cancelled && cfg.poison_cancelled);
         cancel_next = 1'b0;
         @(vif.drv_cb);
       end
@@ -142,7 +179,10 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
         default: ;
       endcase
     end
-    it.t_end = $time;
-    `uvm_info(get_type_name(), {"sent ", it.convert2string()}, UVM_HIGH)
+    foreach (lanes[l]) begin
+      lanes[l].t_end = $time;
+      `uvm_info(get_type_name(), $sformatf("sent (lane %0d) %s", l, lanes[l].convert2string()),
+                UVM_HIGH)
+    end
   endtask
 endclass

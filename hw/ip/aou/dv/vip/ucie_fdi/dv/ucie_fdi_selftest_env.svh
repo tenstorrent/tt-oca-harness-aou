@@ -10,7 +10,8 @@
 // own monitors check the FDI rules on the way. An RX flit may be lost only
 // to a LinkError the Adapter entered mid-flit (UCIe r1.1 §8.3.3.7), so the
 // RX check skips ahead only after a link-down, which the scoreboard sees as an
-// observer of the link-state monitor.
+// observer of the link-state monitor. TX flits with an all-zero payload are
+// the stub's fillers of a wide transfer and are skipped.
 class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   `uvm_component_utils(ucie_fdi_selftest_sb)
 
@@ -19,7 +20,7 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
 
   ucie_flit_item rx_exp[$];   // sent by the test, not yet delivered
   ucie_flit_item lb_exp[$];   // delivered, not yet looped back
-  int unsigned   n_rx, n_tx, n_rx_lost, n_link_down;
+  int unsigned   n_rx, n_tx, n_rx_lost, n_link_down, n_tx_fill;
   local bit      rx_resync;
 
   function new(string name, uvm_component parent);
@@ -51,6 +52,10 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   endfunction
 
   function void write_tx(ucie_flit_item t);
+    if (empty_payload(t)) begin
+      n_tx_fill++;
+      return;
+    end
     if (lb_exp.size() == 0 || !lb_exp[0].same_payload(t)) begin
       `uvm_error(get_type_name(), {"TX flit not the next one delivered: ", t.convert2string()})
       if (lb_exp.size() != 0) void'(lb_exp.pop_front());
@@ -58,6 +63,11 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
     end
     void'(lb_exp.pop_front());
     n_tx++;
+  endfunction
+
+  local static function bit empty_payload(ucie_flit_item t);
+    foreach (t.data[i]) if (!is_adapter_byte(i) && t.data[i] != 8'h00) return 1'b0;
+    return 1'b1;
   endfunction
 
   virtual function void observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
@@ -79,8 +89,8 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
 
   function void report_phase(uvm_phase phase);
     `uvm_info(get_type_name(), $sformatf(
-              "%0d flits delivered, %0d looped back, %0d lost to %0d link-downs", n_rx, n_tx,
-              n_rx_lost, n_link_down), UVM_LOW)
+              "%0d flits delivered, %0d looped back (and %0d fillers), %0d lost to %0d link-downs",
+              n_rx, n_tx, n_tx_fill, n_rx_lost, n_link_down), UVM_LOW)
   endfunction
 endclass
 

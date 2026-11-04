@@ -42,6 +42,7 @@ Nothing the model does every clock allocates an object.
 | Done | Link-state agent (Adapter state machine, handshakes, events: Retrain, L1 entry and exit, LinkError incl. mid-flit, LinkReset, Disabled, aborted bringups) | - |
 | Done | Extension API: link-state observers and a mainband coverage collector (interface classes), flit analysis ports; own rule ledger, self-test | - |
 | Done | FDI widths of 32, 64, 128 and 256 bytes; at 256 B a flit is one transfer and its cancel covers the whole flit | - |
+| Done | FDI widths of 512 and 1024 bytes: 2 or 4 flits per transfer, NOP lanes on RX, a cancel covers every flit of the transfer (see "Flit widths 512 and 1024 B") | - |
 | Next | Covergroups of the model's own as a `ucie_fdi_cov` collector and a link-state observer (the AoU bench's are an example) | - |
 | Next | Protocol-Layer-initiated PM entry (`lp_state_req` = L1/L2), today not modelled | - |
 | Deferred | Other flit formats (68B, Standard 256B), RDI, the sideband, `pl_error` | a user who needs them |
@@ -71,8 +72,8 @@ r3.0 (r1.1 §8.2.x is r3.0 §10.2.x, §8.3.x is §10.3.x).
 | Area | UCIe r1.1 | What the model does |
 |---|---|---|
 | Flit format | §2.4.4, §3.3.4 (r3.0 §3.3.4) | Latency-Optimized 256B with optional bytes (Format 6): two 128B halves, Flit Header bytes 0-1 and CRC bytes 126-127, 254-255 owned by the Adapter |
-| Byte mapping | §8.3.1 | Flit byte k on FDI byte k mod N of transfer floor(k/N), N = 32, 64, 128 or 256 bytes; at 256 the flit is one transfer |
-| Data transfer | §8.2.4, Table 8-2 | RX: `pl_valid` with bubbles, `pl_flit_cancel` of either half (idle or with the replay's first beat, repeated), of the whole flit at 256 B (see "Flit width 256 B"); TX: `pl_trdy` by policy |
+| Byte mapping | §8.3.1 | Flit byte k on FDI byte k mod N of transfer floor(k/N), N = 32, 64, 128 or 256 bytes; at 256 the flit is one transfer; at 512 and 1024 (r3.0 §10.3.1) flit j of a transfer on bytes 256j to 256j+255 |
+| Data transfer | §8.2.4, Table 8-2 | RX: `pl_valid` with bubbles, `pl_flit_cancel` of either half (idle or with the replay's first beat, repeated), of the whole flit at 256 B (see "Flit width 256 B"), of every flit of the transfer at 512 and 1024 B, where RX transfers may carry NOP lanes; TX: `pl_trdy` by policy |
 | Stall | §8.3.2 | `pl_stallreq` / `lp_stallack`, at a flit boundary or mid-flit |
 | Clock gating | §8.2.3.1, §8.2.3.2 | `lp_wake_req` / `pl_wake_ack` responder, `pl_clk_req` / `lp_clk_ack` handshakes |
 | rx_active | §8.2.7 | `pl_rx_active_req` / `lp_rx_active_sts` on every Active entry and exit; optionally RX flits in Reset once the Receiver is active |
@@ -122,10 +123,10 @@ initial begin
 end
 ```
 
-The mainband interface is always `BUS_W` (2048) bits wide, so every FDI has the same
+The mainband interface is always `BUS_W` (8192) bits wide, so every FDI has the same
 virtual-interface type; connect the low `8 * beat_bytes` bits to the design. Take the
 width from `ucie_fdi_pkg::BUS_W`, never a literal: it grows with the widest FDI the
-model supports (it was 1024 before 256 B FDIs).
+model supports (it was 1024 before 256 B FDIs and 2048 before 512 and 1024 B ones).
 The Adapter drives the `pl_*` signals; the design drives the `lp_*` ones
 (`lp_linkerror` tied 0 if it has none). Config-db keys: `fdi_mb<p>` per FDI,
 `fdi_lsm` once.
@@ -255,7 +256,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 
 | Name | Contents |
 |---|---|
-| `ucie_fdi_pkg` | `FLIT_BYTES` (256), `HALF_BYTES` (128), `MIN_BEAT_BYTES` (32), `MAX_BEAT_BYTES` (256), `MAX_BEATS_PER_FLIT` (8), `BUS_W` (2048), `FDI_STS_ACTIVE`, `FDI_STS_RESET`; `ucie_fdi_dir_e` (`UCIE_FDI_TX`, `UCIE_FDI_RX`), `ucie_fdi_cancel_e` (`UCIE_CANCEL_NONE/IDLE/VALID`), `ucie_fdi_trdy_e` (`UCIE_TRDY_ALWAYS/RANDOM/BURSTY/HOLES`), `ucie_fdi_beat_t`; codec helpers `valid_beat_bytes`, `beats_per_flit` (1 once a transfer holds a flit), `flits_per_beat` (1 up to 256 B), `flit_chunk_bytes` (a flit's bytes per transfer), `beats_per_half` (the beats of one cancel unit: a half, or the one beat at 256 B), `halves_per_flit` (cancel units per flit: 2, or 1 at 256 B), `is_adapter_byte`, `is_crc_byte` |
+| `ucie_fdi_pkg` | `FLIT_BYTES` (256), `HALF_BYTES` (128), `MIN_BEAT_BYTES` (32), `MAX_BEAT_BYTES` (1024), `MAX_BEATS_PER_FLIT` (8), `BUS_W` (8192), `FDI_STS_ACTIVE`, `FDI_STS_RESET`; `ucie_fdi_dir_e` (`UCIE_FDI_TX`, `UCIE_FDI_RX`), `ucie_fdi_cancel_e` (`UCIE_CANCEL_NONE/IDLE/VALID`), `ucie_fdi_trdy_e` (`UCIE_TRDY_ALWAYS/RANDOM/BURSTY/HOLES`), `ucie_fdi_beat_t`; codec helpers `valid_beat_bytes`, `beats_per_flit` (1 once a transfer holds a flit), `flits_per_beat` (1 up to 256 B, 2 or 4 above), `flit_chunk_bytes` (a flit's bytes per transfer), `beats_per_half` (the beats of one cancel unit: a half, or the one beat from 256 B up), `halves_per_flit` (cancel units per flit: 2, or 1 from 256 B up), `is_adapter_byte`, `is_crc_byte` |
 | `ucie_lsm_pkg` | `ucie_lsm_state_e` (`LSM_RESET`, `LSM_ACTIVE`, `LSM_L1`, `LSM_RETRAIN`, `LSM_LINKRESET`, `LSM_LINKERROR`, `LSM_DISABLED`, ...), `ucie_lsm_req_e` (`LSM_REQ_*`), `ucie_lsm_ev_e` (`LSM_EV_*`), `ucie_lsm_abort_e` (`LSM_AB_*`); `sts_code`, `sts_decode`, `req_code`, `req_decode` (UCIe r1.1 Table 8-2 encodings) |
 | `ucie_fdi_mb_if #(DATA_W)` | `pl_valid`, `pl_data`, `pl_flit_cancel`, `pl_trdy`, `pl_stallreq`, `pl_state_sts`; `lp_valid`, `lp_irdy`, `lp_data`, `lp_stallack`; `rx_active` (driven by the top); clocking blocks `drv_cb`, `lsm_cb`, `mon_cb` |
 | `ucie_fdi_lsm_if` | `pl_inband_pres`, `pl_clk_req`, `pl_wake_ack`, `pl_rx_active_req`; `lp_state_req`, `lp_wake_req`, `lp_clk_ack`, `lp_rx_active_sts`, `lp_linkerror`; `drv_cb`, `mon_cb` |
@@ -265,16 +266,17 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | Field | Default | Meaning |
 |---|---|---|
 | `phy` | 0 | FDI index (config-db key `fdi_mb<phy>`) |
-| `beat_bytes` | 64 | FDI width: 32, 64, 128 or 256 bytes |
+| `beat_bytes` | 64 | FDI width: 32, 64, 128, 256, 512 or 1024 bytes |
 | `is_active` | 1 | 0: monitor only |
 | `trdy_policy` | `ALWAYS` | `pl_trdy`: always, `RANDOM` (`trdy_pct`), `BURSTY` (runs of 1..`burst_max`), `HOLES` (only inside a flit, `hole_pct` per beat) |
-| `stall_pct`, `stall_mid_pct` | 0, 0 | chance of a stand-alone stall per flit boundary, and the share raised mid-flit (none at 256 B, where every cycle is a flit boundary) |
+| `stall_pct`, `stall_mid_pct` | 0, 0 | chance of a stand-alone stall per flit boundary, and the share raised mid-flit (none from 256 B up, where every cycle is a flit boundary) |
 | `stall_hold_min`, `stall_hold_max` | 1, 8 | cycles `pl_stallreq` stays high after `lp_stallack` |
 | `stall_trdy_free` | 0 | keep the `pl_trdy` policy between `pl_stallreq` and `lp_stallack` instead of holding it high |
 | `stall_timeout` | 2000 | FDI-R57 bound |
 | `tx_hold` | 0 | `pl_trdy` low from the next flit boundary (back-pressure) |
-| `random_adapter_bytes` | 0 | random Flit Header and CRC bytes on RX (the Protocol Layer must ignore them) |
+| `random_adapter_bytes` | 0 | random Flit Header and CRC bytes on RX (the Protocol Layer must ignore them); the Protocol ID is kept, since 00b would make the flit a NOP |
 | `poison_cancelled` | 1 | cancelled halves carry random bytes |
+| `partial_beat_pct` | 0 | 512 and 1024 B: chance an RX transfer carries fewer flits than it could, the empty lanes zero (NOPs) |
 | `checks_en`, `cov_en` | 1, 1 | monitor checks; coverage calls to `mon.cov` |
 | `check_tx_adapter_bytes` | 1 | FDI-R45 |
 | `irdy_reset_grace` | 4 | cycles `lp_irdy` may stay high after entering Reset (FDI-R44) |
@@ -285,11 +287,11 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | Class | Role | Public |
 |---|---|---|
 | `ucie_fdi_agent` | one FDI | `cfg`, `vif`, `sqr`, `drv`, `rsp`, `mon` |
-| `ucie_flit_item` | one 256B flit | `data[256]`, `phy`, `dir`; drive plan `cancel_h0`, `cancel_h1`, `h1_replay_resend_h0`, `cancel_repeat`, `pre_gap`, `beat_gap_pct`, `max_beat_gap`; observed `n_cancel_h0/h1` (a whole-flit cancel at 256 B counts in `n_cancel_h0`), `n_cancel_valid`, `n_stall_cycles`, `gap_before`, `t_start`, `t_end`, `t_beat[]` (when each beat was collected); `get_beat`, `put_beat` (with a `lane` argument for a transfer wider than a flit, 0 today), `randomize_payload`, `clear_adapter_bytes`, `same_payload`, `copy_data`, `mix_cancel_plan` |
+| `ucie_flit_item` | one 256B flit (several share a transfer at 512 and 1024 B) | `data[256]`, `phy`, `dir`; drive plan `cancel_h0`, `cancel_h1`, `h1_replay_resend_h0`, `cancel_repeat`, `pre_gap`, `beat_gap_pct`, `max_beat_gap`; observed `n_cancel_h0/h1` (a whole-flit cancel at 256 B counts in `n_cancel_h0`), `n_cancel_valid`, `n_stall_cycles`, `gap_before`, `t_start`, `t_end`, `t_beat[]` (when each beat was collected); `get_beat`, `put_beat` (with a `lane` argument: the flit's 256 B lane of a 512 or 1024 B transfer), `is_nop` (Flit Header 0000h), `randomize_payload`, `clear_adapter_bytes`, `same_payload`, `copy_data`, `mix_cancel_plan` |
 | `ucie_flit_seq` | RX traffic | `n_flits`, `payloads[$]`, `cancel_pct`, `cancel_mix`, `gap_pct`, `bubble_pct`, `random_payload`, `pid` |
-| `ucie_fdi_pl_driver` | drives RX flits with their cancel plan | |
+| `ucie_fdi_pl_driver` | drives RX flits with their cancel plan; at 512 and 1024 B packs the flits the sequence has ready into one transfer, the first one's plan applying to all | |
 | `ucie_fdi_tx_responder` | `pl_trdy`, `pl_stallreq` | `stall_begin()`, `stall_end()`, `stalled()` |
-| `ucie_fdi_monitor` | both directions, checks | `ap_tx`, `ap_rx`, `cov`, counters `n_tx_flits`, `n_rx_flits`, `n_rx_cancels`, `n_stalls`, ... |
+| `ucie_fdi_monitor` | both directions, checks | `ap_tx`, `ap_rx`, `cov`, counters `n_tx_flits`, `n_rx_flits`, `n_rx_cancels`, `n_stalls`, `n_rx_nops` (RX NOP flits discarded), ... |
 | `ucie_fdi_cov` | interface class: a mainband coverage collector | `sample_xfer`, `sample_cancel`, `sample_stall`, `sample_abandon` (Extension API) |
 | `ucie_rule_log` | rule ledger | `check()`, `fire()`, `lines()`, `clear()` (static) |
 
@@ -347,34 +349,34 @@ violation is counted in `ucie_rule_log`.* A violation is a `uvm_error` with the
 checker's class name as the ID and the message starting `FDI-Rnn:`. "Design" rules
 check the Protocol Layer, "model" rules check the Adapter model itself.
 
-| Rule | Checks | Checker | UCIe r1.1 | At 256 B |
-|---|---|---|---|---|
-| FDI-R01 | a TX beat transfers only on `lp_irdy & lp_valid & pl_trdy` | `ucie_fdi_monitor` | §8.2.4 | unchanged: one beat is the flit |
-| FDI-R02 | design: no bubbles inside a TX flit | `ucie_fdi_monitor` | §8.2.4 | nothing to check: a TX flit is one beat, so it has no inside |
-| FDI-R05 | model: `pl_flit_cancel` only in the cycle after the last beat of a 128B half | `ucie_fdi_monitor` | Table 8-2 | in the cycle after the flit's one beat; it cancels the whole flit, since both halves end in that transfer |
-| FDI-R07 | `pl_stallreq` and `lp_stallack` low at reset exit | `ucie_fdi_monitor` | §8.3.2 | unchanged |
-| FDI-R08 | model: `pl_stallreq` rises with `lp_stallack` low, falls with it high | `ucie_fdi_monitor` | §8.3.2 | unchanged |
-| FDI-R09 | design: `lp_stallack` rises with `pl_stallreq` high, falls with it low | `ucie_fdi_monitor` | §8.3.2 | unchanged |
-| FDI-R10 | design: `lp_valid`, `lp_irdy` low while `lp_stallack` is high | `ucie_fdi_monitor` | §8.3.2 | unchanged |
-| FDI-R12 | design: at least one flop between `pl_stallreq` and `lp_stallack` | `ucie_fdi_monitor` | §8.3.2 | unchanged |
-| FDI-R13 | design: `lp_stallack` rises only at a flit boundary | `ucie_fdi_monitor` | §8.3.2 | always met: every cycle between TX beats is a flit boundary |
-| FDI-R14, R15 | model: `pl_wake_ack` follows `lp_wake_req` | `ucie_lsm_monitor` | §8.2.3.1 | unchanged (no mainband) |
-| FDI-R16 | design: `lp_wake_req` high when `lp_state_req` changes leaving Reset, PM, LinkReset or Disabled | `ucie_lsm_monitor` | §8.2.3, §8.2.3.1 | unchanged (no mainband) |
-| FDI-R18, R19 | design: `lp_clk_ack` answers `pl_clk_req` a clock later at the earliest, and falls after it | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.3.2 | unchanged (no mainband) |
-| FDI-R25, R29 | model: `pl_rx_active_req` rules; both rx_active signals low before leaving Active | `ucie_lsm_monitor` | §8.2.7 | unchanged (no mainband) |
-| FDI-R26, R28 | design: `lp_rx_active_sts` answers `pl_rx_active_req` | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.7 | unchanged (no mainband) |
-| FDI-R33 | design: NOP for at least a clock before Active from Reset | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.8, §8.3.3.1 | unchanged (no mainband) |
-| FDI-R35 | model: flits to the Protocol Layer only in Active (or Reset with the Receiver active) | `ucie_fdi_monitor` | §8.2.7, §8.2.8 | unchanged |
-| FDI-R41 | design: Active requested after a PM exit | `ucie_lsm_driver` | §8.2.9 | unchanged (no mainband) |
-| FDI-R42 | design: `lp_valid` only with `lp_irdy` | `ucie_fdi_monitor` | Table 8-2 | unchanged |
-| FDI-R43 | design: a TX flit starts only in Active | `ucie_fdi_monitor` | §8.2.4, §8.3.3 | unchanged |
-| FDI-R44 | design: `lp_irdy` low in Reset | `ucie_fdi_monitor` | Table 8-2 | unchanged |
-| FDI-R45 | design: TX Protocol ID non-zero, other Flit Header and CRC bytes zero | `ucie_fdi_monitor` | §2.4.4, §3.3.4 | unchanged: the same bytes, collected from one beat |
-| FDI-R46 | design: no reserved `lp_state_req` value | `ucie_lsm_monitor` | Table 8-2 | unchanged (no mainband) |
-| FDI-R47 | design: no Retrain request outside Raw Format | `ucie_lsm_monitor` | §8.3.3.4 | unchanged (no mainband) |
-| FDI-R48 | design: a Retrain from Active ends with NOP->Active | `ucie_lsm_driver` | §8.3.3.4 | unchanged (no mainband) |
-| FDI-R49 | design: `lp_linkerror` released once the Adapter reports LinkError | `ucie_lsm_driver` | §8.3.3.7 | unchanged (no mainband) |
-| FDI-R57 | design: `lp_stallack` within `stall_timeout` cycles of `pl_stallreq` (liveness bound) | `ucie_fdi_monitor` | §8.3.2 | unchanged |
+| Rule | Checks | Checker | UCIe r1.1 | At 256 B | At 512/1024 B |
+|---|---|---|---|---|---|
+| FDI-R01 | a TX beat transfers only on `lp_irdy & lp_valid & pl_trdy` | `ucie_fdi_monitor` | §8.2.4 | unchanged: one beat is the flit | unchanged: one beat is 2 or 4 flits |
+| FDI-R02 | design: no bubbles inside a TX flit | `ucie_fdi_monitor` | §8.2.4 | nothing to check: a TX flit is one beat, so it has no inside | nothing to check: a TX flit is one beat, so it has no inside |
+| FDI-R05 | model: `pl_flit_cancel` only in the cycle after the last beat of a 128B half | `ucie_fdi_monitor` | Table 8-2 | in the cycle after the flit's one beat; it cancels the whole flit, since both halves end in that transfer | in the cycle after the beat; it cancels every flit of the beat (r3.0 §10.3.1) |
+| FDI-R07 | `pl_stallreq` and `lp_stallack` low at reset exit | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
+| FDI-R08 | model: `pl_stallreq` rises with `lp_stallack` low, falls with it high | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
+| FDI-R09 | design: `lp_stallack` rises with `pl_stallreq` high, falls with it low | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
+| FDI-R10 | design: `lp_valid`, `lp_irdy` low while `lp_stallack` is high | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
+| FDI-R12 | design: at least one flop between `pl_stallreq` and `lp_stallack` | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
+| FDI-R13 | design: `lp_stallack` rises only at a flit boundary | `ucie_fdi_monitor` | §8.3.2 | always met: every cycle between TX beats is a flit boundary | always met, as at 256 B |
+| FDI-R14, R15 | model: `pl_wake_ack` follows `lp_wake_req` | `ucie_lsm_monitor` | §8.2.3.1 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R16 | design: `lp_wake_req` high when `lp_state_req` changes leaving Reset, PM, LinkReset or Disabled | `ucie_lsm_monitor` | §8.2.3, §8.2.3.1 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R18, R19 | design: `lp_clk_ack` answers `pl_clk_req` a clock later at the earliest, and falls after it | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.3.2 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R25, R29 | model: `pl_rx_active_req` rules; both rx_active signals low before leaving Active | `ucie_lsm_monitor` | §8.2.7 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R26, R28 | design: `lp_rx_active_sts` answers `pl_rx_active_req` | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.7 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R33 | design: NOP for at least a clock before Active from Reset | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.8, §8.3.3.1 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R35 | model: flits to the Protocol Layer only in Active (or Reset with the Receiver active) | `ucie_fdi_monitor` | §8.2.7, §8.2.8 | unchanged | unchanged; NOP lanes count as flits on the wire |
+| FDI-R41 | design: Active requested after a PM exit | `ucie_lsm_driver` | §8.2.9 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R42 | design: `lp_valid` only with `lp_irdy` | `ucie_fdi_monitor` | Table 8-2 | unchanged | unchanged |
+| FDI-R43 | design: a TX flit starts only in Active | `ucie_fdi_monitor` | §8.2.4, §8.3.3 | unchanged | unchanged |
+| FDI-R44 | design: `lp_irdy` low in Reset | `ucie_fdi_monitor` | Table 8-2 | unchanged | unchanged |
+| FDI-R45 | design: TX Protocol ID non-zero, other Flit Header and CRC bytes zero | `ucie_fdi_monitor` | §2.4.4, §3.3.4 | unchanged: the same bytes, collected from one beat | checked in every lane: the Protocol Layer sends valid data on the full width (r3.0 §10.3.1), so an empty lane (Protocol ID 00b) fails |
+| FDI-R46 | design: no reserved `lp_state_req` value | `ucie_lsm_monitor` | Table 8-2 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R47 | design: no Retrain request outside Raw Format | `ucie_lsm_monitor` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R48 | design: a Retrain from Active ends with NOP->Active | `ucie_lsm_driver` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R49 | design: `lp_linkerror` released once the Adapter reports LinkError | `ucie_lsm_driver` | §8.3.3.7 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R57 | design: `lp_stallack` within `stall_timeout` cycles of `pl_stallreq` (liveness bound) | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
 
 **Flit width 256 B.** UCIe r1.1 times `pl_flit_cancel` from the end of each 128B half
 (Table 8-2) and maps flit byte k to transfer floor(k/N) (§8.3.1). With N = 256 the
@@ -388,6 +390,21 @@ abandon, and a mid-flit LinkError can only catch an RX flit in its cancel cycle 
 between a cancel and its replay. The rules whose wording names a half or the inside of
 a flit are traced in the "At 256 B" column above.
 
+**Flit widths 512 and 1024 B.** UCIe r3.0 §10.3.1 (Implementation Note "NBYTES")
+covers FDIs wider than a flit, recommending multiples of 256 B. A transfer then carries
+2 or 4 flits, flit j on bytes 256j to 256j+255. The Adapter forwards whole flits on the
+low lanes and zeros on the rest; a Flit Header of 0000h is a NOP that the Protocol Layer
+discards (and Table 10-3, `pl_flit_cancel`, has it discard any uncancelled NOP). The
+Protocol Layer sends valid data on the full width, packing a Protocol Flit with empty
+slots if it has nothing else, so an empty TX lane is an FDI-R45 error. `pl_flit_cancel`
+applies to every flit of the transfer before it. The PL driver packs the flits the
+sequence has ready (fewer with `partial_beat_pct`) and uses the first flit's cancel plan
+for the transfer; the monitor publishes each lane as its own flit and drops NOPs on RX
+(at every width). As at 256 B every cycle between transfers is a flit boundary, so a
+stall request or a state change always lands on one. The spec leaves open whether a
+replay after a cancel re-sends the same flits in the same lanes; the monitor makes no
+assumption and takes the replay transfer as it comes.
+
 The model's own obligations that hold by construction (the clock-request ordering
 around link-state exits, Active only after the rx_active handshake, PM entry only after
 a stall, no flits with the Receiver inactive) are in the driver's comments.
@@ -398,11 +415,13 @@ a stall, no flits with the Receiver inactive) are in the driver's comments.
 (`mon.cov`, a `ucie_fdi_cov`) and `cov_en` calls it at every flit, cancel, stall and
 abandoned flit. Link-state coverage is an observer's: it sees every clock and samples
 what it needs. `sample_xfer` gets the FDI width, so a collector bins per width (32,
-64, 128, 256 bytes); `sample_cancel`'s `half` is 0 or 1 for a 128B half and 2 for a
-whole-flit cancel at 256 B. At 256 B a collector can never see a TX stall between
-beats, a stall raised mid-flit, a half cancel or an abandoned TX flit, so bins for
-those belong only to the narrower widths. The AoU bench's collectors are `aou_fdi_cov`
-and `aou_lsm_cov`. Stimulus quality figures (cancels, stalls, abandoned flits, RX beats in Reset) are also in
+64, 128, 256, 512, 1024 bytes); at 512 and 1024 B it is called once per flit of a
+transfer, NOPs not included. `sample_cancel`'s `half` is 0 or 1 for a 128B half and 2
+for a cancel of the whole transfer from 256 B up (one call per cancel, however many
+flits it drops). From 256 B up a collector can never see a TX stall between beats, a
+stall raised mid-flit, a half cancel or an abandoned TX flit, so bins for those belong
+only to the narrower widths. The AoU bench's collectors are `aou_fdi_cov`
+and `aou_lsm_cov`. Stimulus quality figures (cancels, stalls, abandoned flits, RX beats in Reset, RX NOPs and short wide transfers) are also in
 the mainband monitor's end-of-test summary.
 
 ## Self-test
@@ -420,10 +439,10 @@ make test UVM_HOME=<uvm-core checkout> SIM=verilator TEST=ucie_fdi_events_test P
 
 | Test | Covers |
 |---|---|
-| `ucie_fdi_smoke_test` | traffic both ways: cancels of every shape (whole-flit cancels at 256 B), bubbles, gaps, `pl_trdy` policy, stand-alone and mid-flit stalls, random Adapter bytes; fails if no RX flit was cancelled |
+| `ucie_fdi_smoke_test` | traffic both ways: cancels of every shape (whole-transfer cancels from 256 B up), short RX transfers with NOP lanes at 512 and 1024 B, bubbles, gaps, `pl_trdy` policy, stand-alone and mid-flit stalls, random Adapter bytes; fails if no RX flit was cancelled |
 | `ucie_fdi_events_test` | the same under Retrain, L1 entry and exit, a clock wake, LinkError entered mid-flit, LinkReset, Disabled and a Retrain ending in LinkError |
 
-Knobs: `+beat_bytes=32|64|128|256`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus
+Knobs: `+beat_bytes=32|64|128|256|512|1024`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus
 the model's plusargs. A run passes with no `UVM_ERROR` and no `UVM_FATAL`. Verilator
 needs `--vpi` and uses `dv/uvm_dpi_verilator.cc`, as the AoU bench does, and
 solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
@@ -432,10 +451,12 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
 
 - One flit format: Latency-Optimized 256B with optional bytes (Format 6). No 68B or
   Standard 256B formats, no Raw Format.
-- FDI widths up to 256 bytes, one flit per clock at most. Wider FDIs (several flits
-  per clock, UCIe r3.0 §10.3.1) are not modelled.
-- At 256 B a half cannot be cancelled on its own: the interface has one cancel cycle
-  per flit. Cancel plans that name a half become whole-flit cancels.
+- FDI widths up to 1024 bytes (four flits per clock). UCIe r3.0 §10.3.1 also allows
+  wider multiples of 256 B; `MAX_BEAT_BYTES` and `valid_beat_bytes` would grow with them.
+- `pl_error` and `lp_corrupt_crc`, which at 512 B and up apply to every flit of the
+  clock like `pl_flit_cancel`, are not modelled.
+- From 256 B up a half cannot be cancelled on its own: the interface has one cancel
+  cycle per transfer. Cancel plans that name a half become whole-transfer cancels.
 - No sideband, no `pl_error`, no `pl_cfg`/`lp_cfg`, no `pl_phyinrecenter`, no
   `pl_speedmode`/`pl_lnk_cfg`.
 - PM entry is the Adapter's (remote-initiated) only; a Protocol Layer request for L1

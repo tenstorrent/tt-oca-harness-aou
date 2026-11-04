@@ -13,9 +13,12 @@
 // The kind of each cancel (IDLE or VALID) is the kind given for that half.
 // cancel_repeat > 1 cancels the first cancelled half that many times in a row
 // before it goes through (cancel_h0 only, or cancel_h1 without the resend).
-// On a 256 B FDI the flit is one beat and the only cancel unit: any plan with a
-// cancel becomes cancel_repeat whole-flit cancels of the first cancelled half's
-// kind, then the flit; the monitor counts them in n_cancel_h0.
+// From 256 B up the flit is one beat and the cancel unit is the transfer: any
+// plan with a cancel becomes cancel_repeat cancels of the first cancelled
+// half's kind, then the flit; the monitor counts them in n_cancel_h0. On a 512
+// or 1024 B FDI several flits share a transfer, and the plan of the transfer's
+// first flit is the plan of all of them (a cancel applies to every flit in
+// its clock, UCIe r3.0 10.3.1).
 class ucie_flit_item extends uvm_sequence_item;
   `uvm_object_utils(ucie_flit_item)
 
@@ -62,9 +65,8 @@ class ucie_flit_item extends uvm_sequence_item;
     super.new(name);
   endfunction
 
-  // Beat idx of this flit on an FDI of beat_bytes, other bytes zero. `lane`
-  // places it at bytes 256*lane up, for a transfer wider than a flit; 0 for
-  // every width the model supports.
+  // Beat idx of this flit on an FDI of beat_bytes, in lane `lane` of the
+  // transfer (bytes 256*lane up; lane 0 below 512 B), other bytes zero.
   function ucie_fdi_beat_t get_beat(int unsigned beat_bytes, int unsigned idx,
                                     int unsigned lane = 0);
     ucie_fdi_beat_t b = '0;
@@ -78,6 +80,12 @@ class ucie_flit_item extends uvm_sequence_item;
     int unsigned n = flit_chunk_bytes(beat_bytes);
     for (int unsigned i = 0; i < n; i++) data[idx*n + i] = b[8*(lane*FLIT_BYTES + i) +: 8];
     if (idx < MAX_BEATS_PER_FLIT) t_beat[idx] = $time;
+  endfunction
+
+  // A Flit Header of 0000h: a NOP, which the Protocol Layer discards when it
+  // arrives uncancelled (UCIe r3.0 Table 10-3 pl_flit_cancel, 10.3.1).
+  function bit is_nop();
+    return data[0] == 8'h00 && data[1] == 8'h00;
   endfunction
 
   function void clear();

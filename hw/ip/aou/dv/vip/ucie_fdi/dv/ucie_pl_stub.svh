@@ -17,6 +17,11 @@
 //    acknowledged at the next flit boundary, a clock later at the earliest
 //    (§8.3.2). A flit cut off when the Adapter leaves Active mid-flit is sent
 //    again from its start, so the loopback loses nothing.
+//  - On a 512 or 1024 B FDI a TX transfer carries 2 or 4 flits; one sent
+//    with fewer flits queued fills the other lanes with a Protocol Flit with
+//    empty slots (UCIe r3.0 10.3.1: valid data on the full width), here a
+//    flit with a non-zero Protocol ID and an all-zero payload, which the
+//    scoreboard skips.
 class ucie_pl_stub extends uvm_component;
   `uvm_component_utils(ucie_pl_stub)
 
@@ -28,9 +33,10 @@ class ucie_pl_stub extends uvm_component;
 
   int unsigned n_sent;       // flits whose last beat transferred
   int unsigned n_restarted;  // flits cut off mid-flit and sent again
+  int unsigned n_fill;       // empty flits sent to fill a wide transfer
 
   local ucie_flit_item txq[$];
-  local ucie_flit_item cur;
+  local ucie_flit_item cur[$];  // the flits of the transfer, one per lane
   local int unsigned   beat;
   local bit            presenting;
   local bit            stallack;
@@ -53,7 +59,7 @@ class ucie_pl_stub extends uvm_component;
   endfunction
 
   function bit idle();
-    return txq.size() == 0 && cur == null;
+    return txq.size() == 0 && cur.size() == 0;
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -62,7 +68,7 @@ class ucie_pl_stub extends uvm_component;
       @(lsm.mon_cb);
       if (lsm.mon_cb.rst_n !== 1'b1) begin
         txq.delete();
-        cur = null;
+        cur.delete();
         drive_reset();
         continue;
       end
@@ -132,8 +138,8 @@ class ucie_pl_stub extends uvm_component;
     if (presenting && trdy) begin
       beat++;
       if (beat == bpf) begin
-        n_sent++;
-        cur = null;
+        n_sent += cur.size();
+        cur.delete();
         beat = 0;
       end
     end
@@ -147,12 +153,31 @@ class ucie_pl_stub extends uvm_component;
     if (beat != 0) begin
       presenting = 1'b1;
     end else begin
-      if (cur == null && txq.size() != 0) cur = txq.pop_front();
-      presenting = cur != null && active && rx_on && trdy && !stallack && !stallreq;
+      if (cur.size() == 0 && txq.size() != 0) begin
+        int unsigned fpb = flits_per_beat(beat_bytes);
+        while (cur.size() < fpb && txq.size() != 0) cur.push_back(txq.pop_front());
+        while (cur.size() < fpb) cur.push_back(filler());
+      end
+      presenting = cur.size() != 0 && active && rx_on && trdy && !stallack && !stallreq;
     end
     mb.lp_stallack <= stallack;
     mb.lp_valid <= presenting;
     mb.lp_irdy <= presenting;
-    mb.lp_data <= presenting ? cur.get_beat(beat_bytes, beat) : '0;
+    mb.lp_data <= presenting ? beat_data() : '0;
+  endfunction
+
+  local function ucie_fdi_beat_t beat_data();
+    ucie_fdi_beat_t b = '0;
+    foreach (cur[l]) b |= cur[l].get_beat(beat_bytes, beat, l);
+    return b;
+  endfunction
+
+  // A Protocol Flit with no messages: Protocol ID 11b, everything else zero.
+  local function ucie_flit_item filler();
+    ucie_flit_item f = ucie_flit_item::type_id::create("fill");
+    f.dir = UCIE_FDI_TX;
+    f.data[0] = 8'hC0;
+    n_fill++;
+    return f;
   endfunction
 endclass

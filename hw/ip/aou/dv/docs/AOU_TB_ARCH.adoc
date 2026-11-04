@@ -393,7 +393,7 @@ name.
 | Key | Type | Used by
 | `s_axi<r>` | `aou_axi_bus_if #(.DATA_W(1024))` | L4b manager agent (DUT's AXI S port)
 | `m_axi<r>` | `aou_axi_bus_if #(.DATA_W(1024))` | L4b subordinate agent (DUT's AXI M port)
-| `fdi_mb<p>` | `ucie_fdi_mb_if #(.DATA_W(ucie_fdi_pkg::BUS_W))` (2048 bits) | L1 agent, PHY *p*
+| `fdi_mb<p>` | `ucie_fdi_mb_if #(.DATA_W(ucie_fdi_pkg::BUS_W))` (8192 bits; the DUT uses the low bits of its FDI width) | L1 agent, PHY *p*
 | `fdi_lsm` | `ucie_fdi_lsm_if` | L2 agent
 | `aou_bringup` | `aou_bringup_if` | the bench's FDI layer (`aou_fdi_layer`: PHY select, bringup SW pins, bringup status), tests
 | `apb` | `aou_apb_if` | APB agent

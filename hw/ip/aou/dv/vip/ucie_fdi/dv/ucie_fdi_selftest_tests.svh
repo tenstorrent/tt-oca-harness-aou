@@ -3,9 +3,10 @@
 
 // Traffic in both directions with the stress the model can apply: RX cancels
 // of every shape, bubbles and gaps, pl_trdy holes and stand-alone stalls
-// (mid-flit ones included; on a 256 B FDI, where a flit is one beat, cancels
-// cover the whole flit and stalls start at flit boundaries).
-// Knobs: +beat_bytes=32|64|128|256 (FDI width),
+// (mid-flit ones included; from 256 B up, where a flit is one beat, cancels
+// cover every flit of the beat and stalls start at flit boundaries). On a 512
+// or 1024 B FDI some RX beats carry fewer flits than lanes, the rest NOPs.
+// Knobs: +beat_bytes=32|64|128|256|512|1024 (FDI width),
 // +n_flits=N, +trdy=always|random|bursty|holes.
 class ucie_fdi_smoke_test extends uvm_test;
   `uvm_component_utils(ucie_fdi_smoke_test)
@@ -36,6 +37,7 @@ class ucie_fdi_smoke_test extends uvm_test;
     env.fdi_cfg.stall_pct = 3;
     env.fdi_cfg.stall_mid_pct = 30;
     env.fdi_cfg.random_adapter_bytes = 1'b1;
+    env.fdi_cfg.partial_beat_pct = 20;
     configure();
   endfunction
 
@@ -89,6 +91,10 @@ class ucie_fdi_smoke_test extends uvm_test;
     // The traffic plans cancels on a quarter of the flits: none seen means the
     // cancel path at this width went untested.
     if (env.fdi.mon.n_rx_cancels == 0) `uvm_error(get_type_name(), "no RX flit was cancelled")
+    // A fifth of the wide RX beats are sent short: none seen means the NOP
+    // lanes went untested.
+    if (env.fdi_cfg.fpb() > 1 && env.fdi.mon.n_rx_nops == 0)
+      `uvm_error(get_type_name(), "no RX beat carried a NOP lane")
   endfunction
 
   // The model's rule ledger: how often each rule was evaluated and violated.
