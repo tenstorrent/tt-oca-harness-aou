@@ -3,7 +3,9 @@
 
 // Multi-RP accounting, arbitration and independence (plan 2.12), on the local
 // managers' and remote managers' completed transactions and the messages L3
-// decodes from the DUT (identity DEST_RP: wire RP = local RP).
+// decodes from the DUT. A DUT request is counted for the S port it came from
+// (aou_t1_rp_map_chk: its lane's DEST_RP and, on a lane several ports share,
+// its ID's source tag); the other messages by wire RP (identity DEST_RP).
 // T1-M01: per RP, the DUT sends one WriteReq/ReadReq per S-port transaction of
 //   that RP and one WriteResp / last ReadData per remote-die transaction of
 //   that RP; an RP the scenario left idle carries no AXI message.
@@ -19,6 +21,7 @@ class aou_mrp_chk extends uvm_component;
   uvm_tlm_analysis_fifo #(aou_axi_txn) rem_fifo;   // remote-die managers
   uvm_tlm_analysis_fifo #(aou_msg)     dut_fifo;   // DUT -> remote die
 
+  aou_t1_rp_map_chk rp_map;   // a request's S port; null: its wire RP
   int unsigned min_share_pct = 25;
   int          slow_rp = -1;
 
@@ -58,10 +61,15 @@ class aou_mrp_chk extends uvm_component;
 
   function void take_msg(aou_msg m);
     aou_msg_rdata d;
+    aou_msg_req q;
+    int x;
     case (m.msg_type)
       AOU_MT_WREQ, AOU_MT_RREQ: begin
-        n_req[m.rp]++;
-        if (arb_open) arb_seq.push_back(32'(m.rp));
+        x = int'(m.rp);
+        if (rp_map != null && $cast(q, m)) x = rp_map.req_port(int'(m.rp), q.id);
+        if (x < 0) return;   // FEAT-R29 reports it
+        n_req[x]++;
+        if (arb_open) arb_seq.push_back(32'(x));
       end
       AOU_MT_WDATA, AOU_MT_WDATAF: n_wdata[m.rp]++;
       AOU_MT_WRESP: n_rsp[m.rp]++;

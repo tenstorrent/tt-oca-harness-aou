@@ -1707,7 +1707,10 @@ Knobs: +credit=wreq|rreq|wdata|rdata|wresp (random) +hold=<cycles>
 ----
 
 traffic runs on every RP, and the others' may complete while RP r's stays
-queued.
+queued. For a request class the starved credit is that of the remote RP
+local port r sends on: its TX lane's DEST_RP under the asymmetric RP mapping
+(MAS 3.10.4), which every port merged with it shares, so those ports are
+starved with it.
 
 ----
 +limit=<k> with +credit=wreq|rreq (plan 8.3/8.6): every RP gets credit for
@@ -2780,6 +2783,11 @@ MsgCredit order (round robin, 3.19)
 | `aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1` | `+mrp_scn=solo +mrp_rps=0 +remote_rp_count=1` | 1-2 | `3x512-sp64` | 12.20
 | `aou_mrp_test.remote_rp_count-4` | `+remote_rp_count=4` | 1-2 | `1x512-sp64` | 12.20
 | `aou_mrp_test.remote_rp_count-3` | `+remote_rp_count=3` | 1-2 | `2x512-tp32_64` | 12.20
+| `aou_mrp_test.remote_rp_count-1.rp_map_pct-100.4x512-sp64` | `+remote_rp_count=1 +rp_map_pct=100` | 1-3 | `4x512-sp64` | 12.20,12.22
+| `aou_mrp_test.remote_rp_count-2.rp_map_pct-100.4xmix4211-sp128` | `+remote_rp_count=2 +rp_map_pct=100` | 1-3 | `4xmix4211-sp128` | 12.20,12.22
+| `aou_mrp_test.remote_rp_count-3.rp_map_pct-100.4xmix2144-sp64` | `+remote_rp_count=3 +rp_map_pct=100` | 1-3 | `4xmix2144-sp64` | 12.20,12.22
+| `aou_mrp_test.remote_rp_count-2.rp_map_pct-100.3x512-sp64` | `+remote_rp_count=2 +rp_map_pct=100` | 1-3 | `3x512-sp64` | 12.20,12.22
+| `aou_mrp_test.remote_rp_count-1.rp_map_pct-100.2xmix41-sp128` | `+remote_rp_count=1 +rp_map_pct=100` | 1-3 | `2xmix41-sp128` | 12.20,12.22
 | `aou_mrp_test.mrp_scn-interleave.rtl_asserts-1` | `+mrp_scn=interleave +rtl_asserts=1` | 1-2 | `4x512-sp64-assert` | 11.18
 | `aou_mrp_test.mrp_scn-indep.rtl_asserts-1` | `+mrp_scn=indep +rtl_asserts=1` | 1 | `4xmix4211-sp128-assert` | 11.18
 | `aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.rtl_asserts-1` | `+mrp_scn=interleave +mrp_rps=0,1 +rtl_asserts=1` | 1 | `2xmix-tp64_128-assert` | 11.18

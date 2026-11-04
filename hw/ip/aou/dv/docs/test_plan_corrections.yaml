@@ -399,6 +399,11 @@
   priority: P1
   title: 'A write burst the DUT has committed is not held open by back-to-back single-beat writes on another RP (both managers saturating, AWLEN 0 against AWLEN 31-63)'
   note: 'Found missing by the PR #98 review: a stream of short writes starved an open burst in an early version of the TX aligner. T1-C43 checks in every test that a committed write keeps making progress while it is next in write-data order; it does not bound how long the short writes delay a burst that still trickles.'
+- id: '12.22'
+  added: 'MAS 3.10.1, 3.10.4, 3.10.5; RDL ASYMMETRIC_RP_PROC_CON; PR #124'
+  priority: P1
+  title: 'Asymmetric RP mapping: with ASYMMETRIC_RP_PROC_CON programmed before activation to a random legal mapping (disabled, identity, moved ports, merge groups of 2, 3 or 4, two pairs; lanes below the remote die''s RP count), every request leaves on its lane''s DEST_RP with the source tag and ID rules of 3.10.5, and every response returns to the port that issued it'
+  note: 'Added with the bench support for PR #124: the base sequence programs a random mapping per seed (about half enabled), aou_t1_rp_map_chk checks FEAT-R29/R30 in every test and cg_rp_map_req/cg_rp_map_cfg measure it. The arbitration inside a merge group (3.10.4) is exercised by the QoS tests but not checked: aou_qos_order_test keeps the mapping disabled.'
 - id: '13.19'
   added: 'RDL ARB_MODE; MAS 3.2.1'
   priority: P2

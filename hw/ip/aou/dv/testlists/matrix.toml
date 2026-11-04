@@ -1057,6 +1057,59 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_rp_count=3"]
 
+# 12.22: a remote die with fewer RPs than the DUT and every port in use: the
+# asymmetric RP mapping, enabled on every seed, merges the ports at random onto
+# lanes the remote die has (MAS 3.10.1, 3.10.4).
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-1.rp_map_pct-100.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=1", "+rp_map_pct=100"]
+
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-2.rp_map_pct-100.4xmix4211-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix4211-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=2", "+rp_map_pct=100"]
+
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-3.rp_map_pct-100.4xmix2144-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix2144-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=3", "+rp_map_pct=100"]
+
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-2.rp_map_pct-100.3x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "3x512-sp64"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=2", "+rp_map_pct=100"]
+
+[[tests]]
+name = "aou_mrp_test.remote_rp_count-1.rp_map_pct-100.2xmix41-sp128"
+module = { uvm = "aou_mrp_test" }
+target = "2xmix41-sp128"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_rp_count=1", "+rp_map_pct=100"]
+
 # Width pairings (plan items 14.x): every DUT RP width against every remote RP width
 # (256, 512, 1024), the remote's set per run with +remote_bytes. The 4xmix
 # builds carry all three DUT widths; aou_dw_test sends every size up to each

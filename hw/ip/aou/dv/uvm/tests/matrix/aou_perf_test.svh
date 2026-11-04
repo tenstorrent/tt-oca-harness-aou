@@ -60,6 +60,9 @@ class aou_perf_test extends aou_dp_base_test;
       if (mode == "l2r") min_r2l = 0;
       if (mode == "r2l") min_l2r = 0;
     end
+    // The bandwidth model has one arbitration stage and one lane per port: no
+    // asymmetric RP mapping that merges ports.
+    cfg.rp_map_pct = 0;
     // Steady state only: no L1 cancels, bubbles or gaps on the flits to the DUT.
     cfg.l1_cancel_pct = 0;
     cfg.l1_bubble_pct = 0;

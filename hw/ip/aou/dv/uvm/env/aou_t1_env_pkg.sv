@@ -196,6 +196,8 @@ package aou_t1_env_pkg;
   `include "aou_t1_lp_cfg_chk.svh"
   `include "aou_t1_force_deact_chk.svh"
   `include "aou_t1_dbg_fifo_chk.svh"
+  `include "aou_t1_rp_map_fc_bins.svh"
+  `include "aou_t1_rp_map_chk.svh"
   `include "aou_t1_crd_flow_chk.svh"
   `include "aou_t1_crd_rr_chk.svh"
   `include "aou_t1_crd_block_chk.svh"

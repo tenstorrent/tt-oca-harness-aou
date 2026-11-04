@@ -25,6 +25,7 @@ class aou_t1_early_tbl_chk extends uvm_component;
 
   aou_t1_env_cfg cfg;
   aou_core       rm;
+  aou_t1_rp_map_chk rp_map;   // the port a WriteResp is for; null: the RP it names
   aou_axi_vif_t  vif[];
   int unsigned   wr_mo_cnt = AOU_T1_S_MO_CNT;   // S_WR_MO_CNT
   int unsigned   free_bound = 1000;
@@ -92,12 +93,17 @@ class aou_t1_early_tbl_chk extends uvm_component;
   endfunction
 
   // Both counts are indexed by the DUT's own RP. WLAST is counted at that RP's
-  // S port; a WriteResp names the DUT RP it is for, since the remote die sends
-  // responses through its own DEST_RP, the symmetric inverse of the DUT's (MAS
-  // 3.10.1), and the DUT routes a received WriteResp by that field alone. So a
-  // remapped DEST_RP needs no translation here.
+  // S port; a WriteResp names the DUT's TX lane the write went on, since the
+  // remote die sends responses through its own DEST_RP, the symmetric inverse
+  // of the DUT's (MAS 3.10.1), so a remapped DEST_RP needs no translation. On a
+  // lane the asymmetric RP mapping merges, the ID's source tag names the port
+  // (MAS 3.10.5).
   function void write(aou_msg m);
-    if (m.msg_type == AOU_MT_WRESP && int'(m.rp) < AOU_RP_MAX) freed[m.rp]++;
+    aou_msg_wresp b;
+    int x;
+    if (m.msg_type != AOU_MT_WRESP || !$cast(b, m) || int'(m.rp) >= AOU_RP_MAX) return;
+    x = (rp_map == null) ? int'(m.rp) : rp_map.rsp_port(int'(m.rp), b.id);
+    if (x >= 0) freed[x]++;
   endfunction
 
   // Reset contract: the table empties with the core.

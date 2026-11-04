@@ -395,7 +395,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | 
 |===
-===== `testlists/matrix.toml` (127 scenarios)
+===== `testlists/matrix.toml` (132 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -504,6 +504,11 @@
 | `aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1` | `aou_mrp_test` | `+mrp_scn=solo +mrp_rps=0 +remote_rp_count=1` | 1-2 | `3x512-sp64` | 12.20 | 
 | `aou_mrp_test.remote_rp_count-4` | `aou_mrp_test` | `+remote_rp_count=4` | 1-2 | `1x512-sp64` | 12.20 | 
 | `aou_mrp_test.remote_rp_count-3` | `aou_mrp_test` | `+remote_rp_count=3` | 1-2 | `2x512-tp32_64` | 12.20 | 
+| `aou_mrp_test.remote_rp_count-1.rp_map_pct-100.4x512-sp64` | `aou_mrp_test` | `+remote_rp_count=1 +rp_map_pct=100` | 1-3 | `4x512-sp64` | 12.20,12.22 | 
+| `aou_mrp_test.remote_rp_count-2.rp_map_pct-100.4xmix4211-sp128` | `aou_mrp_test` | `+remote_rp_count=2 +rp_map_pct=100` | 1-3 | `4xmix4211-sp128` | 12.20,12.22 | 
+| `aou_mrp_test.remote_rp_count-3.rp_map_pct-100.4xmix2144-sp64` | `aou_mrp_test` | `+remote_rp_count=3 +rp_map_pct=100` | 1-3 | `4xmix2144-sp64` | 12.20,12.22 | 
+| `aou_mrp_test.remote_rp_count-2.rp_map_pct-100.3x512-sp64` | `aou_mrp_test` | `+remote_rp_count=2 +rp_map_pct=100` | 1-3 | `3x512-sp64` | 12.20,12.22 | 
+| `aou_mrp_test.remote_rp_count-1.rp_map_pct-100.2xmix41-sp128` | `aou_mrp_test` | `+remote_rp_count=1 +rp_map_pct=100` | 1-3 | `2xmix41-sp128` | 12.20,12.22 | 
 | `aou_split_test.remote_bytes-128.split-255.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=128 +split_aw=255 +split_ar=255` | 1-2 | `4xmix4211-sp128` | 15.17 | 
 | `aou_split_test.remote_bytes-128.split-3.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=128 +split_aw=3 +split_ar=3` | 1-2 | `4xmix4211-sp128` | 15.17 | 
 | `aou_split_test.remote_bytes-64.split-15.4xmix4211-sp128` | `aou_split_test` | `+remote_bytes=64 +split_aw=15 +split_ar=15` | 1-2 | `4xmix4211-sp128` | 15.17 | 

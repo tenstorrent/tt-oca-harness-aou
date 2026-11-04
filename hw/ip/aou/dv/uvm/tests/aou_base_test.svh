@@ -23,6 +23,9 @@
 // +remote_wreq=awsize|upsize|dut_like how the remote die sizes its WriteReqs
 // (aou_t1_remote_mgr_driver; default awsize);
 // +remote_rp_count=N the remote die's RP count (default: the DUT's);
+// +rp_map_pct=N the share of seeds that enable the asymmetric RP mapping
+// (default 50), +rp_map=<hex> the ASYMMETRIC_RP_PROC_CON value to program
+// (aou_t1_env_cfg::rp_map);
 // +sw_hold_on_deact=0 software keeps issuing requests after DEACTIVATE_START
 // (MAS 7.3.5 broken on purpose); +l3_deact_ack_hold=N the remote die holds its
 // DeactivateAck, and its own deactivation, for N received flits after the
@@ -93,6 +96,8 @@ class aou_base_test extends ocah_test;
     void'($value$plusargs("T1_VSEQ=%s", vseq_type));
     void'($value$plusargs("sw_drain=%d", cfg.sw_drain_before_deact));
     void'($value$plusargs("remote_rp_count=%d", cfg.remote_rp_count));
+    void'($value$plusargs("rp_map_pct=%d", cfg.rp_map_pct));
+    void'($value$plusargs("rp_map=%h", cfg.rp_map));
     void'($value$plusargs("rx_fifo_slack=%d", cfg.rx_fifo_slack));
     void'($value$plusargs("sysrst_on_linkdown=%d", cfg.sysrst_on_linkdown));
     void'($value$plusargs("sw_hold_on_deact=%d", cfg.sw_hold_on_deact));

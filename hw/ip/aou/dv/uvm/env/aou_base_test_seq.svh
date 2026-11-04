@@ -127,6 +127,7 @@ class aou_base_test_seq extends ocah_sequence;
     end
     if (!link_ok) `uvm_error(get_type_name(), "T1-V01: FDI link not Active after bringup")
     else `uvm_info(get_type_name(), "FDI link Active", UVM_LOW)
+    program_rp_map();
   endtask
 
   // ---------------------------------------------------------------------
@@ -165,6 +166,7 @@ class aou_base_test_seq extends ocah_sequence;
     who = pick_who(who);
     order = pick_order(order);
     env.sw_isr.wait_idle();
+    program_rp_map();
     if (!link_is_up()) begin
       // A link an earlier event left down (a deactivation never takes it
       // down): the Adapter (L2) resets and brings it up again.
@@ -210,6 +212,27 @@ class aou_base_test_seq extends ocah_sequence;
     if (!env.status.act_ok)
       `uvm_error(get_type_name(), "T1-V03: DUT not ENABLED (activate_state_enabled)")
     if (l3_ok && env.status.act_ok) `uvm_info(get_type_name(), "activation complete", UVM_LOW)
+  endtask
+
+  // The seed's asymmetric RP mapping (cfg.rp_map), written while the DUT is
+  // DISABLED with no S-port transaction outstanding, and only when the
+  // register does not hold it: at bring-up and before activation, so before the
+  // first traffic and again after a reset returned it to its reset value with
+  // every transaction gone (MAS 3.10.1: static configuration, programmed with
+  // no AXI traffic outstanding). A test that queues requests before its first
+  // activation keeps the mapping it had.
+  task program_rp_map();
+    aou_reg_rp_map_seq s;
+    uvm_reg_data_t     v = uvm_reg_data_t'(cfg.rp_map);
+    if (cfg.rp_map < 0 || cfg.n_rp < 2 || !env.status.disabled) return;
+    if (p_sequencer.regs.asymmetric_rp_proc_con.get_mirrored_value() == v) return;
+    foreach (env.s_mgr[r]) if (env.s_mgr[r].drv.outstanding() != 0) return;
+    s = aou_reg_rp_map_seq::type_id::create("s");
+    prep_reg(s);
+    s.value = 9'(cfg.rp_map);
+    `uvm_info(get_type_name(), $sformatf("asymmetric RP mapping: ASYMMETRIC_RP_PROC_CON = %0h",
+                                         cfg.rp_map), UVM_LOW)
+    s.start(null);
   endtask
 
   // Orderly (or, by APB, forced) deactivation from the DUT, the remote side
@@ -475,12 +498,15 @@ class aou_base_test_seq extends ocah_sequence;
               if (!p.rp_mask[r]) continue;
               fork
                 automatic int unsigned rr = r;
+                // With a remote die of fewer RPs, a port whose lane sends to an
+                // RP that die lacks gets no credit (MAS 3.10.1), and the remote
+                // die originates nothing on a plane it lacks.
                 begin
-                  if (dir != AOU_T1_R2L)
+                  if (dir != AOU_T1_R2L && env.rp_map.req_wire(rr) < cfg.l3_cfg.rp_count)
                     run_seq(p_sequencer.s_mgr_sqr[rr], n, p, p.base + 64'(rr) * p.rp_stride);
                 end
                 begin
-                  if (dir != AOU_T1_L2R)
+                  if (dir != AOU_T1_L2R && rr < cfg.l3_cfg.rp_count)
                     run_seq(p_sequencer.r_mgr_sqr[rr], n, p, p.base + 64'(rr) * p.rp_stride);
                 end
               join_none

@@ -25,8 +25,12 @@ class aou_dest_rp_dup_test extends aou_dest_rp_test;
     k.rp_mask = 4'b1101;
   endfunction
 
+  // The asymmetric RP mapping stays disabled: the misconfiguration under test
+  // is DEST_RP's alone, and with ports moved or merged the lanes that share a
+  // remote plane would no longer be the ones this test idles.
   function void configure_test();
     for (int unsigned r = 0; r < 4; r++) cfg.l3_cfg.dest_rp[r] = 2'(r);
+    cfg.rp_map_pct = 0;
   endfunction
 
   function void start_of_simulation_phase(uvm_phase phase);

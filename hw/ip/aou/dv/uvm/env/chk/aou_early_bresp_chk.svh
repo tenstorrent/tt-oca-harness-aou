@@ -12,7 +12,9 @@
 // another B back to back (BVALID held across the handshake) may have waited
 // behind it, so FEAT-R05 is not judged for it. Writes pair with
 // their remote completion by ID and address; stimulus keeps those unique
-// among in-flight writes.
+// among in-flight writes. A remote completion carries the wire ID, which on a
+// lane the asymmetric RP mapping merges is a remapped one (MAS 3.10.5): it is
+// translated back to the S port's own ID (aou_t1_rp_map_chk).
 // The enable is per RP and may change between traffic phases (plan 16.14,
 // 16.15): set_en() records each change, and a write is judged by its RP's
 // setting when its AW was accepted (the vseq changes it only with no write
@@ -25,6 +27,7 @@ class aou_early_bresp_chk extends uvm_component;
 
   bit          early_en[4] = '{0, 0, 0, 0};
   int unsigned n_rp = 1;
+  aou_t1_rp_map_chk rp_map;   // wire ID -> the S port's own ID; null: the same
 
   int unsigned n_early;
   int unsigned n_early_held;   // bufferable, behind an older same-ID write
@@ -108,8 +111,14 @@ class aou_early_bresp_chk extends uvm_component;
     return s.t_done;
   endfunction
 
-  function string key(aou_axi_txn t);
-    return $sformatf("%0h:%0h", t.id, t.addr);
+  function string key(aou_axi_txn t, bit is_s);
+    bit [9:0] id = t.id;
+    int x;
+    if (!is_s && rp_map != null) begin
+      x = rp_map.req_port(t.rp, t.id);
+      if (x >= 0) id = rp_map.orig_id(x, 1'b0, t.id);
+    end
+    return $sformatf("%0h:%0h", id, t.addr);
   endfunction
 
   function bit expect_early(aou_axi_txn s);
@@ -157,7 +166,7 @@ class aou_early_bresp_chk extends uvm_component;
   function void take(aou_axi_txn t, bit is_s);
     string k;
     if (t.dir != AOU_AXI_WR) return;
-    k = key(t);
+    k = key(t, is_s);
     if (is_s) begin
       s_all.push_back(t);
       s_ord[t.rp].push_back(t);

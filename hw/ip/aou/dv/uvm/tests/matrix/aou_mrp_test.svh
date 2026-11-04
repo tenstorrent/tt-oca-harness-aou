@@ -39,5 +39,6 @@ class aou_mrp_test extends aou_dp_base_test;
     foreach (env.s_mgr[r]) env.s_mgr[r].ap.connect(chk.loc_fifo.analysis_export);
     env.rmgr.ap.connect(chk.rem_fifo.analysis_export);
     env.l3.ap_rx_msg.connect(chk.dut_fifo.analysis_export);
+    chk.rp_map = env.rp_map;
   endfunction
 endclass

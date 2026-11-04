@@ -111,6 +111,7 @@ class aou_early_bresp_test extends aou_dp_base_test;
     super.connect_phase(phase);
     foreach (env.s_mgr[r]) env.s_mgr[r].ap.connect(chk.s_fifo.analysis_export);
     env.remote.ap.connect(chk.remote_fifo.analysis_export);
+    chk.rp_map = env.rp_map;
     env.early_tbl.over_chk = (early_over != 0);
   endfunction
 

@@ -25,6 +25,7 @@ class aou_axi_cfg extends uvm_object;
   int unsigned max_wr_outstanding = 16;
   int unsigned max_rd_outstanding = 16;
   bit          w_before_aw_en     = 1'b1;  // 0: W waits for its AW handshake
+  bit          lock_en            = 1'b1;  // 0: random sequences issue no exclusive access
 
   // Subordinate.
   aou_mem mem;
