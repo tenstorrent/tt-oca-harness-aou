@@ -964,12 +964,14 @@ Class `aou_split_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_split
 *Purpose.* Splitter (plan 15.1-15.10, 15.12, 15.16, 15.17, 20.9; old F2). +split_aw/+split_ar
 take a value (AxLEN), "sweep" (a random legal 2^n-1), "illegal" (a random
 value that is not 2^n-1, stored as 0xF) or "per_rp" (a different random
-legal value on each RP, 15.16). Remote-originated 64-byte-beat bursts of
+legal value on each RP, 15.16, half of them 16 beats or less and half 32 or
+more, so each RP sees both short and long limits). Remote-originated bursts of
 
 ----
-+dp_len lengths; aou_split_chk checks the M-port bursts against each RP's
++dp_len lengths, 32 bytes per beat up to the bus width (+dp_full_size=1 for
 ----
 
+the bus width only); aou_split_chk checks the M-port bursts against each RP's
 limit, counting the beats after the downsizer on RPs narrower than 512 bits
 (15.17), and the scoreboard the reassembled data, RLAST and merged BRESP at
 the remote side.
