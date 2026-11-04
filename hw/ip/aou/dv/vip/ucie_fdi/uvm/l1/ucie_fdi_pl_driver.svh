@@ -6,9 +6,9 @@
 // Receiver is Active in Reset with +fdi_rx_early) and out of reset;
 // once started it runs to completion, cancels and replays included. A
 // cancel comes in the cycle after the last beat of its 128B half
-// (FDI-R05), either with pl_valid low or with the replay's first beat. A
-// LinkError mid-flit (gate abort) abandons the flit at once. At 256 B the
-// flit is one beat and the cancel unit is the whole flit.
+// (FDI-R05), either with pl_valid low or with the replay's first beat. On a
+// 256 B FDI the flit is one beat and its cancel covers the whole flit. A
+// LinkError mid-flit (gate abort) abandons the flit at once.
 class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
   `uvm_component_utils(ucie_fdi_pl_driver)
 
@@ -70,9 +70,9 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     end
 
     if (halves_per_flit(cfg.beat_bytes) == 1) begin
-      // 256 B: the flit is one beat and the cancel unit (fdi-rx-plan 1.3). Any
-      // half cancel in the plan becomes whole-flit cancels, repeated as asked,
-      // in the kind of the first cancelled half; then the clean copy.
+      // 256 B: one cancel unit, the flit. A plan that cancels either half
+      // cancels the whole flit, cancel_repeat times, in the kind of its first
+      // cancelled half; then the flit goes through.
       ucie_fdi_cancel_e kind = it.cancel_h0 != UCIE_CANCEL_NONE ? it.cancel_h0 : it.cancel_h1;
       if (kind != UCIE_CANCEL_NONE) begin
         int unsigned rep = it.cancel_repeat;

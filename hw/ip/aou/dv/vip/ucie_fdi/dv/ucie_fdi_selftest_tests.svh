@@ -3,7 +3,9 @@
 
 // Traffic in both directions with the stress the model can apply: RX cancels
 // of every shape, bubbles and gaps, pl_trdy holes and stand-alone stalls
-// (mid-flit ones included). Knobs: +beat_bytes=32|64|128 (FDI width),
+// (mid-flit ones included; on a 256 B FDI, where a flit is one beat, cancels
+// cover the whole flit and stalls start at flit boundaries).
+// Knobs: +beat_bytes=32|64|128|256 (FDI width),
 // +n_flits=N, +trdy=always|random|bursty|holes.
 class ucie_fdi_smoke_test extends uvm_test;
   `uvm_component_utils(ucie_fdi_smoke_test)
@@ -84,6 +86,9 @@ class ucie_fdi_smoke_test extends uvm_test;
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
     if (env.sb.n_tx == 0) `uvm_error(get_type_name(), "no flit looped back")
+    // The traffic plans cancels on a quarter of the flits: none seen means the
+    // cancel path at this width went untested.
+    if (env.fdi.mon.n_rx_cancels == 0) `uvm_error(get_type_name(), "no RX flit was cancelled")
   endfunction
 
   // The model's rule ledger: how often each rule was evaluated and violated.

@@ -59,7 +59,7 @@ module tb_top;
   endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
   localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
-  localparam int BUS_W      = ucie_fdi_pkg::BUS_W;   // widest FDI beat (256 B)
+  localparam int BUS_W      = ucie_fdi_pkg::BUS_W;  // the UCIe model's mainband width
   localparam int AXI_W      = 1024;
   localparam int WD0 = (FDI_CFG == 0 || FDI_CFG == 3) ? 256 : (FDI_CFG == 2) ? 1024 :
                        (FDI_CFG == 5) ? 2048 : 512;

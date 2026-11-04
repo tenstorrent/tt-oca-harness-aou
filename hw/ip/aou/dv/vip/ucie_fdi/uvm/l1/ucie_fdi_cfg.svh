@@ -20,7 +20,8 @@ class ucie_fdi_cfg extends uvm_object;
   int unsigned   stall_hold_min = 1;
   int unsigned   stall_hold_max = 8;
   // Stall corners (UCIe r1.1 8.3.2): the share of stand-alone stalls raised
-  // mid-flit instead of at a boundary, and pl_trdy keeping its policy (lows
+  // mid-flit instead of at a boundary (none on a 256 B FDI, where a flit is
+  // one beat and every cycle is a flit boundary), and pl_trdy keeping its policy (lows
   // included; rule 7 does not require consecutive pl_trdy) between pl_stallreq
   // and lp_stallack instead of being held high.
   int unsigned   stall_mid_pct = 0;
@@ -50,6 +51,10 @@ class ucie_fdi_cfg extends uvm_object;
 
   function int unsigned bpf();
     return beats_per_flit(beat_bytes);
+  endfunction
+
+  function int unsigned fpb();
+    return flits_per_beat(beat_bytes);
   endfunction
 
   function int unsigned bph();

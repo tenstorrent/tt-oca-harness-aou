@@ -9,7 +9,9 @@
 `define AOU_FDI_FC_STALL(B) \
   `B``_BIN(none, 0, 0) `B``_BIN(one, 1, 1) `B``_BIN(few, 2, 4) `B``_BIN(many, 5, 5)
 `define AOU_FDI_FC_GAP(B) `B``_BIN(b2b, 0, 0) `B``_BIN(short_gap, 1, 3) `B``_BIN(long_gap, 4, 4)
-`define AOU_FDI_FC_HALF(B) `B``_BIN(h0, 0, 0) `B``_BIN(h1, 1, 1)
+// What a cancel took back: the first or second 128 B half, or on a 256 B FDI,
+// where the flit is one transfer, the whole flit (the UCIe model reports 2).
+`define AOU_FDI_FC_HALF(B) `B``_BIN(h0, 0, 0) `B``_BIN(h1, 1, 1) `B``_BIN(flit, 2, 2)
 `define AOU_FDI_FC_CANCEL_KIND(B) `B``_BIN(idle, 0, 0) `B``_BIN(with_valid, 1, 1)
 `define AOU_FDI_FC_REPEAT(B) `B``_BIN(first, 1, 1) `B``_BIN(second, 2, 2) `B``_BIN(more, 3, 3)
 `define AOU_FDI_FC_LAT(B) \
