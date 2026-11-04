@@ -120,6 +120,10 @@ class aou_t1_env_cfg extends uvm_object;
     remote_cfg = aou_axi_cfg::type_id::create("remote_cfg");
     remote_cfg.vif_key = "s_axi0";
     remote_cfg.mem = aou_mem::type_id::create("remote_mem");
+    // A tenth of each memory's pages has no exclusive monitor, so exclusive
+    // reads also see the OKAY of a subordinate without exclusive support.
+    local_mem.no_excl_pct = 10;
+    remote_cfg.mem.no_excl_pct = 10;
     set_rp_count(n_rp);
   endfunction
 

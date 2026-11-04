@@ -25,7 +25,7 @@ cross-checked against pulp's `AXI_BUS_DV` assertion list. No pulp code is copied
 | `aou_axi_txn` | The contract transaction, plus `beats`, `beat_addr`, `beat_base`, `lane_lo/hi`, `lane_mask`, `crosses_4k`, `to_bytes` and `fill_wdata` |
 | `aou_axi_cfg` | Per-agent config: `vif_key`/`vif`, `data_bytes`, `rp`, `local_side`, outstanding limits, `w_before_aw_en`, `reorder_en`, `r_interleave_en`, `exclusive_en`, `mem`, `checks_en`, `cov_en`, `timing` |
 | `aou_axi_timing`, `aou_axi_delay` | Per-channel delays: zero, fixed, range or bursty. `apply(AOU_AXI_TIMING_*)` sets a profile |
-| `aou_mem` | Sparse memory with seeded hashed initial contents, error regions (SLVERR/DECERR) and an exclusive monitor |
+| `aou_mem` | Sparse memory with seeded hashed initial contents, error regions (SLVERR/DECERR) and an exclusive monitor, absent on `no_excl_pct`% of its 4 KB pages |
 | `aou_axi_mgr_agent` | `sqr` (`aou_axi_sequencer`), `drv`, `mon`, `ap` |
 | `aou_axi_sub_agent` | `drv` (answers from `cfg.mem`), `mon`, `ap` |
 | `aou_axi_monitor` | Rebuilds transactions and publishes them on `ap` (writes after B, reads after RLAST). Checks rules AXI-R01..R18 (`checkers/rules.csv`). Coverage in `txn_cg` and `zero_cg` |

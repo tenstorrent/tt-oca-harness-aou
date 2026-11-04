@@ -208,7 +208,8 @@ class header lists its own). Randomisation is per seed: activation initiator
 and order, AXI addresses, lengths, sizes, strobes, attributes and timing within
 the profile, the active PHY on two-PHY targets, the packer layout policy of the
 remote die (`aou_packer_policy`: DUT-like, sparse, minimum and maximum density,
-random), credit return policy and delays.
+random), credit return policy and delays. A tenth of each
+memory's pages has no exclusive monitor (`aou_mem.no_excl_pct`).
 
 Stimulus keeps in-flight transactions to disjoint addresses unless a test asks
 otherwise, so the golden model is unambiguous. Negative scenarios inject through

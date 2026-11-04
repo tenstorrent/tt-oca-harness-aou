@@ -5,10 +5,16 @@
 // address, so two memories with the same seed start identical without storing
 // anything. Error regions make accesses that touch them return SLVERR or DECERR;
 // bytes inside an error region are never written.
+// Exclusive support (AXI4 A7.2): no_excl_pct% of the 4KB pages, picked by a hash
+// of the seed and the page, sit in a region without an exclusive monitor. Such a
+// subordinate ignores AxLOCK and answers OKAY (A7.2.4): an exclusive read there
+// gets OKAY, which tells the manager the exclusive failed, and an exclusive write
+// lands like a normal one.
 class aou_mem extends uvm_object;
   `uvm_object_utils(aou_mem)
 
-  bit [63:0] seed;
+  bit [63:0]   seed;
+  int unsigned no_excl_pct;
 
   protected bit [7:0]  mem_q[bit [63:0]];
   protected bit [63:0] err_lo[$];
@@ -23,13 +29,22 @@ class aou_mem extends uvm_object;
     seed = {$urandom(), $urandom()};
   endfunction
 
-  function bit [7:0] init_byte(bit [63:0] a);
-    bit [63:0] z = a ^ seed;
+  protected function bit [63:0] mix(bit [63:0] z);
     z = z + 64'h9E37_79B9_7F4A_7C15;
     z = (z ^ (z >> 30)) * 64'hBF58_476D_1CE4_E5B9;
     z = (z ^ (z >> 27)) * 64'h94D0_49BB_1331_11EB;
-    z = z ^ (z >> 31);
+    return z ^ (z >> 31);
+  endfunction
+
+  function bit [7:0] init_byte(bit [63:0] a);
+    bit [63:0] z = mix(a ^ seed);
     return z[7:0];
+  endfunction
+
+  // False when a's 4KB page has no exclusive monitor.
+  function bit excl_supported(bit [63:0] a);
+    if (no_excl_pct == 0) return 1'b1;
+    return (mix((a >> 12) ^ ~seed) % 64'd100) >= 64'(no_excl_pct);
   endfunction
 
   function bit [7:0] read_byte(bit [63:0] a);
@@ -136,14 +151,15 @@ class aou_mem extends uvm_object;
   // A subordinate's write: error regions win and an exclusive write lands only
   // with a matching reservation (EXOKAY); a failed exclusive gets OKAY and
   // writes nothing. A normal write that hits an error region still writes its
-  // bytes outside the region.
+  // bytes outside the region. Where there is no exclusive monitor an exclusive
+  // write is a normal one.
   function bit [1:0] axi_write(aou_axi_txn t, bit exclusive_en);
     bit [1:0] r = txn_resp(t);
     if (r != AOU_AXI_OKAY) begin
       if (!t.lock) write_txn(t);
       return r;
     end
-    if (t.lock) begin
+    if (t.lock && excl_supported(t.addr)) begin
       if (exclusive_en && excl_check(t.id, t.addr, t.beats() * t.beat_bytes())) begin
         write_txn(t);
         return AOU_AXI_EXOKAY;
@@ -156,20 +172,22 @@ class aou_mem extends uvm_object;
 
   // Call when a read is accepted: an exclusive read takes a reservation.
   function void axi_read_start(aou_axi_txn t, bit exclusive_en);
-    if (t.lock && exclusive_en) excl_reserve(t.id, t.addr, t.beats() * t.beat_bytes());
+    if (t.lock && exclusive_en && excl_supported(t.addr))
+      excl_reserve(t.id, t.addr, t.beats() * t.beat_bytes());
   endfunction
 
   // A subordinate's response for read beat i.
   function bit [1:0] axi_read_resp(aou_axi_txn t, int unsigned i, bit exclusive_en);
     bit [1:0] r = beat_resp(t, i);
-    if (r == AOU_AXI_OKAY && t.lock && exclusive_en) r = AOU_AXI_EXOKAY;
+    if (r == AOU_AXI_OKAY && t.lock && exclusive_en && excl_supported(t.addr)) r = AOU_AXI_EXOKAY;
     return r;
   endfunction
 
-  // Same seed, error regions and contents as src.
+  // Same seed, exclusive support, error regions and contents as src.
   function void copy_from(aou_mem src);
     bit [63:0] addrs[$];
     seed = src.seed;
+    no_excl_pct = src.no_excl_pct;
     mem_q.delete();
     src.get_written(addrs);
     foreach (addrs[k]) mem_q[addrs[k]] = src.read_byte(addrs[k]);
