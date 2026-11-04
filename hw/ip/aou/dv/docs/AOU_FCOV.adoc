@@ -255,7 +255,7 @@ Code: `cov/sv/aou_axi4_coverage_mod.sv`, bins in `aou_axi4_fc_bins.svh`.
 | W | strobes none, partial or all; WLAST; first beat's masked low lanes {none, up to half, over half} | `cg_w`
 | R, B | RRESP and BRESP {OKAY, EXOKAY, SLVERR, DECERR}; RLAST | `cg_r`, `cg_b`
 | Outstanding | reads and writes outstanding {1, 2-15, up to half the limit, up to the limit less one, at the limit} | `cg_os`
-| Back-pressure | R and B ready-low run length {1, 2-10, 11-100, 101-1000, over 1000 cycles}; a stall while at the outstanding limit | `cg_bp`
+| Back-pressure | AW, W, AR, R and B ready-low run length {1, 2-10, 11-100, 101-1000, over 1000 cycles}; whether an R or B stall ended with the port at its outstanding limit or below it | `cg_bp`
 | Commands | a read and a write issued | `cg_cmd`
 |===
 

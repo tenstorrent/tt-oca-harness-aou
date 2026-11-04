@@ -30,6 +30,10 @@
   localparam string OS_BINS[5]    = '{"os_1","os_few","os_mid","os_hi","os_max"};
   localparam string STALL_BINS[5] = '{"cyc_1","cyc_2_10","cyc_11_100","cyc_101_1k","cyc_gt_1k"};
   localparam string ADDR_BINS[2]  = '{"low","high"};
+  localparam string ATMAX_BINS[2] = '{"below_max","at_max"};
+  // Stall-length coverpoints of cg_bp, indexed by channel (CH_AW .. CH_B).
+  localparam string STALL_CPS[N_CH] = '{"cp_aw_stall_len","cp_w_stall_len","cp_ar_stall_len",
+                                        "cp_r_stall_len","cp_b_stall_len"};
   localparam string B4K_BINS[2]   = '{"within_page","ends_at_4k"};
 
   // ---- value -> bin-name classifiers ("" => value falls in no counted bin) ----
@@ -163,10 +167,10 @@
     fc_reg("cg_cmd|cp_cmd_write|issued");
     foreach (OS_BINS[i])    fc_reg($sformatf("cg_os|cp_rd_outstanding|%s", OS_BINS[i]));
     foreach (OS_BINS[i])    fc_reg($sformatf("cg_os|cp_wr_outstanding|%s", OS_BINS[i]));
-    foreach (STALL_BINS[i]) fc_reg($sformatf("cg_bp|cp_r_stall_len|%s",    STALL_BINS[i]));
-    foreach (STALL_BINS[i]) fc_reg($sformatf("cg_bp|cp_b_stall_len|%s",    STALL_BINS[i]));
-    fc_reg("cg_bp|cp_r_stall_at_max_os|hit");
-    fc_reg("cg_bp|cp_b_stall_at_max_os|hit");
+    foreach (STALL_CPS[c]) foreach (STALL_BINS[i])
+      fc_reg($sformatf("cg_bp|%s|%s", STALL_CPS[c], STALL_BINS[i]));
+    foreach (ATMAX_BINS[i]) fc_reg($sformatf("cg_bp|cp_r_stall_at_max_os|%s", ATMAX_BINS[i]));
+    foreach (ATMAX_BINS[i]) fc_reg($sformatf("cg_bp|cp_b_stall_at_max_os|%s", ATMAX_BINS[i]));
   end
 
   // Per-cycle counting (same timing/guards as the covergroups).
@@ -224,14 +228,12 @@
     if (rd_cmd_r) fc_bump("cg_cmd|cp_cmd_read|issued");
     if (rd_os_chg) fc_bump($sformatf("cg_os|cp_rd_outstanding|%s", fc_os_name(rd_os_cnt)));
     if (wr_os_chg) fc_bump($sformatf("cg_os|cp_wr_outstanding|%s", fc_os_name(wr_os_cnt)));
-    if (r_stall_done) begin
-      fc_bump($sformatf("cg_bp|cp_r_stall_len|%s", fc_stall_name(r_stall_len_r)));
-      if (rd_os_cnt == MAX_OUTSTANDING) fc_bump("cg_bp|cp_r_stall_at_max_os|hit");
-    end
-    if (b_stall_done) begin
-      fc_bump($sformatf("cg_bp|cp_b_stall_len|%s", fc_stall_name(b_stall_len_r)));
-      if (wr_os_cnt == MAX_OUTSTANDING) fc_bump("cg_bp|cp_b_stall_at_max_os|hit");
-    end
+    for (int c = 0; c < N_CH; c++)
+      if (stall_done[c]) fc_bump($sformatf("cg_bp|%s|%s", STALL_CPS[c], fc_stall_name(stall_len_r[c])));
+    if (stall_done[CH_R])
+      fc_bump($sformatf("cg_bp|cp_r_stall_at_max_os|%s", ATMAX_BINS[r_stall_at_max_r]));
+    if (stall_done[CH_B])
+      fc_bump($sformatf("cg_bp|cp_b_stall_at_max_os|%s", ATMAX_BINS[b_stall_at_max_r]));
   end
 
   // Build the machine-readable bin-data section consumed by the union-merge step.
