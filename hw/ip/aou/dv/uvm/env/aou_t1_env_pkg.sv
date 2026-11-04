@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// T1 environment: one AOU_TOP against layered models (docs/ARCHITECTURE.md,
+// T1 environment: one AOU_TOP against layered models (docs/AOU_TB_ARCH.adoc,
 // "Topology" and "Test layer API"). The env, its configuration, the virtual
 // sequencer and the base virtual sequence every T1 test composes.
 `timescale 1ns/1ps

@@ -99,16 +99,37 @@ class FcReportTest(unittest.TestCase):
                 json.dump(data, fh)
             db, _ = fc_report.merge(root)
             pts = db["groups"]["g"]["points"]
-            self.assertEqual(fc_report.tally(pts), (1, 3))          # the illegal bin is out
+            # The illegal bin is out, and so is the revision-tagged one.
+            self.assertEqual(fc_report.tally(pts), (1, 2))
             self.assertEqual(fc_report.tally(pts, "v0.8"), (0, 1))
             self.assertEqual(fc_report.illegal_hits(db), [("g", "cp", "bad", 2)])
             text = io.StringIO()
             fc_report.write_summary(text, db, {"PASS": 1}, "b")
-            self.assertIn("v0.8-tagged bins: 0/1 hit; without them", text.getvalue())
+            self.assertIn("v0.8-tagged bins: 0/1 hit; not in the total above", text.getvalue())
+            self.assertIn("1/2   ", text.getvalue())
             self.assertIn("ILLEGAL BIN HIT: g.cp bad (2 hits)", text.getvalue())
             holes = io.StringIO()
             fc_report.write_holes(holes, db)
             self.assertIn("    cp: b [v0.8]\n", holes.getvalue())
+
+    def test_stimulus_tag_stays_in_total(self):
+        with tempfile.TemporaryDirectory() as root:
+            self.run_dir(root, "t1", "PASS", [1, 0])
+            path = os.path.join(root, os.listdir(root)[0], "fc.json")
+            with open(path, encoding="utf-8") as fh:
+                data = json.load(fh)
+            data["groups"][0]["points"][0]["bins"][1]["spec"] = "rare"
+            data["groups"][0]["points"][0]["bins"][0]["spec"] = "v0.9draft"
+            with open(path, "w", encoding="utf-8") as fh:
+                json.dump(data, fh)
+            db, _ = fc_report.merge(root)
+            pts = db["groups"]["g"]["points"]
+            self.assertEqual(fc_report.tally(pts), (0, 2))          # rare in, v0.9draft out
+            text = io.StringIO()
+            fc_report.write_summary(text, db, {"PASS": 1}, "b")
+            self.assertIn("rare-tagged bins: 0/1 hit, counted in the total; without them 2/4",
+                          text.getvalue())
+            self.assertIn("v0.9draft-tagged bins: 1/1 hit; not in the total above", text.getvalue())
 
     def test_report_files(self):
         with tempfile.TemporaryDirectory() as root:

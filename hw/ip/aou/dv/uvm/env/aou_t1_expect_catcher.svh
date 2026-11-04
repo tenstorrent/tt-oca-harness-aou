@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Expectation registry (docs/ARCHITECTURE.md, "Expectations"). A test or
+// Expectation registry (docs/AOU_TB_ARCH.adoc, "Expectations"). A test or
 // virtual sequence declares the errors its scenario is supposed to cause with
 // add(id, min, max); id is a rule ID ("AOU-R16"), an interrupt
 // ("INT_REQ_LINKRESET") or a scoreboard check ("AXI-S01"). The catcher

@@ -3,7 +3,7 @@
 
 schema_version = 1
 
-# Credits and link (stream G).
+# Credits and link.
 #
 # Credits/link tests (TB=t1). One entry per run-list line: the test, its
 # plusargs, how many seeds and the test-plan IDs it covers

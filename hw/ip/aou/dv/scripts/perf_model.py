@@ -85,28 +85,53 @@ def port_of(m, width):
 # Model of one window
 # -----------------------------------------------------------------------------
 def _txns(m, side, g=None):
-    """side: [(kind, size, offset, width, beat, partial, count)] -> one period of Txns,
-    counts divided by g (default: their gcd). width is the issuing port's data bytes,
-    beat the transfer's AxSIZE bytes."""
-    g = g or reduce(math.gcd, [e[-1] for e in side if e[-1] > 0], 0) or 1
+    """side: [(kind, size, offset, width, beat, partial, count[, rp, peer])] -> one period
+    of Txns, counts divided by g (default: their gcd). width is the issuing port's data
+    bytes, beat the transfer's AxSIZE bytes; rp and peer (the RP index and the data
+    bytes of the port that serves the request on the other die) only matter to
+    port_limit."""
+    g = g or reduce(math.gcd, [e[6] for e in side if e[6] > 0], 0) or 1
     out = []
-    for kind, size, offset, width, beat, partial, count in side:
+    for kind, size, offset, width, beat, partial, count in (e[:7] for e in side):
         out += [m.Txn(kind, size, offset % AXI_4K, port_of(m, width), partial,
                       beat if beat < width else 0)] * (count // g)
     return out
 
 
+def port_limit(local, remote, g):
+    """Cycles one period of the pattern (counts divided by g) needs at the AXI ports.
+    An AXI data channel moves one beat per cycle (the AXI clock equals the core clock),
+    so each RP's write or read stream of one issuing side takes at least its bytes /
+    min(AxSIZE beat, serving port's bytes) cycles: at the issuing side's subordinate
+    port and at the other die's manager port, whichever is narrower. Each such
+    stream has its own channels, so the busiest one sets the period. Entries without
+    an RP index count as a stream of their own."""
+    busy = {}
+    for sd, entries in (("l", local), ("r", remote)):
+        for i, e in enumerate(entries):
+            kind, size, _, width, beat, _, count = e[:7]
+            rp = e[7] if len(e) > 7 else ("e", i)
+            peer = e[8] if len(e) > 8 else width
+            rate = min(beat if 0 < beat < width else width, peer)
+            k = (sd, rp, kind)
+            busy[k] = busy.get(k, 0) + Fraction(size * (count // g), rate)
+    return max(busy.values(), default=0)
+
+
 def model_window(fdi_bytes, local, remote):
     """Saturated model of a window. local/remote: the traffic each side puts on the
     link as [(kind 'R'|'W', bytes, offset, port bytes, AxSIZE bytes, partial strobes,
-    count)]; empty when that side issues nothing. Bursts travel the link whole: the
-    DUT's transaction splitter acts on the requests it receives, at its manager port,
-    not on what its subordinate port sends. Returns {dir: {bpc, eff, duty, msgs}}."""
+    count[, RP index, serving port bytes])]; empty when that side issues nothing.
+    Bursts travel the link whole: the DUT's transaction splitter acts on the requests
+    it receives, at its manager port, not on what its subordinate port sends. The
+    link model is saturated; where the AXI ports cannot feed that rate (port_limit),
+    both links slow by the same factor, since the sides keep their transaction-count
+    ratio. Returns {dir: {bpc, eff, duty, msgs}}."""
     m = model()
     cfg = m.Config(fdi_bytes=fdi_bytes, fdi_ghz=1.0)
     # One period for both sides together: the model issues both lists at the same
     # rate, so the sides keep their transaction-count ratio.
-    g = reduce(math.gcd, [e[-1] for e in local + remote if e[-1] > 0], 0) or 1
+    g = reduce(math.gcd, [e[6] for e in local + remote if e[6] > 0], 0) or 1
     lt, rt = _txns(m, local, g), _txns(m, remote, g)
     if not lt and not rt:
         raise ValueError("window with no traffic")
@@ -117,10 +142,19 @@ def model_window(fdi_bytes, local, remote):
         sc = m.Scenario("bench", rt)      # the remote die's requests travel B->A here
         ab, ba = "r2l", "l2r"
     r = m.run_dirs(m.AoU(cfg), sc)
+    # Link cycles per period: the data one period puts on a link over the model's rate.
+    data = {"l2r": sum(e[1] * (e[6] // g) for e in local if e[0] == "W") +
+                   sum(e[1] * (e[6] // g) for e in remote if e[0] == "R"),
+            "r2l": sum(e[1] * (e[6] // g) for e in remote if e[0] == "W") +
+                   sum(e[1] * (e[6] // g) for e in local if e[0] == "R")}
+    link = max((data[d] / r["Bpb_" + k] for d, k in ((ab, "AB"), (ba, "BA"))
+                if r["Bpb_" + k] > 0), default=0)
+    port = float(port_limit(local, remote, g))
+    scale = link / port if port > link > 0 else 1.0
     out = {}
     for d, k in ((ab, "AB"), (ba, "BA")):
-        out[d] = {"bpc": r["Bpb_" + k], "eff": r["eff_" + k], "duty": r["util_" + k],
-                  "msgs": r["msgs_" + k]}
+        out[d] = {"bpc": r["Bpb_" + k] * scale, "eff": r["eff_" + k],
+                  "duty": r["util_" + k] * scale, "msgs": r["msgs_" + k]}
     return out
 
 
@@ -199,7 +233,7 @@ def window_sides(w, conf):
     offset = int(w.get("offset", 0))
     partial = w.get("strb", "full") == "partial"
 
-    def side(widths):
+    def side(widths, peers):
         out = []
         for r in rps:
             if "bytes" in w:
@@ -212,11 +246,12 @@ def window_sides(w, conf):
             for k, f in kinds:
                 cnt = int(share[r] * f * den)
                 if cnt:
-                    e = (k, size, offset, widths[r], beat, partial and k == "W", cnt)
+                    e = (k, size, offset, widths[r], beat, partial and k == "W", cnt, r,
+                         peers[r])
                     out.append(e)
         return out
 
-    loc, rem_side = side(conf["rp_bytes"]), side(rem)
+    loc, rem_side = side(conf["rp_bytes"], rem), side(rem, conf["rp_bytes"])
     if loc is None or rem_side is None:
         return None
     td = w.get("traffic_dir", "both")
@@ -445,19 +480,20 @@ def run_sides(build, win):
         k, rp = h["kind"], int(h.get("rp", 0))
         partial = (k == "W") and not (h.get("full_strb", True) and build.get("writefull", True))
         beat = int(h["beat_bytes"])
+        lw = int(rpb[rp]) if rp < len(rpb) else beat
+        rw = int(rmb[rp]) if rp < len(rmb) else beat
         if h["init"] == "l2r":
-            width = int(rpb[rp]) if rp < len(rpb) else beat
-            local.append((k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), width, beat,
-                          partial, int(h["count"])))
+            local.append((k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), lw, beat,
+                          partial, int(h["count"]), rp, rw))
             continue
-        width = int(rmb[rp]) if rp < len(rmb) else beat
-        ent = (k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), width, beat, partial,
-               int(h["count"]))
+        ent = (k, int(h["bytes"]), int(h.get("offset_mod_4k", 0)), rw, beat, partial,
+               int(h["count"]), rp, lw)
         if k == "W" and not partial and full_pct < 100:
             # the remote die sends WriteDataFull for only full_pct % of its full-strobe writes
             c = ent[6]
             nf = round(c * full_pct / 100)
-            remote += [e for e in (ent[:5] + (False, nf), ent[:5] + (True, c - nf)) if e[6]]
+            remote += [e for e in (ent[:5] + (False, nf) + ent[7:],
+                                   ent[:5] + (True, c - nf) + ent[7:]) if e[6]]
         else:
             remote.append(ent)
     return local, remote

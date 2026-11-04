@@ -124,6 +124,16 @@ class aou_mrp_vseq extends aou_dp_vseq;
         foreach (sub[j]) if (sub[j] == r) dup = 1'b1;
         if (!dup) sub.push_back(r);
       end
+      // The DUT picks the RP for its next header MsgCredit as soon as the
+      // last one is sent and keeps it until a header can carry it. Credit
+      // still trickling back from the last round would have it pick that RP
+      // before the hold and send it twice in a row after the release, so the
+      // hold waits until the DUT owes nothing.
+      while (!env.crd_rr.owes_nothing() && waited < win) begin
+        wait_cycles(1);
+        waited++;
+      end
+      waited = 0;
       hold_tx();
       traffic_nb(AOU_T1_R2L, num_txns, prof(mask_of(sub)));
       // Long enough for the DUT to dequeue every request it received.

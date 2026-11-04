@@ -3,13 +3,13 @@
 
 schema_version = 1
 
-# Configuration matrix (stream J).
+# Configuration matrix.
 #
-# Configuration matrix (stream J): multi-RP (plan 2.12), data width conversion
-# (2.14) and performance data (2.10) on the CONFIGs of docs/ARCHITECTURE.md. TB=t1.
+# Configuration matrix: multi-RP (plan items 12.x), data width conversion
+# (14.x) and performance data (10.x) on every CONFIG of aou_sim_cfg.toml. TB=t1.
 # The latency and drain performance runs pass when they produced their data;
 # scripts/perf_report.py tabulates perf.txt. The gated bandwidth scenarios
-# (plan 10.1-10.3, 10.8, 10.10-10.13) are in perf.yaml.
+# (plan 10.1-10.3, 10.8, 10.10-10.13) are in perf.toml.
 #
 # Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
 # every list all.toml includes; a name carries the plusargs, target or area only
@@ -1044,7 +1044,7 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_rp_count=3"]
 
-# Width pairings (plan 2.14): every DUT RP width against every remote RP width
+# Width pairings (plan items 14.x): every DUT RP width against every remote RP width
 # (256, 512, 1024), the remote's set per run with +remote_bytes. The 4xmix
 # builds carry all three DUT widths; aou_dw_test sends every size up to each
 # requester's width both ways (narrower requests included), and aou_split_test
@@ -1419,7 +1419,7 @@ tests = [
 
 # The nine DUT x remote RP width pairings, both directions, narrower requests,
 # the downsizer with the splitter and every legal remote write sizing
-# (triage record of the width matrix; plan 2.14, 15.17).
+# (triage record of the width matrix; plan items 14.x, 15.17).
 [[groups]]
 name = "width_pairs"
 expected_count = 35

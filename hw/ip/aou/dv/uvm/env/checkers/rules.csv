@@ -43,11 +43,11 @@ AXI-R16,aou_axi_monitor,,DUT,WSTRB is set only on the active byte lanes of each 
 AXI-R17,aou_axi_monitor,,DUT,Every request has completed by the end of the test,AXI4 A3.3
 AXI-R18,aou_axi_monitor,,DUT,No VALID signal is X or Z out of reset,AXI4 A3.1.2
 AXI-R19,aou_axi_monitor,,MODEL,"On an INCR-only port (the DUT's S ports) every AW/AR burst is INCR; anything else is a test-stimulus error (AoU carries no AxBURST, the DUT supports INCR only)",AoU 2.5 / Basic Profile BURST=INCR; DECISIONS D5
-AXI-S01,aou_scoreboard,,DUT,BRESP equals the target memory's response (error region; exclusive OKAY/EXOKAY); SLVERR allowed if outstanding at AOU_SW_RESET,ARCHITECTURE.md scoreboard rule
-AXI-S02,aou_scoreboard,,DUT,After B the target memory holds the written bytes,ARCHITECTURE.md scoreboard rule
-AXI-S03,aou_scoreboard,,DUT,Each RRESP equals the target memory's response for that beat; SLVERR allowed if outstanding at AOU_SW_RESET,ARCHITECTURE.md scoreboard rule
-AXI-S04,aou_scoreboard,,DUT,Read data equals golden memory on every active lane of OKAY/EXOKAY beats (a byte an aborted write strobed: old or written value),ARCHITECTURE.md scoreboard rule
-AXI-S05,aou_scoreboard,,DUT,At end of test the real memories equal golden on every written byte (a byte an aborted write strobed: old or written value),ARCHITECTURE.md scoreboard rule
+AXI-S01,aou_scoreboard,,DUT,BRESP equals the target memory's response (error region; exclusive OKAY/EXOKAY); SLVERR allowed if outstanding at AOU_SW_RESET,AOU_TB_ARCH.adoc scoreboard rule
+AXI-S02,aou_scoreboard,,DUT,After B the target memory holds the written bytes,AOU_TB_ARCH.adoc scoreboard rule
+AXI-S03,aou_scoreboard,,DUT,Each RRESP equals the target memory's response for that beat; SLVERR allowed if outstanding at AOU_SW_RESET,AOU_TB_ARCH.adoc scoreboard rule
+AXI-S04,aou_scoreboard,,DUT,Read data equals golden memory on every active lane of OKAY/EXOKAY beats (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule
+AXI-S05,aou_scoreboard,,DUT,At end of test the real memories equal golden on every written byte (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule
 FDI-R01,aou_fdi_monitor,,DUT,A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both),UCIe r1.1 8.2.4
 FDI-R02,aou_fdi_monitor,,DUT,No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes (L1; checks the DUT),UCIe r1.1 8.2.4
 FDI-R03,by construction (aou_fdi_pl_driver),,MODEL,RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes),UCIe r1.1 8.2.4
@@ -161,9 +161,9 @@ FEAT-R08,aou_lp_mode_vseq,,DUT,Idle FDI flits: continuous with TX_LP_MODE=0; non
 FEAT-R09,aou_dest_rp_chk,,DUT,AXI messages the DUT sends carry DEST_RP of the local RP,MAS 3.10.2
 FEAT-R10,aou_dest_rp_chk,,DUT,CrdtGrant credits use the source (local) RP slot not DEST_RP,MAS 3.10.2
 FEAT-R11,not checked,,DUT,"Port/AXI QoS: with requests of two tiers queued the higher tier is sent first (until the starvation timer promotes); WriteData only for writes whose W data was queued too",MAS 3.2.1
-T1-T01,aou_base_test,,DUT,Nothing is outstanding at the end of the test (scoreboard drained),ARCHITECTURE.md scoreboard rule
-T1-T02,aou_base_test,,DUT,The scoreboard checked at least min_l2r local->remote transactions (a test whose traffic never reached it fails),test self-check; ARCHITECTURE.md scoreboard rule
-T1-T03,aou_base_test,,DUT,The scoreboard checked at least min_r2l remote->local transactions,test self-check; ARCHITECTURE.md scoreboard rule
+T1-T01,aou_base_test,,DUT,Nothing is outstanding at the end of the test (scoreboard drained),AOU_TB_ARCH.adoc scoreboard rule
+T1-T02,aou_base_test,,DUT,The scoreboard checked at least min_l2r local->remote transactions (a test whose traffic never reached it fails),test self-check; AOU_TB_ARCH.adoc scoreboard rule
+T1-T03,aou_base_test,,DUT,The scoreboard checked at least min_r2l remote->local transactions,test self-check; AOU_TB_ARCH.adoc scoreboard rule
 T1-V01,aou_base_test_seq,,DUT,The FDI link reaches Active after bringup (pulsing I_SW_ACTIVATE_START once if it waits for software),UCIe r1.1 8.2.8; integrator guide 6.6
 T1-V02,aou_base_test_seq,,DUT,The remote side (L3) reaches ENABLED within act_timeout of an activation,AoU 8.4; MAS software-operation 7.3.2
 T1-V03,aou_base_test_seq,aou_int_vseq,DUT,ACTIVATE_STATE_ENABLED is set within act_timeout of an activation,MAS software-operation 7.1/7.3.2
@@ -281,7 +281,7 @@ T1-RM01,aou_t1_remote_mgr_driver,,DUT,A WriteResp the DUT sends matches a remote
 T1-RM02,aou_t1_remote_mgr_driver,,DUT,ReadData the DUT sends matches a remote read outstanding on its RP and ID (late answers to aborted reads excepted),AXI4 A5.2
 T1-RM03,aou_t1_remote_mgr_driver,,DUT,A remote read gets no more ReadData beats than ARLEN+1,AXI4 A3.4.1
 T1-RM04,aou_t1_remote_mgr_driver,,DUT,ReadData LAST is set on the last beat of a remote read and no other,AXI4 A3.4.1
-T1-RM05,aou_t1_remote_mgr_driver,,DUT,No remote write or read is outstanding at the end of the test,ARCHITECTURE.md scoreboard rule
+T1-RM05,aou_t1_remote_mgr_driver,,DUT,No remote write or read is outstanding at the end of the test,AOU_TB_ARCH.adoc scoreboard rule
 T1-RM06,aou_t1_remote_mgr,,DUT,A WriteResp/ReadData the DUT sends carries an RP below the remote managers' plane count,AoU 6.4.1; MAS 3.10
 T1-L4A01,aou_t1_l4a_adapter,,DUT,Every WriteData beat of one write burst carries the same DLENGTH,MAS 3.5.2
 T1-L4A02,aou_t1_l4a_adapter,,DUT,"WriteData DLENGTH is at least max(the size of its WriteReq, 256 bits)","AoU 5.4 (DLENGTH); project ruling: DLENGTH is self-describing, any width at or above the WriteReq's size is legal"

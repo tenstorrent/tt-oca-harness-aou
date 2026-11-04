@@ -1,0 +1,65 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+#
+# The feature areas of the verification plan (docs/AOU_VPLAN.adoc, Feature
+# Areas), in reading order. Each plan item of docs/test_plan_items.yaml belongs
+# to exactly one area: every item of the old-plan sections listed in
+# `sections` (item N.M is in section N), plus the single items in `items`,
+# which take precedence. Item IDs never change; the area only decides where an
+# item is shown and counted. scripts/plan_areas.py reads this file;
+# scripts/gen_dv_docs.py groups the matrix by it and checks that every item
+# lands in one area.
+
+- key: fdi
+  title: FDI bring-up and link events
+  sections: [18, 22]
+
+- key: activation
+  title: Activation and deactivation
+  sections: [1, 2]
+
+- key: credits
+  title: Credits and flow control
+  sections: [3]
+
+- key: packing
+  title: Flit packing and message format
+  sections: [6]
+  items: [11.1, 11.2, 11.3, 11.4, 11.5, 11.6, 11.7, 11.8, 11.9, 11.14]
+
+- key: axi
+  title: AXI transactions, ordering and data integrity
+  sections: [4, 5, 7, 8]
+  items: [11.13]
+
+- key: rp
+  title: Resource planes, DEST_RP and QoS arbitration
+  sections: [12, 13]
+
+- key: width
+  title: Width conversion, splitting and aggregation
+  sections: [14, 15, 17]
+
+- key: early
+  title: Early write response and the write watchdog
+  sections: [16]
+
+- key: errors
+  title: Errors, debug FIFO and interrupts
+  sections: [9, 19]
+
+- key: registers
+  title: Registers
+  sections: [20]
+
+- key: lowpower
+  title: TX low-power mode
+  sections: [21]
+
+- key: resets
+  title: Resets, clocks, DFT and RTL assertions
+  items: [11.10, 11.11, 11.12, 11.15, 11.16, 11.17, 11.18, 11.19]
+
+- key: perf
+  title: Performance
+  sections: [10]

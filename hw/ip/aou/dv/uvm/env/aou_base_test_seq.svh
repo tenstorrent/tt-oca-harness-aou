@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Base of every T1 virtual sequence (docs/ARCHITECTURE.md, "Base virtual
+// Base of every T1 virtual sequence (docs/AOU_TB_ARCH.adoc, "Base virtual
 // sequence"), on the shared library's ocah_sequence: scenario_seed,
 // random_count and loop_index are set by aou_base_test when it starts a
 // scenario pass (run_single_scenario / run_looped_scenario); a body that

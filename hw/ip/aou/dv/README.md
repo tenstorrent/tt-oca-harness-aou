@@ -184,12 +184,10 @@ re-vendored without harness-side work beyond the pin.
 
 | Document | What it covers |
 | --- | --- |
-| [docs/AOU_TB_ARCH.adoc](docs/AOU_TB_ARCH.adoc) | Testbench hierarchy, model ownership, environment components, clock and reset, stimulus, checking and coverage strategies, the SV-UVM realization and its differences from the harness pattern, adding a scenario |
-| [docs/AOU_VPLAN.adoc](docs/AOU_VPLAN.adoc) | Verification strategy, naming rules, scope, the requirement-to-test matrix, the scenario summary and test procedures (generated from the testlists and class headers), regression groups, known limitations |
-| [docs/AOU_FCOV.adoc](docs/AOU_FCOV.adoc) | Functional coverage goals, the covergroup inventory, closure policy, VPLAN-to-FCOV traceability |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | The stream contracts and API names the layers were built against |
+| [docs/AOU_TB_ARCH.adoc](docs/AOU_TB_ARCH.adoc) | Testbench hierarchy, model ownership, environment components, clock and reset, stimulus, checking and coverage strategies, the SV-UVM realization and its differences from the harness pattern, adding and naming a scenario, and the layer APIs (config_db names, inter-layer APIs, the transaction contract, scoreboard rule, test layer API) |
+| [docs/AOU_VPLAN.adoc](docs/AOU_VPLAN.adoc) | The verification plan: summary and road-map, scope and references, how the bench verifies, the 13 feature areas with their plan items, known limitations, and the generated scenario summary, test procedures and regression groups |
+| [docs/AOU_FCOV.adoc](docs/AOU_FCOV.adoc) | Functional coverage: summary and real holes, every group in plain terms with its report name, gaps against the spec, plan traceability, goals and closure policy |
 | [docs/DECISIONS.md](docs/DECISIONS.md) | Decision records |
-| [docs/COVERAGE_CLOSURE.md](docs/COVERAGE_CLOSURE.md) | Coverage closure plan, hole analysis, owner decisions |
 | [docs/WAVE_DEBUG.md](docs/WAVE_DEBUG.md), [docs/AXI_OUTSTANDING.md](docs/AXI_OUTSTANDING.md) | Debugging a failure from waves; the outstanding-transaction histogram |
 | [docs/PERF_JSON.md](docs/PERF_JSON.md) | The performance record each `aou_perf_test` run writes |
 | [docs/checker_inventory.md](docs/checker_inventory.md) | Generated: every rule, its checker and the evidence from the runs |
@@ -227,10 +225,11 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | CONFIG | RPs | RP widths (bits) | FDI_CONFIG | PHYs | For |
 |---|---|---|---|---|---|
 | `1x512-sp64` (default) | 1 | 512 | FDI_CFG_SP_64B | 1 | The default: one RP, the usual data path |
-| `4x512-sp64` | 4 | 512 each | FDI_CFG_SP_64B | 1 | Multi-RP behaviour (plan 2.12) at one width |
+| `4x512-sp64` | 4 | 512 each | FDI_CFG_SP_64B | 1 | Multi-RP behaviour (plan items 12.x) at one width |
 | `3x512-sp64` | 3 | 512 each | FDI_CFG_SP_64B | 1 | An RP count that is not a power of two |
-| `4xmix4211-sp128` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | Mixed widths, every local width (2.14), 128-byte FDI |
+| `4xmix4211-sp128` | 4 | 1024, 512, 256, 256 | FDI_CFG_SP_128B | 1 | Mixed widths, every local width (plan items 14.x), 128-byte FDI |
 | `4xmix2144-sp64` | 4 | 512, 256, 1024, 1024 | FDI_CFG_SP_64B | 1 | Mixed widths with RP2 and RP3 at 1024 bits; with `4xmix4211-sp128`, every RP at every local width |
+| `2xmix41-sp128` | 2 | 1024, 256 | FDI_CFG_SP_128B | 1 | A 1024-bit and a 256-bit RP sharing one 128-byte FDI (a common product case) |
 | `1x256-sp32` | 1 | 256 | FDI_CFG_SP_32B | 1 | Narrowest RP and FDI (the RTL's default FDI_CONFIG) |
 | `2xmix-tp64_128` | 2 | 512, 1024 | FDI_CFG_TP_64B_128B | 2 | Two-PHY FDI, two RPs, mixed widths |
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
@@ -611,7 +610,8 @@ count is the number; the simulators' covergroup scores are not used.
 With `COV=1` each run writes `<run>/fc.json`: every group, coverpoint and
 cross, every declared bin with its hit count (zero-hit bins included, so holes
 show), the samples that fell outside every bin, and `spec` and `plan_ids`
-fields. A bin's `spec` names the AoU revision it needs (`v0.8`) and an illegal
+fields. A bin's `spec` is a tag: the spec revision it needs (`v0.8`, or
+`v0.9draft` for a draft rule) or a stimulus note (`rare`). An illegal
 bin carries `"illegal": true`; ignored bins are not written; `plan_ids` is
 empty for now. Without
 `COV=1` nothing is written: the AXI4 monitors exist only in COV builds, so a
@@ -624,13 +624,17 @@ groups `axi4.<interface>.<covergroup>`) into `out/<build>/merged/fc/`:
 bin no passing run hit), `index.html` (the same, self-contained) and
 `fc_merged.json`. It prints the merged/excluded run counts like `cov_report`.
 A group's percentage is its hit bins over all its bins, crosses included.
-Bins tagged `v0.8` stay in every count; the summary adds a column and a total
-for them, and `holes.txt` marks them `[v0.8]`. Illegal bins are not counted,
-and any that a passing run hit are listed.
-The closure target is 100% and there are no waivers: an unreachable bin stays
-a hole until the user agrees to waive it. Closure is measured on the union of
-every configuration; the plan, its status and the owner's decisions are in
-[docs/COVERAGE_CLOSURE.md](docs/COVERAGE_CLOSURE.md).
+Bins tagged with a spec revision (`v0.8`, `v0.9draft`) are left out of every
+total and percentage until the DUT targets that revision; the summary gives
+them their own column and total, and `holes.txt` marks them (`[v0.8]`).
+`rare` bins stay in the totals and get a column too. Illegal bins are not
+counted, and any that a passing run hit are listed.
+The closure target is 100% of the headline bins. A bin that turns out to be
+unreachable stays a hole until it is reviewed; it then becomes an ignored bin
+with its reason in the bins table, never a silent waiver. Closure is measured
+on the union of every configuration; the owner's decisions are in
+[docs/DECISIONS.md](docs/DECISIONS.md) D10, and the open coverage work in the
+verification plan's road-map.
 
 ### Reset transitions and X-propagation
 
@@ -707,7 +711,11 @@ a checkout. Simulations never need it; they read the committed table.
   crosses the link: whole bursts (the DUT's transaction splitter divides the
   requests it receives, at its manager port, and never changes what crosses
   the link), narrow AxSIZE where a burst would exceed 4 KB (d2d-compare's
-  `Txn.beat`).
+  `Txn.beat`). d2d_model packs the link as if the AXI ports could feed it
+  without limit; `perf_model.py` caps that at what the ports can move, one
+  data beat per cycle on each RP's write and read channels at both dies, so a
+  window that loads only narrow RPs (S5 `pl_w0` on 2xmix41-sp128, all on a
+  256-bit RP) expects the ports' rate, not the link's.
 - `uvm/env/perf/perf_overrides.yaml` widens the tolerance of single targets, each
   with a measured structural reason. It is empty by default.
 - `make perf_check` judges every `out/**/perf.json` (docs/PERF_JSON.md) against

@@ -3,7 +3,7 @@
 
 schema_version = 1
 
-# Data path (stream F).
+# Data path.
 #
 # Data-path tests (plus issues #56 and #64). TB=t1. Each entry: test, seeds,
 # plusargs and plan_ids; every entry runs on every configuration.

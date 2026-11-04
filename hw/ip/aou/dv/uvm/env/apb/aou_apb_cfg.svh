@@ -5,7 +5,7 @@
 class aou_apb_cfg extends uvm_object;
   virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)) vif;
   uvm_active_passive_enum is_active = UVM_ACTIVE;
-  // config_db key of the interface (see docs/ARCHITECTURE.md).
+  // config_db key of the interface (see docs/AOU_TB_ARCH.adoc).
   string vif_key = "apb";
   // Idle PCLK cycles between transfers, drawn per transfer from [min, max].
   int unsigned min_idle_cycles = 0;

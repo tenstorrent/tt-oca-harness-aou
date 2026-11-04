@@ -10,7 +10,7 @@
 // AOU_RX_FIFO_ALT for non-default RX FIFO depths (granules for W and R) with the
 // request/response register slices off
 // (aou_t1_env_pkg::AOU_T1_RX_DEPTH). Every interface is registered in
-// uvm_config_db under scope "*" (docs/ARCHITECTURE.md) by the SV-UVM harness
+// uvm_config_db under scope "*" (docs/AOU_TB_ARCH.adoc) by the SV-UVM harness
 // block at the end (`ifdef UVM), which also compiles the test classes
 // (uvm/tests/aou_tests.sv) and calls run_test().
 
@@ -443,10 +443,24 @@ module tb_top;
       .RP2_AXI_DATA_WD(RPW2),
       .RP3_AXI_DATA_WD(RPW3),
       .TX_NXT_PACKING_EN(NXT_PACK),
-      .S_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
-      .S_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
-      .M_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
-      .M_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT)
+      // The checkers take one S-port and one M-port limit for every RP
+      // (aou_t1_env_pkg), so every RP is built with the same values.
+      .RP0_S_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP0_S_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP0_M_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP0_M_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP1_S_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP1_S_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP1_M_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP1_M_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP2_S_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP2_S_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP2_M_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP2_M_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP3_S_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP3_S_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_S_MO_CNT),
+      .RP3_M_RD_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT),
+      .RP3_M_WR_MO_CNT    (aou_t1_env_pkg::AOU_T1_M_MO_CNT)
 `ifdef AOU_RX_FIFO_ALT
       ,
       .RP0_RX_AW_FIFO_DEPTH(aou_t1_env_pkg::AOU_T1_RX_DEPTH[0][0]),

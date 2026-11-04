@@ -3,7 +3,7 @@
 
 // The L1 <-> L3 boundary: one 256-byte flit in wire byte order, as L1's
 // aou_flit_item carries it. L3 depends on nothing else from L1, so the
-// integrator converts with a byte copy (docs/ARCHITECTURE.md, "L3 boundary").
+// integrator converts with a byte copy (docs/AOU_TB_ARCH.adoc, "L3 boundary").
 class aou_l3_flit_item extends uvm_sequence_item;
   `uvm_object_utils(aou_l3_flit_item)
 

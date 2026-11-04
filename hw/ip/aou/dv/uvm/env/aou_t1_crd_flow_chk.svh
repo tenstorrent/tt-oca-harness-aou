@@ -184,7 +184,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
     rx_msg_imp = new("rx_msg_imp", this);
     cg_crd = new();
     db = aou_fc_db::get();
-    fc_crd = db.group("env.cg_crd_flow", fresh);
+    fc_crd = db.group("env.cg_crd", fresh);
     if (fresh) begin
       p = fc_crd.cp("cp_cls"); `AOU_T1_CRD_FC_CLS(AOU_FC_REG)
       p = fc_crd.cp("cp_ev"); `AOU_T1_CRD_FC_EV(AOU_FC_REG)

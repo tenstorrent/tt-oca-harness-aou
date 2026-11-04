@@ -192,8 +192,12 @@ xref:aou-ig-parameter-list[Section 2]). Two-PHY variants additionally
 require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY ports
 physically exist.
 * Parameterized number of Resource Plane and each RP’s AXI data width
-* RP Remapping
-* QoS scheme between RPs on the AW and AR channels
+* RP Remapping: programmable remote RP per lane (DEST_RP) and asymmetric
+RP mapping (ASYMMETRIC_RP_PROC_CON, 0x0084) that merges several local
+slave ports onto one remote RP, for a link partner with fewer RPs
+(xref:../MAS/architecture.adoc#aou-310-rp-remapping[MAS Section 3.10])
+* QoS scheme between RPs on the AW and AR channels, applied a second time
+among the slave ports merged onto one lane
 * Interoperability with different data width remote die
 * Handling of flit cancel and stall request as specified in the UCIe
 specification
@@ -295,9 +299,21 @@ message width from any remote die.
 
 |APB_DATA_WD |parameter |32 |APB data width.
 
-|S_RD_MO_CNT |parameter |32 |Slave read outstanding count.
+|RP0_S_RD_MO_CNT ... RP3_S_RD_MO_CNT |parameter |32 ([.monospaced]#++AOU_TOP++#) /
+64 ([.monospaced]#++AOU_CORE_TOP++#) |Slave read outstanding count of the RP: the
+number of reads the slave port keeps outstanding before the subordinate ID
+checker holds AR (when enabled), and the number of entries of the RP's AR ID
+remap table when the asymmetric RP mapping merges the RP onto a shared lane
+(distinct IDs outstanding, and requests per ID;
+xref:../MAS/architecture.adoc#aou-3105-axi-id-handling-on-merged-routes[MAS Section 3.10.5]).
+One parameter per RP; the ones of RPs the build does not have are unused.
 
-|S_WR_MO_CNT |parameter |32 |Slave write outstanding count.
+|RP0_S_WR_MO_CNT ... RP3_S_WR_MO_CNT |parameter |32 ([.monospaced]#++AOU_TOP++#) /
+64 ([.monospaced]#++AOU_CORE_TOP++#) |Slave write outstanding count of the RP: depth of
+the early write response table
+(xref:../MAS/architecture.adoc#aou-375-write-outstanding-queue-backpressure[MAS Section 3.7.5]),
+limit of the subordinate ID checker on AW/W, and entries of the RP's AW ID
+remap table on a merged route.
 
 |TX_NXT_PACKING_EN |parameter |0 |TX flit packer output stage in
 [.monospaced]#++AOU_TX_CORE++#. 0: each FDI chunk is driven combinationally from the
@@ -305,21 +321,21 @@ granule ring and the current packing state. 1: the chunk is computed from the
 look-ahead (next) packing state and ring contents and registered before the
 FDI output mux, so the FDI TX data leaves a register.
 
-|M_RD_MO_CNT |parameter |32 |Number of remote read requests an RP keeps in
+|RP0_M_RD_MO_CNT ... RP3_M_RD_MO_CNT |parameter |32 |Number of remote read requests the RP keeps in
 service at its AXI manager port (one pending-ID table entry per request, from
 the first AR it issues for the request until the last R beat). A request the
 splitter cuts into sub-bursts ([.monospaced]#++AOU_SPLIT_TR_RPn.MAX_ARBURSTLEN++#,
 xref:../MAS/architecture.adoc#aou-36-axi-transaction-splitter[MAS Section 3.6])
 holds one entry for all of them, so the manager port may have up to
-[.monospaced]#++M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts
+[.monospaced]#++RPn_M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts
 outstanding, where [.monospaced]#++beats++# is the request's length at the
 manager port's data width. The local interconnect may back-pressure AR as usual.
 
-|M_WR_MO_CNT |parameter |32 |Number of remote write requests an RP keeps in
+|RP0_M_WR_MO_CNT ... RP3_M_WR_MO_CNT |parameter |32 |Number of remote write requests the RP keeps in
 service at its AXI manager port (one pending-ID table entry per request, from
 the first AW it issues for the request until the last B). As for reads, a split
 request holds one entry for all of its sub-bursts, so the manager port may have
-up to [.monospaced]#++M_WR_MO_CNT x ceil(beats / (MAX_AWBURSTLEN + 1))++# write
+up to [.monospaced]#++RPn_M_WR_MO_CNT x ceil(beats / (MAX_AWBURSTLEN + 1))++# write
 bursts outstanding.
 
 |RP0_AGG_WCH_FIFO_DEPTH ... RP3_AGG_WCH_FIFO_DEPTH |localparam in
@@ -491,7 +507,7 @@ both resets have been released.
 ____________________________________________________________________________________________________________________________________________________________________________________________________________________________________
 *Note:* AOU_CORE_SFR decodes [.monospaced]#++PADDR[15:0]++# only; bits
 [.monospaced]#++[APB_ADDR_WD-1:16]++# are ignored, so the register map
-(offsets 0x0000 to 0x00A0) repeats at every 64 KiB within the APB window.
+(offsets 0x0000 to 0x011C) repeats at every 64 KiB within the APB window.
 Size the APB window for 64 KiB and let the interconnect decode the upper
 address bits. Within the window, an offset that is not a defined register
 (including a non-word-aligned address) reads as 0x00000000 and ignores
@@ -771,7 +787,9 @@ Tie to 0 when unused.
 |O_AOU_TX_AXI_S_AWREADY |output |[RP_COUNT-1:0] |AW ready.
 
 |I_AOU_TX_AXI_S_WDATA |input |[RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]
-|Write data.
+|Write data. Each RP drives its own [.monospaced]#++RPn_AXI_DATA_WD++# bits; a beat is
+sent to the remote die as a WriteData message of that width, also when the
+asymmetric RP mapping sends it on a lane whose own port is wider or narrower.
 
 |I_AOU_TX_AXI_S_WSTRB |input |[RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]
 |Write strobe.
@@ -1337,6 +1355,14 @@ popped before sending the ActivateReq message.
 Activation START (via SFR AOU_INIT.ACTIVATE_START SFR)
 
 * Activation can be triggered by setting ACTIVATE_START.
+* Program the RP mapping (DEST_RP and ASYMMETRIC_RP_PROC_CON) and the
+arbitration registers (PRIOR_RP_AXI, PRIOR_TIMER) before ACTIVATE_START,
+with no AXI traffic outstanding on the slave ports, and keep them until the
+next deactivation has completed. The two dies' mappings must agree on the
+remote RPs in use. The mapping is not changed by a deactivation or a
+LinkReset request; AOU_CON0.AOU_SW_RESET returns it, with the other
+configuration registers, to one-to-one with the asymmetric mapping disabled
+(xref:../MAS/software-operation.adoc#aou-71-sfr-setting[MAS Section 7.1]).
 * Activation does not proceed until I_INT_FSM_IN_ACTIVE is asserted,
 since no flits can be transmitted beforehand. Therefore, it is allowed
 to set the ACTIVATE_START SFR before I_INT_FSM_IN_ACTIVE is asserted. If
@@ -1347,10 +1373,10 @@ activation is completed and AOU_ACTIVATE_STATE transitions to ENABLED.
 * Profile exchange (AoU v0.8 chapter 11). The four-granule ActivateReq
 AOU_CORE sends announces the Basic Profile (ProfileID, ProfileRev,
 ProfileOpt 0/0/0) for every RP, the only profile it implements;
-PROFILE_CFG_RP0..3 (0x0084 to 0x0090) read those values and are read-only,
+PROFILE_CFG_RP0..3 (0x0100 to 0x010C) read those values and are read-only,
 so nothing is programmed before ACTIVATE_START. The remote die's values,
 from the last ActivateReq AOU_CORE accepted, are read from
-PROFILE_RMT_RP0..3 (0x0094 to 0x00A0; RCVD set once one has been accepted;
+PROFILE_RMT_RP0..3 (0x0110 to 0x011C; RCVD set once one has been accepted;
 a remote die sending zeros reads as the Basic Profile). Hardware does not
 compare or negotiate: software reads PROFILE_RMT_RPn once ENABLED and
 decides. AOU_SW_RESET clears PROFILE_RMT_RP0..3.
