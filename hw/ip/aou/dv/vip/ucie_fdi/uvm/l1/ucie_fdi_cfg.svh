@@ -5,7 +5,7 @@ class ucie_fdi_cfg extends uvm_object;
   `uvm_object_utils(ucie_fdi_cfg)
 
   int unsigned   phy = 0;
-  int unsigned   beat_bytes = 64;     // 32, 64, 128 or 256 (FDI width of this PHY)
+  int unsigned   beat_bytes = 64;     // 32, 64, 128, 256, 512 or 1024 (FDI width of this PHY)
   bit            is_active = 1'b1;    // 0: monitor only
 
   // TX responder
@@ -35,6 +35,11 @@ class ucie_fdi_cfg extends uvm_object;
   // Fill FH/CRC with random bytes; the Protocol Layer must ignore them.
   bit            random_adapter_bytes = 1'b0;
   bit            poison_cancelled = 1'b1; // cancelled copies carry random bytes
+  // 512 and 1024 B: chance a transfer is sent with fewer flits than it could
+  // carry, the empty lanes zero (NOP), as an Adapter does after a gap on the
+  // Link (UCIe r3.0 10.3.1). Without it a transfer is short only when the
+  // sequence has no more flits ready.
+  int unsigned   partial_beat_pct = 0;
 
   // Monitor
   bit            checks_en = 1'b1;

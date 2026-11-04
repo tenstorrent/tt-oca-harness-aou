@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //
 // L1: FDI mainband with UCIe Flit Format 6 (Latency-Optimized 256B with
-// optional bytes). Flit item, Format 6 codec, PL driver (to the DUT RX), TX
-// responder (pl_trdy and stallreq towards the DUT TX), monitor with protocol
-// checks and a coverage hook. Rule IDs are listed in ../README.md.
+// optional bytes), on FDIs of 32 to 1024 bytes. Flit item, Format 6 codec,
+// PL driver (to the DUT RX), TX responder (pl_trdy and stallreq towards the
+// DUT TX), monitor with protocol checks and a coverage hook. Rule IDs are listed in ../README.md.
 
 package ucie_fdi_pkg;
   import uvm_pkg::*;
@@ -14,7 +14,7 @@ package ucie_fdi_pkg;
   localparam int FLIT_BYTES     = 256;
   localparam int HALF_BYTES     = 128;
   localparam int MIN_BEAT_BYTES = 32;
-  localparam int MAX_BEAT_BYTES = 256;
+  localparam int MAX_BEAT_BYTES = 1024;
   localparam int BUS_W          = MAX_BEAT_BYTES * 8;
   // The most transfers one flit can take (at the narrowest FDI).
   localparam int MAX_BEATS_PER_FLIT = FLIT_BYTES / MIN_BEAT_BYTES;
@@ -26,9 +26,9 @@ package ucie_fdi_pkg;
   // TX: Protocol Layer (DUT) to Adapter. RX: Adapter to Protocol Layer (DUT).
   typedef enum bit {UCIE_FDI_TX, UCIE_FDI_RX} ucie_fdi_dir_e;
 
-  // How the PL driver cancels a 128B half (the whole flit on a 256 B FDI): not
-  // at all, with pl_valid low in the cancel cycle, or with the replay's first
-  // beat in the cancel cycle.
+  // How the PL driver cancels a 128B half (from 256 B up, every flit of the
+  // transfer): not at all, with pl_valid low in the cancel cycle, or with the
+  // replay's first beat in the cancel cycle.
   typedef enum bit [1:0] {
     UCIE_CANCEL_NONE,
     UCIE_CANCEL_IDLE,
@@ -56,14 +56,17 @@ package ucie_fdi_pkg;
   // the whole flit (as UCIe r3.0 10.3.1 says of wider FDIs: a cancel applies
   // to every flit in that clock).
   //
-  // The helpers below are the only place the width arithmetic lives. They
-  // stay defined (never 0) for an FDI wider than a flit, where a transfer
-  // would carry several flits, flit j on bytes 256j up (lane j; UCIe r3.0
-  // 10.3.1, Implementation Note "NBYTES"); valid_beat_bytes keeps such
-  // widths out.
+  // Wider FDIs (UCIe r3.0 10.3.1, Implementation Note "NBYTES"): a 512 or
+  // 1024 B transfer carries 2 or 4 flits, flit j on bytes 256j to 256j+255
+  // (lane j; the byte mapping above, continued). The Adapter forwards whole
+  // flits on the low lanes and zeros on the rest, and a Flit Header of 0000h
+  // is a NOP the Protocol Layer discards; the Protocol Layer sends valid flits
+  // on every lane. pl_flit_cancel applies to every flit of the transfer
+  // before it. The helpers below are the only place the width arithmetic
+  // lives.
   // ---------------------------------------------------------------------------
   function automatic bit valid_beat_bytes(int unsigned n);
-    return n inside {32, 64, 128, 256};
+    return n inside {32, 64, 128, 256, 512, 1024};
   endfunction
 
   // Transfers per flit: 1 once a transfer holds a whole flit.

@@ -26,7 +26,8 @@ class ucie_fdi_agent extends uvm_agent;
             this, "", $sformatf("fdi_mb%0d", cfg.phy), vif))
       `uvm_fatal(get_type_name(), $sformatf("no fdi_mb%0d in config_db", cfg.phy))
     if (!valid_beat_bytes(cfg.beat_bytes))
-      `uvm_fatal(get_type_name(), $sformatf("beat_bytes %0d not 32/64/128/256", cfg.beat_bytes))
+      `uvm_fatal(get_type_name(), $sformatf("beat_bytes %0d not 32/64/128/256/512/1024",
+                                            cfg.beat_bytes))
     mon = ucie_fdi_monitor::type_id::create("mon", this);
     mon.cfg = cfg;
     mon.vif = vif;

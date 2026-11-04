@@ -7,8 +7,14 @@
 // - ap_tx: flits the DUT sent; a beat transfers on lp_valid & lp_irdy &
 //   pl_trdy (FDI-R01).
 // - ap_rx: flits delivered to the DUT, after cancel rollback: a cancel in the
-//   cycle after a 128B half drops that half (FDI-R05); on a 256 B FDI, where
-//   the flit is one beat, a cancel after it drops the whole flit.
+//   cycle after a 128B half drops that half (FDI-R05); from 256 B up, where
+//   the flit is one beat, a cancel after it drops every flit of that beat.
+//   NOP flits (Flit Header 0000h) are not delivered: the Protocol Layer
+//   discards them (UCIe r3.0 Table 10-3 pl_flit_cancel, 10.3.1).
+// On a 512 or 1024 B FDI a beat carries 2 or 4 flits, one per 256 B lane
+// (UCIe r3.0 10.3.1): a TX beat is that many flits, each checked (FDI-R45, so
+// a lane the DUT leaves empty is an error), and an RX beat is that many
+// flits, of which the zero-padded lanes are NOPs.
 // Reset flushes both directions, and so does a LinkError the Adapter entered
 // mid-flit (gate abort; UCIe r1.1 8.3.3.7): the partial flits are abandoned.
 class ucie_fdi_monitor extends uvm_monitor;
@@ -38,13 +44,15 @@ class ucie_fdi_monitor extends uvm_monitor;
   // sends compares against this, not wall-clock cycles, so the pl_trdy policy
   // the seed drew doesn't decide the result.
   int unsigned n_tx_ready;
+  int unsigned n_rx_nops;        // uncancelled RX NOP flits, discarded
+  int unsigned n_rx_part;        // 512/1024 B: RX beats with fewer flits than lanes
 
-  local ucie_flit_item tx_cur;
+  local ucie_flit_item tx_cur[$];  // the flits of the current beat(s), one per lane
   local int unsigned  tx_beat;
   local int unsigned  tx_gap;
   local int unsigned  tx_stall;
 
-  local ucie_flit_item rx_cur;
+  local ucie_flit_item rx_cur[$];
   local int unsigned  rx_beat;
   local int unsigned  rx_gap;
   local int unsigned  rx_bubbles;
@@ -105,8 +113,8 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (tx_beat != 0 || rx_beat != 0)
       `uvm_info(get_type_name(), $sformatf("%s: dropping partial flits (tx beat %0d, rx beat %0d)",
                                            why, tx_beat, rx_beat), UVM_MEDIUM)
-    tx_cur = null; tx_beat = 0; tx_gap = 0; tx_stall = 0;
-    rx_cur = null; rx_beat = 0; rx_gap = 0; rx_bubbles = 0; rx_half_done = 1'b0;
+    tx_cur.delete(); tx_beat = 0; tx_gap = 0; tx_stall = 0;
+    rx_cur.delete(); rx_beat = 0; rx_gap = 0; rx_bubbles = 0; rx_half_done = 1'b0;
     prev_sr = 1'b0; prev_sa = 1'b0; sr_cycles = 0; sa_cycles = 0;
   endfunction
 
@@ -144,17 +152,17 @@ class ucie_fdi_monitor extends uvm_monitor;
       n_tx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b0);
     end
-    if (rx_cur != null) begin
+    if (rx_cur.size() != 0) begin
       n_rx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b1);
     end
-    if (tx_beat != 0 || rx_cur != null)
+    if (tx_beat != 0 || rx_cur.size() != 0)
       `uvm_info(get_type_name(), $sformatf(
                 "left Active mid-flit: TX beat %0d, RX beat %0d abandoned", tx_beat, rx_beat),
                 UVM_MEDIUM)
-    abandon_h_done = rx_cur != null && rx_half_done;
-    tx_cur = null; tx_beat = 0; tx_stall = 0;
-    rx_cur = null; rx_beat = 0; rx_bubbles = 0; rx_half_done = 1'b0;
+    abandon_h_done = rx_cur.size() != 0 && rx_half_done;
+    tx_cur.delete(); tx_beat = 0; tx_stall = 0;
+    rx_cur.delete(); rx_beat = 0; rx_bubbles = 0; rx_half_done = 1'b0;
     abandoned = 1'b1;
   endfunction
 
@@ -175,7 +183,7 @@ class ucie_fdi_monitor extends uvm_monitor;
       err(R02, $sformatf("bubble inside a TX flit at beat %0d", tx_beat));
       // The partial flit is lost; resynchronise on the next lp_valid so one
       // truncation is one report, not one per idle cycle that follows.
-      tx_cur = null;
+      tx_cur.delete();
       tx_beat = 0;
       tx_stall = 0;
     end
@@ -192,33 +200,37 @@ class ucie_fdi_monitor extends uvm_monitor;
       return;
     end
     if (tx_beat == 0) begin
-      tx_cur = new("tx_cur");
-      tx_cur.dir = UCIE_FDI_TX;
-      tx_cur.phy = cfg.phy;
-      tx_cur.t_start = $time;
-      tx_cur.gap_before = tx_gap;
+      for (int unsigned l = 0; l < cfg.fpb(); l++) begin
+        ucie_flit_item f = new("tx_cur");
+        f.dir = UCIE_FDI_TX;
+        f.phy = cfg.phy;
+        f.t_start = $time;
+        f.gap_before = l == 0 ? tx_gap : 0;
+        tx_cur.push_back(f);
+      end
       tx_gap = 0;
       tx_stall = 0;
     end
     chk(R01);
-    tx_cur.put_beat(cfg.beat_bytes, tx_beat, vif.mon_cb.lp_data);
+    foreach (tx_cur[l]) tx_cur[l].put_beat(cfg.beat_bytes, tx_beat, vif.mon_cb.lp_data, l);
     tx_beat++;
     if (tx_beat == cfg.bpf()) begin
-      publish_tx(tx_cur);
-      tx_cur = null;
+      foreach (tx_cur[l]) publish_tx(tx_cur[l], l);
+      tx_cur.delete();
       tx_beat = 0;
     end
   endfunction
 
-  // A complete DUT TX flit: its Adapter-owned bytes checked, then published.
-  local function void publish_tx(ucie_flit_item f);
+  // A complete DUT TX flit (in lane `lane` of a 512 or 1024 B beat): its
+  // Adapter-owned bytes checked, then published.
+  local function void publish_tx(ucie_flit_item f, int unsigned lane);
     f.t_end = $time;
     f.n_stall_cycles = tx_stall;
     if (cfg.check_tx_adapter_bytes) chk(R45);
     if (cfg.check_tx_adapter_bytes && !f.tx_adapter_bytes_legal())
-      err(R45, $sformatf("Adapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
-                         f.data[0], f.data[1], f.data[126], f.data[127], f.data[254],
-                         f.data[255]));
+      err(R45, $sformatf("%sAdapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
+                         cfg.fpb() > 1 ? $sformatf("lane %0d: ", lane) : "", f.data[0],
+                         f.data[1], f.data[126], f.data[127], f.data[254], f.data[255]));
     if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
     n_tx_flits++;
     `uvm_info(get_type_name(), {"DUT TX ", f.convert2string()}, UVM_HIGH)
@@ -275,20 +287,23 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (c && abandon_h_done) begin
       n_rx_cancels++;
     end else if (c) begin
-      if (!rx_half_done || rx_cur == null) begin
-        err(R05, "pl_flit_cancel not in the cycle after a 128B half (a 256B flit)");
+      if (!rx_half_done || rx_cur.size() == 0) begin
+        err(R05, "pl_flit_cancel not in the cycle after a 128B half (from 256 B up, a beat)");
       end else begin
-        // The cancelled unit: half 0 or 1, or 2, the whole flit, on a 256 B FDI.
+        // The cancelled unit: half 0 or 1, or 2, every flit of the beat, from
+        // 256 B up.
         int unsigned half = (cfg.bpf() == 1) ? 2 : (rx_beat == cfg.bpf()) ? 1 : 0;
         int unsigned count;
         bit stalled;
         rx_beat -= cfg.bph();
-        if (half != 1) rx_cur.n_cancel_h0++;
-        else rx_cur.n_cancel_h1++;
-        if (v) rx_cur.n_cancel_valid++;
+        foreach (rx_cur[l]) begin
+          if (half != 1) rx_cur[l].n_cancel_h0++;
+          else rx_cur[l].n_cancel_h1++;
+          if (v) rx_cur[l].n_cancel_valid++;
+        end
         stalled = vif.mon_cb.pl_stallreq === 1'b1 || vif.mon_cb.lp_stallack === 1'b1;
         if (stalled) n_cancels_stalled++;
-        count = rx_cur.n_cancel_h0 + rx_cur.n_cancel_h1;
+        count = rx_cur[0].n_cancel_h0 + rx_cur[0].n_cancel_h1;
         n_rx_cancels++;
         if (cov != null) cov.sample_cancel(half, v, count, stalled);
       end
@@ -307,37 +322,53 @@ class ucie_fdi_monitor extends uvm_monitor;
       err(R35, $sformatf("pl_valid while pl_state_sts=0x%0h (rx_active %0b)", sts,
                                vif.mon_cb.rx_active === 1'b1));
     if (!v) begin
-      if (rx_cur == null) begin
+      if (rx_cur.size() == 0) begin
         if (rx_gap < 1000) rx_gap++;
       end else if (!c) begin
         rx_bubbles++;
       end
       return;
     end
-    if (rx_cur == null) begin
-      rx_cur = new("rx_cur");
-      rx_cur.dir = UCIE_FDI_RX;
-      rx_cur.phy = cfg.phy;
-      rx_cur.t_start = $time;
-      rx_cur.gap_before = rx_gap;
+    if (rx_cur.size() == 0) begin
+      for (int unsigned l = 0; l < cfg.fpb(); l++) begin
+        ucie_flit_item f = new("rx_cur");
+        f.dir = UCIE_FDI_RX;
+        f.phy = cfg.phy;
+        f.t_start = $time;
+        f.gap_before = l == 0 ? rx_gap : 0;
+        rx_cur.push_back(f);
+      end
       rx_gap = 0;
       rx_bubbles = 0;
     end
-    rx_cur.put_beat(cfg.beat_bytes, rx_beat, vif.mon_cb.pl_data);
+    // A replay after a cancel rewrites every lane (fewer flits leave NOPs).
+    foreach (rx_cur[l]) rx_cur[l].put_beat(cfg.beat_bytes, rx_beat, vif.mon_cb.pl_data, l);
     rx_beat++;
     rx_half_done = (rx_beat % cfg.bph()) == 0;
   endfunction
 
+  // The flits of the finished beat(s), less the NOPs the Protocol Layer
+  // discards.
   local function void publish_rx();
-    rx_cur.t_end = $time;
-    if (rx_cur.n_cancel_h1 != 0) n_rx_cancel_h1++;
-    if (rx_cur.n_cancel_h0 > 1 || rx_cur.n_cancel_h1 > 1) n_rx_cancel_rep++;
-    rx_cur.n_stall_cycles = rx_bubbles;
-    if (cov != null) cov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, rx_cur.gap_before);
-    n_rx_flits++;
-    `uvm_info(get_type_name(), {"DUT RX ", rx_cur.convert2string()}, UVM_HIGH)
-    ap_rx.write(rx_cur);
-    rx_cur = null;
+    int unsigned n_nop;
+    foreach (rx_cur[l]) begin
+      ucie_flit_item f = rx_cur[l];
+      if (f.is_nop()) begin
+        n_nop++;
+        continue;
+      end
+      f.t_end = $time;
+      if (f.n_cancel_h1 != 0) n_rx_cancel_h1++;
+      if (f.n_cancel_h0 > 1 || f.n_cancel_h1 > 1) n_rx_cancel_rep++;
+      f.n_stall_cycles = rx_bubbles;
+      if (cov != null) cov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before);
+      n_rx_flits++;
+      `uvm_info(get_type_name(), {"DUT RX ", f.convert2string()}, UVM_HIGH)
+      ap_rx.write(f);
+    end
+    n_rx_nops += n_nop;
+    if (cfg.fpb() > 1 && n_nop != 0) n_rx_part++;
+    rx_cur.delete();
     rx_beat = 0;
   endfunction
 
@@ -347,10 +378,11 @@ class ucie_fdi_monitor extends uvm_monitor;
                                           "cancel, %0d with a repeated one), %0d stalls (%0d ",
                                           "mid-flit, %0d of them with pl_trdy low); %0d TX ",
                                           "and %0d RX flits abandoned mid-flit; %0d RX beats ",
-                                          "in Reset"}, cfg.phy,
+                                          "in Reset; %0d RX NOP flits discarded, %0d RX beats ",
+                                          "not full"}, cfg.phy,
                                          n_tx_flits, n_rx_flits, n_rx_cancels, n_cancels_stalled,
                                          n_rx_cancel_h1, n_rx_cancel_rep, n_stalls, n_stalls_mid,
                                          n_stalls_trdy0, n_tx_abandoned, n_rx_abandoned,
-                                         n_rx_beats_reset), UVM_LOW)
+                                         n_rx_beats_reset, n_rx_nops, n_rx_part), UVM_LOW)
   endfunction
 endclass
