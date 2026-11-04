@@ -239,7 +239,11 @@ class aou_t1_env_cfg extends uvm_object;
     if ($value$plusargs("l1_cancel_mix=%d", v)) l1_cancel_mix = v != 0;
   endfunction
 
-  // Random choices a test usually wants per seed.
+  // Random choices a test usually wants per seed. On a tenth of the S ports
+  // each, the local manager holds BREADY or RREADY low while the port fills
+  // to its outstanding limit (aou_axi_timing b_fill_hold, r_fill_hold), and
+  // may then keep as many requests in flight as the port accepts; applying a
+  // timing profile turns the holds off again.
   function void randomize_knobs();
     local_timing = aou_axi_timing_e'($urandom_range(4));
     for (int unsigned r = 0; r < n_rp; r++) begin
@@ -247,20 +251,30 @@ class aou_t1_env_cfg extends uvm_object;
       m_sub_cfg[r].timing.apply(local_timing);
       s_mgr_cfg[r].w_before_aw_en = 1'($urandom_range(1));
       m_sub_cfg[r].r_interleave_en = 1'($urandom_range(1));
+      s_mgr_cfg[r].timing.b_fill_hold = ($urandom_range(9) == 0);
+      s_mgr_cfg[r].timing.r_fill_hold = ($urandom_range(9) == 0);
+      if (s_mgr_cfg[r].timing.b_fill_hold) s_mgr_cfg[r].max_wr_outstanding = AOU_T1_S_MO_CNT;
+      if (s_mgr_cfg[r].timing.r_fill_hold) s_mgr_cfg[r].max_rd_outstanding = AOU_T1_S_MO_CNT;
     end
     l3_cfg.resp_fork = 1'($urandom_range(1));
     remote_lat_max = $urandom_range(30);
   endfunction
 
   function string convert2string();
+    bit [3:0] bh = '0;
+    bit [3:0] rh = '0;
+    foreach (s_mgr_cfg[r]) begin
+      bh[r] = s_mgr_cfg[r].timing.b_fill_hold;
+      rh[r] = s_mgr_cfg[r].timing.r_fill_hold;
+    end
     return $sformatf({"n_rp=%0d remote_rp_count=%0d rp_bytes=%p remote_bytes=%0d ",
                       "rp_remote_bytes=%p phy=%0d/%0d ",
                       "spec=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
-                      "l1 cancel/bubble=%0d/%0d"},
+                      "l1 cancel/bubble=%0d/%0d fill_hold b/r=%4b/%4b"},
                      n_rp, remote_rp_count, rp_bytes, remote_bytes, rp_remote_bytes,
                      lsm_cfg.active_phy,
                      lsm_cfg.n_phy, spec_rev.name(),
                      local_timing.name(), remote_lat_max, l3_cfg.resp_fork, l1_cancel_pct,
-                     l1_bubble_pct);
+                     l1_bubble_pct, bh, rh);
   endfunction
 endclass

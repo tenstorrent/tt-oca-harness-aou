@@ -209,7 +209,10 @@ and order, AXI addresses, lengths, sizes, strobes, attributes and timing within
 the profile, the active PHY on two-PHY targets, the packer layout policy of the
 remote die (`aou_packer_policy`: DUT-like, sparse, minimum and maximum density,
 random), credit return policy and delays. A tenth of each
-memory's pages has no exclusive monitor (`aou_mem.no_excl_pct`).
+memory's pages has no exclusive monitor (`aou_mem.no_excl_pct`). At a modest rate per seed
+(`aou_t1_env_cfg::randomize_knobs`) an S-port manager holds BREADY or RREADY
+low while its port fills to the outstanding limit (`aou_axi_timing`
+`b_fill_hold`, `r_fill_hold`); a test that measures performance sets its own timing.
 
 Stimulus keeps in-flight transactions to disjoint addresses unless a test asks
 otherwise, so the golden model is unambiguous. Negative scenarios inject through

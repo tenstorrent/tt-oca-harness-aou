@@ -793,6 +793,15 @@ at the M port (FEAT-R22) and its cg_mo full bin records that the limit was
 reached; the DUT must
 back-pressure without an error or a lost transfer.
 
+----
++dp_sfull=1: local-originated only, the S-port managers may keep the port's
+----
+
+outstanding limit (S_RD_MO_CNT, S_WR_MO_CNT) in flight and hold BREADY and
+RREADY low until it is, sometimes for over 1000 cycles (aou_axi_timing
+b_fill_hold, r_fill_hold), so each S port reaches its limit with its
+responses backed up; the DUT must neither lose nor reorder a response.
+
 *Procedure.* The base class's virtual sequence `aou_dp_vseq`, configured by this class and its arguments.
 
 *Rules named.* `FEAT-R22`
@@ -814,6 +823,8 @@ back-pressure without an error or a lost transfer.
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.1x512-sp64` | `+dp_mfull=600 +dp_wr_pct=100` | 1-2 | `1x512-sp64` | 9.20
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.4x512-sp64` | `+dp_mfull=600 +dp_wr_pct=0` | 1-2 | `4x512-sp64` | 9.20
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.4x512-sp64` | `+dp_mfull=600 +dp_wr_pct=100` | 1-2 | `4x512-sp64` | 9.20
+| `aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-100` | `+dp_sfull=1 +dp_wr_pct=100` | 1-2 |  | 8.1
+| `aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-0` | `+dp_sfull=1 +dp_wr_pct=0` | 1-2 |  | 8.1
 | `aou_dp_outstanding_test.dp_batch-16.dp_ids-same.rtl_asserts-1` | `+dp_batch=16 +dp_ids=same +rtl_asserts=1` | 1 | `1x512-sp64-assert` | 11.18
 |===
 
