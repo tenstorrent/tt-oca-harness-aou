@@ -66,7 +66,7 @@ class aou_base_test_seq extends ocah_sequence;
   endtask
 
   function bit link_is_up();
-    return env.lsm_vif.mon_cb.fdi_link_up === 1'b1 && env.lsm.drv.link_active;
+    return env.brg_vif.mon_cb.fdi_link_up === 1'b1 && env.lsm.drv.link_active;
   endfunction
 
   // Waits up to `timeout` cycles for the link; link_ok = 0 on time-out.
@@ -122,7 +122,7 @@ class aou_base_test_seq extends ocah_sequence;
       // With pl_clk_req released during bringup the DUT waits in WAIT_PRESENCE
       // for its software pin.
       `uvm_info(get_type_name(), "link not up yet: pulsing I_SW_ACTIVATE_START", UVM_LOW)
-      env.lsm.drv.pulse_sw(LSM_SW_ACTIVATE, 2);
+      env.fdi_layer.pulse_sw(LSM_SW_ACTIVATE, 2);
       wait_link(cfg.link_timeout);
     end
     if (!link_ok) `uvm_error(get_type_name(), "T1-V01: FDI link not Active after bringup")
@@ -149,7 +149,7 @@ class aou_base_test_seq extends ocah_sequence;
 
   task dut_activate(aou_t1_who_e who);
     if (who == AOU_T1_BY_PIN) begin
-      env.lsm.drv.pulse_sw(LSM_SW_ACTIVATE, 2);
+      env.fdi_layer.pulse_sw(LSM_SW_ACTIVATE, 2);
     end else begin
       aou_reg_activation_seq s = aou_reg_activation_seq::type_id::create("act");
       prep_reg(s);
@@ -621,9 +621,9 @@ class aou_base_test_seq extends ocah_sequence;
   // instead (check_link_down_status()).
   protected function void expect_link_down(ucie_lsm_ev_e kind);
     if (!(kind inside {LSM_EV_LINKERROR, LSM_EV_LINK_RESET, LSM_EV_DISABLED})) return;
-    if (env.lsm.mon.model.st inside {BRG_RESET, BRG_LINKERROR, BRG_LINKDOWN}) return;
+    if (env.fdi_layer.model.st inside {BRG_RESET, BRG_LINKERROR, BRG_LINKDOWN}) return;
     if (!env.status.disabled &&
-        env.lsm.mon.model.st inside {BRG_ACTIVE, BRG_RETRAIN, BRG_L1, BRG_L1_CLK_WAKE}) begin
+        env.fdi_layer.model.st inside {BRG_ACTIVE, BRG_RETRAIN, BRG_L1, BRG_L1_CLK_WAKE}) begin
       ld_expected = 1'b1;   // until check_link_down_status()
       n_ld_min++;
     end

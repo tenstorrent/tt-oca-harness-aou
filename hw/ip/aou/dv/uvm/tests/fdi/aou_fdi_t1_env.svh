@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// FDI agents of each PHY plus the link-state agent, with the L1 gates and
-// TX responders handed to L2. When the top connects the AXI agents
+// FDI agents of each PHY plus the link-state agent (the UCIe model), which
+// takes the FDI agents, and the bench's layer on it (aou_fdi_layer). When the top connects the AXI agents
 // (AOU_T1_AXI_AGENTS), idle AXI agents keep the S ports quiet and answer the
 // M ports. The DUT's RX flit framing is checked as in the T1 env
 // (aou_t1_rx_align_chk, when the top provides "rst").
@@ -13,6 +13,7 @@ class aou_fdi_t1_env extends uvm_env;
   ucie_fdi_agent fdi[N_PHY];
   ucie_lsm_cfg   lsm_cfg;
   ucie_lsm_agent lsm;
+  aou_fdi_layer  fdi_layer;
   aou_t1_rx_align_chk rx_align;
 `ifdef AOU_T1_AXI_AGENTS
   aou_axi_mgr_agent s_mgr[FDI_T1_RP_COUNT];
@@ -35,10 +36,11 @@ class aou_fdi_t1_env extends uvm_env;
     foreach (fdi[p]) begin
       fdi[p] = ucie_fdi_agent::type_id::create($sformatf("fdi%0d", p), this);
       fdi[p].cfg = fdi_cfg[p];
-      lsm_cfg.gate.push_back(fdi_cfg[p].gate);
     end
     lsm = ucie_lsm_agent::type_id::create("lsm", this);
     lsm.cfg = lsm_cfg;
+    foreach (fdi[p]) lsm.phy.push_back(fdi[p]);
+    fdi_layer = aou_fdi_layer::type_id::create("fdi_layer", this);
     rx_align = aou_t1_rx_align_chk::type_id::create("rx_align", this);
     void'(uvm_config_db #(virtual aou_rst_if)::get(this, "", "rst", rx_align.rst_vif));
 `ifdef AOU_T1_AXI_AGENTS
@@ -57,7 +59,7 @@ class aou_fdi_t1_env extends uvm_env;
 
   function void connect_phase(uvm_phase phase);
     super.connect_phase(phase);
-    foreach (fdi[p]) if (fdi_cfg[p].is_active) lsm_cfg.rsp.push_back(fdi[p].rsp);
+    fdi_layer.attach(lsm);
     fdi[lsm_cfg.active_phy].mon.ap_rx.connect(rx_align.rx_flit_imp);
     rx_align.mb_vif = fdi[lsm_cfg.active_phy].vif;
   endfunction

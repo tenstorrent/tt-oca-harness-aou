@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Sends n_flits flits with random cancel plans and gaps. Payloads are empty
-// AoU flits (all zero: no MsgStart, no MsgCredit) unless random_payload is
-// set or flits are queued in `payloads`, which go first.
+// Sends n_flits flits with random cancel plans and gaps. Payloads are all
+// zero (what that means is the protocol layer's: an empty flit for AoU)
+// unless random_payload is set or flits are queued in `payloads`, which go
+// first.
 class ucie_flit_seq extends uvm_sequence #(ucie_flit_item);
   `uvm_object_utils(ucie_flit_seq)
 
@@ -26,7 +27,7 @@ class ucie_flit_seq extends uvm_sequence #(ucie_flit_item);
       bit cancel = $urandom_range(99) < cancel_pct;
       bit gap = $urandom_range(99) < gap_pct;
       start_item(it);
-      `AOU_RANDOMIZE_WITH(it, {
+      `UCIE_RANDOMIZE_WITH(it, {
         if (!cancel) { cancel_h0 == UCIE_CANCEL_NONE; cancel_h1 == UCIE_CANCEL_NONE; }
         else { cancel_h0 != UCIE_CANCEL_NONE || cancel_h1 != UCIE_CANCEL_NONE; }
         if (!gap) pre_gap == 0; else pre_gap inside {[1:6]};

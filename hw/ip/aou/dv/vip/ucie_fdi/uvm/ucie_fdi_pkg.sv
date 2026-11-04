@@ -4,15 +4,12 @@
 // L1: FDI mainband with UCIe Flit Format 6 (Latency-Optimized 256B with
 // optional bytes). Flit item, Format 6 codec, PL driver (to the DUT RX), TX
 // responder (pl_trdy and stallreq towards the DUT TX), monitor with protocol
-// checks and coverage. Rule IDs refer to checkers/rules.csv.
+// checks and a coverage hook. Rule IDs are listed in ../README.md.
 
 package ucie_fdi_pkg;
   import uvm_pkg::*;
-  import aou_rule_pkg::*;
-  import aou_fc_pkg::*;
   `include "uvm_macros.svh"
-  `include "aou_macros.svh"
-  `include "aou_fc_macros.svh"
+  `include "ucie_fdi_macros.svh"
 
   localparam int FLIT_BYTES     = 256;
   localparam int HALF_BYTES     = 128;
@@ -75,11 +72,11 @@ package ucie_fdi_pkg;
     return i inside {126, 127, 254, 255};
   endfunction
 
+  `include "ucie_rule_log.svh"
   `include "l1/ucie_fdi_gate.svh"
   `include "l1/ucie_fdi_cfg.svh"
   `include "l1/ucie_flit_item.svh"
-  `include "l1/aou_fdi_fc_bins.svh"
-  `include "l1/aou_fdi_cov.svh"
+  `include "l1/ucie_fdi_cov.svh"
   `include "l1/ucie_fdi_pl_driver.svh"
   `include "l1/ucie_fdi_tx_responder.svh"
   `include "l1/ucie_fdi_monitor.svh"

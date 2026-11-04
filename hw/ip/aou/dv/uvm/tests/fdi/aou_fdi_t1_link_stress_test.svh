@@ -31,19 +31,19 @@ class aou_fdi_t1_link_stress_test extends aou_fdi_t1_bringup_test;
     for (int unsigned i = 0; i < n_events; i++) begin
       ucie_lsm_event_seq ev;
       case ($urandom_range(6))
-        0: ev = ucie_lsm_retrain_seq::type_id::create("ev");
+        0: ev = ucie_lsm_event_seq::of(LSM_EV_RETRAIN);
         1: ev = ucie_lsm_l1_seq::type_id::create("ev");
-        2: ev = ucie_lsm_linkerror_seq::type_id::create("ev");
-        3: ev = ucie_lsm_reset_seq::type_id::create("ev");
-        4: ev = ucie_lsm_clk_wake_seq::type_id::create("ev");
+        2: ev = ucie_lsm_event_seq::of(LSM_EV_LINKERROR);
+        3: ev = ucie_lsm_event_seq::of(LSM_EV_LINK_RESET);
+        4: ev = ucie_lsm_event_seq::of(LSM_EV_CLK_WAKE);
         5: begin
           ucie_lsm_state_e ends[3] = '{LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED};
-          ev = ucie_lsm_retrain_seq::type_id::create("ev");
+          ev = ucie_lsm_event_seq::of(LSM_EV_RETRAIN);
           ev.ev_to = ends[$urandom_range(2)];
         end
         default: begin
-          ev = ucie_lsm_event_seq::type_id::create("ev");
-          ev.ev_kind = ($urandom_range(1) != 0) ? LSM_EV_DISABLED : LSM_EV_LINK_RESET;
+          ev = ucie_lsm_event_seq::of(($urandom_range(1) != 0) ? LSM_EV_DISABLED :
+                                                                 LSM_EV_LINK_RESET);
           ev.ev_to = LSM_LINKERROR;
         end
       endcase

@@ -4,7 +4,7 @@
 // One 256B Format 6 flit. For driving it carries a cancel plan per 128B half
 // and idle gaps; the monitor fills in what it observed.
 //
-// Cancel plan (UCIe r1.1 §8.2.5):
+// Cancel plan (UCIe r1.1 §8.2.5, r3.0 §10.2.5):
 //   cancel_h0 only        H0 (cancelled), H0, H1
 //   cancel_h0 and h1      H0 (cancelled), H1 (cancelled), H0, H1
 //   cancel_h1 only        H0, H1 (cancelled), then either

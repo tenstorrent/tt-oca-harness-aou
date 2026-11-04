@@ -11,6 +11,7 @@ package aou_fdi_test_pkg;
   `include "aou_macros.svh"
   import ucie_fdi_pkg::*;
   import ucie_lsm_pkg::*;
+  import aou_fdi_layer_pkg::*;
   import aou_axi_pkg::*;
   import aou_t1_env_pkg::aou_t1_rx_align_chk;
 

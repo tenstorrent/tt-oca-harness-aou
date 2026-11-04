@@ -39,7 +39,7 @@ class aou_t1_force_deact_chk extends uvm_component;
 
   virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb_vif;
   virtual aou_rst_if     rst_vif;   // core clock and core reset
-  virtual ucie_fdi_lsm_if lsm_vif;
+  virtual aou_bringup_if brg_vif;
   virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
   aou_t1_env_cfg         cfg;
   aou_core               rm;
@@ -108,7 +108,7 @@ class aou_t1_force_deact_chk extends uvm_component;
           apb_vif.mon_cb.pwdata[lsb] !== 1'b1)
         continue;
       if (owed || dut_deact_sent || !(status.enabled || (was_enabled && !status.disabled)) ||
-          lsm_vif == null || lsm_vif.mon_cb.fdi_link_up !== 1'b1) begin
+          brg_vif == null || brg_vif.mon_cb.fdi_link_up !== 1'b1) begin
         `uvm_info(get_type_name(), "DEACTIVATE_FORCE written with no DeactivateReq owed",
                   UVM_MEDIUM)
         continue;
@@ -133,7 +133,7 @@ class aou_t1_force_deact_chk extends uvm_component;
       end
       if (!owed) continue;
       if (rst_vif.mon_cb.rst_n !== 1'b1 || rst_vif.mon_cb.core_rst_n !== 1'b1 ||
-          lsm_vif.mon_cb.fdi_link_up !== 1'b1) begin
+          brg_vif.mon_cb.fdi_link_up !== 1'b1) begin
         // A reset or the link going down takes the expectation with it.
         `uvm_info(get_type_name(), "reset or link down while a forced DeactivateReq was owed",
                   UVM_LOW)

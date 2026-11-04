@@ -405,9 +405,10 @@ STALE_REBUILD = make build SIM=$(SIM) TB=$(TB)$(if $(filter t1 reg,$(TB)), CONFI
 STALE_CMD = python3 -I $(UVM_ROOT)/scripts/stale_build.py --build-dir $(BUILD_DIR) --simv '$(SIMV)' \
   --defines '$(DEFINES)' --rebuild '$(STALE_REBUILD)' $(STALE_SOURCES)
 
-# Hand-written testbench sources (the generated register model is PeakRDL's style).
+# Hand-written testbench sources (the generated register model is PeakRDL's style),
+# the UCIe FDI model's included, without its self-test's builds.
 TB_SOURCES = $(shell find $(UVM_ROOT) -path $(UVM_ROOT)/.deps -prune -o -path $(UVM_ROOT)/build -prune -o -path $(UVM_ROOT)/out -prune \
-               -o -path $(UVM_ROOT)/uvm/env/gen -prune -o -type f \( -name '*.sv' -o -name '*.svh' \) -print | sort)
+               -o -path $(UVM_ROOT)/uvm/env/gen -prune -o -path $(UVM_ROOT)/vip/ucie_fdi/dv/build -prune -o -type f \( -name '*.sv' -o -name '*.svh' \) -print | sort)
 
 .PHONY: help configs setup ral docs build run test cov_report fc_report check-config lint clean clean-out check-public plan_status compare rule_inventory perf_report perf_targets perf_check job-hooks stale-check build-name regress lsf-bsub
 help:

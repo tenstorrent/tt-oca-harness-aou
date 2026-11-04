@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Mainband monitor of one PHY, both directions, with the FDI mainband rule
-// checks (checkers/rules.csv, FDI-Rnn).
+// checks (FDI-Rnn, listed in ../../README.md).
+// Each completed flit is a new ucie_flit_item, which subscribers may keep.
 // - ap_tx: flits the DUT sent; a beat transfers on lp_valid & lp_irdy &
 //   pl_trdy (FDI-R01).
 // - ap_rx: flits delivered to the DUT, after cancel rollback: a cancel in the
@@ -14,7 +15,7 @@ class ucie_fdi_monitor extends uvm_monitor;
 
   virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) vif;
   ucie_fdi_cfg cfg;
-  aou_fdi_cov cov;
+  ucie_fdi_cov cov;   // coverage collector, set by the bench; null: none
 
   uvm_analysis_port #(ucie_flit_item) ap_tx;
   uvm_analysis_port #(ucie_flit_item) ap_rx;
@@ -59,8 +60,14 @@ class ucie_fdi_monitor extends uvm_monitor;
   local bit           sr_trdy0;
   local bit           abandoned;  // left Active mid-flit; until the next Active
   local bit           abandon_h_done;  // ... right after a whole 128B half: its cancel may follow
-  // Rule evaluations for the ledger, flushed in check_phase.
-  local int unsigned  n_chk[string];
+  // Rule evaluations for the ledger, by index; flushed in check_phase.
+  typedef enum int {
+    R01, R02, R05, R07, R08, R09, R10, R12, R13, R35, R42, R43, R44, R45, R57, N_RULES
+  } rule_e;
+  local static const string RULE[N_RULES] = '{
+      "FDI-R01", "FDI-R02", "FDI-R05", "FDI-R07", "FDI-R08", "FDI-R09", "FDI-R10", "FDI-R12",
+      "FDI-R13", "FDI-R35", "FDI-R42", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57"};
+  local int unsigned  n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -68,33 +75,29 @@ class ucie_fdi_monitor extends uvm_monitor;
     ap_rx = new("ap_rx", this);
   endfunction
 
-  function void build_phase(uvm_phase phase);
-    super.build_phase(phase);
-    if (cfg != null && cfg.cov_en) cov = aou_fdi_cov::type_id::create("cov");
-  endfunction
-
   task run_phase(uvm_phase phase);
+    if (!cfg.cov_en) cov = null;
     forever begin
       @(vif.mon_cb);
       sample();
     end
   endtask
 
-  local function void err(string rule, string msg);
+  local function void err(rule_e r, string msg);
     if (!cfg.checks_en) return;
-    aou_rule_log::fire(rule, get_type_name());
-    `uvm_error(get_type_name(), $sformatf("%s: phy%0d %s", rule, cfg.phy, msg))
+    ucie_rule_log::fire(RULE[r], get_type_name());
+    `uvm_error(get_type_name(), $sformatf("%s: phy%0d %s", RULE[r], cfg.phy, msg))
   endfunction
 
-  local function void chk(string rule);
-    if (!cfg.checks_en) return;
-    n_chk[rule] = n_chk.exists(rule) ? n_chk[rule] + 1 : 1;
+  local function void chk(rule_e r);
+    n_chk[r]++;
   endfunction
 
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
-    foreach (n_chk[r]) aou_rule_log::check(r, get_type_name(), n_chk[r]);
-    n_chk.delete();
+    if (cfg.checks_en)
+      foreach (n_chk[r]) ucie_rule_log::check(RULE[r], get_type_name(), n_chk[r]);
+    n_chk = '{default: 0};
   endfunction
 
   local function void flush_partial(string why);
@@ -114,9 +117,9 @@ class ucie_fdi_monitor extends uvm_monitor;
       return;
     end
     if (!prev_rst_n) begin
-      chk("FDI-R07");
+      chk(R07);
       if (vif.mon_cb.pl_stallreq !== 1'b0 || vif.mon_cb.lp_stallack !== 1'b0)
-        err("FDI-R07", "pl_stallreq and lp_stallack must both be low at reset exit");
+        err(R07, "pl_stallreq and lp_stallack must both be low at reset exit");
       prev_sts = sts;
       since_reset_sts = 0;
     end
@@ -158,26 +161,26 @@ class ucie_fdi_monitor extends uvm_monitor;
     bit v = vif.mon_cb.lp_valid === 1'b1;
     bit i = vif.mon_cb.lp_irdy === 1'b1;
     bit t = vif.mon_cb.pl_trdy === 1'b1;
-    if (v) chk("FDI-R42");
-    if (v && !i) err("FDI-R42", "lp_valid without lp_irdy");
-    if (sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace) chk("FDI-R44");
+    if (v) chk(R42);
+    if (v && !i) err(R42, "lp_valid without lp_irdy");
+    if (sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace) chk(R44);
     if (i && sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace)
-      err("FDI-R44", "lp_irdy high while pl_state_sts is Reset");
-    if (vif.mon_cb.lp_stallack === 1'b1) chk("FDI-R10");
+      err(R44, "lp_irdy high while pl_state_sts is Reset");
+    if (vif.mon_cb.lp_stallack === 1'b1) chk(R10);
     if (vif.mon_cb.lp_stallack === 1'b1 && (v || i))
-      err("FDI-R10", $sformatf("lp_valid=%0b lp_irdy=%0b while lp_stallack is high", v, i));
-    if (tx_beat != 0) chk("FDI-R02");
+      err(R10, $sformatf("lp_valid=%0b lp_irdy=%0b while lp_stallack is high", v, i));
+    if (tx_beat != 0) chk(R02);
     if (tx_beat != 0 && !(v && i)) begin
-      err("FDI-R02", $sformatf("bubble inside a TX flit at beat %0d", tx_beat));
+      err(R02, $sformatf("bubble inside a TX flit at beat %0d", tx_beat));
       // The partial flit is lost; resynchronise on the next lp_valid so one
       // truncation is one report, not one per idle cycle that follows.
       tx_cur = null;
       tx_beat = 0;
       tx_stall = 0;
     end
-    if (tx_beat == 0 && v && !abandoned) chk("FDI-R43");
+    if (tx_beat == 0 && v && !abandoned) chk(R43);
     if (tx_beat == 0 && v && sts != FDI_STS_ACTIVE && !abandoned)
-      err("FDI-R43", $sformatf("TX flit starts while pl_state_sts=0x%0h", sts));
+      err(R43, $sformatf("TX flit starts while pl_state_sts=0x%0h", sts));
 
     if (t && sts == FDI_STS_ACTIVE && vif.mon_cb.pl_stallreq !== 1'b1 &&
         vif.mon_cb.lp_stallack !== 1'b1)
@@ -188,7 +191,7 @@ class ucie_fdi_monitor extends uvm_monitor;
       return;
     end
     if (tx_beat == 0) begin
-      tx_cur = ucie_flit_item::type_id::create("tx_cur");
+      tx_cur = new("tx_cur");
       tx_cur.dir = UCIE_FDI_TX;
       tx_cur.phy = cfg.phy;
       tx_cur.t_start = $time;
@@ -196,15 +199,15 @@ class ucie_fdi_monitor extends uvm_monitor;
       tx_gap = 0;
       tx_stall = 0;
     end
-    chk("FDI-R01");
+    chk(R01);
     tx_cur.put_beat(cfg.beat_bytes, tx_beat, vif.mon_cb.lp_data);
     tx_beat++;
     if (tx_beat == cfg.bpf()) begin
       tx_cur.t_end = $time;
       tx_cur.n_stall_cycles = tx_stall;
-      if (cfg.check_tx_adapter_bytes) chk("FDI-R45");
+      if (cfg.check_tx_adapter_bytes) chk(R45);
       if (cfg.check_tx_adapter_bytes && !tx_cur.tx_adapter_bytes_legal())
-        err("FDI-R45", $sformatf("Adapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
+        err(R45, $sformatf("Adapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
                                  tx_cur.data[0], tx_cur.data[1], tx_cur.data[126],
                                  tx_cur.data[127], tx_cur.data[254], tx_cur.data[255]));
       if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, tx_cur.gap_before);
@@ -219,21 +222,21 @@ class ucie_fdi_monitor extends uvm_monitor;
   local function void sample_stall();
     bit sr = vif.mon_cb.pl_stallreq === 1'b1;
     bit sa = vif.mon_cb.lp_stallack === 1'b1;
-    if (sr != prev_sr) chk("FDI-R08");
-    if (sa != prev_sa) chk("FDI-R09");
+    if (sr != prev_sr) chk(R08);
+    if (sa != prev_sa) chk(R09);
     if (sa && !prev_sa) begin
-      chk("FDI-R12");
-      chk("FDI-R13");
+      chk(R12);
+      chk(R13);
     end
-    if (sr && !prev_sr && prev_sa) err("FDI-R08", "pl_stallreq rose while lp_stallack was high");
-    if (!sr && prev_sr && !prev_sa) err("FDI-R08", "pl_stallreq fell before lp_stallack rose");
+    if (sr && !prev_sr && prev_sa) err(R08, "pl_stallreq rose while lp_stallack was high");
+    if (!sr && prev_sr && !prev_sa) err(R08, "pl_stallreq fell before lp_stallack rose");
     if (sa && !prev_sa && !prev_sr) begin
-      if (sr) err("FDI-R12", "lp_stallack rose in the same cycle as pl_stallreq");
-      else err("FDI-R09", "lp_stallack rose without pl_stallreq");
+      if (sr) err(R12, "lp_stallack rose in the same cycle as pl_stallreq");
+      else err(R09, "lp_stallack rose without pl_stallreq");
     end
-    if (!sa && prev_sa && prev_sr) err("FDI-R09", "lp_stallack fell while pl_stallreq was high");
+    if (!sa && prev_sa && prev_sr) err(R09, "lp_stallack fell while pl_stallreq was high");
     if (sa && !prev_sa && tx_beat != 0)
-      err("FDI-R13", $sformatf("lp_stallack rose inside a TX flit (beat %0d)", tx_beat));
+      err(R13, $sformatf("lp_stallack rose inside a TX flit (beat %0d)", tx_beat));
 
     if (sr && !prev_sr) begin
       sr_cycles = 0;
@@ -243,10 +246,10 @@ class ucie_fdi_monitor extends uvm_monitor;
       if (sr_trdy0) n_stalls_trdy0++;
     end
     if (sr && !sa) sr_cycles++;
-    if (sa && !prev_sa) chk("FDI-R57");
+    if (sa && !prev_sa) chk(R57);
     if (sr && !sa && sr_cycles == cfg.stall_timeout) begin
-      chk("FDI-R57");
-      err("FDI-R57", $sformatf("no lp_stallack %0d cycles after pl_stallreq (TX beat %0d)",
+      chk(R57);
+      err(R57, $sformatf("no lp_stallack %0d cycles after pl_stallreq (TX beat %0d)",
                                sr_cycles, tx_beat));
     end
     if (sa && !prev_sa) sa_cycles = 0;
@@ -262,12 +265,12 @@ class ucie_fdi_monitor extends uvm_monitor;
   local function void sample_rx(logic [3:0] sts);
     bit v = vif.mon_cb.pl_valid === 1'b1;
     bit c = vif.mon_cb.pl_flit_cancel === 1'b1;
-    if (c) chk("FDI-R05");
+    if (c) chk(R05);
     if (c && abandon_h_done) begin
       n_rx_cancels++;
     end else if (c) begin
       if (!rx_half_done || rx_cur == null) begin
-        err("FDI-R05", "pl_flit_cancel not in the cycle after the end of a 128B half");
+        err(R05, "pl_flit_cancel not in the cycle after the end of a 128B half");
       end else begin
         int unsigned half = (rx_beat == cfg.bpf()) ? 1 : 0;
         int unsigned count;
@@ -291,10 +294,10 @@ class ucie_fdi_monitor extends uvm_monitor;
     // UCIe r1.1 8.2.7 rule 3: with rx_active req and sts both 1 the Receiver
     // is Active even while pl_state_sts is still Reset (+fdi_rx_early). Retrain
     // carries no mainband flits, so the rule stays strict there.
-    if (v) chk("FDI-R35");
+    if (v) chk(R35);
     if (v && sts == FDI_STS_RESET) n_rx_beats_reset++;
     if (v && sts != FDI_STS_ACTIVE && !(sts == FDI_STS_RESET && vif.mon_cb.rx_active === 1'b1))
-      err("FDI-R35", $sformatf("pl_valid while pl_state_sts=0x%0h (rx_active %0b)", sts,
+      err(R35, $sformatf("pl_valid while pl_state_sts=0x%0h (rx_active %0b)", sts,
                                vif.mon_cb.rx_active === 1'b1));
     if (!v) begin
       if (rx_cur == null) begin
@@ -305,7 +308,7 @@ class ucie_fdi_monitor extends uvm_monitor;
       return;
     end
     if (rx_cur == null) begin
-      rx_cur = ucie_flit_item::type_id::create("rx_cur");
+      rx_cur = new("rx_cur");
       rx_cur.dir = UCIE_FDI_RX;
       rx_cur.phy = cfg.phy;
       rx_cur.t_start = $time;

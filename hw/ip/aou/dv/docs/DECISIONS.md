@@ -122,7 +122,7 @@ third-party AXI agent could be plugged in later behind one adapter.
 - *Use a UCIe VIP for the FDI side.* No open one exists, and the DUT's FDI needs
   only the Adapter's side of the FDI handshakes, which a model covers (D3).
 
-**Where.** `axi/`, `apb/`, `fdi/`, `l3/`, `env/`; the VIP-neutral transaction in
+**Where.** `axi/`, `apb/`, `fdi/` (with the UCIe FDI model in `vip/ucie_fdi`), `l3/`, `env/`; the VIP-neutral transaction in
 `axi/` (`aou_axi_txn`) and the swap note in `axi/README.md`. CODING_GUIDELINES.md,
 "Licensing", and AGENTS.md, "Boundaries", forbid committing Avery, Synopsys SVT
 or Arm material.
@@ -211,7 +211,7 @@ downward:
 | Layer | Package | Role |
 |---|---|---|
 | L1 | `ucie_fdi_pkg` | FDI mainband: beats and 256-byte flits, Format 6 codec, PL driver and TX responder, monitor |
-| L2 | `ucie_lsm_pkg` | FDI link state: the Adapter's side of bringup, PL-initiated events, and a reference model of the DUT's bringup controller |
+| L2 | `ucie_lsm_pkg` | FDI link state: the Adapter's side of bringup and Adapter-initiated events; the bench layers on it (`aou_fdi_layer_pkg`, an observer of its link state) the DUT's bringup pins and a reference model of the DUT's bringup controller |
 | L3 | `aou_l3_pkg` | AoU protocol layer: messages, packing and unpacking, credits, activation and deactivation |
 | L4a / L4b | `aou_axi_pkg` | The remote die's AXI side behind L3 (L4a), and the local AXI agents on the DUT's ports (L4b) |
 

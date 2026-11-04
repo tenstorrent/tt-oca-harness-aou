@@ -17,9 +17,13 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
 
   local bit cancel_next;  // the next beat carries pl_flit_cancel
   local int unsigned epoch;  // gate epoch when the current item was fetched
+  // Random bytes for the cancelled copies of a half (cfg.poison_cancelled),
+  // refilled for every flit that has a cancel.
+  local ucie_flit_item poison;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
+    poison = new("poison");
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -56,14 +60,14 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     int unsigned seg_half[$];
     ucie_fdi_cancel_e seg_cancel[$];
     int unsigned bph = cfg.bph();
-    ucie_flit_item poison;
 
     if (!valid_beat_bytes(cfg.beat_bytes))
       `uvm_fatal(get_type_name(), $sformatf("unsupported beat_bytes %0d", cfg.beat_bytes))
     if (cfg.random_adapter_bytes) it.randomize_adapter_bytes();
-    poison = ucie_flit_item::type_id::create("poison");
-    poison.randomize_payload();
-    poison.randomize_adapter_bytes();
+    if (it.has_cancel() && cfg.poison_cancelled) begin
+      poison.randomize_payload();
+      poison.randomize_adapter_bytes();
+    end
 
     if (halves_per_flit(cfg.beat_bytes) == 1) begin
       // 256 B: the flit is one beat and the cancel unit (fdi-rx-plan 1.3). Any

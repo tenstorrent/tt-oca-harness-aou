@@ -15,7 +15,7 @@ class ucie_lsm_l1_seq extends ucie_lsm_event_seq;
     foreach (evs[i]) begin
       ucie_lsm_item it = ucie_lsm_item::type_id::create("ev");
       start_item(it);
-      `AOU_RANDOMIZE_WITH(it, { kind == evs[i]; cycles == ev_cycles; })
+      `UCIE_RANDOMIZE_WITH(it, { kind == evs[i]; cycles == ev_cycles; })
       finish_item(it);
     end
   endtask

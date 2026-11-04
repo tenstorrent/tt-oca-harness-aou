@@ -16,6 +16,7 @@ package aou_t1_env_pkg;
   import aou_env_pkg::*;
   import ucie_fdi_pkg::*;
   import ucie_lsm_pkg::*;
+  import aou_fdi_layer_pkg::*;
   import aou_l3_pkg::*;
   import aou_rule_pkg::*;
   import aou_apb_pkg::*;

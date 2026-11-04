@@ -182,6 +182,7 @@ module tb_top;
   ucie_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));
 `endif
   ucie_fdi_lsm_if                   fdi_lsm (.clk(clk), .rst_n(rst_n));
+  aou_bringup_if                   fdi_brg (.clk(clk), .rst_n(rst_n));
   aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb (.pclk(pclk), .presetn(prst_n));
   aou_status_if                    status ();
   aou_irq_if                       irq (.clk(clk));
@@ -354,11 +355,11 @@ module tb_top;
   // Core-to-bringup triggers for the bringup reference model and the status
   // interface. AOU_TOP keeps the activation state and LinkReset request
   // internal, so they are read from its wires.
-  assign fdi_lsm.int_req_linkreset = u_dut.w_aou_req_linkreset;
-  assign fdi_lsm.act_st_disabled   = status.activate_st_disabled;
-  assign fdi_lsm.sw_reset          = u_dut.w_sw_reset;
-  assign fdi_lsm.int_activate_start = status.int_activate_start;
-  assign fdi_lsm.int_fdi_link_down  = status.int_fdi_link_down;
+  assign fdi_brg.int_req_linkreset = u_dut.w_aou_req_linkreset;
+  assign fdi_brg.act_st_disabled   = status.activate_st_disabled;
+  assign fdi_brg.sw_reset          = u_dut.w_sw_reset;
+  assign fdi_brg.int_activate_start = status.int_activate_start;
+  assign fdi_brg.int_fdi_link_down  = status.int_fdi_link_down;
   assign status.activate_st_disabled = u_dut.w_aou_activate_st_disabled;
   assign status.activate_st_enabled  = u_dut.w_aou_activate_st_enabled;
   assign status.o_aou_req_linkreset  = u_dut.w_aou_req_linkreset;
@@ -555,7 +556,7 @@ module tb_top;
       .O_AOU_RX_AXI_S_BVALID (s_bvalid),  .I_AOU_RX_AXI_S_BREADY (s_bready),
 
 `ifdef TWO_PHY
-      .I_PHY_TYPE            (fdi_lsm.phy_type),
+      .I_PHY_TYPE            (fdi_brg.phy_type),
 `endif
       .I_FDI_PL_0_VALID      (fdi_mb0.pl_valid),
       .I_FDI_PL_0_DATA       (fdi_mb0.pl_data[WD0-1:0]),
@@ -590,10 +591,10 @@ module tb_top;
       .O_LP_RX_ACTIVE_STS    (fdi_lsm.lp_rx_active_sts),
       .O_LP_LINKERROR        (fdi_lsm.lp_linkerror),
 
-      .I_SW_ACTIVATE_START   (fdi_lsm.sw_activate_start),
-      .I_SW_LINKERROR_INJECT (fdi_lsm.sw_linkerror_inject),
-      .O_FDI_FSM_STATE       (fdi_lsm.fdi_fsm_state),
-      .O_FDI_LINK_UP         (fdi_lsm.fdi_link_up),
+      .I_SW_ACTIVATE_START   (fdi_brg.sw_activate_start),
+      .I_SW_LINKERROR_INJECT (fdi_brg.sw_linkerror_inject),
+      .O_FDI_FSM_STATE       (fdi_brg.fdi_fsm_state),
+      .O_FDI_LINK_UP         (fdi_brg.fdi_link_up),
 
       .INT_REQ_LINKRESET     (status.req_linkreset),
       .INT_SI0_ID_MISMATCH   (status.int_si0_id_mismatch),
@@ -657,7 +658,7 @@ module tb_top;
   aou_fdi_checker_if fdi_chk_p0 (.clk(clk));
   aou_fdi_checker_if fdi_chk_p1 (.clk(clk));
   // Before the LSM driver sets I_PHY_TYPE it is X; PHY 0 is watched until then.
-  wire chk_sel1 = (fdi_lsm.phy_type === 1'b1);
+  wire chk_sel1 = (fdi_brg.phy_type === 1'b1);
 
   aou_fdi_chk_phy #(.WD(WD0), .RP_COUNT(RP_COUNT)) u_fdi_chk0 (
       .clk            (clk),
@@ -743,6 +744,7 @@ module tb_top;
   import aou_axi_pkg::*;
   import ucie_fdi_pkg::*;
   import ucie_lsm_pkg::*;
+  import aou_fdi_layer_pkg::*;
   import aou_l3_pkg::*;
   import aou_reg_pkg::*;
   import aou_core_csr_uvm_pkg::*;
@@ -767,6 +769,7 @@ module tb_top;
     uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb1", fdi_mb1);
 `endif
     uvm_config_db #(virtual ucie_fdi_lsm_if)::set(null, "*", "fdi_lsm", fdi_lsm);
+    uvm_config_db #(virtual aou_bringup_if)::set(null, "*", "aou_bringup", fdi_brg);
     uvm_config_db #(virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)))::set(null, "*", "apb", apb);
     uvm_config_db #(virtual aou_status_if)::set(null, "*", "status", status);
     uvm_config_db #(virtual aou_irq_if)::set(null, "*", "irq", irq);

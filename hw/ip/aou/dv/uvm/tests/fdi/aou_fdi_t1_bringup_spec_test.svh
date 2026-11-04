@@ -17,7 +17,7 @@ class aou_fdi_t1_bringup_spec_test extends aou_fdi_t1_bringup_test;
   endfunction
 
   task link_events();
-    ucie_lsm_retrain_seq retrain = ucie_lsm_retrain_seq::type_id::create("retrain");
+    ucie_lsm_event_seq retrain = ucie_lsm_event_seq::of(LSM_EV_RETRAIN, "retrain");
     `uvm_info(get_type_name(), "Adapter-initiated Retrain (pl_state_sts=1011b)", UVM_LOW)
     retrain.start(env.lsm.sqr);
     wait_link_up("retrain");

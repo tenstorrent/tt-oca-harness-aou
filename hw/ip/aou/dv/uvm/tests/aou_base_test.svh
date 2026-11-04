@@ -241,11 +241,15 @@ class aou_base_test extends ocah_test;
                                             env.sb.n_r2l_wr + env.sb.n_r2l_rd))
   endfunction
 
-  // The rule ledger (checkers/aou_rule_log.svh) for scripts/rule_inventory.py.
+  // The rule ledgers (checkers/aou_rule_log.svh and the UCIe FDI model's) for
+  // scripts/rule_inventory.py.
   function void report_phase(uvm_phase phase);
     string q[$];
     super.report_phase(phase);
     aou_rule_log::lines(q);
+    foreach (q[i]) `uvm_info(get_type_name(), q[i], UVM_NONE)
+    // The UCIe FDI model keeps its own ledger.
+    ucie_fdi_pkg::ucie_rule_log::lines(q);
     foreach (q[i]) `uvm_info(get_type_name(), q[i], UVM_NONE)
   endfunction
 endclass
