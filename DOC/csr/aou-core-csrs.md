@@ -1151,7 +1151,7 @@ Don't override. Generated from: aou_core
 - Base Offset: 0x84
 - Size: 0x4
 
-<p>Software-configured mapping of each local subordinate-port RP to the remote RP its requests are sent on, for dies with different numbers of active RPs. With asymmetric_rp_en clear every RP keeps its own index (RP n to remote RP n) and the rpN_tx_rp_sel fields are ignored. With it set, each RP's requests go to the remote RP in its rpN_tx_rp_sel field; RPs that select the same remote RP are merged onto it, and their AXI IDs are remapped so that the responses return to the originating RP with the original ID restored. Static configuration: program this register before the link is activated and no AXI traffic is outstanding, and leave it unchanged until all outstanding traffic has drained. Each rpN_tx_rp_sel value must be below RP_COUNT. On an RP_COUNT=1 build the register has no effect.</p>
+<p>Software-configured mapping of each local subordinate-port RP to the local TX lane its requests are sent on, for dies with different numbers of active RPs; DEST_RP then names the remote RP of each lane. With asymmetric_rp_en clear every RP keeps its own index (RP n on lane n) and the rpN_tx_rp_sel fields are ignored. With it set, each RP's requests go on the lane in its rpN_tx_rp_sel field; RPs that select the same lane are merged onto it and share its remote RP, credits and arbitration slot, and their AXI IDs are remapped so that the responses return to the originating RP with the original ID restored. Static configuration: program this register while the activation FSM is DISABLED and no AXI traffic is outstanding, and leave it unchanged until all outstanding traffic has drained. Each rpN_tx_rp_sel value must be below RP_COUNT: with asymmetric_rp_en set, a value of RP_COUNT or above (RP_COUNT 2 or 3) holds AWREADY, WREADY and ARREADY low on every subordinate port, without an error flag, until it is corrected. On an RP_COUNT=1 build the register has no effect. AOU_SW_RESET returns the register to its reset value; a deactivation does not change it.</p>
 
 |Bits|   Identifier   |Access|Reset|Name|
 |----|----------------|------|-----|----|
@@ -1164,20 +1164,20 @@ Don't override. Generated from: aou_core
 
 #### asymmetric_rp_en field
 
-<p>Enable the asymmetric RP mapping. Reset 0: every RP maps to the remote RP of the same index and the rpN_tx_rp_sel fields are ignored. Set to 1 to route each RP's requests to the remote RP in its rpN_tx_rp_sel field, merging the RPs that select the same one. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding.</p>
+<p>Enable the asymmetric RP mapping. Reset 0: every RP is on the lane of the same index and the rpN_tx_rp_sel fields are ignored. Set to 1 to route each RP's requests on the lane in its rpN_tx_rp_sel field, merging the RPs that select the same one. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding.</p>
 
 #### rp0_tx_rp_sel field
 
-<p>Remote RP that RP0's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 0 (RP0 to RP0).</p>
+<p>Local TX lane that RP0's requests are sent on when asymmetric_rp_en is set; the lane's DEST_RP field names the remote RP. Must be below RP_COUNT. Reset 0 (RP0 on lane 0).</p>
 
 #### rp1_tx_rp_sel field
 
-<p>Remote RP that RP1's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 1 (RP1 to RP1).</p>
+<p>Local TX lane that RP1's requests are sent on when asymmetric_rp_en is set; the lane's DEST_RP field names the remote RP. Must be below RP_COUNT. Reset 1 (RP1 on lane 1).</p>
 
 #### rp2_tx_rp_sel field
 
-<p>Remote RP that RP2's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 2 (RP2 to RP2).</p>
+<p>Local TX lane that RP2's requests are sent on when asymmetric_rp_en is set; the lane's DEST_RP field names the remote RP. Must be below RP_COUNT. Reset 2 (RP2 on lane 2).</p>
 
 #### rp3_tx_rp_sel field
 
-<p>Remote RP that RP3's requests are sent on when asymmetric_rp_en is set. Must be below RP_COUNT. Reset 3 (RP3 to RP3).</p>
+<p>Local TX lane that RP3's requests are sent on when asymmetric_rp_en is set; the lane's DEST_RP field names the remote RP. Must be below RP_COUNT. Reset 3 (RP3 on lane 3).</p>

@@ -61,7 +61,7 @@ image::image1.png[Figure 1. Block Diagram of AOU_CORE and function description]
 * Selectable Early response by setting SFR
 * Selectable 32B / 64B / 128B single-PHY and 32B+64B / 64B+128B two-PHY FDI configurations, selected via the [.monospaced]#++FDI_CONFIG++# parameter (see xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2]). Two-PHY variants additionally require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY ports physically exist.
 * Configurable number of Resource Plane and each RPpass:[']s AXI data width
-* RP Remapping
+* RP Remapping: the remote RP of each local RP is programmable (DEST_RP), and the asymmetric RP mapping (ASYMMETRIC_RP_PROC_CON) merges several local subordinate ports onto one remote RP, so that a die uses all its RPs against a link partner that has fewer (xref:{aou-architecture-xref}#aou-310-rp-remapping[Section 3.10])
 * QoS scheme between RPs on the AW and AR channels
 * Interoperability with different data width remote die
 * Handling of flit cancel and stall request as specified in the UCIe specification
@@ -78,5 +78,11 @@ AOU_CORE forwards the requests it receives from the remote die to its AXI Manage
 * the burst does not cross a 4 KB address boundary (A3.4.1);
 * the burst transfers at most Max_Transaction_Bytes (4096) bytes, as defined by the AoU Basic Profile;
 * AxSIZE does not exceed the data width of the remote die.
+
+On a route the asymmetric RP mapping merges (several local subordinate ports on one remote RP, xref:{aou-architecture-xref}#aou-3104-asymmetric-rp-mapping[Section 3.10.4]) AOU_CORE further assumes:
+
+* a port has at most [.monospaced]#++RPn_S_RD_MO_CNT++# (reads) and [.monospaced]#++RPn_S_WR_MO_CNT++# (writes) distinct AXI IDs outstanding at a time, and at most that many requests per ID; the port is back-pressured beyond that, which is not an error;
+* exclusive accesses are not issued on a merged route: the read and the write of an exclusive pair may reach the remote die with different IDs (xref:{aou-architecture-xref}#aou-3105-axi-id-handling-on-merged-routes[Section 3.10.5]);
+* the mapping registers are programmed while the activation FSM is DISABLED with no AXI traffic outstanding, and are stable otherwise.
 
 AOU_CORE does not check these properties and does not split or reject a request that violates them. In particular, the xref:{aou-architecture-xref}#aou-36-axi-transaction-splitter[AXI Transaction Splitter] generates sub-burst addresses within the 4 KB page of the original request only, so a request that crosses a 4 KB boundary is issued with addresses that wrap within that page, and no error is reported. Ensuring that only compliant requests are sent is the responsibility of the AXI requesters and the AoU bridge of the remote die. See also xref:{aou-errors-xref}#aou-51-non-compliant-requests[Section 5.1].
