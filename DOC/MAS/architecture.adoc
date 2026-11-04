@@ -27,6 +27,8 @@ image::image2.png[Figure 2. Architecture of AOU_CORE]
 
 xref:figure-2[Figure 2] shows block diagram of current AOU_CORE. The AXI interface supports both Manager and Subordinate transactions for message transmission and reception. AOU_CORE may issue AR and AW requests to the remote die using the local bus width. Consequently, R-data from the remote die and W-data from the local die are constrained to the local bus width. However, since the remote die can transmit data with variable DLEN, AOU_CORE must support all possible data lengths. This functionality is managed by AXI4MUX_3X1_TOP, which receives variable DLEN data from RX_CORE, aligns it to the local bus width, and splits the burst length into segments matching the local bus burst size.
 
+Between the subordinate (TX) AXI ports and AOU_TX_CORE sits [.monospaced]#++AOU_ASYMMETRIC_RP_PROC++# (not drawn in xref:figure-2[Figure 2]). It routes each subordinate port to a TX lane and can merge several ports onto one lane, so that a die with more RPs than its link partner can use them all; see xref:aou-310-rp-remapping[Section 3.10]. With the mapping disabled (the reset state) it is a wire from port n to lane n.
+
 Inside AXI4MUX_3X1_TOP, AXI aggregator is added for improving bus utilization. AXI aggregator combines narrow read & write data and send it to BUS. This functionality may modify AXI Len & Size. For example, AXI AR with 256-bit size & 16 burst length may transfer into 1024-bit size & 4 burst length. This operation can be controlled via SFR setting.
 
 AOU_CORE provides a parameterizable FDI interface; the data-path width is selected by [.monospaced]#++FDI_CONFIG++# ([.monospaced]#++FDI_CFG_SP_32B++# / [.monospaced]#++FDI_CFG_SP_64B++# / [.monospaced]#++FDI_CFG_SP_128B++# for single-PHY, [.monospaced]#++FDI_CFG_TP_32B_64B++# / [.monospaced]#++FDI_CFG_TP_64B_128B++# for two-PHY). See xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2] for the full table of [.monospaced]#++FDI_CONFIG++# values and resulting per-PHY widths.
@@ -52,6 +54,8 @@ image::image4.png[Figure 4. TX_CORE QoS Scheme]
 When multiple RP requests are issued from the TX core, a QoS scheme is applied. The TX core supports three QoS schemes: *Round-Robin*, *Port QoS*, and *AXI QoS*, selected by PRIOR_RP_AXI.ARB_MODE. Each transaction has one of three QoS levels: *High, Normal, Low.*
 
 The scheme arbitrates the AW and AR channels between RPs. W data is sent in the order of the granted AWs, and B and R responses are arbitrated round-robin whatever the scheme. The arbitration SFRs (PRIOR_RP_AXI and PRIOR_TIMER) are intended to be programmed before the link is activated. They may be written in mission mode, but the arbitration of requests already accepted or in flight is then not guaranteed.
+
+The RPs the TX core arbitrates between are its TX lanes. When the asymmetric RP mapping merges several subordinate ports onto one lane (xref:aou-3104-asymmetric-rp-mapping[Section 3.10.4]), the ports of that lane are arbitrated first, inside [.monospaced]#++AOU_ASYMMETRIC_RP_PROC++#, with the same scheme and the same SFRs: ARB_MODE, the RPx_PRIOR of the source ports, the AXI QoS thresholds and PRIOR_TIMER. The winner then competes as the lane in the TX core, with the lane's own RPx_PRIOR. The source-port stage has its own starvation timers (one per port and channel, below); the TX core's timers count the lane's requests as before.
 
 *Round-Robin (ARB_MODE = 2pass:[']b00)* : Round-robin arbitration between valid RP. When a handshake occurs, the RP that will receive the next grant is determined. ARB_MODE = 2pass:[']b11 is reserved and behaves as Round-Robin.
 
@@ -86,6 +90,8 @@ image::image7.png[Figure 7. AXI QoS arbitration example]
 Every Normal or Low request in the buffer counts ticks from the cycle it is accepted, not from the time it reaches the head of its buffer. When its count reaches PRIOR_TIMER.TIMER_THRESHOLD, the request is arbitrated as High; the count saturates at TIMER_THRESHOLD. The prescaler is shared by all requests in a buffer and is not restarted when a request arrives, so the first tick a request sees comes 1 to TIMER_RESOLUTION + 1 cycles after acceptance. TIMER_THRESHOLD = 0 promotes every Normal and Low request at once, so all requests arbitrate as High and the result is round-robin. At the reset values (TIMER_RESOLUTION = TIMER_THRESHOLD = 0xF) a request is promoted about 225 to 240 cycles after acceptance.
 
 The timer runs in the Round-Robin scheme too but has no effect there.
+
+Within a merge group of the asymmetric RP mapping, each source port has an equivalent prescaler and count per channel, running while the port presents a request to the group's arbiter and reset when it is granted. They use the same PRIOR_TIMER values and promote the port's request to High within its group. With ASYMMETRIC_RP_EN = 0 they are idle.
 
 [[aou-33-rx_core]]
 === 3.3. RX_CORE
@@ -232,7 +238,7 @@ The [.monospaced]#++MAX_AxBURSTLEN++# value must be of the form 2^n - 1. Legal v
 
 *ID width:* The 3:1 mux in front of the splitter appends 2 bits to the AXI ID that name the width path a request took (upsizer, direct or downsizer), so that its responses return to the right path. The splitter carries them and strips them from the manager-side ID, which is therefore [.monospaced]#++ID_WD - 2++# bits wide. The sub-bursts of one request share one manager-side ID; their responses return in order, as AXI requires for one ID, and the pending-ID table counts them. The sub-bursts of a request are issued back to back, and nothing limits how many of them are outstanding other than the manager port's readiness.
 
-*Outstanding requests:* The pending-ID tables ([.monospaced]#++AOU_SPLIT_RD_PENDING_INFO++#, [.monospaced]#++AOU_SPLIT_WR_PENDING_INFO++#) hold one entry per request, not per sub-burst, and are sized by [.monospaced]#++M_RD_MO_CNT++# / [.monospaced]#++M_WR_MO_CNT++# (default 32). An RP therefore keeps at most that many remote requests in service, while its manager port may have up to [.monospaced]#++M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts (and likewise writes) outstanding, with [.monospaced]#++beats++# the request's length at the manager port's data width. See xref:software-operation.adoc#aou-722-axi-id-mismatch-error[Section 7.2.2] for the back-pressure when a table is full.
+*Outstanding requests:* The pending-ID tables ([.monospaced]#++AOU_SPLIT_RD_PENDING_INFO++#, [.monospaced]#++AOU_SPLIT_WR_PENDING_INFO++#) hold one entry per request, not per sub-burst, and are sized by the RP's [.monospaced]#++RPn_M_RD_MO_CNT++# / [.monospaced]#++RPn_M_WR_MO_CNT++# parameters (default 32). An RP therefore keeps at most that many remote requests in service, while its manager port may have up to [.monospaced]#++M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts (and likewise writes) outstanding, with [.monospaced]#++beats++# the request's length at the manager port's data width. See xref:software-operation.adoc#aou-722-axi-id-mismatch-error[Section 7.2.2] for the back-pressure when a table is full.
 
 [[aou-363-response-reassembly]]
 ==== 3.6.3. Response Reassembly
@@ -297,7 +303,7 @@ The interrupt fires when the consumed response has [.monospaced]#++BRESP[1] = 1+
 [[aou-374-id-ordering]]
 ==== 3.7.4. ID Ordering
 
-The [.monospaced]#++AOU_EARLY_TABLE++# inside the controller maintains a tracking table with [.monospaced]#++WR_MO_CNT++# entries (matching the subordinate write outstanding count). Each entry records:
+The [.monospaced]#++AOU_EARLY_TABLE++# inside the controller maintains a tracking table with [.monospaced]#++WR_MO_CNT++# entries (matching the subordinate write outstanding count of the RP, [.monospaced]#++RPn_S_WR_MO_CNT++#). Each entry records:
 
 [width="100%",cols="<50%,<50%",options="header",]
 |=======================================================================================================================================
@@ -317,7 +323,7 @@ The [.monospaced]#++early_go++# flag ensures that for transactions sharing the s
 
 The backpressure mechanism described in this section is only active when the early response feature is enabled ([.monospaced]#++EARLY_BRESP_EN = 1++#). When disabled, the module is a pass-through: AW, W, and B signals are wired directly between the subordinate and manager interfaces with no outstanding-count gating, and write depth is bounded only by whatever the downstream AOU TX datapath can accept. The one ordering rule the pass-through keeps is that W data is accepted only for a write whose AW has been accepted (or is accepted in the same cycle): [.monospaced]#++WREADY++# stays low toward a manager that presents a W burst ahead of its AW until the AW arrives (AXI4 A3.3.1 allows a subordinate to wait for [.monospaced]#++AWVALID++# before asserting [.monospaced]#++WREADY++#).
 
-When enabled, the early table has [.monospaced]#++WR_MO_CNT++# entries (default 32, set by the [.monospaced]#++S_WR_MO_CNT++# parameter). Every write that enters the controller \-- bufferable or non-bufferable \-- occupies one table entry from the time WLAST is accepted until the *actual B response* arrives from the remote die and is consumed.
+When enabled, the early table has [.monospaced]#++WR_MO_CNT++# entries (set by the RP's [.monospaced]#++RPn_S_WR_MO_CNT++# parameter: default 32 on AOU_TOP, 64 on AOU_CORE_TOP). Every write that enters the controller \-- bufferable or non-bufferable \-- occupies one table entry from the time WLAST is accepted until the *actual B response* arrives from the remote die and is consumed.
 
 Issuing an early B does *not* free the table entry. The entry remains occupied ([.monospaced]#++pending = 1, out = 1++#) until the real remote B is received. The table depth therefore limits the total number of writes in flight across the FDI link, not just the number awaiting early response.
 
@@ -557,6 +563,7 @@ RX R MAX CREDIT = {RX R FIFO DEPTH / (AXI_DATA_WD / 256)} x AXI_DATA_WD RDATA Gr
 
 * Tx Credit refers to the credit that the local die receives from the remote die. Based on this credit, the Tx Core is permitted to pack messages into flits and transmit them. For this reason, the term is defined as Tx Credit.
 * Tx Credit is managed by the AOU_TX_CRD_CTRL in AOU_CRD_CTRL, which is responsible for counting the credits received from the remote die and tracking the credits consumed during message packing.
+* Tx Credit is kept per TX lane (the RP of the protocol). A WriteData message is charged the granules of its own length, which the W beat's WDLEN gives (the AXI data width of the subordinate port the beat came from), not the width of the lane's own port: on a lane that the asymmetric RP mapping (xref:aou-3104-asymmetric-rp-mapping[Section 3.10.4]) shares between ports of different widths, a 256-bit port's beat costs a WriteData256. The ports merged onto a lane draw from the lane's credit.
 * It is recommended that Tx Max Credit parameter be set to the maximum credit value that the remote die is capable of granting.
 ** If Tx Max Credit is configured to a value lower than the maximum credit issued by the remote die, credit accounting shall be limited to the Tx Max Credit value. In this case, flow control operates strictly within the range defined by Tx Max Credit, regardless of the remote diepass:[']s capability.
 ** If Tx Max Credit is configured to a value greater than or equal to the maximum grantable credit of the remote die, the local die can fully utilize all credits actually granted by the remote die.
@@ -575,33 +582,69 @@ Upon receipt of an ActivateReq from the remote die during the initial activation
 [[aou-310-rp-remapping]]
 === 3.10. RP Remapping
 
+AOU_CORE maps its Resource Planes (RPs) in two stages. The first stage, the asymmetric RP mapping of [.monospaced]#++AOU_ASYMMETRIC_RP_PROC++# (xref:aou-3104-asymmetric-rp-mapping[Section 3.10.4]), routes the requests of each local subordinate (TX) port to a local TX lane, and lets several ports share one lane. The second stage, [.monospaced]#++DEST_RP++#, names the remote RP each lane's messages are sent to. With the asymmetric mapping disabled (the reset state) only the second stage is in effect and every TX port is its own lane.
+
 [[aou-3101-configuration-rules]]
 ==== 3.10.1. Configuration Rules
 
-The Resource Plane (RP) operates based on the smaller RP count between the local and remote dies and follows a strict one-to-one mapping. RP assignments are configured through the *DEST_RP* SFR. The values of [.monospaced]#++RP3_DEST++#, [.monospaced]#++RP2_DEST++#, [.monospaced]#++RP1_DEST++#, and [.monospaced]#++RP0_DEST++# must be unique, and for any RP that is utilized, the configuration on the local and remote dies must be symmetrical.
+A local TX lane carries the traffic of one remote RP. The [.monospaced]#++DEST_RP++# SFR assigns a remote RP to each lane: [.monospaced]#++RP0_DEST++# to lane 0, [.monospaced]#++RP1_DEST++# to lane 1, and so on. The values of the lanes in use must be unique, and for every remote RP in use the configuration of the two dies must agree: the remote RP a local lane sends to must send its own requests back to a local RP that is in use, so that the responses of the two dies find their requests.
 
-This configuration must remain static and must be programmed before activation. It must not be altered during normal operation.
+Which local ports feed a lane is decided by [.monospaced]#++ASYMMETRIC_RP_PROC_CON++# (xref:software-operation.adoc#aou-71-sfr-setting[Section 7.1]). With [.monospaced]#++ASYMMETRIC_RP_EN++# = 0, port n feeds lane n and nothing else does, so the mapping is one-to-one and the number of lanes in use is the number of ports with traffic. With [.monospaced]#++ASYMMETRIC_RP_EN++# = 1, port n feeds lane [.monospaced]#++RPn_TX_RP_SEL++#; ports that select the same lane are merged onto it (xref:aou-3104-asymmetric-rp-mapping[Section 3.10.4]), and the number of lanes in use, hence of remote RPs the local die needs, is the number of distinct lanes selected. This is how a die with more RPs than its link partner uses them all: a local die with [.monospaced]#++RP_COUNT++# = 4 facing a remote die with one RP merges its four ports onto one lane, and that lane's [.monospaced]#++DEST_RP++# is the remote RP.
 
-When the local and remote dies have different [.monospaced]#++RP_COUNT++# values, the effective RP count is the smaller of the two. Unused RP slots in the [.monospaced]#++DEST_RP++# register are functionally donpass:[']t-care but should be set to non-overlapping values for clean credit routing (see xref:aou-3103-misconfiguration-behavior[Section 3.10.3]).
+Both registers are static configuration. Program them while the activation FSM is DISABLED and no AXI traffic is outstanding on the subordinate ports (before [.monospaced]#++AOU_INIT.ACTIVATE_START++#, or after a deactivation has completed), and leave them unchanged until the next such window: a mapping changed with a request or a response in flight sends that transaction's remaining beats, or returns its response, on the wrong route. The lanes that no port selects need no [.monospaced]#++DEST_RP++# value, but the value should not duplicate one in use (xref:aou-3103-misconfiguration-behavior[Section 3.10.3]).
 
 [caption=""]
 .Figure 17. Resource Plane Remapping
 [[figure-17]]
 image::image16.png[Figure 17. Resource Plane Remapping]
 
+xref:figure-17[Figure 17] shows the one-to-one case. In the merged case the lane the ports share appears once on the wire: every header the lane sends carries the lane's [.monospaced]#++DEST_RP++# value, and the remote die cannot tell which local port a request came from. It does not need to: the responses return on the same remote RP, and [.monospaced]#++AOU_ASYMMETRIC_RP_PROC++# returns each to the port that issued the request (xref:aou-3105-axi-id-handling-on-merged-routes[Section 3.10.5]).
+
 [[aou-3102-header-encoding]]
 ==== 3.10.2. Header Encoding
 
-For AXI messages (WriteReq, WriteData, ReadReq), the TX path ([.monospaced]#++AOU_TX_AXI_BUFFER++#) embeds the [.monospaced]#++DEST_RP++# field from the SFR into the destination RP field of every outgoing message header. The remote die uses this field to route the received message to the correct RP for processing.
+For AXI messages (WriteReq, WriteData, ReadReq), the TX path ([.monospaced]#++AOU_TX_AXI_BUFFER++#) embeds the [.monospaced]#++DEST_RP++# field of the lane the message is sent on into the destination RP field of every outgoing message header. The remote die uses this field to route the received message to the correct RP for processing. The header does not name the local port the request came from; a merged lane's messages all carry the same value.
 
-For credit grant messages, [.monospaced]#++AOU_TX_CRD_CTRL++# encodes the _local_ RP index (not the [.monospaced]#++DEST_RP++# value) so that the remote die can route returned credits to the correct local RPpass:[']s credit counter. This asymmetry \-- destination RP in data messages, source RP in credit messages \-- is fundamental to the RP remapping scheme.
+For credit grant messages, [.monospaced]#++AOU_TX_CRD_CTRL++# encodes the _local_ RP index (not the [.monospaced]#++DEST_RP++# value) so that the remote die can route returned credits to the correct local RPpass:[']s credit counter. This asymmetry \-- destination RP in data messages, source RP in credit messages \-- is fundamental to the RP remapping scheme. The credit RP is the lane: the ports merged onto a lane share its credit counters (xref:aou-39-credit-controller[Section 3.9]).
 
 [[aou-3103-misconfiguration-behavior]]
 ==== 3.10.3. Misconfiguration Behavior
 
-No hardware duplicate-detection logic exists for the [.monospaced]#++DEST_RP++# register. If [.monospaced]#++DEST_RP++# values are configured with overlapping (duplicate) entries, the credit routing logic in [.monospaced]#++AOU_TX_CRD_CTRL++# \-- which uses a [.monospaced]#++unique case++# statement on [.monospaced]#++I_RP_DEST_RP[i]++# \-- will fall through to the [.monospaced]#++default++# case, mapping to the RP0 credit view. This results in silent credit accounting errors rather than a flagged interrupt or error condition.
+No hardware duplicate-detection logic exists for the [.monospaced]#++DEST_RP++# register. If [.monospaced]#++DEST_RP++# values are configured with overlapping (duplicate) entries, the credit routing logic in [.monospaced]#++AOU_TX_CRD_CTRL++# \-- which uses a [.monospaced]#++unique case++# statement on [.monospaced]#++I_RP_DEST_RP[i]++# \-- will fall through to the [.monospaced]#++default++# case, mapping to the RP0 credit view. This results in silent credit accounting errors rather than a flagged interrupt or error condition. Sharing a remote RP between local ports is done with [.monospaced]#++ASYMMETRIC_RP_PROC_CON++#, which merges the ports onto one lane, never by giving two lanes the same [.monospaced]#++DEST_RP++# value.
+
+[.monospaced]#++ASYMMETRIC_RP_PROC_CON++# has one checked error. On an [.monospaced]#++RP_COUNT++# = 2 or 3 build, a [.monospaced]#++RPn_TX_RP_SEL++# value of [.monospaced]#++RP_COUNT++# or above with [.monospaced]#++ASYMMETRIC_RP_EN++# = 1 is an invalid configuration: [.monospaced]#++AOU_ASYMMETRIC_RP_PROC++# then holds AWREADY, WREADY and ARREADY low on every subordinate port and drives no read data, so no request is accepted until the register is corrected. No status bit or interrupt reports it. On an [.monospaced]#++RP_COUNT++# = 4 build every value is a lane; on an [.monospaced]#++RP_COUNT++# = 1 build the register has no effect.
 
 Software is responsible for ensuring uniqueness and symmetry of the [.monospaced]#++DEST_RP++# configuration on both link partners before initiating activation.
+
+[[aou-3104-asymmetric-rp-mapping]]
+==== 3.10.4. Asymmetric RP Mapping
+
+[.monospaced]#++AOU_ASYMMETRIC_RP_PROC++# sits in [.monospaced]#++AOU_CORE++# between the per-RP subordinate port logic ([.monospaced]#++AOU_CORE_RP++#: the subordinate ID checker and the write early response controller of xref:aou-37-write-early-response-controller[Section 3.7]) and [.monospaced]#++AOU_TX_CORE++#. Its subordinate side is indexed by local port, its manager side by TX lane. It is built from [.monospaced]#++AOU_AXIMUX_NX1++# (an N:1 AXI mux per merged lane with a QoS arbiter, [.monospaced]#++AOU_ASYMMETRIC_RP_QOS_ARBITER++#) and [.monospaced]#++AOU_ID_REMAPPER++# (one per port and direction). It is present on every build with [.monospaced]#++RP_COUNT++# of 2 or more; with [.monospaced]#++RP_COUNT++# = 1 it is a wire.
+
+*Routes.* With [.monospaced]#++ASYMMETRIC_RP_EN++# = 0 every port is wired to the lane of the same index whatever the [.monospaced]#++RPn_TX_RP_SEL++# fields hold. With it set, each port goes to the lane its field selects:
+
+* A port that is alone on its lane is a _singleton_. It is routed to that lane unchanged, its AXI ID included, whether or not the lane index is its own. Two singletons may swap lanes, for example.
+* Ports that select the same lane form a _merge group_. Their AW and AR requests are arbitrated onto the lane (below), their IDs are remapped (xref:aou-3105-axi-id-handling-on-merged-routes[Section 3.10.5]) so that B and R responses from the lane return to the port that issued the request. Writes of a group are serialised: the mux accepts an AW, then the W beats of that write from the same port until WLAST, and only then the next AW of the group, whichever port it comes from. W beats a port presents before its AW has been granted wait. Reads are not serialised; AR requests are granted as the arbitration allows.
+* [.monospaced]#++RP_COUNT++# = 2 and 3 allow one merge group (of 2 or 3 ports). [.monospaced]#++RP_COUNT++# = 4 allows one group of 2, 3 or 4 ports, or two groups of 2; the group that contains the lowest-numbered port is served by the 4:1 mux, the other by a 3:1 mux. A lane that no port selects sends nothing.
+
+*Arbitration within a merge group.* The group's AW and AR channels are arbitrated with the scheme of xref:aou-321-tx_core-qos-scheme[Section 3.2.1], read from the same SFRs: [.monospaced]#++PRIOR_RP_AXI.ARB_MODE++# selects Round-Robin, Port QoS or AXI QoS, the port priorities are [.monospaced]#++PRIOR_RP_AXI.RPx_PRIOR++# of the _source_ ports, the AXI QoS thresholds are [.monospaced]#++AXI_QOS_TO_HP++# / [.monospaced]#++AXI_QOS_TO_NP++#, and [.monospaced]#++PRIOR_TIMER++# bounds the wait of a Normal or Low request. The group has its own starvation timers, one per source port and channel, counting while the port presents a request; they are independent of the timers in [.monospaced]#++AOU_TX_CORE++#. Arbitration is therefore two-stage: a request first wins its lane within its group, then the lane competes with the other lanes in [.monospaced]#++AOU_TX_CORE++# under the same scheme, where the lane's priority is that of the lane index. B and R responses are returned to the source ports as they arrive; a response is held only while its source port is not ready.
+
+*Data width.* Ports of different AXI data widths may share a lane. Each W beat carries the width of its source port ([.monospaced]#++WDLEN++#, 256/512/1024 bits); [.monospaced]#++AOU_TX_CORE++# sends the beat as a WriteData message of that length and [.monospaced]#++AOU_TX_CRD_CTRL++# charges the lane's WriteData credit for that length, not for the width of the lane's own port. The ReadData the remote die returns has the length the request's ARSIZE asked for (xref:aou-35-data-width-converter[Section 3.5]), and the RX data path presents it at [.monospaced]#++AXI_PEER_DIE_MAX_DATA_WD++# (1024 bits), a narrower beat replicated across the bus (xref:aou-33-rx_core[Section 3.3]); the response is returned to the source port and truncated to that port's width, which holds the beat. The W and R storage of a lane is sized for the widest port of the build ([.monospaced]#++RP_AXI_DATA_WD_MAX++#) and the widest AoU data message, so a wide port may share a lane whose own port is narrow.
+
+*Credits.* The ports merged onto a lane share the lane's TX credit counters, and the remote RP's RX FIFOs. The MsgCredit RP field of received headers, and the RP field of CrdtGrant messages, name a local lane, as before.
+
+*Limits.* The merged routes have the ID limits of xref:aou-3105-axi-id-handling-on-merged-routes[Section 3.10.5]. The write early response controller and the subordinate ID checker of each port work on the port's own traffic and IDs, in front of the mapping, and are not affected by it.
+
+[[aou-3105-axi-id-handling-on-merged-routes]]
+==== 3.10.5. AXI ID Handling on Merged Routes
+
+The ports of a merge group share one 10-bit AXI ID space on the lane, so their IDs are remapped before the mux and restored after the demux. [.monospaced]#++AOU_ID_REMAPPER++# does this per port and per direction (AW and AR separately). The ID on the lane is [.monospaced]#++{remapped ID, source tag}++#: the tag is the index of the source port in the low 1 bit ([.monospaced]#++RP_COUNT++# = 2) or 2 bits ([.monospaced]#++RP_COUNT++# = 3 or 4), and the remapped ID occupies the upper 9 or 8 bits. The remote die sees ordinary 10-bit IDs. When a B or R returns, the tag selects the port and the port's table restores the original 10-bit ID.
+
+Each remapper is a table of [.monospaced]#++RPn_S_WR_MO_CNT++# (AW) or [.monospaced]#++RPn_S_RD_MO_CNT++# (AR) entries, one per distinct source ID with requests outstanding; the remapped ID is the entry index. Requests of the same port with the same ID share one entry and keep one remapped ID, so the ordering AXI guarantees between same-ID transactions is kept on the lane and at the remote die. An entry holds up to [.monospaced]#++RPn_S_*_MO_CNT++# outstanding requests and is freed when the last of them has completed (B, or R with RLAST). A request that needs a new entry when none is free, or that would exceed the count of its entry, is held (AWREADY / ARREADY low) until one is released; nothing is dropped or overwritten. The usable ID space of a port on a merged route is therefore [.monospaced]#++RPn_S_*_MO_CNT++# distinct IDs outstanding at a time, not 2^10, and the remote die sees at most that many distinct IDs per port in each direction. The table is sized so that a port which keeps its outstanding requests within [.monospaced]#++RPn_S_*_MO_CNT++# in total, per direction, never meets this back-pressure: with at most that many requests outstanding at most that many entries are in use, so a new ID always finds a free one. The subordinate ID checker enforces that total while [.monospaced]#++AXI_SLV_ID_MISMATCH_EN++# is set (xref:software-operation.adoc#aou-722-axi-id-mismatch-error[Section 7.2.2]), and the write early response controller does for writes while it is enabled; with both disabled the port may exceed the total, and the remapper holds AW or AR until an entry is freed.
+
+Singletons, ports on builds with [.monospaced]#++RP_COUNT++# = 1, and every port with [.monospaced]#++ASYMMETRIC_RP_EN++# = 0 keep their 10-bit ID end to end.
+
+The AW and AR remappers of a port are independent, so an exclusive write and the exclusive read it pairs with may reach the remote die with different remapped IDs. The remote die's exclusive-access monitor matches on ID, so exclusive sequences across a merged route are not guaranteed the EXOKAY they would get on a one-to-one route; use exclusive accesses on singleton or unmapped routes only.
 
 [[aou-311-ucie-flit-cancel-mechanism]]
 === 3.11. UCIe Flit cancel mechanism

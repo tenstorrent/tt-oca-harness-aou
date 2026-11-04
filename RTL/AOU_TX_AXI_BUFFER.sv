@@ -105,6 +105,7 @@ import packet_def_pkg::*;
 
     input  logic    [RP_CNT-1:0][MAX_AXI_DATA_WD-1:0]    I_AOU_TX_S_AXI_WDATA,
     input  logic    [RP_CNT-1:0][MAX_AXI_STRB_WD-1:0]    I_AOU_TX_S_AXI_WSTRB,
+    input  logic    [RP_CNT-1:0][1:0]                    I_AOU_TX_S_AXI_WDLEN,
     input  logic    [RP_CNT-1:0]                         I_AOU_TX_S_AXI_WLAST,
     input  logic    [RP_CNT-1:0]                         I_AOU_TX_S_AXI_WVALID,
     output logic    [RP_CNT-1:0]                         O_AOU_TX_S_AXI_WREADY,
@@ -150,6 +151,7 @@ import packet_def_pkg::*;
     input  logic                                         I_AOU_TX_M_AXI_AWREADY,
 
     output logic    [1:0]                                O_AOU_TX_M_AXI_W_RP,
+    output logic    [1:0]                                O_AOU_TX_M_AXI_WDLEN,
     output logic    [40*W1024b_G-1:0]                    O_AOU_TX_M_AXI_W_MESSAGE,
     output logic                                         O_AOU_TX_M_AXI_WSTRB_FULL,
     output logic                                         O_AOU_TX_M_AXI_WVALID,
@@ -180,6 +182,7 @@ import packet_def_pkg::*;
     output logic    [RP_CNT-1:0]                            O_AOU_TX_WREQVALID,
     output logic    [RP_CNT-1:0]                            O_AOU_TX_RREQVALID, 
     output logic    [RP_CNT-1:0]                            O_AOU_TX_WDATAVALID,
+    output logic    [RP_CNT-1:0][1:0]                       O_AOU_TX_WDATA_DLENGTH,
     output logic    [RP_CNT-1:0]                            O_AOU_TX_WFDATA,
     output logic    [RP_CNT-1:0]                            O_AOU_TX_RDATAVALID,
     output logic    [RP_CNT-1:0][1:0]                       O_AOU_TX_RDATA_DLENGTH,
@@ -255,6 +258,7 @@ logic       [RP_CNT-1:0]                        w_aou_tx_m_axi_awready;
 logic       [RP_CNT-1:0][MAX_AXI_DATA_WD-1:0]   w_aou_tx_m_axi_wdata;
 logic       [RP_CNT-1:0][MAX_AXI_STRB_WD-1:0]   w_aou_tx_m_axi_wstrb;
 logic       [RP_CNT-1:0]                        w_aou_tx_m_axi_wlast;
+logic       [RP_CNT-1:0][1:0]                   w_aou_tx_m_axi_wdlen;
 logic       [RP_CNT-1:0]                        w_aou_tx_m_axi_wstrb_full;
 logic       [RP_CNT-1:0]                        w_aou_tx_m_axi_wvalid;
 logic       [RP_CNT-1:0]                        w_aou_tx_m_axi_wready;
@@ -304,6 +308,7 @@ logic                             w_aou_tx_fifo_m_axi_awready;
 logic     [MAX_AXI_DATA_WD-1:0]   w_aou_tx_fifo_m_axi_wdata;
 logic     [MAX_AXI_STRB_WD-1:0]   w_aou_tx_fifo_m_axi_wstrb;
 logic                             w_aou_tx_fifo_m_axi_wlast;
+logic     [1:0]                   w_aou_tx_fifo_m_axi_wdlen;
 logic                             w_aou_tx_fifo_m_axi_wstrb_full;
 logic                             w_aou_tx_fifo_m_axi_wvalid;
 logic                             w_aou_tx_fifo_m_axi_wready;
@@ -571,36 +576,47 @@ u_axi_slave_aw_fifo(
 //--------------------------------------------------------------------
 logic w_w_full_strb [RP_CNT];
 
-genvar j;
+integer j;
 generate
-    for (j = 0; j < RP_CNT; j++) begin
+    if(MAX_AXI_DATA_WD == 256) begin : gen_w_full_strb_256
         always_comb begin
-            w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][0+:RP_AXI_STRB_WD[j]]);
+            for (j = 0; j < RP_CNT ; j = j + 1) begin
+                case(I_AOU_TX_S_AXI_WDLEN[j])
+                    2'b00: w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][31:0]);
+                    default: w_w_full_strb[j] = 1'b0;
+                endcase
+            end
+        end
+    end else if(MAX_AXI_DATA_WD == 512) begin : gen_w_full_strb_512
+        always_comb begin
+            for (j = 0; j < RP_CNT ; j = j + 1) begin
+                case(I_AOU_TX_S_AXI_WDLEN[j])
+                    2'b00: w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][31:0]);
+                    2'b01: w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][63:0]);
+                    default: w_w_full_strb[j] = 1'b0;
+                endcase
+            end
+        end
+    end else if(MAX_AXI_DATA_WD == 1024) begin : gen_w_full_strb_1024
+        always_comb begin
+            for (j = 0; j < RP_CNT ; j = j + 1) begin
+                case(I_AOU_TX_S_AXI_WDLEN[j])
+                    2'b00: w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][31:0]);
+                    2'b01: w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][63:0]);
+                    2'b10: w_w_full_strb[j] = &(I_AOU_TX_S_AXI_WSTRB[j][127:0]);
+                    default: w_w_full_strb[j] = 1'b0;
+                endcase
+            end
         end
     end
 endgenerate
 
-logic [RP0_AXI_DATA_WD-1:0] w_aou_tx_rp0_wdata;
-logic [RP1_AXI_DATA_WD-1:0] w_aou_tx_rp1_wdata;
-logic [RP2_AXI_DATA_WD-1:0] w_aou_tx_rp2_wdata;
-logic [RP3_AXI_DATA_WD-1:0] w_aou_tx_rp3_wdata;
-
-
-logic [RP0_AXI_STRB_WD-1:0] w_aou_tx_rp_wstrb_tmp;
-logic [RP1_AXI_STRB_WD-1:0] w_aou_tx_rp1_wstrb;
-logic [RP2_AXI_STRB_WD-1:0] w_aou_tx_rp2_wstrb;
-logic [RP3_AXI_STRB_WD-1:0] w_aou_tx_rp3_wstrb;
-
 generate 
     for (i = 0; i < RP_CNT ; i ++) begin : g_w_rp_fifo
-        localparam int DATA_WD = RP_AXI_DATA_WD[i];
-        localparam int STRB_WD = RP_AXI_STRB_WD[i];
-        logic [DATA_WD-1:0] w_tx_axi_data_tmp;
-        logic [STRB_WD-1:0] w_tx_axi_strb_tmp;
 
         AOU_SYNC_FIFO_REG
         #(
-            .FIFO_WIDTH                     (RP_AXI_DATA_WD[i] + RP_AXI_STRB_WD[i] + 1 + 1),
+            .FIFO_WIDTH                     (MAX_AXI_DATA_WD + MAX_AXI_STRB_WD + 1 + 2 + 1),
             .FIFO_DEPTH                     (AXI_W_FIFO_DEPTH)        
         )
         u_axi_slave_w_rp_fifo(
@@ -608,23 +624,17 @@ generate
             .I_RESETN                       (I_RESETN),
 
             .I_SVALID                       (I_AOU_TX_S_AXI_WVALID[i]),
-            .I_SDATA                        ({I_AOU_TX_S_AXI_WDATA[i][0 +: RP_AXI_DATA_WD[i]], I_AOU_TX_S_AXI_WSTRB[i][0 +: RP_AXI_STRB_WD[i]], I_AOU_TX_S_AXI_WLAST[i], w_w_full_strb[i]}),
+            .I_SDATA                        ({I_AOU_TX_S_AXI_WDATA[i], I_AOU_TX_S_AXI_WSTRB[i], I_AOU_TX_S_AXI_WLAST[i], I_AOU_TX_S_AXI_WDLEN[i], w_w_full_strb[i]}),
             .O_SREADY                       (O_AOU_TX_S_AXI_WREADY[i]),
 
             .I_MREADY                       (w_aou_tx_m_axi_wready[i] && w_aou_tx_w_credit_valid[i]),
-            .O_MDATA                        ({w_tx_axi_data_tmp, w_tx_axi_strb_tmp, w_aou_tx_m_axi_wlast[i], w_aou_tx_m_axi_wstrb_full[i]}),
+            .O_MDATA                        ({w_aou_tx_m_axi_wdata[i], w_aou_tx_m_axi_wstrb[i], w_aou_tx_m_axi_wlast[i], w_aou_tx_m_axi_wdlen[i], w_aou_tx_m_axi_wstrb_full[i]}),
             .O_MVALID                       (w_aou_tx_m_axi_wvalid[i]),
 
             .O_EMPTY_CNT                    (),
             .O_FULL_CNT                     ()
         );
 
-        always_comb begin
-            w_aou_tx_m_axi_wdata[i] = '0;
-            w_aou_tx_m_axi_wdata[i][0 +: RP_AXI_DATA_WD[i]] = w_tx_axi_data_tmp;
-            w_aou_tx_m_axi_wstrb[i] = '0;
-            w_aou_tx_m_axi_wstrb[i][0 +: RP_AXI_STRB_WD[i]] = w_tx_axi_strb_tmp;
-        end
 
     end
 endgenerate
@@ -657,6 +667,7 @@ AOU_AW_W_ALIGNER #(
     .I_S_WSTRB      ( w_aou_tx_m_axi_wstrb              ),
     .I_S_WSTRB_FULL ( w_aou_tx_m_axi_wstrb_full         ),
     .I_S_WLAST      ( w_aou_tx_m_axi_wlast              ),
+    .I_S_WDLEN      ( w_aou_tx_m_axi_wdlen              ),
     .I_S_WVALID     ( w_aou_tx_m_axi_wvalid & w_aou_tx_w_credit_valid),
     .O_S_WREADY     ( w_aou_tx_m_axi_wready             ),
 
@@ -679,6 +690,7 @@ AOU_AW_W_ALIGNER #(
     .O_M_WSTRB      ( w_aou_tx_fifo_m_axi_wstrb         ),
     .O_M_WSTRB_FULL ( w_aou_tx_fifo_m_axi_wstrb_full    ),
     .O_M_WLAST      ( w_aou_tx_fifo_m_axi_wlast         ),
+    .O_M_WDLEN      ( w_aou_tx_fifo_m_axi_wdlen         ),
     .O_M_WVALID     ( w_aou_tx_fifo_m_axi_wvalid        ),
     .I_M_WREADY     ( w_aou_tx_fifo_m_axi_wready        )
 );
@@ -697,16 +709,16 @@ always_comb begin
     w_fifo_wdata_ext[$bits(w_aou_tx_fifo_m_axi_wdata)-1:0] = w_aou_tx_fifo_m_axi_wdata;
     w_fifo_wstrb_ext[$bits(w_aou_tx_fifo_m_axi_wstrb)-1:0] = w_aou_tx_fifo_m_axi_wstrb;
 
-    case (RP_AXI_DATA_WD[w_aou_tx_fifo_m_axi_w_rp_tmp])
-        256 : begin
+    case (w_aou_tx_fifo_m_axi_wdlen)
+        2'b00 : begin
             w_writedata_wo_strb_message_byteswap = {MSG_WRF_DATA, I_RP_DEST_RP[w_aou_tx_fifo_m_axi_w_rp_tmp], 2'b00, 4'b0, w_aou_writedata_prof, w_fifo_wdata_ext[255:0], 768'b0, 32'b0};
             w_writedata_message_byteswap         = {MSG_WR_DATA,  I_RP_DEST_RP[w_aou_tx_fifo_m_axi_w_rp_tmp], 2'b00, 4'b0, w_aou_writedata_prof, w_fifo_wdata_ext[255:0], w_fifo_wstrb_ext[31:0], 768'b0, 96'b0, 24'b0};
         end
-        512 : begin 
+        2'b01 : begin 
             w_writedata_wo_strb_message_byteswap = {MSG_WRF_DATA, I_RP_DEST_RP[w_aou_tx_fifo_m_axi_w_rp_tmp], 2'b01, 4'b0, w_aou_writedata_prof, w_fifo_wdata_ext[511:0], 512'b0, 32'b0};
             w_writedata_message_byteswap         = {MSG_WR_DATA,  I_RP_DEST_RP[w_aou_tx_fifo_m_axi_w_rp_tmp], 2'b01, 4'b0, w_aou_writedata_prof, w_fifo_wdata_ext[511:0], w_fifo_wstrb_ext[63:0], 512'b0, 64'b0, 24'b0};
         end
-        1024 : begin 
+        2'b10 : begin 
             w_writedata_wo_strb_message_byteswap = {MSG_WRF_DATA, I_RP_DEST_RP[w_aou_tx_fifo_m_axi_w_rp_tmp], 2'b10, 4'b0, w_aou_writedata_prof, w_fifo_wdata_ext, 32'b0};
             w_writedata_message_byteswap         = {MSG_WR_DATA,  I_RP_DEST_RP[w_aou_tx_fifo_m_axi_w_rp_tmp], 2'b10, 4'b0, w_aou_writedata_prof, w_fifo_wdata_ext, w_fifo_wstrb_ext, 24'b0};
         end
@@ -727,7 +739,7 @@ assign w_writedata_wf_message_en = w_aou_tx_fifo_m_axi_wstrb_full ? {{(40*(W1024
 
 AOU_SYNC_FIFO_REG
 #(
-    .FIFO_WIDTH                     (2 + 40*W1024b_G + 1),
+    .FIFO_WIDTH                     (2 + 2 + 40*W1024b_G + 1),
     .FIFO_DEPTH                     (AXI_W_FIFO_DEPTH)        
 )
 u_axi_slave_w_fifo(
@@ -735,11 +747,11 @@ u_axi_slave_w_fifo(
     .I_RESETN                       (I_RESETN),
 
     .I_SVALID                       (w_aou_tx_fifo_m_axi_wvalid),
-    .I_SDATA                        ({w_aou_tx_fifo_m_axi_w_rp_tmp, w_writedata_wf_message_en, w_aou_tx_fifo_m_axi_wstrb_full}),
+    .I_SDATA                        ({w_aou_tx_fifo_m_axi_wdlen, w_aou_tx_fifo_m_axi_w_rp_tmp, w_writedata_wf_message_en, w_aou_tx_fifo_m_axi_wstrb_full}),
     .O_SREADY                       (w_aou_tx_fifo_m_axi_wready),
 
     .I_MREADY                       (I_AOU_TX_M_AXI_WREADY),
-    .O_MDATA                        ({O_AOU_TX_M_AXI_W_RP, O_AOU_TX_M_AXI_W_MESSAGE, O_AOU_TX_M_AXI_WSTRB_FULL}),
+    .O_MDATA                        ({O_AOU_TX_M_AXI_WDLEN, O_AOU_TX_M_AXI_W_RP, O_AOU_TX_M_AXI_W_MESSAGE, O_AOU_TX_M_AXI_WSTRB_FULL}),
     .O_MVALID                       (O_AOU_TX_M_AXI_WVALID),
 
     .O_EMPTY_CNT                    (),
@@ -1134,21 +1146,22 @@ logic [5:0]  w_wdata_granule_size   [RP_CNT];
 
 always_comb begin
     for (int unsigned i = 0 ; i < RP_CNT ; i ++) begin
-        case (w_aou_tx_s_axi_rdlen[i])
-            2'b00 : w_rdata_granule_size[i] = R256b_G;
-            2'b01: w_rdata_granule_size[i] = R512b_G;
-            2'b10: w_rdata_granule_size[i] = R1024b_G;
-            default: w_rdata_granule_size[i] = 0;
+        case (w_aou_tx_m_axi_wdlen[i])
+            2'b00: w_wdata_granule_size[i] = w_aou_tx_m_axi_wstrb_full[i] ? WF256b_G  : W256b_G;
+            2'b01: w_wdata_granule_size[i] = w_aou_tx_m_axi_wstrb_full[i] ? WF512b_G  : W512b_G;
+            2'b10: w_wdata_granule_size[i] = w_aou_tx_m_axi_wstrb_full[i] ? WF1024b_G : W1024b_G;
+            default: w_wdata_granule_size[i] = 0;
         endcase
     end
 end
 
 always_comb begin
     for (int unsigned i = 0 ; i < RP_CNT ; i ++) begin
-        case (w_aou_tx_m_axi_wstrb_full[i])
-            1'b0 : w_wdata_granule_size[i] = RP_W_G_SIZE[i];
-            1'b1 : w_wdata_granule_size[i] = RP_WF_G_SIZE[i];
-            default: w_wdata_granule_size[i] = 0;
+        case (w_aou_tx_s_axi_rdlen[i])
+            2'b00: w_rdata_granule_size[i] = R256b_G;
+            2'b01: w_rdata_granule_size[i] = R512b_G;
+            2'b10: w_rdata_granule_size[i] = R1024b_G;
+            default: w_rdata_granule_size[i] = 0;
         endcase
     end
 end
@@ -1168,6 +1181,7 @@ always_comb begin
         O_AOU_TX_WREQVALID     [i] = w_aou_tx_aw_valid[i] && w_aou_tx_m_axi_awready[i];
         O_AOU_TX_RREQVALID     [i] = w_aou_tx_m_axi_arvalid[i] && w_aou_tx_m_axi_arready[i] && w_aou_tx_ar_credit_valid [i];
         O_AOU_TX_WDATAVALID    [i] = w_aou_tx_m_axi_wvalid [i] && w_aou_tx_m_axi_wready [i] && w_aou_tx_w_credit_valid  [i];
+        O_AOU_TX_WDATA_DLENGTH [i] = w_aou_tx_m_axi_wdlen[i];
         O_AOU_TX_WFDATA        [i] = w_aou_tx_m_axi_wstrb_full[i];
         O_AOU_TX_RDATAVALID    [i] = w_aou_tx_s_axi_rvalid [i] && w_aou_tx_s_axi_rready [i] && w_aou_tx_r_credit_valid  [i];
         O_AOU_TX_RDATA_DLENGTH [i] = w_aou_tx_s_axi_rdlen[i];

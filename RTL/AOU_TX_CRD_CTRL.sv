@@ -181,6 +181,7 @@ import packet_def_pkg::*;
     input       [RP_COUNT-1:0]                  I_AOU_TX_WREQVALID,
     input       [RP_COUNT-1:0]                  I_AOU_TX_RREQVALID,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WDATAVALID,
+    input       [RP_COUNT-1:0][1:0]             I_AOU_TX_WDATA_DLENGTH,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WFDATA,
     input       [RP_COUNT-1:0]                  I_AOU_TX_RDATAVALID,
     input       [RP_COUNT-1:0][1:0]             I_AOU_TX_RDATA_DLENGTH,
@@ -401,20 +402,20 @@ always_comb begin
     end
 end
 
-genvar k;
-generate
-    for(k = 0; k < RP_COUNT; k++) begin 
-        if(RP_AXI_DATA_WD[k]==1024) begin : GEN_CREDIT_DISCOUNT_1024
-            assign w_cnt_rp_w_credit_discount[k] = I_AOU_TX_WDATAVALID[k] ? I_AOU_TX_WFDATA[k] ? WF1024b_G : W1024b_G : 'd0; 
-        end else if(RP_AXI_DATA_WD[k]==512) begin : GEN_CREDIT_DISCOUNT_512
-            assign w_cnt_rp_w_credit_discount[k] = I_AOU_TX_WDATAVALID[k] ? I_AOU_TX_WFDATA[k] ? WF512b_G  : W512b_G  : 'd0;
-        end else if(RP_AXI_DATA_WD[k]==256) begin : GEN_CREDIT_DISCOUNT_256
-            assign w_cnt_rp_w_credit_discount[k] = I_AOU_TX_WDATAVALID[k] ? I_AOU_TX_WFDATA[k] ? WF256b_G  : W256b_G  : 'd0;
-        end else begin : GEN_CREDIT_DISCOUNT_DEFAULT
-            assign w_cnt_rp_w_credit_discount[k] = 'd0;
+always_comb begin
+    for(int unsigned i = 0; i < RP_COUNT; i++) begin
+        w_cnt_rp_w_credit_discount[i] = 'd0;
+        if(I_AOU_TX_WDATAVALID[i]) begin
+            if(I_AOU_TX_WDATA_DLENGTH[i]==2'b10) begin
+                w_cnt_rp_w_credit_discount[i] = I_AOU_TX_WFDATA[i] ? WF1024b_G : W1024b_G;
+            end else if (I_AOU_TX_WDATA_DLENGTH[i]==2'b01) begin
+                w_cnt_rp_w_credit_discount[i] = I_AOU_TX_WFDATA[i] ? WF512b_G  : W512b_G;        
+            end else if (I_AOU_TX_WDATA_DLENGTH[i]==2'b00) begin
+                w_cnt_rp_w_credit_discount[i] = I_AOU_TX_WFDATA[i] ? WF256b_G  : W256b_G;
+            end
         end
     end
-endgenerate
+end
 
 always_comb begin
     for(int unsigned i = 0; i < RP_COUNT; i++) begin

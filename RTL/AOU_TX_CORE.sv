@@ -112,6 +112,7 @@ import packet_def_pkg::*;
     input  logic    [RP_CNT-1:0][MAX_AXI_DATA_WD-1:0]           I_AOU_TX_AXI_WDATA,
     input  logic    [RP_CNT-1:0][MAX_AXI_STRB_WD-1:0]           I_AOU_TX_AXI_WSTRB,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_WLAST,
+    input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_WDLEN,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_WVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_WREADY,
 
@@ -205,6 +206,7 @@ import packet_def_pkg::*;
     output logic    [RP_CNT-1:0]                                O_AOU_TX_WREQVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_RREQVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_WDATAVALID,
+    output logic    [RP_CNT-1:0][1:0]                           O_AOU_TX_WDATA_DLENGTH,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_WFDATA,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_RDATAVALID,
     output logic    [RP_CNT-1:0][1:0]                           O_AOU_TX_RDATA_DLENGTH,
@@ -310,6 +312,7 @@ logic                           w_aou_fifo_awready;
 logic   [MAX_AXI_DATA_WD-1:0]   w_aou_fifo_wdata;
 logic   [MAX_AXI_STRB_WD-1:0]   w_aou_fifo_wstrb;
 logic                           w_aou_fifo_wstrb_full;
+logic   [1:0]                   w_aou_fifo_wdlen;
 logic                           w_aou_fifo_wlast;
 logic                           w_aou_fifo_wvalid;
 logic                           w_aou_fifo_wready;
@@ -372,7 +375,8 @@ logic  [RP_CNT-1:0] w_aou_tx_r_hs      ;
 logic   w_rdata_256b;
 logic   w_rdata_512b;
 
-
+logic   w_wdata_256b;
+logic   w_wdata_512b;
 
 assign  w_aou_fifo_aw_hs        = w_aou_fifo_awvalid && w_aou_fifo_awready;
 assign  w_aou_fifo_w_hs         = w_aou_fifo_wvalid && w_aou_fifo_wready;
@@ -461,6 +465,8 @@ logic                       r_ring_buffer_ready;
 assign  w_rdata_256b    = (w_aou_fifo_rdlen == 2'b00);
 assign  w_rdata_512b    = (w_aou_fifo_rdlen == 2'b01);
 
+assign  w_wdata_256b    = (w_aou_fifo_wdlen == 2'b00);
+assign  w_wdata_512b    = (w_aou_fifo_wdlen == 2'b01);
 
 //assume maximum granule is not larger than 64
 logic [5:0]  w_rdata_granule_size;
@@ -476,12 +482,12 @@ always_comb begin
 end
 
 always_comb begin
-    w_wdata_granule_size = 0;
-    for (int unsigned i = 0 ; i < RP_CNT ; i ++) begin
-        if (i == w_aou_fifo_w_rp) begin
-            w_wdata_granule_size = w_aou_fifo_wstrb_full ? RP_NO_STRB_W_G_SIZE[i] : RP_W_G_SIZE[i];
-        end
-    end
+    case (w_aou_fifo_wdlen)
+        2'b00: w_wdata_granule_size = w_aou_fifo_wstrb_full ? WF256b_G  : W256b_G;
+        2'b01: w_wdata_granule_size = w_aou_fifo_wstrb_full ? WF512b_G  : W512b_G;
+        2'b10: w_wdata_granule_size = w_aou_fifo_wstrb_full ? WF1024b_G : W1024b_G;
+        default: w_wdata_granule_size = 0;
+    endcase    
 end
 
 assign w_ring_buffer_ready = (((r_cur_granule_start - r_cur_flit_for_fifo_start) & 8'b1111_1111 ) < (128 - (AW_G + w_wdata_granule_size + B_G + AR_G + w_rdata_granule_size) ));
@@ -594,6 +600,7 @@ AOU_TX_AXI_BUFFER
     .I_AOU_TX_S_AXI_WDATA                   ( I_AOU_TX_AXI_WDATA                ),
     .I_AOU_TX_S_AXI_WSTRB                   ( I_AOU_TX_AXI_WSTRB                ),
     .I_AOU_TX_S_AXI_WLAST                   ( I_AOU_TX_AXI_WLAST                ),
+    .I_AOU_TX_S_AXI_WDLEN                   ( I_AOU_TX_AXI_WDLEN                ),
     .I_AOU_TX_S_AXI_WVALID                  ( I_AOU_TX_AXI_WVALID               ),
     .O_AOU_TX_S_AXI_WREADY                  ( O_AOU_TX_AXI_WREADY               ),
 
@@ -640,6 +647,7 @@ AOU_TX_AXI_BUFFER
 
     .O_AOU_TX_M_AXI_W_RP                    ( w_aou_fifo_w_rp                   ),//only w channel rp is source rp
     .O_AOU_TX_M_AXI_WSTRB_FULL              ( w_aou_fifo_wstrb_full             ),
+    .O_AOU_TX_M_AXI_WDLEN                   ( w_aou_fifo_wdlen                  ),
     .O_AOU_TX_M_AXI_W_MESSAGE               ( w_aou_tx_m_axi_w_message          ),
     .O_AOU_TX_M_AXI_WVALID                  ( w_aou_fifo_wvalid                 ),
     .I_AOU_TX_M_AXI_WREADY                  ( w_aou_fifo_wready                 ),
@@ -666,6 +674,7 @@ AOU_TX_AXI_BUFFER
     .O_AOU_TX_WREQVALID                     ( O_AOU_TX_WREQVALID                ),
     .O_AOU_TX_RREQVALID                     ( O_AOU_TX_RREQVALID                ),
     .O_AOU_TX_WDATAVALID                    ( O_AOU_TX_WDATAVALID               ),
+    .O_AOU_TX_WDATA_DLENGTH                 ( O_AOU_TX_WDATA_DLENGTH            ),
     .O_AOU_TX_WFDATA                        ( O_AOU_TX_WFDATA                   ),
     .O_AOU_TX_RDATAVALID                    ( O_AOU_TX_RDATAVALID               ),
     .O_AOU_TX_RDATA_DLENGTH                 ( O_AOU_TX_RDATA_DLENGTH            ),
@@ -839,19 +848,39 @@ always_comb begin
     end
 
     if (w_aou_fifo_w_hs) begin
-        for (int unsigned i = 0 ; i < RP_CNT ; i ++) begin
-            if (w_aou_fifo_w_rp == i) begin
-                if (w_aou_fifo_wstrb_full) begin
-                    for (int unsigned n=0; n < RP_NO_STRB_W_G_SIZE[i]; n++) begin
-                        nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_wo_strb_message[n*40 +: 40];
-                        nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
-                    end
-                end else begin
-                    for (int unsigned n=0; n < RP_W_G_SIZE[i]; n++) begin
-                        nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_message[n*40 +: 40];
-                        nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
-                    end
+        if (w_aou_fifo_wstrb_full) begin
+            if (w_wdata_256b) begin
+                for (int unsigned n=0; n < WF256b_G; n++) begin
+                    nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_wo_strb_message[n*40 +: 40];
+                    nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
                 end
+            end else if (w_wdata_512b) begin
+                for (int unsigned n=0; n < WF512b_G; n++) begin
+                    nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_wo_strb_message[n*40 +: 40];
+                    nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
+                end 
+            end else begin
+                for (int unsigned n=0; n < WF1024b_G; n++) begin
+                    nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_wo_strb_message[n*40 +: 40];
+                    nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
+                end         
+            end
+        end else begin
+            if (w_wdata_256b) begin
+                for (int unsigned n=0; n < W256b_G; n++) begin
+                    nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_message[n*40 +: 40];
+                    nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
+                end
+            end else if (w_wdata_512b) begin
+                for (int unsigned n=0; n < W512b_G; n++) begin
+                    nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_message[n*40 +: 40];
+                    nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
+                end 
+            end else begin
+                for (int unsigned n=0; n < W1024b_G; n++) begin
+                    nxt_granule_buffer[add_idx(w_w_message_start_idx, n)] = w_writedata_message[n*40 +: 40];
+                    nxt_msgstart_buffer[add_idx(w_w_message_start_idx, n)] = (n == 0);
+                end         
             end
         end
     end
@@ -1046,6 +1075,7 @@ assign w_lp_engaged = I_AOU_TX_LP_MODE && I_STATUS_ENABLED
 //   chunk-2 payload at handshake time, so credit accounting is unchanged.)
 
 logic w_flit_header_credit_valid;
+logic w_aou_tx_axi_tr_pending;
 
 assign w_flit_header_credit_valid = w_aou_msgcredit_valid && |{
         w_aou_rs_msgcredit_wrespcred, w_aou_rs_msgcredit_rdatacred,
@@ -1078,6 +1108,7 @@ assign O_AOU_TX_PENDING = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_aou_fifo_
 assign O_AOU_TX_AXI_TR_PENDING = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_aou_fifo_bvalid || w_aou_fifo_arvalid || w_aou_fifo_rvalid || w_aou_tx_axi_hs
                                 || |I_AOU_TX_AXI_AWVALID || |I_AOU_TX_AXI_WVALID || |I_AOU_TX_AXI_ARVALID || |w_aou_tx_b_fifo_svalid || |I_AOU_TX_AXI_RVALID;
 
+assign w_aou_tx_axi_tr_pending = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_aou_fifo_bvalid || w_aou_fifo_arvalid || w_aou_fifo_rvalid || w_aou_tx_axi_hs;
 
 // Two parallel packing pipelines. Exactly one elaborates per config:
 //   FDI_PACK_WD == 1024 -> g_pack_2step (half-flit per cycle, 24 granules)
@@ -1116,7 +1147,7 @@ generate if (FDI_PACK_WD != 1024) begin : g_pack_4step
         always_ff @ (posedge I_CLK or negedge I_RESETN) begin
             if (!I_RESETN) begin
                 r_flit_fifo_data <= 'd0;
-            end else if (w_misc_activation_valid || w_flit_fifo_valid || O_AOU_TX_AXI_TR_PENDING) begin
+            end else if (w_misc_activation_valid || w_flit_fifo_valid || w_aou_tx_axi_tr_pending || w_misc_crdtgrant_fifo_valid) begin
                 r_flit_fifo_data <= w_flit_fifo_data;
             end
         end
@@ -1384,7 +1415,7 @@ end else begin : g_pack_2step
         always_ff @ (posedge I_CLK or negedge I_RESETN) begin
             if (!I_RESETN) begin
                 r_flit_fifo_data <= 'd0;
-            end else if (w_misc_activation_valid || w_flit_fifo_valid || O_AOU_TX_AXI_TR_PENDING) begin
+            end else if (w_misc_activation_valid || w_flit_fifo_valid || w_aou_tx_axi_tr_pending || w_misc_crdtgrant_fifo_valid) begin
                 r_flit_fifo_data <= w_flit_fifo_data;
             end
         end

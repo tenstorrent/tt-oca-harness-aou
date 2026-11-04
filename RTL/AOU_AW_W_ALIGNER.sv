@@ -55,6 +55,7 @@ module AOU_AW_W_ALIGNER #(
     input       [AXI_SLV_NUM-1:0][AXI_STRB_WD-1: 0]     I_S_WSTRB,
     input       [AXI_SLV_NUM-1:0]                       I_S_WSTRB_FULL,
     input       [AXI_SLV_NUM-1:0]                       I_S_WLAST,
+    input       [AXI_SLV_NUM-1:0][1:0]                  I_S_WDLEN,
     input       [AXI_SLV_NUM-1:0]                       I_S_WVALID,
     output      [AXI_SLV_NUM-1:0]                       O_S_WREADY,
 
@@ -77,6 +78,7 @@ module AOU_AW_W_ALIGNER #(
     output wire [AXI_STRB_WD-1: 0]                      O_M_WSTRB,
     output wire                                         O_M_WSTRB_FULL,
     output wire                                         O_M_WLAST,
+    output wire [1:0]                                   O_M_WDLEN,
     output wire                                         O_M_WVALID,
     input                                               I_M_WREADY
 
@@ -200,6 +202,7 @@ end
 assign O_M_WDATA       = I_S_WDATA[w_w_sel] ;
 assign O_M_WSTRB       = I_S_WSTRB[w_w_sel] ;
 assign O_M_WLAST       = I_S_WLAST[w_w_sel] ;
+assign O_M_WDLEN       = I_S_WDLEN[w_w_sel] ;
 assign O_M_WSTRB_FULL  = I_S_WSTRB_FULL[w_w_sel] ;
 assign O_M_WVALID      = |w_w_grant;
 

@@ -900,6 +900,35 @@ package aou_core_csr_uvm_pkg;
         endfunction : build
     endclass : aou_core__write_early_response_wdt_ctl
 
+    // reg - aou_core::asymmetric_rp_proc_con
+    class aou_core__asymmetric_rp_proc_con extends uvm_reg;
+        rand uvm_reg_field asymmetric_rp_en;
+        rand uvm_reg_field rp0_tx_rp_sel;
+        rand uvm_reg_field rp1_tx_rp_sel;
+        rand uvm_reg_field rp2_tx_rp_sel;
+        rand uvm_reg_field rp3_tx_rp_sel;
+        rand uvm_reg_field reserved_31_9;
+
+        function new(string name = "aou_core__asymmetric_rp_proc_con");
+            super.new(name, 32, UVM_NO_COVERAGE);
+        endfunction : new
+
+        virtual function void build();
+            this.asymmetric_rp_en = new("asymmetric_rp_en");
+            this.asymmetric_rp_en.configure(this, 1, 0, "RW", 1, 'h0, 1, 1, 0);
+            this.rp0_tx_rp_sel = new("rp0_tx_rp_sel");
+            this.rp0_tx_rp_sel.configure(this, 2, 1, "RW", 1, 'h0, 1, 1, 0);
+            this.rp1_tx_rp_sel = new("rp1_tx_rp_sel");
+            this.rp1_tx_rp_sel.configure(this, 2, 3, "RW", 1, 'h1, 1, 1, 0);
+            this.rp2_tx_rp_sel = new("rp2_tx_rp_sel");
+            this.rp2_tx_rp_sel.configure(this, 2, 5, "RW", 1, 'h2, 1, 1, 0);
+            this.rp3_tx_rp_sel = new("rp3_tx_rp_sel");
+            this.rp3_tx_rp_sel.configure(this, 2, 7, "RW", 1, 'h3, 1, 1, 0);
+            this.reserved_31_9 = new("reserved_31_9");
+            this.reserved_31_9.configure(this, 23, 9, "RO", 1, 'h0, 1, 1, 0);
+        endfunction : build
+    endclass : aou_core__asymmetric_rp_proc_con
+
     // addrmap - aou_core
     class aou_core extends uvm_reg_block;
         rand aou_core__ip_version ip_version;
@@ -935,6 +964,7 @@ package aou_core_csr_uvm_pkg;
         rand aou_core__axi_error_info1_rp3 axi_error_info1_rp3;
         rand aou_core__axi_slv_id_mismatch_err_rp3 axi_slv_id_mismatch_err_rp3;
         rand aou_core__write_early_response_wdt_ctl write_early_response_wdt_ctl;
+        rand aou_core__asymmetric_rp_proc_con asymmetric_rp_proc_con;
 
         function new(string name = "aou_core");
             super.new(name);
@@ -1107,6 +1137,11 @@ package aou_core_csr_uvm_pkg;
 
             this.write_early_response_wdt_ctl.build();
             this.default_map.add_reg(this.write_early_response_wdt_ctl, 'h80);
+            this.asymmetric_rp_proc_con = new("asymmetric_rp_proc_con");
+            this.asymmetric_rp_proc_con.configure(this);
+
+            this.asymmetric_rp_proc_con.build();
+            this.default_map.add_reg(this.asymmetric_rp_proc_con, 'h84);
         endfunction : build
     endclass : aou_core
 
