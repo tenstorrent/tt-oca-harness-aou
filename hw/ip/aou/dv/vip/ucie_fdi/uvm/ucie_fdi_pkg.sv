@@ -13,8 +13,11 @@ package ucie_fdi_pkg;
 
   localparam int FLIT_BYTES     = 256;
   localparam int HALF_BYTES     = 128;
+  localparam int MIN_BEAT_BYTES = 32;
   localparam int MAX_BEAT_BYTES = 256;
   localparam int BUS_W          = MAX_BEAT_BYTES * 8;
+  // The most transfers one flit can take (at the narrowest FDI).
+  localparam int MAX_BEATS_PER_FLIT = FLIT_BYTES / MIN_BEAT_BYTES;
 
   // UCIe pl_state_sts Active; the same value in the UCIe and RTL encodings.
   localparam logic [3:0] FDI_STS_ACTIVE = 4'h1;
@@ -23,8 +26,9 @@ package ucie_fdi_pkg;
   // TX: Protocol Layer (DUT) to Adapter. RX: Adapter to Protocol Layer (DUT).
   typedef enum bit {UCIE_FDI_TX, UCIE_FDI_RX} ucie_fdi_dir_e;
 
-  // How the PL driver cancels a 128B half: not at all, with pl_valid low in
-  // the cancel cycle, or with the replay's first beat in the cancel cycle.
+  // How the PL driver cancels a 128B half (the whole flit on a 256 B FDI): not
+  // at all, with pl_valid low in the cancel cycle, or with the replay's first
+  // beat in the cancel cycle.
   typedef enum bit [1:0] {
     UCIE_CANCEL_NONE,
     UCIE_CANCEL_IDLE,
@@ -43,23 +47,47 @@ package ucie_fdi_pkg;
   // ---------------------------------------------------------------------------
   // Format 6 codec. Flit byte k travels on FDI byte (k mod N) of transfer
   // floor(k/N), N = beat bytes (UCIe r1.1 §8.3.1). Bytes 0-1 (Flit Header)
-  // and 126-127, 254-255 (CRC0/CRC1) belong to the Adapter. At 256 B the
-  // whole flit is one beat and the cancel unit is the flit (fdi-rx-plan 1.3):
-  // beats_per_half is 1 so the half bookkeeping degenerates to one "half".
+  // and 126-127, 254-255 (CRC0/CRC1) belong to the Adapter.
+  //
+  // The cancel unit. pl_flit_cancel comes in the cycle after the last chunk
+  // of a 128B half (UCIe r1.1 Table 8-2). Up to 128 B a half ends on its own
+  // transfer, so each half has its own cancel. On a 256 B FDI the flit is one
+  // transfer and both halves end in it, so the one cancel after it applies to
+  // the whole flit (as UCIe r3.0 10.3.1 says of wider FDIs: a cancel applies
+  // to every flit in that clock).
+  //
+  // The helpers below are the only place the width arithmetic lives. They
+  // stay defined (never 0) for an FDI wider than a flit, where a transfer
+  // would carry several flits, flit j on bytes 256j up (lane j; UCIe r3.0
+  // 10.3.1, Implementation Note "NBYTES"); valid_beat_bytes keeps such
+  // widths out.
   // ---------------------------------------------------------------------------
   function automatic bit valid_beat_bytes(int unsigned n);
     return n inside {32, 64, 128, 256};
   endfunction
 
+  // Transfers per flit: 1 once a transfer holds a whole flit.
   function automatic int unsigned beats_per_flit(int unsigned beat_bytes);
-    return FLIT_BYTES / beat_bytes;
+    return (beat_bytes >= FLIT_BYTES) ? 1 : FLIT_BYTES / beat_bytes;
   endfunction
 
+  // Flits per transfer (lanes): 1 up to 256 B, beat_bytes / 256 above.
+  function automatic int unsigned flits_per_beat(int unsigned beat_bytes);
+    return (beat_bytes > FLIT_BYTES) ? beat_bytes / FLIT_BYTES : 1;
+  endfunction
+
+  // Bytes of one flit in one transfer: the beat, or the flit's 256 B lane.
+  function automatic int unsigned flit_chunk_bytes(int unsigned beat_bytes);
+    return (beat_bytes > FLIT_BYTES) ? FLIT_BYTES : beat_bytes;
+  endfunction
+
+  // Beats of one cancel unit: a 128B half, or one beat from 256 B up.
   function automatic int unsigned beats_per_half(int unsigned beat_bytes);
     return (beat_bytes >= FLIT_BYTES) ? 1 : HALF_BYTES / beat_bytes;
   endfunction
 
-  // Halves per flit as the cancel unit sees them: 2 up to 128 B, 1 at 256 B.
+  // Cancel units per flit: 2 halves up to 128 B; 1 from 256 B up, where the
+  // unit is the transfer (one flit at 256 B, every flit in it above).
   function automatic int unsigned halves_per_flit(int unsigned beat_bytes);
     return beats_per_flit(beat_bytes) / beats_per_half(beat_bytes);
   endfunction

@@ -9,7 +9,8 @@
 //   DUT can reach a flit boundary (FDI-R11), or with cfg.stall_trdy_free
 //   keeps its policy, lows included (r1.1 8.3.2 rule 7).
 // - Stand-alone stalls start at a flit boundary, or mid-flit for
-//   cfg.stall_mid_pct of them.
+//   cfg.stall_mid_pct of them (on a 256 B FDI a flit is one beat, so always
+//   at a boundary).
 // - pl_stallreq rises only with lp_stallack low and falls only with it high
 //   (FDI-R08).
 class ucie_fdi_tx_responder extends uvm_component;
@@ -116,7 +117,7 @@ class ucie_fdi_tx_responder extends uvm_component;
     forever begin
       bit mid;
       @(vif.drv_cb);
-      mid = $urandom_range(99) < cfg.stall_mid_pct;
+      mid = cfg.bpf() > 1 && $urandom_range(99) < cfg.stall_mid_pct;
       // None while the TX is held (tx_hold): the handshake raises pl_trdy and
       // would let flits through the hold.
       if (cfg.gate.open && !cfg.tx_hold && (mid ? tx_beat != 0 : tx_beat == 0) && !stall_busy &&

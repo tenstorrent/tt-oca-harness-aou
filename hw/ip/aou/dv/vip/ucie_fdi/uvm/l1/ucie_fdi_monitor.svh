@@ -7,7 +7,8 @@
 // - ap_tx: flits the DUT sent; a beat transfers on lp_valid & lp_irdy &
 //   pl_trdy (FDI-R01).
 // - ap_rx: flits delivered to the DUT, after cancel rollback: a cancel in the
-//   cycle after a 128B half drops that half (FDI-R05).
+//   cycle after a 128B half drops that half (FDI-R05); on a 256 B FDI, where
+//   the flit is one beat, a cancel after it drops the whole flit.
 // Reset flushes both directions, and so does a LinkError the Adapter entered
 // mid-flit (gate abort; UCIe r1.1 8.3.3.7): the partial flits are abandoned.
 class ucie_fdi_monitor extends uvm_monitor;
@@ -27,7 +28,7 @@ class ucie_fdi_monitor extends uvm_monitor;
   int unsigned n_stalls_mid;     // pl_stallreq rose inside a DUT TX flit
   int unsigned n_stalls_trdy0;   // ... in a cycle with pl_trdy low
   int unsigned n_cancels_stalled; // RX cancels while the TX side was stalled
-  int unsigned n_rx_cancel_h1;   // RX flits with a second-half cancel
+  int unsigned n_rx_cancel_h1;   // RX flits with a second-half cancel (none at 256 B)
   int unsigned n_rx_cancel_rep;  // RX flits with one half cancelled more than once
   int unsigned n_tx_abandoned;   // partial flits abandoned on a mid-flit LinkError
   int unsigned n_rx_abandoned;
@@ -203,20 +204,25 @@ class ucie_fdi_monitor extends uvm_monitor;
     tx_cur.put_beat(cfg.beat_bytes, tx_beat, vif.mon_cb.lp_data);
     tx_beat++;
     if (tx_beat == cfg.bpf()) begin
-      tx_cur.t_end = $time;
-      tx_cur.n_stall_cycles = tx_stall;
-      if (cfg.check_tx_adapter_bytes) chk(R45);
-      if (cfg.check_tx_adapter_bytes && !tx_cur.tx_adapter_bytes_legal())
-        err(R45, $sformatf("Adapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
-                                 tx_cur.data[0], tx_cur.data[1], tx_cur.data[126],
-                                 tx_cur.data[127], tx_cur.data[254], tx_cur.data[255]));
-      if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, tx_cur.gap_before);
-      n_tx_flits++;
-      `uvm_info(get_type_name(), {"DUT TX ", tx_cur.convert2string()}, UVM_HIGH)
-      ap_tx.write(tx_cur);
+      publish_tx(tx_cur);
       tx_cur = null;
       tx_beat = 0;
     end
+  endfunction
+
+  // A complete DUT TX flit: its Adapter-owned bytes checked, then published.
+  local function void publish_tx(ucie_flit_item f);
+    f.t_end = $time;
+    f.n_stall_cycles = tx_stall;
+    if (cfg.check_tx_adapter_bytes) chk(R45);
+    if (cfg.check_tx_adapter_bytes && !f.tx_adapter_bytes_legal())
+      err(R45, $sformatf("Adapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
+                         f.data[0], f.data[1], f.data[126], f.data[127], f.data[254],
+                         f.data[255]));
+    if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
+    n_tx_flits++;
+    `uvm_info(get_type_name(), {"DUT TX ", f.convert2string()}, UVM_HIGH)
+    ap_tx.write(f);
   endfunction
 
   local function void sample_stall();
@@ -270,13 +276,14 @@ class ucie_fdi_monitor extends uvm_monitor;
       n_rx_cancels++;
     end else if (c) begin
       if (!rx_half_done || rx_cur == null) begin
-        err(R05, "pl_flit_cancel not in the cycle after the end of a 128B half");
+        err(R05, "pl_flit_cancel not in the cycle after a 128B half (a 256B flit)");
       end else begin
-        int unsigned half = (rx_beat == cfg.bpf()) ? 1 : 0;
+        // The cancelled unit: half 0 or 1, or 2, the whole flit, on a 256 B FDI.
+        int unsigned half = (cfg.bpf() == 1) ? 2 : (rx_beat == cfg.bpf()) ? 1 : 0;
         int unsigned count;
         bit stalled;
         rx_beat -= cfg.bph();
-        if (half == 0) rx_cur.n_cancel_h0++;
+        if (half != 1) rx_cur.n_cancel_h0++;
         else rx_cur.n_cancel_h1++;
         if (v) rx_cur.n_cancel_valid++;
         stalled = vif.mon_cb.pl_stallreq === 1'b1 || vif.mon_cb.lp_stallack === 1'b1;

@@ -13,6 +13,9 @@
 // The kind of each cancel (IDLE or VALID) is the kind given for that half.
 // cancel_repeat > 1 cancels the first cancelled half that many times in a row
 // before it goes through (cancel_h0 only, or cancel_h1 without the resend).
+// On a 256 B FDI the flit is one beat and the only cancel unit: any plan with a
+// cancel becomes cancel_repeat whole-flit cancels of the first cancelled half's
+// kind, then the flit; the monitor counts them in n_cancel_h0.
 class ucie_flit_item extends uvm_sequence_item;
   `uvm_object_utils(ucie_flit_item)
 
@@ -53,21 +56,28 @@ class ucie_flit_item extends uvm_sequence_item;
   int unsigned          gap_before;     // idle cycles since the previous flit
   time                  t_start;
   time                  t_end;
-  time                  t_beat[FLIT_BYTES/32];  // each beat's transfer (index: beat)
+  time                  t_beat[MAX_BEATS_PER_FLIT];  // when each beat was collected (index: beat)
 
   function new(string name = "ucie_flit_item");
     super.new(name);
   endfunction
 
-  function ucie_fdi_beat_t get_beat(int unsigned beat_bytes, int unsigned idx);
+  // Beat idx of this flit on an FDI of beat_bytes, other bytes zero. `lane`
+  // places it at bytes 256*lane up, for a transfer wider than a flit; 0 for
+  // every width the model supports.
+  function ucie_fdi_beat_t get_beat(int unsigned beat_bytes, int unsigned idx,
+                                    int unsigned lane = 0);
     ucie_fdi_beat_t b = '0;
-    for (int unsigned i = 0; i < beat_bytes; i++) b[8*i +: 8] = data[idx*beat_bytes + i];
+    int unsigned n = flit_chunk_bytes(beat_bytes);
+    for (int unsigned i = 0; i < n; i++) b[8*(lane*FLIT_BYTES + i) +: 8] = data[idx*n + i];
     return b;
   endfunction
 
-  function void put_beat(int unsigned beat_bytes, int unsigned idx, ucie_fdi_beat_t b);
-    for (int unsigned i = 0; i < beat_bytes; i++) data[idx*beat_bytes + i] = b[8*i +: 8];
-    if (idx < FLIT_BYTES/32) t_beat[idx] = $time;
+  function void put_beat(int unsigned beat_bytes, int unsigned idx, ucie_fdi_beat_t b,
+                         int unsigned lane = 0);
+    int unsigned n = flit_chunk_bytes(beat_bytes);
+    for (int unsigned i = 0; i < n; i++) data[idx*n + i] = b[8*(lane*FLIT_BYTES + i) +: 8];
+    if (idx < MAX_BEATS_PER_FLIT) t_beat[idx] = $time;
   endfunction
 
   function void clear();
@@ -86,8 +96,9 @@ class ucie_flit_item extends uvm_sequence_item;
     data[254] = 8'h00; data[255] = 8'h00;
   endfunction
 
+  // The Protocol ID (Byte0[7:6]) stays: 00b would make the flit a NOP.
   function void randomize_adapter_bytes();
-    data[0] = 8'($urandom); data[1] = 8'($urandom);
+    data[0] = {data[0][7:6], 6'($urandom)}; data[1] = 8'($urandom);
     data[126] = 8'($urandom); data[127] = 8'($urandom);
     data[254] = 8'($urandom); data[255] = 8'($urandom);
   endfunction
