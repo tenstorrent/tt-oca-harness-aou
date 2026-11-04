@@ -103,44 +103,48 @@ class aou_bringup_model extends uvm_object;
     endcase
   endfunction
 
-  // Comparisons and mismatches per FDI-M rule, for the ledger (the L2 monitor
-  // flushes them).
-  int unsigned    n_cmp[string];
-  int unsigned    n_bad[string];
+  // The FDI-M rules, by the index of the output they compare, and their
+  // comparisons and mismatches for the ledger (aou_fdi_layer flushes them).
+  static const string RULE[7] = '{"FDI-M01", "FDI-M02", "FDI-M03", "FDI-M04", "FDI-M05",
+                                   "FDI-M06", "FDI-M07"};
+  int unsigned    n_cmp[7];
+  int unsigned    n_bad[7];
 
-  local function void cmp(int unsigned idx, string rule, string what, bit ok, string detail);
-    if (cfg.checks_en) n_cmp[rule] = n_cmp.exists(rule) ? n_cmp[rule] + 1 : 1;
+  // One comparison of output idx: 1 when it has differed from the prediction
+  // for ref_slack + 1 cycles, the cycle to report it. The caller formats the
+  // report only then, so a matching clock builds no strings.
+  local function bit cmp(int unsigned idx, bit ok);
+    if (cfg.checks_en) n_cmp[idx]++;
     if (ok) begin
       miss[idx] = 0;
-      return;
+      return 1'b0;
     end
     miss[idx]++;
-    if (miss[idx] == cfg.ref_slack + 1) mismatch(rule, what, detail);
+    return miss[idx] == cfg.ref_slack + 1;
   endfunction
 
-  local function void mismatch(string rule, string what, string detail);
+  local function void mismatch(int unsigned idx, string what, string detail);
     n_mismatch++;
-    if (cfg.checks_en) n_bad[rule] = n_bad.exists(rule) ? n_bad[rule] + 1 : 1;
-    if (cfg.checks_en)
-      `uvm_error(get_type_name(), $sformatf("%s: %s mismatch in %s: %s", rule, what, st.name(),
-                                            detail))
+    if (!cfg.checks_en) return;
+    n_bad[idx]++;
+    `uvm_error(get_type_name(), $sformatf("%s: %s mismatch in %s: %s", RULE[idx], what,
+                                          st.name(), detail))
   endfunction
 
   // A protocol-layer LinkError that ends (the Adapter reports LinkError, the
   // FSM leaves LINKERROR, or the test ends) without lp_linkerror ever high.
   local function void check_linkerror_raised();
     if (st != BRG_LINKERROR || !le_by_req || le_seen) return;
-    if (cfg.checks_en) n_cmp["FDI-M07"] = n_cmp.exists("FDI-M07") ? n_cmp["FDI-M07"] + 1 : 1;
+    if (cfg.checks_en) n_cmp[6]++;
     if (!le_raised)
-      mismatch("FDI-M07", "lp_linkerror",
-               "DUT 0, never raised in this protocol-layer LinkError");
+      mismatch(6, "lp_linkerror", "DUT 0, never raised in this protocol-layer LinkError");
   endfunction
 
   function void final_check();
     check_linkerror_raised();
   endfunction
 
-  function void step(ucie_lsm_obs o);
+  function void step(ucie_lsm_obs_t o, aou_brg_obs_t b);
     bit ok;
     bit rx_sts_exp;
     logic [3:0] fsm_code;
@@ -164,17 +168,19 @@ class aou_bringup_model extends uvm_object;
     fsm_code = sts_code(pred_fsm(), ok);
     if (st == BRG_RETRAIN) begin
       if (o.lp_state_req == req_code(LSM_REQ_NOP)) rt_nop_seen = 1'b1;
-      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(LSM_REQ_NOP) ||
-          (rt_nop_seen && o.lp_state_req == req_code(LSM_REQ_ACTIVE)),
-          $sformatf("DUT 0x%0h, expected LSM_REQ_NOP, or LSM_REQ_ACTIVE after NOP",
-                    o.lp_state_req));
+      if (cmp(0, o.lp_state_req == req_code(LSM_REQ_NOP) ||
+              (rt_nop_seen && o.lp_state_req == req_code(LSM_REQ_ACTIVE))))
+        mismatch(0, "lp_state_req", $sformatf(
+                 "DUT 0x%0h, expected LSM_REQ_NOP, or LSM_REQ_ACTIVE after NOP", o.lp_state_req));
     end else begin
-      cmp(0, "FDI-M01", "lp_state_req", o.lp_state_req == req_code(pred_req()),
-          $sformatf("DUT 0x%0h, expected %s%s", o.lp_state_req, pred_req().name(), why()));
+      if (cmp(0, o.lp_state_req == req_code(pred_req())))
+        mismatch(0, "lp_state_req", $sformatf("DUT 0x%0h, expected %s%s", o.lp_state_req,
+                                              pred_req().name(), why()));
     end
-    cmp(1, "FDI-M02", "lp_wake_req", o.wake_req == pred_wake_req(),
-        $sformatf("DUT %0b%s", o.wake_req, why()));
-    cmp(2, "FDI-M03", "lp_clk_ack", o.clk_ack == prev_clk_req, $sformatf("DUT %0b", o.clk_ack));
+    if (cmp(1, o.wake_req == pred_wake_req()))
+      mismatch(1, "lp_wake_req", $sformatf("DUT %0b%s", o.wake_req, why()));
+    if (cmp(2, o.clk_ack == prev_clk_req))
+      mismatch(2, "lp_clk_ack", $sformatf("DUT %0b", o.clk_ack));
     // lp_rx_active_sts rises on pl_rx_active_req outside Reset/LinkError and,
     // once high, falls only after the request has (UCIe r1.1 8.2.7), whatever
     // the state. A drop while the request is still high is wrong in the cycle
@@ -182,29 +188,31 @@ class aou_bringup_model extends uvm_object;
     // under it, and FDI-R28 in the monitor only catches late drops.
     rx_sts_exp = prev_rx_req && (prev_rx_sts || !(st inside {BRG_RESET, BRG_LINKERROR}));
     if (prev_rx_sts && prev_rx_req && !o.rx_active_sts) begin
-      if (cfg.checks_en) n_cmp["FDI-M04"] = n_cmp.exists("FDI-M04") ? n_cmp["FDI-M04"] + 1 : 1;
-      mismatch("FDI-M04", "lp_rx_active_sts",
+      if (cfg.checks_en) n_cmp[3]++;
+      mismatch(3, "lp_rx_active_sts",
                "DUT 0, fell while pl_rx_active_req is still high (UCIe r1.1 8.2.7)");
     end else begin
-      cmp(3, "FDI-M04", "lp_rx_active_sts", o.rx_active_sts == rx_sts_exp,
-          $sformatf("DUT %0b, expected %0b", o.rx_active_sts, rx_sts_exp));
+      if (cmp(3, o.rx_active_sts == rx_sts_exp))
+        mismatch(3, "lp_rx_active_sts", $sformatf("DUT %0b, expected %0b", o.rx_active_sts,
+                                                  rx_sts_exp));
     end
-    cmp(4, "FDI-M05", "O_FDI_FSM_STATE", o.fsm_state == fsm_code,
-        $sformatf("DUT 0x%0h, expected 0x%0h (%s)", o.fsm_state, fsm_code, pred_fsm().name()));
-    cmp(5, "FDI-M06", "O_FDI_LINK_UP", o.link_up == (st == BRG_ACTIVE),
-        $sformatf("DUT %0b%s", o.link_up, why()));
+    if (cmp(4, b.fsm_state == fsm_code))
+      mismatch(4, "O_FDI_FSM_STATE", $sformatf("DUT 0x%0h, expected 0x%0h (%s)", b.fsm_state,
+                                               fsm_code, pred_fsm().name()));
+    if (cmp(5, b.link_up == (st == BRG_ACTIVE)))
+      mismatch(5, "O_FDI_LINK_UP", $sformatf("DUT %0b%s", b.link_up, why()));
     if (st != BRG_LINKERROR) begin
-      cmp(6, "FDI-M07", "lp_linkerror", !o.linkerror, $sformatf("DUT %0b", o.linkerror));
+      if (cmp(6, !o.linkerror)) mismatch(6, "lp_linkerror", $sformatf("DUT %0b", o.linkerror));
     end else if (le_by_req && !le_seen) begin
       // Rises within ref_slack of LINKERROR entry; once high it holds until
       // the Adapter reports LinkError (the Adapter LSM follows RDI there).
       if (!le_raised) begin
-        cmp(6, "FDI-M07", "lp_linkerror", o.linkerror,
-            {"DUT 0, not raised within ref_slack of this protocol-layer LinkError ",
-             "(UCIe r1.1 Table 8-2)"});
+        if (cmp(6, o.linkerror))
+          mismatch(6, "lp_linkerror", {"DUT 0, not raised within ref_slack of this ",
+                                       "protocol-layer LinkError (UCIe r1.1 Table 8-2)"});
       end else if (!o.linkerror && !le_fell) begin
-        if (cfg.checks_en) n_cmp["FDI-M07"] = n_cmp.exists("FDI-M07") ? n_cmp["FDI-M07"] + 1 : 1;
-        mismatch("FDI-M07", "lp_linkerror",
+        if (cfg.checks_en) n_cmp[6]++;
+        mismatch(6, "lp_linkerror",
                  "DUT 0, fell before the Adapter reported LinkError (UCIe r1.1 Table 8-2)");
         le_fell = 1'b1;
       end
@@ -213,11 +221,11 @@ class aou_bringup_model extends uvm_object;
     end
     if (st == BRG_LINKERROR && o.linkerror) le_raised = 1'b1;
 
-    nxt = next_state(o);
+    nxt = next_state(o, b);
     if (nxt != BRG_LINKERROR || o.sts == LSM_LINKERROR) check_linkerror_raised();
     // The DUT registers the software reset it sees in LINKERROR and leaves on
     // the registered flag, so the reset counts from the next clock.
-    if (st == BRG_LINKERROR && o.sw_reset) le_sw_reset = 1'b1;
+    if (st == BRG_LINKERROR && b.sw_reset) le_sw_reset = 1'b1;
     if (nxt == BRG_LINKERROR && st != BRG_LINKERROR) begin
       le_by_req = o.sts != LSM_LINKERROR;
       le_seen = 1'b0;
@@ -238,12 +246,12 @@ class aou_bringup_model extends uvm_object;
     prev_rx_sts = o.rx_active_sts;
   endfunction
 
-  local function aou_brg_state_e next_state(ucie_lsm_obs o);
+  local function aou_brg_state_e next_state(ucie_lsm_obs_t o, aou_brg_obs_t b);
     bit pl_reset = o.sts == LSM_RESET;
     bit pl_active = o.sts == LSM_ACTIVE;
     bit pl_linkerror = o.sts == LSM_LINKERROR;
-    bit activate = o.sw_activate || o.int_activate;
-    bit linkerror_req = o.req_linkreset || o.sw_linkerror;
+    bit activate = b.sw_activate || b.int_activate;
+    bit linkerror_req = b.req_linkreset || b.sw_linkerror;
     bit pl_linkdown = o.sts inside {LSM_LINKRESET, LSM_DISABLED};
     if (pl_linkerror && st != BRG_LINKERROR) return BRG_LINKERROR;
     if (pl_linkdown && !(st inside {BRG_LINKERROR, BRG_LINKDOWN}) &&

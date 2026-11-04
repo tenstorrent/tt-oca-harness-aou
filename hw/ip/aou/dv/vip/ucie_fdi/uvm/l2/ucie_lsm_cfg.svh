@@ -4,11 +4,14 @@
 class ucie_lsm_cfg extends uvm_object;
   `uvm_object_utils(ucie_lsm_cfg)
 
+  // FDIs (PHYs) of the link, 1 or 2. Every FDI reports the same pl_state_sts;
+  // the Protocol Layer follows active_phy's, and the monitor samples that one.
   int unsigned  n_phy = 1;
-  int unsigned  active_phy = 0;          // drives I_PHY_TYPE
-  // Two-PHY builds: the PHY I_PHY_TYPE does not select stays in Reset with its
-  // mainband closed and no stalls, instead of mirroring the active PHY's state,
-  // so the DUT must take state and stalls from the selected PHY (+park_idle_phy).
+  int unsigned  active_phy = 0;
+  // Two FDIs: the one the Protocol Layer does not follow stays in Reset with
+  // its mainband closed and no stalls, instead of mirroring the followed
+  // FDI's state, so the Protocol Layer must take state and stalls from the
+  // followed one (+park_idle_phy).
   bit           park_idle_phy = 1'b0;
   bit           is_active = 1'b1;
 
@@ -45,15 +48,10 @@ class ucie_lsm_cfg extends uvm_object;
   // waits for Active. 0 (off) keeps RX flits to Active. +fdi_rx_early=N.
   int unsigned  rx_early = 0;
 
-  // Monitor and reference model
+  // Monitor
   bit           checks_en = 1'b1;
-  bit           model_en = 1'b1;
-  bit           cov_en = 1'b1;
-  int unsigned  ref_slack = 3;           // cycles a DUT output may lag the model
-
-  // L1 handles of each PHY, set by the environment.
-  ucie_fdi_gate         gate[$];
-  ucie_fdi_tx_responder rsp[$];
+  bit           cov_en = 1'b1;          // for observers that collect link-state coverage
+  int unsigned  ref_slack = 3;           // cycles a Protocol Layer output may lag its cause
 
   function new(string name = "ucie_lsm_cfg");
     super.new(name);

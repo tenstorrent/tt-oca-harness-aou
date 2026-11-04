@@ -2,17 +2,13 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //
 // L2: FDI link state. The Adapter-side link-state agent (pl_state_sts per
-// PHY, inband_pres, wake/clk/rx_active handshakes, PL-initiated events), its
-// monitor with the handshake checks, and a reference model of the DUT's
-// bringup controller (integrator guide §3.14-3.16, §6.6; UCIe r1.1 §8.2-8.3).
+// FDI, inband_pres, wake/clk/rx_active handshakes, Adapter-initiated events)
+// and its monitor with the handshake checks (UCIe r1.1 §8.2-8.3).
 
 package ucie_lsm_pkg;
   import uvm_pkg::*;
-  import aou_rule_pkg::*;
-  import aou_fc_pkg::*;
   `include "uvm_macros.svh"
-  `include "aou_macros.svh"
-  `include "aou_fc_macros.svh"
+  `include "ucie_fdi_macros.svh"
   import ucie_fdi_pkg::*;
 
   // Adapter link states (pl_state_sts)
@@ -41,21 +37,6 @@ package ucie_lsm_pkg;
     LSM_REQ_RESERVED
   } ucie_lsm_req_e;
 
-  // States of the bringup controller (integrator guide §6.6)
-  typedef enum bit [3:0] {
-    BRG_RESET,
-    BRG_WAIT_PRESENCE,
-    BRG_WAKE_ASSERT,
-    BRG_WAKE_WAIT_ACK,
-    BRG_REQ_ACTIVE,
-    BRG_ACTIVE,
-    BRG_LINKERROR,
-    BRG_RETRAIN,
-    BRG_L1,
-    BRG_L1_CLK_WAKE,
-    BRG_LINKDOWN         // Adapter in LinkReset/Disabled
-  } aou_brg_state_e;
-
   typedef enum bit [3:0] {
     LSM_EV_BRINGUP,      // Reset to Active (clk_req, inband_pres, Active entry)
     LSM_EV_RETRAIN,      // Active to Retrain and back
@@ -73,18 +54,14 @@ package ucie_lsm_pkg;
   // Where LSM_EV_ABORT leaves the bringup or the L1 exit (ucie_lsm_driver::do_abort)
   typedef enum bit [1:0] {
     LSM_AB_RESET,        // Reset before pl_inband_pres: training never completed
-    LSM_AB_WAKE,         // `gap` cycles after the pl_clk_req that wakes the DUT (0: status first)
-    LSM_AB_REQ_ACTIVE    // `gap` cycles after the DUT requested Active, before the Active entry
+    LSM_AB_WAKE,         // `gap` cycles after the pl_clk_req that wakes the Protocol Layer
+                         // (0: status first)
+    LSM_AB_REQ_ACTIVE    // `gap` cycles after the Protocol Layer requested Active, before the
+                         // Active entry
   } ucie_lsm_abort_e;
 
-  // Bringup software pins of the DUT (integrator guide §3.15)
-  typedef enum bit {
-    LSM_SW_ACTIVATE,
-    LSM_SW_LINKERROR
-  } aou_lsm_sw_e;
-
-  // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts, lp_state_req and
-  // O_FDI_FSM_STATE. States without a code return 4'hF with ok=0.
+  // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts and lp_state_req.
+  // States without a code return 4'hF with ok=0.
   function automatic logic [3:0] sts_code(ucie_lsm_state_e s, output bit ok);
     ok = 1'b1;
     case (s)
@@ -144,20 +121,12 @@ package ucie_lsm_pkg;
 
   `include "l2/ucie_lsm_cfg.svh"
   `include "l2/ucie_lsm_obs.svh"
+  `include "l2/ucie_lsm_observer.svh"
   `include "l2/ucie_lsm_item.svh"
-  `include "l2/aou_lsm_fc_bins.svh"
-  `include "l2/aou_lsm_cov.svh"
-  `include "l2/aou_bringup_model.svh"
   `include "l2/ucie_lsm_monitor.svh"
   `include "l2/ucie_lsm_driver.svh"
   `include "l2/ucie_lsm_agent.svh"
   `include "l2/ucie_lsm_event_seq.svh"
-  `include "l2/ucie_lsm_bringup_seq.svh"
-  `include "l2/ucie_lsm_retrain_seq.svh"
-  `include "l2/ucie_lsm_linkerror_seq.svh"
   `include "l2/ucie_lsm_l1_seq.svh"
-  `include "l2/ucie_lsm_reset_seq.svh"
-  `include "l2/ucie_lsm_inband_drop_seq.svh"
-  `include "l2/ucie_lsm_clk_wake_seq.svh"
 
 endpackage

@@ -202,7 +202,7 @@ into one book with Asciidoctor.
 | Path | Contents |
 | --- | --- |
 | `tb/` | `tb_top.sv` (T1), `aou_reg_top.sv`, `aou_l3_unit_top.sv`, `aou_axi_selftest_top.sv`; the status, interrupt and reset interfaces; `aou_waves.sv` |
-| `uvm/env/` | The environment: `axi/`, `fdi/` (`l1/`, `l2/`), `l3/`, `apb/`, `checker/` (`AOU_FDI_CHECKER`), `checkers/` (`rules.csv`, the rule ledger), `chk/` and `perf/` (checkers), `gen/` (the committed register model), `pkg/`; the T1 env and its checkers at the top level |
+| `uvm/env/` | The environment: `axi/`, `fdi/` (the bench's layer on the UCIe FDI model in `vip/ucie_fdi`), `l3/`, `apb/`, `checker/` (`AOU_FDI_CHECKER`), `checkers/` (`rules.csv`, the rule ledger), `chk/` and `perf/` (checkers), `gen/` (the committed register model), `pkg/`; the T1 env and its checkers at the top level |
 | `uvm/seq_lib/` | Every virtual sequence, by area |
 | `uvm/tests/` | `aou_tests.sv` (included by `tb_top.sv` under `UVM`), the test classes by area; `reg/`, `l3_unit/`, `axi_selftest/` for the other tops |
 | `vip/` | Verification IP the bench is built on that is not AoU-specific, laid out like tt-oca-harness's shared VIP: `ucie_fdi/`, the UCIe FDI model (its `README.md`; `dv/` its self-test) |

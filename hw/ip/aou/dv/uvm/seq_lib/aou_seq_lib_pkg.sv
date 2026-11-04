@@ -14,6 +14,7 @@ package aou_seq_lib_pkg;
   import aou_axi_pkg::*;
   import ucie_fdi_pkg::*;
   import ucie_lsm_pkg::*;
+  import aou_fdi_layer_pkg::*;
   import aou_l3_pkg::*;
   import aou_reg_pkg::*;
   import aou_core_csr_uvm_pkg::*;

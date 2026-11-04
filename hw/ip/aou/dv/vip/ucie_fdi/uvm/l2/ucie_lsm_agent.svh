@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// L2 agent. The parent sets `cfg` (or puts an ucie_lsm_cfg in config_db under
-// "cfg"), including the L1 gates and responders of each PHY. Virtual
-// interfaces come from config_db keys "fdi_lsm" and "fdi_mb<p>".
+// L2 agent. Before build the parent sets `cfg` (or puts an ucie_lsm_cfg in
+// config_db under "cfg") and adds the mainband agent of each PHY to `phy`:
+// the driver closes their gates and stalls their TX before leaving Active.
+// Virtual interfaces come from config_db keys "fdi_lsm" and "fdi_mb<p>".
 class ucie_lsm_agent extends uvm_agent;
   `uvm_component_utils(ucie_lsm_agent)
 
   ucie_lsm_cfg                   cfg;
+  ucie_fdi_agent                 phy[$];
   uvm_sequencer #(ucie_lsm_item) sqr;
   ucie_lsm_driver                drv;
   ucie_lsm_monitor               mon;
@@ -52,6 +54,7 @@ class ucie_lsm_agent extends uvm_agent;
       sqr = uvm_sequencer #(ucie_lsm_item)::type_id::create("sqr", this);
       drv = ucie_lsm_driver::type_id::create("drv", this);
       drv.cfg = cfg;
+      drv.phy = phy;
       drv.lsm_vif = lsm_vif;
       drv.mb_vif = mb_vif;
     end

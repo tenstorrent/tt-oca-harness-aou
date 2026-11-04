@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
+
+# Ordered SV compile manifest of the UCIe FDI model, in the tt-oca-harness
+# source-list format: a bench's sim config lists it under
+# [build].source_lists. Paths are repository-root relative, all under the
+# model's directory, so a move changes only that prefix. Needs only UVM,
+# compiled before it. ucie_fdi.f is the same list for tools that read -f files.
+description = "UCIe FDI model: Adapter side of the FDI (mainband, link state), SV-UVM"
+
+incdirs = [
+  "hw/ip/aou/dv/vip/ucie_fdi/uvm",
+]
+
+sources = [
+  "hw/ip/aou/dv/vip/ucie_fdi/interface/ucie_fdi_mb_if.sv",
+  "hw/ip/aou/dv/vip/ucie_fdi/interface/ucie_fdi_lsm_if.sv",
+  "hw/ip/aou/dv/vip/ucie_fdi/uvm/ucie_fdi_pkg.sv",
+  "hw/ip/aou/dv/vip/ucie_fdi/uvm/ucie_lsm_pkg.sv",
+]

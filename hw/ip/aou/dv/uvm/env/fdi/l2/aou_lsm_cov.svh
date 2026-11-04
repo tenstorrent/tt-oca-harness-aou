@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// L2 functional coverage. Transitions are (previous, current) pairs packed
+// L2 functional coverage, sampled by aou_fdi_layer (link state) and
+// aou_bringup_model (bringup FSM). Transitions are (previous, current) pairs packed
 // as prev*16 + cur, with one explicit bin per transition of interest.
 class aou_lsm_cov extends uvm_object;
   `uvm_object_utils(aou_lsm_cov)

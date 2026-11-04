@@ -25,10 +25,10 @@ class aou_fdi_t1_linkerror_spec_test extends aou_fdi_t1_bringup_test;
   endfunction
 
   task link_events();
-    ucie_lsm_linkerror_seq le = ucie_lsm_linkerror_seq::type_id::create("linkerror");
+    ucie_lsm_event_seq le = ucie_lsm_event_seq::of(LSM_EV_LINKERROR, "linkerror");
     int unsigned n = 0;
     `uvm_info(get_type_name(), "pulsing I_SW_LINKERROR_INJECT", UVM_LOW)
-    env.lsm.drv.pulse_sw(LSM_SW_LINKERROR, 2);
+    env.fdi_layer.pulse_sw(LSM_SW_LINKERROR, 2);
     while (lsm_vif.mon_cb.lp_linkerror !== 1'b1 && n < linkerror_wait) begin
       @(lsm_vif.mon_cb);
       n++;
@@ -46,7 +46,7 @@ class aou_fdi_t1_linkerror_spec_test extends aou_fdi_t1_bringup_test;
   // A Retrain held long enough for the request to land inside it; the
   // Adapter answers lp_linkerror there and trains again afterwards.
   local task linkerror_in_retrain();
-    ucie_lsm_retrain_seq rt = ucie_lsm_retrain_seq::type_id::create("retrain");
+    ucie_lsm_event_seq rt = ucie_lsm_event_seq::of(LSM_EV_RETRAIN, "retrain");
     int unsigned n = 0;
     rt.ev_cycles = 400;
     fork
@@ -55,7 +55,7 @@ class aou_fdi_t1_linkerror_spec_test extends aou_fdi_t1_bringup_test;
         while (env.lsm.drv.state != LSM_RETRAIN && n++ < link_timeout) @(lsm_vif.mon_cb);
         repeat ($urandom_range(100, 5)) @(lsm_vif.mon_cb);
         `uvm_info(get_type_name(), "pulsing I_SW_LINKERROR_INJECT in Retrain", UVM_LOW)
-        env.lsm.drv.pulse_sw(LSM_SW_LINKERROR, 2);
+        env.fdi_layer.pulse_sw(LSM_SW_LINKERROR, 2);
       end
     join
     wait_link_up("LinkError in Retrain recovery");
