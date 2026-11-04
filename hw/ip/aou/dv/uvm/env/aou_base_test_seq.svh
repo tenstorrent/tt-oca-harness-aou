@@ -619,7 +619,7 @@ class aou_base_test_seq extends ocah_sequence;
   // bound a second one per event. With the mask set the pin never rises (no
   // declaration, so any rise is an error) and the status bit is checked
   // instead (check_link_down_status()).
-  protected function void expect_link_down(aou_lsm_ev_e kind);
+  protected function void expect_link_down(ucie_lsm_ev_e kind);
     if (!(kind inside {LSM_EV_LINKERROR, LSM_EV_LINK_RESET, LSM_EV_DISABLED})) return;
     if (env.lsm.mon.model.st inside {BRG_RESET, BRG_LINKERROR, BRG_LINKDOWN}) return;
     if (!env.status.disabled &&
@@ -649,8 +649,8 @@ class aou_base_test_seq extends ocah_sequence;
                  "T1-L49: AOU_INIT.INT_FDI_LINK_DOWN reads 0 after a link loss with AoU in use")
   endtask
 
-  task link_event(aou_lsm_ev_e kind, int unsigned cycles = 0);
-    aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("ev");
+  task link_event(ucie_lsm_ev_e kind, int unsigned cycles = 0);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::type_id::create("ev");
     // A link-down the Adapter brings back up by itself while AoU state is in
     // use: the system resets both dies while the link is down, then they
     // activate again (cfg.sysrst_on_linkdown).

@@ -4,20 +4,20 @@
 // Samples the link-state signals every clock, checks the Protocol Layer
 // (DUT) side of the FDI handshakes, steps the bringup model and publishes a
 // sample on `ap` whenever a signal changes.
-class aou_lsm_monitor extends uvm_monitor;
-  `uvm_component_utils(aou_lsm_monitor)
+class ucie_lsm_monitor extends uvm_monitor;
+  `uvm_component_utils(ucie_lsm_monitor)
 
-  virtual aou_fdi_lsm_if lsm_vif;
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[2];
-  aou_lsm_cfg       cfg;
+  virtual ucie_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[2];
+  ucie_lsm_cfg       cfg;
   aou_lsm_cov       cov;
   aou_bringup_model model;
 
-  uvm_analysis_port #(aou_lsm_obs) ap;
+  uvm_analysis_port #(ucie_lsm_obs) ap;
 
-  aou_lsm_obs cur;   // latest sample
+  ucie_lsm_obs cur;   // latest sample
 
-  local aou_lsm_obs prev;
+  local ucie_lsm_obs prev;
   local int unsigned clk_ack_late;
   local int unsigned rx_sts_late;
 
@@ -37,7 +37,7 @@ class aou_lsm_monitor extends uvm_monitor;
   endfunction
 
   task run_phase(uvm_phase phase);
-    prev = aou_lsm_obs::type_id::create("prev");
+    prev = ucie_lsm_obs::type_id::create("prev");
     forever begin
       @(lsm_vif.mon_cb);
       cur = capture();
@@ -50,8 +50,8 @@ class aou_lsm_monitor extends uvm_monitor;
     end
   endtask
 
-  local function aou_lsm_obs capture();
-    aou_lsm_obs o = aou_lsm_obs::type_id::create("obs");
+  local function ucie_lsm_obs capture();
+    ucie_lsm_obs o = ucie_lsm_obs::type_id::create("obs");
     o.rst_n          = lsm_vif.mon_cb.rst_n === 1'b1;
     if (cfg.n_phy > 1 && lsm_vif.mon_cb.phy_type === 1'b1)
       o.pl_state_sts = mb_vif[1].mon_cb.pl_state_sts;
@@ -79,7 +79,7 @@ class aou_lsm_monitor extends uvm_monitor;
     return o;
   endfunction
 
-  local function bit changed(aou_lsm_obs a, aou_lsm_obs b);
+  local function bit changed(ucie_lsm_obs a, ucie_lsm_obs b);
     return a.rst_n != b.rst_n || a.pl_state_sts != b.pl_state_sts ||
            a.inband_pres != b.inband_pres || a.clk_req != b.clk_req ||
            a.wake_ack != b.wake_ack || a.rx_active_req != b.rx_active_req ||
@@ -102,7 +102,7 @@ class aou_lsm_monitor extends uvm_monitor;
     n_chk[rule] = n_chk.exists(rule) ? n_chk[rule] + 1 : 1;
   endfunction
 
-  local function void check_rules(aou_lsm_obs c, aou_lsm_obs p);
+  local function void check_rules(ucie_lsm_obs c, ucie_lsm_obs p);
     if (c.lp_state_req != p.lp_state_req) begin
       chk("FDI-R46");
       chk("FDI-R56");

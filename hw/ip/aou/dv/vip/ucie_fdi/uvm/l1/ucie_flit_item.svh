@@ -13,15 +13,15 @@
 // The kind of each cancel (IDLE or VALID) is the kind given for that half.
 // cancel_repeat > 1 cancels the first cancelled half that many times in a row
 // before it goes through (cancel_h0 only, or cancel_h1 without the resend).
-class aou_flit_item extends uvm_sequence_item;
-  `uvm_object_utils(aou_flit_item)
+class ucie_flit_item extends uvm_sequence_item;
+  `uvm_object_utils(ucie_flit_item)
 
   bit [7:0]             data[FLIT_BYTES];
   int unsigned          phy = 0;
-  aou_fdi_dir_e         dir = AOU_FDI_RX;
+  ucie_fdi_dir_e         dir = UCIE_FDI_RX;
 
-  rand aou_fdi_cancel_e cancel_h0;
-  rand aou_fdi_cancel_e cancel_h1;
+  rand ucie_fdi_cancel_e cancel_h0;
+  rand ucie_fdi_cancel_e cancel_h1;
   rand bit              h1_replay_resend_h0;
   rand int unsigned     cancel_repeat;
   rand int unsigned     pre_gap;       // idle cycles before the first beat
@@ -31,10 +31,10 @@ class aou_flit_item extends uvm_sequence_item;
   // The solver behind Verilator's randomize() can pick enum values that have
   // no name unless they are excluded.
   constraint c_plan {
-    cancel_h0 inside {AOU_CANCEL_NONE, AOU_CANCEL_IDLE, AOU_CANCEL_VALID};
-    cancel_h1 inside {AOU_CANCEL_NONE, AOU_CANCEL_IDLE, AOU_CANCEL_VALID};
-    soft cancel_h0 == AOU_CANCEL_NONE;
-    soft cancel_h1 == AOU_CANCEL_NONE;
+    cancel_h0 inside {UCIE_CANCEL_NONE, UCIE_CANCEL_IDLE, UCIE_CANCEL_VALID};
+    cancel_h1 inside {UCIE_CANCEL_NONE, UCIE_CANCEL_IDLE, UCIE_CANCEL_VALID};
+    soft cancel_h0 == UCIE_CANCEL_NONE;
+    soft cancel_h1 == UCIE_CANCEL_NONE;
     soft cancel_repeat == 1;
     cancel_repeat inside {[1:4]};
     soft pre_gap == 0;
@@ -55,17 +55,17 @@ class aou_flit_item extends uvm_sequence_item;
   time                  t_end;
   time                  t_beat[FLIT_BYTES/32];  // each beat's transfer (index: beat)
 
-  function new(string name = "aou_flit_item");
+  function new(string name = "ucie_flit_item");
     super.new(name);
   endfunction
 
-  function aou_fdi_beat_t get_beat(int unsigned beat_bytes, int unsigned idx);
-    aou_fdi_beat_t b = '0;
+  function ucie_fdi_beat_t get_beat(int unsigned beat_bytes, int unsigned idx);
+    ucie_fdi_beat_t b = '0;
     for (int unsigned i = 0; i < beat_bytes; i++) b[8*i +: 8] = data[idx*beat_bytes + i];
     return b;
   endfunction
 
-  function void put_beat(int unsigned beat_bytes, int unsigned idx, aou_fdi_beat_t b);
+  function void put_beat(int unsigned beat_bytes, int unsigned idx, ucie_fdi_beat_t b);
     for (int unsigned i = 0; i < beat_bytes; i++) data[idx*beat_bytes + i] = b[8*i +: 8];
     if (idx < FLIT_BYTES/32) t_beat[idx] = $time;
   endfunction
@@ -100,12 +100,12 @@ class aou_flit_item extends uvm_sequence_item;
   endfunction
 
   // Payload comparison; Adapter-owned bytes never take part.
-  function bit same_payload(aou_flit_item rhs);
+  function bit same_payload(ucie_flit_item rhs);
     foreach (data[i]) if (!is_adapter_byte(i) && data[i] != rhs.data[i]) return 1'b0;
     return 1'b1;
   endfunction
 
-  function void copy_data(aou_flit_item rhs);
+  function void copy_data(ucie_flit_item rhs);
     data = rhs.data;
   endfunction
 
@@ -114,13 +114,13 @@ class aou_flit_item extends uvm_sequence_item;
   // or VALID, and a single-half cancel repeated 1-3 times (UCIe r1.1
   // Table 8-2: the Adapter replays a half until it goes through uncancelled).
   function void mix_cancel_plan();
-    aou_fdi_cancel_e k0 = $urandom_range(1) != 0 ? AOU_CANCEL_VALID : AOU_CANCEL_IDLE;
-    aou_fdi_cancel_e k1 = $urandom_range(1) != 0 ? AOU_CANCEL_VALID : AOU_CANCEL_IDLE;
+    ucie_fdi_cancel_e k0 = $urandom_range(1) != 0 ? UCIE_CANCEL_VALID : UCIE_CANCEL_IDLE;
+    ucie_fdi_cancel_e k1 = $urandom_range(1) != 0 ? UCIE_CANCEL_VALID : UCIE_CANCEL_IDLE;
     int unsigned shape = $urandom_range(3);
     cancel_repeat = $urandom_range(3, 1);
     h1_replay_resend_h0 = 1'b0;
-    cancel_h0 = AOU_CANCEL_NONE;
-    cancel_h1 = AOU_CANCEL_NONE;
+    cancel_h0 = UCIE_CANCEL_NONE;
+    cancel_h1 = UCIE_CANCEL_NONE;
     case (shape)
       0: cancel_h0 = k0;
       1: cancel_h1 = k1;
@@ -138,7 +138,7 @@ class aou_flit_item extends uvm_sequence_item;
   endfunction
 
   function bit has_cancel();
-    return cancel_h0 != AOU_CANCEL_NONE || cancel_h1 != AOU_CANCEL_NONE;
+    return cancel_h0 != UCIE_CANCEL_NONE || cancel_h1 != UCIE_CANCEL_NONE;
   endfunction
 
   function string convert2string();

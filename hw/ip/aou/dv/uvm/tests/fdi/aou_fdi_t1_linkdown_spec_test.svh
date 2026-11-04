@@ -48,8 +48,8 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     env.lsm_cfg.clk_req_hold_bringup = 1'b1;
   endfunction
 
-  local task adapter_event(aou_lsm_ev_e kind, aou_lsm_state_e to = LSM_UNKNOWN);
-    aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("ev");
+  local task adapter_event(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::type_id::create("ev");
     bit in_use = lsm_vif.mon_cb.act_st_disabled !== 1'b1;
     string what = to == LSM_UNKNOWN ? kind.name() : {kind.name(), " ending in ", to.name()};
     s.ev_kind = kind;
@@ -64,7 +64,7 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
   // also clears the interrupt: sw_reset_hold keeps it back until
   // adapter_event() has checked the interrupt, and the Adapter trains again
   // only after that.
-  local task down_event(aou_lsm_ev_e kind, aou_lsm_state_e to);
+  local task down_event(ucie_lsm_ev_e kind, ucie_lsm_state_e to);
     bit le = to == LSM_LINKERROR;
     if (le) begin
       sw_reset_hold = 1'b1;
@@ -99,7 +99,7 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
 
   // Waits up to `max` cycles until the Adapter is (in = 1) or is not
   // (in = 0) in state `s`; ok = 0 on time-out.
-  local task wait_adapter(aou_lsm_state_e s, bit in, int unsigned max, output bit ok);
+  local task wait_adapter(ucie_lsm_state_e s, bit in, int unsigned max, output bit ok);
     int unsigned n;
     ok = 1'b1;
     while ((env.lsm.drv.state == s) != in) begin

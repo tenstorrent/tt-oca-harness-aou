@@ -21,10 +21,10 @@ class aou_fdi_t1_bringup_test extends uvm_test;
 
   aou_fdi_t1_env  env;
   aou_fdi_msg_log msg_log;
-  uvm_tlm_analysis_fifo #(aou_flit_item) tx_fifo;
+  uvm_tlm_analysis_fifo #(ucie_flit_item) tx_fifo;
 
   virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb_vif;
-  virtual aou_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_lsm_if lsm_vif;
 
   int unsigned link_timeout = 20000;
   int unsigned sw_reset_delay_max = 300;
@@ -44,7 +44,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
     if (!uvm_config_db #(virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)))::get(
             this, "", "apb", apb_vif))
       `uvm_fatal(get_type_name(), "no apb in config_db")
-    if (!uvm_config_db #(virtual aou_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
+    if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
       `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
     void'($value$plusargs("sw_reset_delay_max=%d", sw_reset_delay_max));
     configure();
@@ -52,7 +52,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
 
   virtual function void configure();
     env.lsm_cfg.clk_req_hold_bringup = 1'b0;
-    foreach (env.fdi_cfg[p]) env.fdi_cfg[p].trdy_policy = AOU_TRDY_HOLES;
+    foreach (env.fdi_cfg[p]) env.fdi_cfg[p].trdy_policy = UCIE_TRDY_HOLES;
   endfunction
 
   function void connect_phase(uvm_phase phase);
@@ -102,8 +102,8 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   endtask
 
   virtual task link_events();
-    aou_lsm_retrain_seq retrain = aou_lsm_retrain_seq::type_id::create("retrain");
-    aou_lsm_l1_seq l1 = aou_lsm_l1_seq::type_id::create("l1");
+    ucie_lsm_retrain_seq retrain = ucie_lsm_retrain_seq::type_id::create("retrain");
+    ucie_lsm_l1_seq l1 = ucie_lsm_l1_seq::type_id::create("l1");
     `uvm_info(get_type_name(), "Adapter-initiated Retrain", UVM_LOW)
     retrain.start(env.lsm.sqr);
     wait_link_up("retrain");
@@ -114,7 +114,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   endtask
 
   task send_flits(int unsigned n, int unsigned cancel_pct);
-    aou_flit_seq seq = aou_flit_seq::type_id::create("flits");
+    ucie_flit_seq seq = ucie_flit_seq::type_id::create("flits");
     seq.n_flits = n;
     seq.cancel_pct = cancel_pct;
     seq.bubble_pct = 20;
@@ -173,7 +173,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
 
   local task collect_tx();
     forever begin
-      aou_flit_item f;
+      ucie_flit_item f;
       tx_fifo.get(f);
       msg_log.log_flit(f);
     end

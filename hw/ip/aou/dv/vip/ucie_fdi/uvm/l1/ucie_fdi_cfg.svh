@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-class aou_fdi_cfg extends uvm_object;
-  `uvm_object_utils(aou_fdi_cfg)
+class ucie_fdi_cfg extends uvm_object;
+  `uvm_object_utils(ucie_fdi_cfg)
 
   int unsigned   phy = 0;
   int unsigned   beat_bytes = 64;     // 32, 64, 128 or 256 (FDI width of this PHY)
   bit            is_active = 1'b1;    // 0: monitor only
 
   // TX responder
-  aou_fdi_trdy_e trdy_policy = AOU_TRDY_ALWAYS;
+  ucie_fdi_trdy_e trdy_policy = UCIE_TRDY_ALWAYS;
   int unsigned   trdy_pct = 70;       // RANDOM: chance trdy is high
   int unsigned   hole_pct = 20;       // HOLES: chance of a hole before a mid-flit beat
   int unsigned   burst_max = 8;       // BURSTY: longest high or low run
@@ -41,11 +41,11 @@ class aou_fdi_cfg extends uvm_object;
   bit            check_tx_adapter_bytes = 1'b1;
   int unsigned   irdy_reset_grace = 4; // cycles lp_irdy may stay high after entering Reset
 
-  aou_fdi_gate   gate;
+  ucie_fdi_gate   gate;
 
-  function new(string name = "aou_fdi_cfg");
+  function new(string name = "ucie_fdi_cfg");
     super.new(name);
-    gate = aou_fdi_gate::type_id::create("gate");
+    gate = ucie_fdi_gate::type_id::create("gate");
   endfunction
 
   function int unsigned bpf();

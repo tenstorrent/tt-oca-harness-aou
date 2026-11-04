@@ -6,7 +6,7 @@
 // responder (pl_trdy and stallreq towards the DUT TX), monitor with protocol
 // checks and coverage. Rule IDs refer to checkers/rules.csv.
 
-package aou_fdi_pkg;
+package ucie_fdi_pkg;
   import uvm_pkg::*;
   import aou_rule_pkg::*;
   import aou_fc_pkg::*;
@@ -24,24 +24,24 @@ package aou_fdi_pkg;
   localparam logic [3:0] FDI_STS_RESET  = 4'h0;
 
   // TX: Protocol Layer (DUT) to Adapter. RX: Adapter to Protocol Layer (DUT).
-  typedef enum bit {AOU_FDI_TX, AOU_FDI_RX} aou_fdi_dir_e;
+  typedef enum bit {UCIE_FDI_TX, UCIE_FDI_RX} ucie_fdi_dir_e;
 
   // How the PL driver cancels a 128B half: not at all, with pl_valid low in
   // the cancel cycle, or with the replay's first beat in the cancel cycle.
   typedef enum bit [1:0] {
-    AOU_CANCEL_NONE,
-    AOU_CANCEL_IDLE,
-    AOU_CANCEL_VALID
-  } aou_fdi_cancel_e;
+    UCIE_CANCEL_NONE,
+    UCIE_CANCEL_IDLE,
+    UCIE_CANCEL_VALID
+  } ucie_fdi_cancel_e;
 
   typedef enum bit [1:0] {
-    AOU_TRDY_ALWAYS,  // pl_trdy high whenever the link is Active
-    AOU_TRDY_RANDOM,  // each cycle high with trdy_pct
-    AOU_TRDY_BURSTY,  // alternating high/low runs of 1..burst_max cycles
-    AOU_TRDY_HOLES    // high, with holes only inside a flit (hole_pct per beat)
-  } aou_fdi_trdy_e;
+    UCIE_TRDY_ALWAYS,  // pl_trdy high whenever the link is Active
+    UCIE_TRDY_RANDOM,  // each cycle high with trdy_pct
+    UCIE_TRDY_BURSTY,  // alternating high/low runs of 1..burst_max cycles
+    UCIE_TRDY_HOLES    // high, with holes only inside a flit (hole_pct per beat)
+  } ucie_fdi_trdy_e;
 
-  typedef logic [BUS_W-1:0] aou_fdi_beat_t;
+  typedef logic [BUS_W-1:0] ucie_fdi_beat_t;
 
   // ---------------------------------------------------------------------------
   // Format 6 codec. Flit byte k travels on FDI byte (k mod N) of transfer
@@ -75,15 +75,15 @@ package aou_fdi_pkg;
     return i inside {126, 127, 254, 255};
   endfunction
 
-  `include "l1/aou_fdi_gate.svh"
-  `include "l1/aou_fdi_cfg.svh"
-  `include "l1/aou_flit_item.svh"
+  `include "l1/ucie_fdi_gate.svh"
+  `include "l1/ucie_fdi_cfg.svh"
+  `include "l1/ucie_flit_item.svh"
   `include "l1/aou_fdi_fc_bins.svh"
   `include "l1/aou_fdi_cov.svh"
-  `include "l1/aou_fdi_pl_driver.svh"
-  `include "l1/aou_fdi_tx_responder.svh"
-  `include "l1/aou_fdi_monitor.svh"
-  `include "l1/aou_fdi_agent.svh"
-  `include "l1/aou_flit_seq.svh"
+  `include "l1/ucie_fdi_pl_driver.svh"
+  `include "l1/ucie_fdi_tx_responder.svh"
+  `include "l1/ucie_fdi_monitor.svh"
+  `include "l1/ucie_fdi_agent.svh"
+  `include "l1/ucie_flit_seq.svh"
 
 endpackage

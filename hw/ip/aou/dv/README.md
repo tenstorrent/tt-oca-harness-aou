@@ -205,6 +205,7 @@ into one book with Asciidoctor.
 | `uvm/env/` | The environment: `axi/`, `fdi/` (`l1/`, `l2/`), `l3/`, `apb/`, `checker/` (`AOU_FDI_CHECKER`), `checkers/` (`rules.csv`, the rule ledger), `chk/` and `perf/` (checkers), `gen/` (the committed register model), `pkg/`; the T1 env and its checkers at the top level |
 | `uvm/seq_lib/` | Every virtual sequence, by area |
 | `uvm/tests/` | `aou_tests.sv` (included by `tb_top.sv` under `UVM`), the test classes by area; `reg/`, `l3_unit/`, `axi_selftest/` for the other tops |
+| `vip/` | Verification IP the bench is built on that is not AoU-specific, laid out like tt-oca-harness's shared VIP: `ucie_fdi/`, the UCIe FDI model (its `README.md`; `dv/` its self-test) |
 | `cov/` | `sv/`: the coverage service, the AXI4 coverage monitors and binds; `config/vcs/`: coverage scope, exclusion and FSM reset filter files |
 | `testlists/` | TOML testlists (`all.toml` and the per-area lists, `registers.toml`, `l3_unit.toml`, `axi_selftest.toml`), `plan_ids.yaml` |
 | `docs/` | The documents above; `gen/` is generated |

@@ -9,11 +9,11 @@
 // (FDI-R05), either with pl_valid low or with the replay's first beat. A
 // LinkError mid-flit (gate abort) abandons the flit at once. At 256 B the
 // flit is one beat and the cancel unit is the whole flit.
-class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
-  `uvm_component_utils(aou_fdi_pl_driver)
+class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
+  `uvm_component_utils(ucie_fdi_pl_driver)
 
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) vif;
-  aou_fdi_cfg cfg;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) vif;
+  ucie_fdi_cfg cfg;
 
   local bit cancel_next;  // the next beat carries pl_flit_cancel
   local int unsigned epoch;  // gate epoch when the current item was fetched
@@ -52,16 +52,16 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
     @(vif.drv_cb);
   endtask
 
-  local task drive_flit(aou_flit_item it);
+  local task drive_flit(ucie_flit_item it);
     int unsigned seg_half[$];
-    aou_fdi_cancel_e seg_cancel[$];
+    ucie_fdi_cancel_e seg_cancel[$];
     int unsigned bph = cfg.bph();
-    aou_flit_item poison;
+    ucie_flit_item poison;
 
     if (!valid_beat_bytes(cfg.beat_bytes))
       `uvm_fatal(get_type_name(), $sformatf("unsupported beat_bytes %0d", cfg.beat_bytes))
     if (cfg.random_adapter_bytes) it.randomize_adapter_bytes();
-    poison = aou_flit_item::type_id::create("poison");
+    poison = ucie_flit_item::type_id::create("poison");
     poison.randomize_payload();
     poison.randomize_adapter_bytes();
 
@@ -69,29 +69,29 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
       // 256 B: the flit is one beat and the cancel unit (fdi-rx-plan 1.3). Any
       // half cancel in the plan becomes whole-flit cancels, repeated as asked,
       // in the kind of the first cancelled half; then the clean copy.
-      aou_fdi_cancel_e kind = it.cancel_h0 != AOU_CANCEL_NONE ? it.cancel_h0 : it.cancel_h1;
-      if (kind != AOU_CANCEL_NONE) begin
+      ucie_fdi_cancel_e kind = it.cancel_h0 != UCIE_CANCEL_NONE ? it.cancel_h0 : it.cancel_h1;
+      if (kind != UCIE_CANCEL_NONE) begin
         int unsigned rep = it.cancel_repeat;
         repeat (rep < 1 ? 1 : rep) begin
           seg_half.push_back(0); seg_cancel.push_back(kind);
         end
       end
-      seg_half.push_back(0); seg_cancel.push_back(AOU_CANCEL_NONE);
-    end else if (it.cancel_h0 != AOU_CANCEL_NONE) begin
-      int unsigned rep = it.cancel_h1 != AOU_CANCEL_NONE ? 1 : it.cancel_repeat;
+      seg_half.push_back(0); seg_cancel.push_back(UCIE_CANCEL_NONE);
+    end else if (it.cancel_h0 != UCIE_CANCEL_NONE) begin
+      int unsigned rep = it.cancel_h1 != UCIE_CANCEL_NONE ? 1 : it.cancel_repeat;
       repeat (rep < 1 ? 1 : rep) begin
         seg_half.push_back(0); seg_cancel.push_back(it.cancel_h0);
       end
-      if (it.cancel_h1 != AOU_CANCEL_NONE) begin
+      if (it.cancel_h1 != UCIE_CANCEL_NONE) begin
         seg_half.push_back(1); seg_cancel.push_back(it.cancel_h1);
       end
-      seg_half.push_back(0); seg_cancel.push_back(AOU_CANCEL_NONE);
-      seg_half.push_back(1); seg_cancel.push_back(AOU_CANCEL_NONE);
+      seg_half.push_back(0); seg_cancel.push_back(UCIE_CANCEL_NONE);
+      seg_half.push_back(1); seg_cancel.push_back(UCIE_CANCEL_NONE);
     end else begin
       int unsigned rep = it.h1_replay_resend_h0 ? 1 : it.cancel_repeat;
-      seg_half.push_back(0); seg_cancel.push_back(AOU_CANCEL_NONE);
-      if (it.cancel_h1 == AOU_CANCEL_NONE) begin
-        seg_half.push_back(1); seg_cancel.push_back(AOU_CANCEL_NONE);
+      seg_half.push_back(0); seg_cancel.push_back(UCIE_CANCEL_NONE);
+      if (it.cancel_h1 == UCIE_CANCEL_NONE) begin
+        seg_half.push_back(1); seg_cancel.push_back(UCIE_CANCEL_NONE);
       end else begin
         repeat (rep < 1 ? 1 : rep) begin
           seg_half.push_back(1); seg_cancel.push_back(it.cancel_h1);
@@ -99,7 +99,7 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
         if (it.h1_replay_resend_h0) begin
           seg_half.push_back(0); seg_cancel.push_back(it.cancel_h1);
         end
-        seg_half.push_back(1); seg_cancel.push_back(AOU_CANCEL_NONE);
+        seg_half.push_back(1); seg_cancel.push_back(UCIE_CANCEL_NONE);
       end
     end
 
@@ -107,7 +107,7 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
     it.t_start = $time;
     cancel_next = 1'b0;
     foreach (seg_half[s]) begin
-      bit cancelled = seg_cancel[s] != AOU_CANCEL_NONE;
+      bit cancelled = seg_cancel[s] != UCIE_CANCEL_NONE;
       for (int unsigned b = 0; b < bph; b++) begin
         int unsigned idx = seg_half[s] * bph + b;
         // A VALID cancel rides on this half's first beat: no gap before it.
@@ -133,8 +133,8 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
         @(vif.drv_cb);
       end
       case (seg_cancel[s])
-        AOU_CANCEL_IDLE:  idle_cycle(1'b1);
-        AOU_CANCEL_VALID: cancel_next = 1'b1;
+        UCIE_CANCEL_IDLE:  idle_cycle(1'b1);
+        UCIE_CANCEL_VALID: cancel_next = 1'b1;
         default: ;
       endcase
     end

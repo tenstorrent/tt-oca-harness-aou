@@ -6,7 +6,7 @@
 class aou_lsm_cov extends uvm_object;
   `uvm_object_utils(aou_lsm_cov)
 
-  int unsigned l_tr;    // aou_lsm_state_e pair
+  int unsigned l_tr;    // ucie_lsm_state_e pair
   int unsigned l_sts;
   int unsigned l_req;
   int unsigned b_tr;    // aou_brg_state_e pair
@@ -84,7 +84,7 @@ class aou_lsm_cov extends uvm_object;
     end
   endfunction
 
-  function void sample_link(aou_lsm_state_e prev, aou_lsm_state_e cur, aou_lsm_req_e req);
+  function void sample_link(ucie_lsm_state_e prev, ucie_lsm_state_e cur, ucie_lsm_req_e req);
     l_tr = int'(prev) * 16 + int'(cur);
     l_sts = int'(cur);
     l_req = int'(req);

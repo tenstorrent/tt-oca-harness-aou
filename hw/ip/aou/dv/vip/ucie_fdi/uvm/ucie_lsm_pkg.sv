@@ -6,14 +6,14 @@
 // monitor with the handshake checks, and a reference model of the DUT's
 // bringup controller (integrator guide §3.14-3.16, §6.6; UCIe r1.1 §8.2-8.3).
 
-package aou_lsm_pkg;
+package ucie_lsm_pkg;
   import uvm_pkg::*;
   import aou_rule_pkg::*;
   import aou_fc_pkg::*;
   `include "uvm_macros.svh"
   `include "aou_macros.svh"
   `include "aou_fc_macros.svh"
-  import aou_fdi_pkg::*;
+  import ucie_fdi_pkg::*;
 
   // Adapter link states (pl_state_sts)
   typedef enum bit [3:0] {
@@ -27,7 +27,7 @@ package aou_lsm_pkg;
     LSM_RETRAIN,
     LSM_DISABLED,
     LSM_UNKNOWN
-  } aou_lsm_state_e;
+  } ucie_lsm_state_e;
 
   // Protocol Layer requests (lp_state_req)
   typedef enum bit [3:0] {
@@ -39,7 +39,7 @@ package aou_lsm_pkg;
     LSM_REQ_RETRAIN,
     LSM_REQ_DISABLED,
     LSM_REQ_RESERVED
-  } aou_lsm_req_e;
+  } ucie_lsm_req_e;
 
   // States of the bringup controller (integrator guide §6.6)
   typedef enum bit [3:0] {
@@ -67,15 +67,15 @@ package aou_lsm_pkg;
     LSM_EV_CLK_WAKE,     // a pl_clk_req handshake
     LSM_EV_IDLE,         // wait `cycles`
     LSM_EV_DISABLED,     // Active to Disabled, then Reset and bringup
-    LSM_EV_ABORT         // a bringup or an L1 exit abandoned part-way (aou_lsm_item::at)
-  } aou_lsm_ev_e;
+    LSM_EV_ABORT         // a bringup or an L1 exit abandoned part-way (ucie_lsm_item::at)
+  } ucie_lsm_ev_e;
 
-  // Where LSM_EV_ABORT leaves the bringup or the L1 exit (aou_lsm_driver::do_abort)
+  // Where LSM_EV_ABORT leaves the bringup or the L1 exit (ucie_lsm_driver::do_abort)
   typedef enum bit [1:0] {
     LSM_AB_RESET,        // Reset before pl_inband_pres: training never completed
     LSM_AB_WAKE,         // `gap` cycles after the pl_clk_req that wakes the DUT (0: status first)
     LSM_AB_REQ_ACTIVE    // `gap` cycles after the DUT requested Active, before the Active entry
-  } aou_lsm_abort_e;
+  } ucie_lsm_abort_e;
 
   // Bringup software pins of the DUT (integrator guide §3.15)
   typedef enum bit {
@@ -85,7 +85,7 @@ package aou_lsm_pkg;
 
   // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts, lp_state_req and
   // O_FDI_FSM_STATE. States without a code return 4'hF with ok=0.
-  function automatic logic [3:0] sts_code(aou_lsm_state_e s, output bit ok);
+  function automatic logic [3:0] sts_code(ucie_lsm_state_e s, output bit ok);
     ok = 1'b1;
     case (s)
       LSM_RESET:        return 4'h0;
@@ -101,7 +101,7 @@ package aou_lsm_pkg;
     endcase
   endfunction
 
-  function automatic aou_lsm_state_e sts_decode(logic [3:0] code);
+  function automatic ucie_lsm_state_e sts_decode(logic [3:0] code);
     case (code)
       4'h0:    return LSM_RESET;
       4'h1:    return LSM_ACTIVE;
@@ -116,7 +116,7 @@ package aou_lsm_pkg;
     endcase
   endfunction
 
-  function automatic logic [3:0] req_code(aou_lsm_req_e r);
+  function automatic logic [3:0] req_code(ucie_lsm_req_e r);
     case (r)
       LSM_REQ_NOP:       return 4'h0;
       LSM_REQ_ACTIVE:    return 4'h1;
@@ -129,7 +129,7 @@ package aou_lsm_pkg;
     endcase
   endfunction
 
-  function automatic aou_lsm_req_e req_decode(logic [3:0] code);
+  function automatic ucie_lsm_req_e req_decode(logic [3:0] code);
     case (code)
       4'h0:    return LSM_REQ_NOP;
       4'h1:    return LSM_REQ_ACTIVE;
@@ -142,22 +142,22 @@ package aou_lsm_pkg;
     endcase
   endfunction
 
-  `include "l2/aou_lsm_cfg.svh"
-  `include "l2/aou_lsm_obs.svh"
-  `include "l2/aou_lsm_item.svh"
+  `include "l2/ucie_lsm_cfg.svh"
+  `include "l2/ucie_lsm_obs.svh"
+  `include "l2/ucie_lsm_item.svh"
   `include "l2/aou_lsm_fc_bins.svh"
   `include "l2/aou_lsm_cov.svh"
   `include "l2/aou_bringup_model.svh"
-  `include "l2/aou_lsm_monitor.svh"
-  `include "l2/aou_lsm_driver.svh"
-  `include "l2/aou_lsm_agent.svh"
-  `include "l2/aou_lsm_event_seq.svh"
-  `include "l2/aou_lsm_bringup_seq.svh"
-  `include "l2/aou_lsm_retrain_seq.svh"
-  `include "l2/aou_lsm_linkerror_seq.svh"
-  `include "l2/aou_lsm_l1_seq.svh"
-  `include "l2/aou_lsm_reset_seq.svh"
-  `include "l2/aou_lsm_inband_drop_seq.svh"
-  `include "l2/aou_lsm_clk_wake_seq.svh"
+  `include "l2/ucie_lsm_monitor.svh"
+  `include "l2/ucie_lsm_driver.svh"
+  `include "l2/ucie_lsm_agent.svh"
+  `include "l2/ucie_lsm_event_seq.svh"
+  `include "l2/ucie_lsm_bringup_seq.svh"
+  `include "l2/ucie_lsm_retrain_seq.svh"
+  `include "l2/ucie_lsm_linkerror_seq.svh"
+  `include "l2/ucie_lsm_l1_seq.svh"
+  `include "l2/ucie_lsm_reset_seq.svh"
+  `include "l2/ucie_lsm_inband_drop_seq.svh"
+  `include "l2/ucie_lsm_clk_wake_seq.svh"
 
 endpackage

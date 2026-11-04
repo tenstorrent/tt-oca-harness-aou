@@ -25,7 +25,7 @@ class aou_fdi_t1_linkerror_spec_test extends aou_fdi_t1_bringup_test;
   endfunction
 
   task link_events();
-    aou_lsm_linkerror_seq le = aou_lsm_linkerror_seq::type_id::create("linkerror");
+    ucie_lsm_linkerror_seq le = ucie_lsm_linkerror_seq::type_id::create("linkerror");
     int unsigned n = 0;
     `uvm_info(get_type_name(), "pulsing I_SW_LINKERROR_INJECT", UVM_LOW)
     env.lsm.drv.pulse_sw(LSM_SW_LINKERROR, 2);
@@ -46,7 +46,7 @@ class aou_fdi_t1_linkerror_spec_test extends aou_fdi_t1_bringup_test;
   // A Retrain held long enough for the request to land inside it; the
   // Adapter answers lp_linkerror there and trains again afterwards.
   local task linkerror_in_retrain();
-    aou_lsm_retrain_seq rt = aou_lsm_retrain_seq::type_id::create("retrain");
+    ucie_lsm_retrain_seq rt = ucie_lsm_retrain_seq::type_id::create("retrain");
     int unsigned n = 0;
     rt.ev_cycles = 400;
     fork

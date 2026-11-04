@@ -21,7 +21,7 @@ class aou_fdi_t1_link_stress_test extends aou_fdi_t1_bringup_test;
     super.configure();
     env.lsm_cfg.clk_req_hold_bringup = 1'b1;
     foreach (env.fdi_cfg[p]) begin
-      env.fdi_cfg[p].trdy_policy = aou_fdi_trdy_e'($urandom_range(3));
+      env.fdi_cfg[p].trdy_policy = ucie_fdi_trdy_e'($urandom_range(3));
       env.fdi_cfg[p].stall_pct = 2;
       `uvm_info(get_type_name(), env.fdi_cfg[p].convert2string(), UVM_LOW)
     end
@@ -29,20 +29,20 @@ class aou_fdi_t1_link_stress_test extends aou_fdi_t1_bringup_test;
 
   task link_events();
     for (int unsigned i = 0; i < n_events; i++) begin
-      aou_lsm_event_seq ev;
+      ucie_lsm_event_seq ev;
       case ($urandom_range(6))
-        0: ev = aou_lsm_retrain_seq::type_id::create("ev");
-        1: ev = aou_lsm_l1_seq::type_id::create("ev");
-        2: ev = aou_lsm_linkerror_seq::type_id::create("ev");
-        3: ev = aou_lsm_reset_seq::type_id::create("ev");
-        4: ev = aou_lsm_clk_wake_seq::type_id::create("ev");
+        0: ev = ucie_lsm_retrain_seq::type_id::create("ev");
+        1: ev = ucie_lsm_l1_seq::type_id::create("ev");
+        2: ev = ucie_lsm_linkerror_seq::type_id::create("ev");
+        3: ev = ucie_lsm_reset_seq::type_id::create("ev");
+        4: ev = ucie_lsm_clk_wake_seq::type_id::create("ev");
         5: begin
-          aou_lsm_state_e ends[3] = '{LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED};
-          ev = aou_lsm_retrain_seq::type_id::create("ev");
+          ucie_lsm_state_e ends[3] = '{LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED};
+          ev = ucie_lsm_retrain_seq::type_id::create("ev");
           ev.ev_to = ends[$urandom_range(2)];
         end
         default: begin
-          ev = aou_lsm_event_seq::type_id::create("ev");
+          ev = ucie_lsm_event_seq::type_id::create("ev");
           ev.ev_kind = ($urandom_range(1) != 0) ? LSM_EV_DISABLED : LSM_EV_LINK_RESET;
           ev.ev_to = LSM_LINKERROR;
         end

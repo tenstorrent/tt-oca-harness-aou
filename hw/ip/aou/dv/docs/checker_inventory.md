@@ -76,49 +76,49 @@ Runs with a ledger: 708.
 | AOU-R41 | N/A | v0.8 only: ERROR transmits nothing and ignores what it receives (the v0.7 DUT has no ERROR state) | aou_link_ctrl |  |  | 0 |  | n/a |
 | AOU-R42 | N/A | v0.8 only: ERROR returns to DISABLED (recover()) | aou_link_ctrl |  |  | 0 |  | n/a |
 | AOU-R43 | N/A | Profile configuration completes before leaving DISABLED (Basic Profile only; nothing to configure) | n/a |  |  | 0 |  | n/a |
-| AOU-R44 | MODEL | Streaming + Format 6 negotiated before AoU starts (the Adapter's job; L2 only presents a Streaming Format 6 link) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
+| AOU-R44 | MODEL | Streaming + Format 6 negotiated before AoU starts (the Adapter's job; L2 only presents a Streaming Format 6 link) | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
 | AOU-R45 | DUT | RP counts/DEST_RP maps agree on both ends (checker VIOL_RP_MAP) | aou_fdi_chk_adapter |  | aou_link_event_test | 5463924 |  | hit |
-| FDI-R01 | DUT | A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both) | aou_fdi_monitor |  | aou_link_event_test | 22827527 |  | hit |
-| FDI-R02 | DUT | No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes (L1; checks the DUT) | aou_fdi_monitor |  | aou_link_event_test | 21388576 |  | hit |
-| FDI-R03 | MODEL | RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes) | by construction (aou_fdi_pl_driver) |  |  | 0 |  | by construction |
+| FDI-R01 | DUT | A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both) | ucie_fdi_monitor |  | aou_link_event_test | 22827527 |  | hit |
+| FDI-R02 | DUT | No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes (L1; checks the DUT) | ucie_fdi_monitor |  | aou_link_event_test | 21388576 |  | hit |
+| FDI-R03 | MODEL | RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes) | by construction (ucie_fdi_pl_driver) |  |  | 0 |  | by construction |
 | FDI-R04 | DUT | Flit byte k is FDI byte k mod N of transfer floor(k/N) both ways (a mis-mapped DUT flit decodes to undefined granules) | via AOU-R3 |  | aou_t1_slice_test | 1030711 | negative: aou_rx_msg_error_test (60); negative: aou_t1_inject_test (12); negative: aou_l3_inject_test (6) | fired |
-| FDI-R05 | MODEL | pl_flit_cancel only in the cycle after the last beat of a 128B half (L1; checks the Adapter) | aou_fdi_monitor |  | aou_t1_slice_test | 35244 |  | hit |
+| FDI-R05 | MODEL | pl_flit_cancel only in the cycle after the last beat of a 128B half (L1; checks the Adapter) | ucie_fdi_monitor |  | aou_t1_slice_test | 35244 |  | hit |
 | FDI-R06 | N/A | On pl_error the Adapter completes and cancels the partial flit (the DUT has no pl_error input) | n/a |  |  | 0 |  | n/a |
-| FDI-R07 | DUT | pl_stallreq and lp_stallack both low at reset exit (L1; checks the both) | aou_fdi_monitor |  | aou_reset_test | 736 |  | hit |
-| FDI-R08 | MODEL | pl_stallreq rises only with lp_stallack low and falls only with lp_stallack high (L1; checks the Adapter) | aou_fdi_monitor | by construction (aou_fdi_tx_responder) | aou_link_event_test | 134 |  | hit |
-| FDI-R09 | DUT | lp_stallack rises only with pl_stallreq high and falls only with pl_stallreq low (L1; checks the DUT) | aou_fdi_monitor |  | aou_link_event_test | 134 |  | hit |
-| FDI-R10 | DUT | lp_valid and lp_irdy low while lp_stallack is high (L1; checks the DUT) | aou_fdi_monitor |  | aou_link_event_test | 620 |  | hit |
-| FDI-R11 | MODEL | While pl_stallreq is high the Adapter accepts presented data until lp_stallack (TX responder holds pl_trdy) (L1; checks the Adapter) | by construction (aou_fdi_tx_responder) |  |  | 0 |  | by construction |
-| FDI-R12 | DUT | At least one flop between pl_stallreq and lp_stallack (L1; checks the DUT) | aou_fdi_monitor |  | aou_link_event_test | 67 |  | hit |
-| FDI-R13 | DUT | lp_stallack rises only at a flit boundary (L1; checks the DUT) | aou_fdi_monitor |  | aou_link_event_test | 67 |  | hit |
-| FDI-R14 | MODEL | pl_wake_ack rises at least one clock after lp_wake_req (L2; checks the Adapter) | aou_lsm_monitor |  | aou_invalid_actmsg_test | 2046 |  | hit |
-| FDI-R15 | MODEL | pl_wake_ack falls only after lp_wake_req fell (L2; checks the Adapter) | aou_lsm_monitor |  | aou_invalid_actmsg_test | 2046 |  | hit |
-| FDI-R16 | DUT | lp_wake_req is high when lp_state_req changes leaving Reset or PM (L2; checks the DUT) | aou_lsm_monitor | aou_bringup_model (FDI-M02) | aou_invalid_actmsg_test | 1304 | failing: aou_fdi_t1_bringup_test (1) | hit |
+| FDI-R07 | DUT | pl_stallreq and lp_stallack both low at reset exit (L1; checks the both) | ucie_fdi_monitor |  | aou_reset_test | 736 |  | hit |
+| FDI-R08 | MODEL | pl_stallreq rises only with lp_stallack low and falls only with lp_stallack high (L1; checks the Adapter) | ucie_fdi_monitor | by construction (ucie_fdi_tx_responder) | aou_link_event_test | 134 |  | hit |
+| FDI-R09 | DUT | lp_stallack rises only with pl_stallreq high and falls only with pl_stallreq low (L1; checks the DUT) | ucie_fdi_monitor |  | aou_link_event_test | 134 |  | hit |
+| FDI-R10 | DUT | lp_valid and lp_irdy low while lp_stallack is high (L1; checks the DUT) | ucie_fdi_monitor |  | aou_link_event_test | 620 |  | hit |
+| FDI-R11 | MODEL | While pl_stallreq is high the Adapter accepts presented data until lp_stallack (TX responder holds pl_trdy) (L1; checks the Adapter) | by construction (ucie_fdi_tx_responder) |  |  | 0 |  | by construction |
+| FDI-R12 | DUT | At least one flop between pl_stallreq and lp_stallack (L1; checks the DUT) | ucie_fdi_monitor |  | aou_link_event_test | 67 |  | hit |
+| FDI-R13 | DUT | lp_stallack rises only at a flit boundary (L1; checks the DUT) | ucie_fdi_monitor |  | aou_link_event_test | 67 |  | hit |
+| FDI-R14 | MODEL | pl_wake_ack rises at least one clock after lp_wake_req (L2; checks the Adapter) | ucie_lsm_monitor |  | aou_invalid_actmsg_test | 2046 |  | hit |
+| FDI-R15 | MODEL | pl_wake_ack falls only after lp_wake_req fell (L2; checks the Adapter) | ucie_lsm_monitor |  | aou_invalid_actmsg_test | 2046 |  | hit |
+| FDI-R16 | DUT | lp_wake_req is high when lp_state_req changes leaving Reset or PM (L2; checks the DUT) | ucie_lsm_monitor | aou_bringup_model (FDI-M02) | aou_invalid_actmsg_test | 1304 | failing: aou_fdi_t1_bringup_test (1) | hit |
 | FDI-R17 | N/A | The PL waits for pl_wake_ack before driving lp_cfg (the DUT has no sideband config interface) | n/a |  |  | 0 |  | n/a |
-| FDI-R18 | DUT | lp_clk_ack rises at least one clock after pl_clk_req and answers it (L2; checks the DUT) | aou_lsm_monitor | aou_lsm_driver | aou_invalid_actmsg_test | 2712 |  | hit |
-| FDI-R19 | DUT | lp_clk_ack falls after pl_clk_req falls (L2; checks the DUT) | aou_lsm_monitor | aou_lsm_driver | aou_invalid_actmsg_test | 2712 |  | hit |
-| FDI-R20 | MODEL | The Adapter may change level signals (inband_pres, rx_active_req, ...) without waiting for lp_clk_ack (a permission) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
-| FDI-R21 | MODEL | pl_clk_req handshake before a LinkError transition from Reset/LinkReset/Disabled/PM (L2 enters LinkError only from Active) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
+| FDI-R18 | DUT | lp_clk_ack rises at least one clock after pl_clk_req and answers it (L2; checks the DUT) | ucie_lsm_monitor | ucie_lsm_driver | aou_invalid_actmsg_test | 2712 |  | hit |
+| FDI-R19 | DUT | lp_clk_ack falls after pl_clk_req falls (L2; checks the DUT) | ucie_lsm_monitor | ucie_lsm_driver | aou_invalid_actmsg_test | 2712 |  | hit |
+| FDI-R20 | MODEL | The Adapter may change level signals (inband_pres, rx_active_req, ...) without waiting for lp_clk_ack (a permission) | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
+| FDI-R21 | MODEL | pl_clk_req handshake before a LinkError transition from Reset/LinkReset/Disabled/PM (L2 enters LinkError only from Active) | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
 | FDI-R22 | MODEL | pl_clk_req asserted before leaving Reset/PM and held until the status leaves (L2 releases it before Active unless clk_req_hold_bringup, a deliberate variation) | not checked |  |  | 0 |  | missing |
 | FDI-R23 | N/A | The Adapter waits for lp_clk_ack before driving pl_cfg (no sideband config interface) | n/a |  |  | 0 |  | n/a |
 | FDI-R24 | DUT | No clock gating in LinkError; a gated PL in Reset requests Active only after pl_inband_pres (the bringup model predicts lp_state_req from inband_pres) | via FDI-M01 |  | aou_link_event_test | 27997645 |  | hit |
-| FDI-R25 | MODEL | pl_rx_active_req rises only with lp_rx_active_sts low in Reset/Retrain/Active (L2; checks the Adapter) | aou_lsm_monitor |  | aou_link_event_test | 1392 |  | hit |
-| FDI-R26 | DUT | lp_rx_active_sts rises at least one clock after pl_rx_active_req (L2; checks the DUT) | aou_lsm_monitor | aou_lsm_driver | aou_link_event_test | 2048 |  | hit |
+| FDI-R25 | MODEL | pl_rx_active_req rises only with lp_rx_active_sts low in Reset/Retrain/Active (L2; checks the Adapter) | ucie_lsm_monitor |  | aou_link_event_test | 1392 |  | hit |
+| FDI-R26 | DUT | lp_rx_active_sts rises at least one clock after pl_rx_active_req (L2; checks the DUT) | ucie_lsm_monitor | ucie_lsm_driver | aou_link_event_test | 2048 |  | hit |
 | FDI-R27 | N/A | pl_rx_active_req=1 and lp_rx_active_sts=1 means RX is Active (a definition) | n/a |  |  | 0 |  | n/a |
-| FDI-R28 | DUT | lp_rx_active_sts falls after pl_rx_active_req falls (L2; checks the DUT) | aou_lsm_monitor | aou_lsm_driver | aou_link_event_test | 2048 |  | hit |
-| FDI-R29 | MODEL | rx_active req and sts both low before pl_state_sts leaves Active (except to LinkError) (L2; checks the Adapter) | aou_lsm_monitor |  | aou_invalid_actmsg_test | 656 |  | hit |
-| FDI-R30 | MODEL | With pl_rx_active_req low in Active the Adapter sends no flits (the PL driver runs only while L2 has the gate open) | by construction (aou_fdi_pl_driver) |  |  | 0 |  | by construction |
-| FDI-R31 | MODEL | Active to LinkError: rx_active req and sts both low before leaving LinkError | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
-| FDI-R32 | MODEL | Bring-up order: clk_req handshake, then pl_inband_pres=1 | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
-| FDI-R33 | DUT | From Reset lp_state_req is NOP for at least one clock before Active (L2; checks the DUT) | aou_lsm_monitor | aou_lsm_driver | aou_invalid_actmsg_test | 1269 |  | hit |
-| FDI-R34 | MODEL | Active only after rx_active req and sts are both 1, on every entry to Active (Rsp.Active itself is sideband) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
-| FDI-R35 | MODEL | Flits go to the Protocol Layer only in Active, or in Reset once rx_active req and sts are both 1 (L1; checks the Adapter) | aou_fdi_monitor |  | aou_t1_slice_test | 1428168 |  | hit |
+| FDI-R28 | DUT | lp_rx_active_sts falls after pl_rx_active_req falls (L2; checks the DUT) | ucie_lsm_monitor | ucie_lsm_driver | aou_link_event_test | 2048 |  | hit |
+| FDI-R29 | MODEL | rx_active req and sts both low before pl_state_sts leaves Active (except to LinkError) (L2; checks the Adapter) | ucie_lsm_monitor |  | aou_invalid_actmsg_test | 656 |  | hit |
+| FDI-R30 | MODEL | With pl_rx_active_req low in Active the Adapter sends no flits (the PL driver runs only while L2 has the gate open) | by construction (ucie_fdi_pl_driver) |  |  | 0 |  | by construction |
+| FDI-R31 | MODEL | Active to LinkError: rx_active req and sts both low before leaving LinkError | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
+| FDI-R32 | MODEL | Bring-up order: clk_req handshake, then pl_inband_pres=1 | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
+| FDI-R33 | DUT | From Reset lp_state_req is NOP for at least one clock before Active (L2; checks the DUT) | ucie_lsm_monitor | ucie_lsm_driver | aou_invalid_actmsg_test | 1269 |  | hit |
+| FDI-R34 | MODEL | Active only after rx_active req and sts are both 1, on every entry to Active (Rsp.Active itself is sideband) | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
+| FDI-R35 | MODEL | Flits go to the Protocol Layer only in Active, or in Reset once rx_active req and sts are both 1 (L1; checks the Adapter) | ucie_fdi_monitor |  | aou_t1_slice_test | 1428168 |  | hit |
 | FDI-R36 | N/A | Streaming PM is requested symmetrically over sideband | n/a |  |  | 0 |  | n/a |
 | FDI-R37 | DUT | The PL requests L1/L2 only after blocking new flits and holds the request (the DUT never requests PM; any L1/L2 request diverges from the bringup model) | via FDI-M01 |  | aou_link_event_test | 27997645 |  | hit |
-| FDI-R38 | MODEL | The Adapter enters PM only after the stallreq/ack handshake (L2 stalls the DUT TX first) | by construction (aou_lsm_driver) |  |  | 0 |  | by construction |
+| FDI-R38 | MODEL | The Adapter enters PM only after the stallreq/ack handshake (L2 stalls the DUT TX first) | by construction (ucie_lsm_driver) |  |  | 0 |  | by construction |
 | FDI-R39 | N/A | PM response timing and PMNAK (sideband, Adapter-internal) | n/a |  |  | 0 |  | n/a |
 | FDI-R40 | N/A | From Active.PMNAK the PL requests Active (unreachable: the DUT never requests PM) | n/a |  |  | 0 |  | n/a |
-| FDI-R41 | DUT | After a remote-initiated PM exit the Protocol Layer requests Active (L2; checks the DUT) | aou_lsm_driver |  | aou_link_event_test | 67 |  | hit |
+| FDI-R41 | DUT | After a remote-initiated PM exit the Protocol Layer requests Active (L2; checks the DUT) | ucie_lsm_driver |  | aou_link_event_test | 67 |  | hit |
 
 ## Additional AoU/FDI rules
 
@@ -132,10 +132,10 @@ Rules the testbench checks beyond the two normative lists.
 | FDI-M04 | aou_bringup_model | lp_rx_active_sts follows pl_rx_active_req outside Reset/LinkError (L2; checks the DUT) | 27997645 |  |
 | FDI-M05 | aou_bringup_model | O_FDI_FSM_STATE matches the bringup model (L2; checks the DUT) | 27997645 |  |
 | FDI-M06 | aou_bringup_model | O_FDI_LINK_UP matches the bringup model (L2; checks the DUT) | 27997645 |  |
-| FDI-R42 | aou_fdi_monitor | lp_valid only with lp_irdy (L1; checks the DUT) | 27096110 |  |
-| FDI-R43 | aou_fdi_monitor | A TX flit starts only while pl_state_sts is Active (L1; checks the DUT) | 5707534 |  |
-| FDI-R44 | aou_fdi_monitor | lp_irdy low while pl_state_sts is Reset (after irdy_reset_grace cycles) (L1; checks the DUT) | 57632 |  |
-| FDI-R45 | aou_fdi_monitor | TX flit: Byte0[7:6] (Protocol ID) non-zero; other Flit Header bits and CRC bytes zero (L1; checks the DUT) | 5706686 |  |
-| FDI-R46 | aou_lsm_monitor | lp_state_req never takes a reserved value (L2; checks the DUT) | 2233 |  |
-| FDI-R47 | aou_lsm_monitor | No Retrain request outside Raw Format (L2; checks the DUT) | 0 |  |
-| FDI-R48 | aou_lsm_driver | Retrain entered from Active ends with a NOP->Active request (L2; checks the DUT) | 0 |  |
+| FDI-R42 | ucie_fdi_monitor | lp_valid only with lp_irdy (L1; checks the DUT) | 27096110 |  |
+| FDI-R43 | ucie_fdi_monitor | A TX flit starts only while pl_state_sts is Active (L1; checks the DUT) | 5707534 |  |
+| FDI-R44 | ucie_fdi_monitor | lp_irdy low while pl_state_sts is Reset (after irdy_reset_grace cycles) (L1; checks the DUT) | 57632 |  |
+| FDI-R45 | ucie_fdi_monitor | TX flit: Byte0[7:6] (Protocol ID) non-zero; other Flit Header bits and CRC bytes zero (L1; checks the DUT) | 5706686 |  |
+| FDI-R46 | ucie_lsm_monitor | lp_state_req never takes a reserved value (L2; checks the DUT) | 2233 |  |
+| FDI-R47 | ucie_lsm_monitor | No Retrain request outside Raw Format (L2; checks the DUT) | 0 |  |
+| FDI-R48 | ucie_lsm_driver | Retrain entered from Active ends with a NOP->Active request (L2; checks the DUT) | 0 |  |

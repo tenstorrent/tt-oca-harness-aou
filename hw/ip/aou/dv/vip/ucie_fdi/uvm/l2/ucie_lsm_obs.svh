@@ -3,18 +3,18 @@
 
 // One clock's view of the link-state signals, as the monitor samples them.
 // pl_state_sts is the one the DUT follows (I_PHY_TYPE in TWO_PHY builds).
-class aou_lsm_obs extends uvm_sequence_item;
-  `uvm_object_utils(aou_lsm_obs)
+class ucie_lsm_obs extends uvm_sequence_item;
+  `uvm_object_utils(ucie_lsm_obs)
 
   bit             rst_n = '0;
   logic [3:0]     pl_state_sts = '0;
-  aou_lsm_state_e sts = LSM_RESET;
+  ucie_lsm_state_e sts = LSM_RESET;
   bit             inband_pres = '0;
   bit             clk_req = '0;
   bit             wake_ack = '0;
   bit             rx_active_req = '0;
   logic [3:0]     lp_state_req = '0;
-  aou_lsm_req_e   req = LSM_REQ_NOP;
+  ucie_lsm_req_e   req = LSM_REQ_NOP;
   bit             wake_req = '0;
   bit             clk_ack = '0;
   bit             rx_active_sts = '0;
@@ -28,7 +28,7 @@ class aou_lsm_obs extends uvm_sequence_item;
   bit             act_st_disabled = '0;
   bit             sw_reset = '0;
 
-  function new(string name = "aou_lsm_obs");
+  function new(string name = "ucie_lsm_obs");
     super.new(name);
   endfunction
 

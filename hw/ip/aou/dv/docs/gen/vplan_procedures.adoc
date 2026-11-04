@@ -216,7 +216,7 @@ The bringup model checks the DUT side throughout.
 Class `aou_fdi_t1_abort_test` extends `aou_fdi_t1_bringup_test` (`uvm/tests/fdi/aou_fdi_t1_abort_test.svh`).
 
 *Purpose.* The bringup test, then the Adapter abandoning a bringup or a PM exit from
-L1 part-way (aou_lsm_driver::do_abort), once at every point, in random
+L1 part-way (ucie_lsm_driver::do_abort), once at every point, in random
 order, with flits between:
 - from Reset: LinkError before pl_inband_pres (status first, or pl_clk_req
 first); LinkError with the DUT waiting for a trigger, one cycle after the

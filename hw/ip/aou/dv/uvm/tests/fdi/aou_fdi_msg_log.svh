@@ -24,7 +24,7 @@ class aou_fdi_msg_log extends uvm_object;
     endcase
   endfunction
 
-  function void log_flit(aou_flit_item f);
+  function void log_flit(ucie_flit_item f);
     aou_l3_pkg::aou_flit fl = new("fl");
     fl.from_bytes(f.data);
     `uvm_info(get_type_name(), $sformatf("%s flit: FH=%02h%02h fdid=%0d start=%012h credit=%04h",

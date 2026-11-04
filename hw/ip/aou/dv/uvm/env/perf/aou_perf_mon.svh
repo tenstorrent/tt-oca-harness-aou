@@ -31,7 +31,7 @@ class aou_perf_mon extends uvm_component;
   uvm_analysis_port #(aou_perf_result) res_ap;
 
   aou_l3_agent  l3;
-  virtual aou_fdi_lsm_if vif;      // clock for credit polling
+  virtual ucie_fdi_lsm_if vif;      // clock for credit polling
   aou_t1_env_cfg cfg;
   uvm_reg_block regs;              // the DUT's RAL model: split lengths
   int unsigned  beat_bytes = 64;   // FDI bytes per cycle on the active PHY

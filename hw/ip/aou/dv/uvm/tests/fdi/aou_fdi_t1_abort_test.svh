@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // The bringup test, then the Adapter abandoning a bringup or a PM exit from
-// L1 part-way (aou_lsm_driver::do_abort), once at every point, in random
+// L1 part-way (ucie_lsm_driver::do_abort), once at every point, in random
 // order, with flits between:
 // - from Reset: LinkError before pl_inband_pres (status first, or pl_clk_req
 //   first); LinkError with the DUT waiting for a trigger, one cycle after the
@@ -27,8 +27,8 @@ class aou_fdi_t1_abort_test extends aou_fdi_t1_bringup_test;
 
   typedef struct {
     bit             in_l1;
-    aou_lsm_abort_e at;
-    aou_lsm_state_e to;
+    ucie_lsm_abort_e at;
+    ucie_lsm_state_e to;
     int unsigned    gap;
     bit             hold;
   } abort_t;
@@ -45,7 +45,7 @@ class aou_fdi_t1_abort_test extends aou_fdi_t1_bringup_test;
     env.lsm_cfg.clk_req_hold_bringup = 1'b1;
   endfunction
 
-  local function abort_t mk(bit in_l1, aou_lsm_abort_e at, aou_lsm_state_e to, int unsigned gap,
+  local function abort_t mk(bit in_l1, ucie_lsm_abort_e at, ucie_lsm_state_e to, int unsigned gap,
                             bit hold);
     abort_t a;
     a.in_l1 = in_l1;
@@ -57,7 +57,7 @@ class aou_fdi_t1_abort_test extends aou_fdi_t1_bringup_test;
   endfunction
 
   // LinkReset or Disabled, picked at random.
-  local function aou_lsm_state_e down();
+  local function ucie_lsm_state_e down();
     return ($urandom_range(1) != 0) ? LSM_DISABLED : LSM_LINKRESET;
   endfunction
 
@@ -86,7 +86,7 @@ class aou_fdi_t1_abort_test extends aou_fdi_t1_bringup_test;
     q.push_back(mk(1'b1, LSM_AB_REQ_ACTIVE, down(), $urandom_range(3), 1'b0));
     q.shuffle();
     foreach (q[i]) begin
-      aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("abort");
+      ucie_lsm_event_seq s = ucie_lsm_event_seq::type_id::create("abort");
       s.ev_kind = LSM_EV_ABORT;
       s.ev_in_l1 = q[i].in_l1;
       s.ev_at = q[i].at;
