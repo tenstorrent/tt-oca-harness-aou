@@ -13,6 +13,13 @@ class aou_packer_policy extends uvm_object;
 
   // Messages started per flit; 0 is no limit (1 gives minimum density).
   int unsigned      max_msgs_per_flit;
+  // With max_msgs_per_flit, the same RP's WriteData placed right after a
+  // WriteReq does not count: the pair shares the flit (max_msgs_per_flit 1
+  // then gives one request, or one WriteReq with its first WriteData, per
+  // flit). With bulk_last the pick prefers queued requests over data, so a
+  // second RP's WriteReq can take the data's place; the perf windows that use
+  // this (+perf_l3_one_msg=1) run one transaction at a time.
+  bit               wreq_wdata_pair = 1'b0;
   // Percent chance of leaving 1..max_hole empty granules before a message.
   int unsigned      hole_pct;
   int unsigned      max_hole = 4;
@@ -54,8 +61,12 @@ class aou_packer_policy extends uvm_object;
   // batch queues up and leaves in densely packed flits; the caller kicks the
   // model when it clears the hold.
   bit               hold_credited;
-  // Percent chance that an AXI message gets a random PROF (FLEX[11:0]);
-  // PROFEXTLEN (FLEX[15:12]) stays 0, the only length the TB models.
+  // Percent chance that an AXI message to the DUT without a fixed FLEX gets
+  // a random one. v0.8 makes FLEX the AXI USER[15:0] (5.2 / 11.1): the DUT
+  // presents what it receives on its ports' USER outputs (aou_t1_attr_chk
+  // DP-R12), so a message whose FLEX the remote AXI agent chose (flex_fixed)
+  // keeps all 16 bits; only the others get FLEX[11:0] randomised here, with
+  // FLEX[15:12] 0 (v0.7's PROF / PROFEXTLEN; the name predates v0.8).
   int unsigned      prof_pct;
   // A message that would not end in this flit is swapped for the largest
   // eligible queue head that does (reorders across queues only), so flits
@@ -144,12 +155,12 @@ class aou_packer_policy extends uvm_object;
   endfunction
 
   virtual function string convert2string();
-    return $sformatf({"max_msgs=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
+    return $sformatf({"max_msgs=%0d/pair=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
                       "cred_only=%0d empty=%0d%% cred=%0d misc_half=%0d hold=%0d ",
                       "prof=%0d%% zero_grants=%0d grant_span=%0d%% best_fit=%0d ",
                       "wdata_first=%0d%%/%0d hold_wreq=%b bulk_last=%0d"},
-                     max_msgs_per_flit, hole_pct, max_hole, start_granule, split_at,
-                     allow_span, random_order, credit_only_flits, empty_flit_pct,
+                     max_msgs_per_flit, wreq_wdata_pair, hole_pct, max_hole, start_granule,
+                     split_at, allow_span, random_order, credit_only_flits, empty_flit_pct,
                      cred_method, misc_per_half_max, hold_credited, prof_pct,
                      zero_grants, grant_span_pct, best_fit, wdata_first_pct, wdata_first_beats,
                      hold_wreq_rps, bulk_last);

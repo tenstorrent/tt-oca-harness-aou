@@ -59,44 +59,44 @@ import packet_def_pkg::*;
                                 (FDI_CONFIG == FDI_CFG_SP_64B     ) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_SP_128B    ) ? 1024 :
                                 (FDI_CONFIG == FDI_CFG_TP_32B_64B ) ? 256  :
-                                (FDI_CONFIG == FDI_CFG_TP_64B_128B) ? 512  : 256,
+                                (FDI_CONFIG == FDI_CFG_TP_64B_128B) ? 512  :
+                                (FDI_CONFIG == FDI_CFG_SP_256B    ) ? 2048 : 256,
     localparam int FDI_IF_WD1 = (FDI_CONFIG == FDI_CFG_SP_32B     ) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_SP_64B     ) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_SP_128B    ) ? 1024 :
                                 (FDI_CONFIG == FDI_CFG_TP_32B_64B ) ? 512  :
-                                (FDI_CONFIG == FDI_CFG_TP_64B_128B) ? 1024 : 512,
+                                (FDI_CONFIG == FDI_CFG_TP_64B_128B) ? 1024 :
+                                (FDI_CONFIG == FDI_CFG_SP_256B    ) ? 2048 : 512,
 
     // FIFO depths default to 140 for 1024b (128B) FDI data paths, 88 otherwise.
     // Matches the original +define+FDI_128B branch which applied to both
     // single-PHY (FDI_IF_WD0 == 1024) and two-PHY (FDI_IF_WD1 == 1024) cases.
     parameter   RP0_RX_AW_FIFO_DEPTH        = 44,
     parameter   RP0_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP0_RX_W_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
-    parameter   RP0_RX_R_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
+    parameter   RP0_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
+    parameter   RP0_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
     parameter   RP0_RX_B_FIFO_DEPTH         = 44,
 
     parameter   RP1_RX_AW_FIFO_DEPTH        = 44,
     parameter   RP1_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP1_RX_W_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
-    parameter   RP1_RX_R_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
+    parameter   RP1_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
+    parameter   RP1_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
     parameter   RP1_RX_B_FIFO_DEPTH         = 44,
 
     parameter   RP2_RX_AW_FIFO_DEPTH        = 44,
     parameter   RP2_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP2_RX_W_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
-    parameter   RP2_RX_R_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
+    parameter   RP2_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
+    parameter   RP2_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
     parameter   RP2_RX_B_FIFO_DEPTH         = 44,
 
     parameter   RP3_RX_AW_FIFO_DEPTH        = 44,
     parameter   RP3_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP3_RX_W_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
-    parameter   RP3_RX_R_FIFO_DEPTH         = ((FDI_IF_WD0 == 1024) || (FDI_IF_WD1 == 1024)) ? 140 : 88,
+    parameter   RP3_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
+    parameter   RP3_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
     parameter   RP3_RX_B_FIFO_DEPTH         = 44,
 
     parameter   RX_AW_FIFO_RS_EN            = 1,
     parameter   RX_AR_FIFO_RS_EN            = 1,
-    parameter   RX_W_FIFO_RS_EN             = 1,
-    parameter   RX_R_FIFO_RS_EN             = 1,
     parameter   RX_B_FIFO_RS_EN             = 1,
 
     parameter   RP0_AXI_DATA_WD             = 512,
@@ -112,15 +112,31 @@ import packet_def_pkg::*;
     parameter   APB_ADDR_WD                 = 32,
     parameter   APB_DATA_WD                 = 32,
 
-    parameter   S_RD_MO_CNT                 = 32,
-    parameter   S_WR_MO_CNT                 = 32,
 
     // TX flit packer output stage: 0 combinational (current state),
     // 1 registered from the look-ahead state. See AOU_TX_CORE.
     parameter   TX_NXT_PACKING_EN           = 0,
 
-    parameter   M_RD_MO_CNT                 = 32,
-    parameter   M_WR_MO_CNT                 = 32,
+    parameter   RP0_S_RD_MO_CNT             = 64,
+    parameter   RP0_S_WR_MO_CNT             = 64,
+    parameter   RP0_M_RD_MO_CNT             = 32,
+    parameter   RP0_M_WR_MO_CNT             = 32,
+
+    parameter   RP1_S_RD_MO_CNT             = 64,
+    parameter   RP1_S_WR_MO_CNT             = 64,
+    parameter   RP1_M_RD_MO_CNT             = 32,
+    parameter   RP1_M_WR_MO_CNT             = 32,
+
+    parameter   RP2_S_RD_MO_CNT             = 64,
+    parameter   RP2_S_WR_MO_CNT             = 64,
+    parameter   RP2_M_RD_MO_CNT             = 32,
+    parameter   RP2_M_WR_MO_CNT             = 32,
+
+    parameter   RP3_S_RD_MO_CNT             = 64,
+    parameter   RP3_S_WR_MO_CNT             = 64,
+    parameter   RP3_M_RD_MO_CNT             = 32,
+    parameter   RP3_M_WR_MO_CNT             = 32,
+
 
     localparam  RP_AXI_DATA_WD_MAX          = max4(RP0_AXI_DATA_WD, RP1_AXI_DATA_WD, RP2_AXI_DATA_WD, RP3_AXI_DATA_WD),
     localparam  RP_AXI_STRB_WD_MAX          = RP_AXI_DATA_WD_MAX / 8,
@@ -202,12 +218,14 @@ import packet_def_pkg::*;
     output  [RP_COUNT-1:0][3:0]                     O_AOU_RX_AXI_M_ARCACHE,
     output  [RP_COUNT-1:0][2:0]                     O_AOU_RX_AXI_M_ARPROT,
     output  [RP_COUNT-1:0][3:0]                     O_AOU_RX_AXI_M_ARQOS,
+    output  [RP_COUNT-1:0][15:0]                    O_AOU_RX_AXI_M_ARUSER,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_M_ARVALID,
     input   [RP_COUNT-1:0]                          I_AOU_RX_AXI_M_ARREADY,
 
     input   [RP_COUNT-1:0][AXI_ID_WD-1:0]           I_AOU_TX_AXI_M_RID,
     input   [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]  I_AOU_TX_AXI_M_RDATA,
     input   [RP_COUNT-1:0][1:0]                     I_AOU_TX_AXI_M_RRESP,
+    input   [RP_COUNT-1:0][15:0]                    I_AOU_TX_AXI_M_RUSER,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_M_RLAST,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_M_RVALID,
     output  [RP_COUNT-1:0]                          O_AOU_TX_AXI_M_RREADY,
@@ -221,17 +239,20 @@ import packet_def_pkg::*;
     output  [RP_COUNT-1:0][3:0]                     O_AOU_RX_AXI_M_AWCACHE,
     output  [RP_COUNT-1:0][2:0]                     O_AOU_RX_AXI_M_AWPROT,
     output  [RP_COUNT-1:0][3:0]                     O_AOU_RX_AXI_M_AWQOS,
+    output  [RP_COUNT-1:0][15:0]                    O_AOU_RX_AXI_M_AWUSER,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_M_AWVALID,
     input   [RP_COUNT-1:0]                          I_AOU_RX_AXI_M_AWREADY,
 
     output  [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]  O_AOU_RX_AXI_M_WDATA,
     output  [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]  O_AOU_RX_AXI_M_WSTRB,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_M_WLAST,
+    output  [RP_COUNT-1:0][15:0]                    O_AOU_RX_AXI_M_WUSER,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_M_WVALID,
     input   [RP_COUNT-1:0]                          I_AOU_RX_AXI_M_WREADY,
 
     input   [RP_COUNT-1:0][AXI_ID_WD-1:0]           I_AOU_TX_AXI_M_BID,
     input   [RP_COUNT-1:0][1:0]                     I_AOU_TX_AXI_M_BRESP,
+    input   [RP_COUNT-1:0][15:0]                    I_AOU_TX_AXI_M_BUSER,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_M_BVALID,
     output  [RP_COUNT-1:0]                          O_AOU_TX_AXI_M_BREADY,
 
@@ -245,6 +266,7 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][3:0]                     I_AOU_TX_AXI_S_ARCACHE,
     input   [RP_COUNT-1:0][2:0]                     I_AOU_TX_AXI_S_ARPROT,
     input   [RP_COUNT-1:0][3:0]                     I_AOU_TX_AXI_S_ARQOS,
+    input   [RP_COUNT-1:0][15:0]                    I_AOU_TX_AXI_S_ARUSER,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_S_ARVALID,
     output  [RP_COUNT-1:0]                          O_AOU_TX_AXI_S_ARREADY,
 
@@ -252,6 +274,7 @@ import packet_def_pkg::*;
     output  [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]  O_AOU_RX_AXI_S_RDATA,
     output  [RP_COUNT-1:0][1:0]                     O_AOU_RX_AXI_S_RRESP,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_S_RLAST,
+    output  [RP_COUNT-1:0][15:0]                    O_AOU_RX_AXI_S_RUSER,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_S_RVALID,
     input   [RP_COUNT-1:0]                          I_AOU_RX_AXI_S_RREADY,
 
@@ -264,17 +287,20 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][3:0]                     I_AOU_TX_AXI_S_AWCACHE,
     input   [RP_COUNT-1:0][2:0]                     I_AOU_TX_AXI_S_AWPROT,
     input   [RP_COUNT-1:0][3:0]                     I_AOU_TX_AXI_S_AWQOS,
+    input   [RP_COUNT-1:0][15:0]                    I_AOU_TX_AXI_S_AWUSER,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_S_AWVALID,
     output  [RP_COUNT-1:0]                          O_AOU_TX_AXI_S_AWREADY,
 
     input   [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]  I_AOU_TX_AXI_S_WDATA,
     input   [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]  I_AOU_TX_AXI_S_WSTRB,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_S_WLAST,
+    input   [RP_COUNT-1:0][15:0]                    I_AOU_TX_AXI_S_WUSER,
     input   [RP_COUNT-1:0]                          I_AOU_TX_AXI_S_WVALID,
     output  [RP_COUNT-1:0]                          O_AOU_TX_AXI_S_WREADY,
 
     output  [RP_COUNT-1:0][AXI_ID_WD-1:0]           O_AOU_RX_AXI_S_BID,
     output  [RP_COUNT-1:0][1:0]                     O_AOU_RX_AXI_S_BRESP,
+    output  [RP_COUNT-1:0][15:0]                    O_AOU_RX_AXI_S_BUSER,
     output  [RP_COUNT-1:0]                          O_AOU_RX_AXI_S_BVALID,
     input   [RP_COUNT-1:0]                          I_AOU_RX_AXI_S_BREADY,
 
@@ -333,29 +359,22 @@ import packet_def_pkg::*;
     input                                           TIEL_DFT_MODESCAN
 );
 //----------------------------------------------------------------------------
-    // Active FDI width for RX decode and PHY classification.
-    // In both TWO_PHY and single-PHY configurations the relevant width is
-    // max(FDI_IF_WD0, FDI_IF_WD1). This matches the original ifdef branches:
-    //   TWO_PHY+FDI_32B   -> max(256,512)  = 512
-    //   TWO_PHY+FDI_128B  -> max(512,1024) = 1024
-    //   SP+FDI_32B        -> max(256,512)  = 512
-    //   SP+FDI_64B        -> max(512,512)  = 512
-    //   SP+FDI_128B       -> max(1024,512) = 1024
-    localparam  FDI_ACTIVE_WD               = (FDI_IF_WD0 > FDI_IF_WD1) ? FDI_IF_WD0 : FDI_IF_WD1;
-    localparam  PHY_TYPE                    = (FDI_ACTIVE_WD == 32*8)  ? 0:
-                                              (FDI_ACTIVE_WD == 64*8)  ? 1:
-                                              (FDI_ACTIVE_WD == 128*8) ? 2: 0;
-    localparam  PHASE_CNT                   = 256*8/FDI_ACTIVE_WD;
+    // FDI beat width the RX decode sees: with TWO_PHY the wider PHY (the
+    // narrower one is paired up to it), otherwise PHY0 as is. The decode
+    // handles one half flit per cycle, or a whole flit on a 2048-bit FDI.
+`ifdef TWO_PHY
+    localparam  FDI_DEC_WD                  = (FDI_IF_WD0 > FDI_IF_WD1) ? FDI_IF_WD0 : FDI_IF_WD1;
+`else
+    localparam  FDI_DEC_WD                  = FDI_IF_WD0;
+`endif
+    localparam  G_CNT                       = (FDI_DEC_WD == 2048) ? 48 : 24;
+    localparam  REQ_LANES                   = G_CNT/3 + 1;
+    localparam  B_LANES                     = G_CNT;
 
-    localparam  DEC_MULTI                   = (PHY_TYPE == 0) ? 1 : 4/PHASE_CNT;
-
-    localparam  AW_AR_FIFO_WIDTH            = AXI_ID_WD + AXI_ADDR_WD + AXI_LEN_WD + 3 + 1 + 4 + 3 + 4;
-    localparam  B_FIFO_WIDTH                = AXI_ID_WD + 2;
+    localparam  AW_AR_FIFO_WIDTH            = AXI_ID_WD + AXI_ADDR_WD + AXI_LEN_WD + 3 + 1 + 4 + 3 + 4 + 16; // + FLEX
+    localparam  B_FIFO_WIDTH                = AXI_ID_WD + 2 + 16;                                            // + FLEX
     localparam  R_FIFO_EXT_DATA_WIDTH       = AXI_ID_WD + 2 + 1;
 
-    localparam  MAX_REQ_COUNT               = 4;
-    localparam  MAX_WR_RESP_COUNT           = 12;
-    localparam  DATA_DEC_CNT                = 4;
     //It should be configured to a value greater than the maximum burst length of the local bus.
     localparam  RP0_AGG_WCH_FIFO_DEPTH      = 16;
     localparam  RP1_AGG_WCH_FIFO_DEPTH      = 16; 
@@ -381,11 +400,13 @@ import packet_def_pkg::*;
     logic    [RP_COUNT-1:0][3:0]            w_aou_rx_wlast_gen_awcache      ;
     logic    [RP_COUNT-1:0][2:0]            w_aou_rx_wlast_gen_awprot       ;
     logic    [RP_COUNT-1:0][3:0]            w_aou_rx_wlast_gen_awqos        ;
+    logic    [RP_COUNT-1:0][15:0]           w_aou_rx_wlast_gen_awuser       ;
     logic    [RP_COUNT-1:0]                 w_aou_rx_wlast_gen_awvalid      ;
     logic    [RP_COUNT-1:0]                 w_aou_rx_wlast_gen_awready      ;
 
     logic    [RP_COUNT-1:0][1024-1:0]       w_aou_rx_wlast_gen_wdata        ;
     logic    [RP_COUNT-1:0][128-1:0]        w_aou_rx_wlast_gen_wstrb        ;
+    logic    [RP_COUNT-1:0][15:0]           w_aou_rx_wlast_gen_wuser        ;
     logic    [RP_COUNT-1:0]                 w_aou_rx_wlast_gen_wvalid       ;
     logic    [RP_COUNT-1:0]                 w_aou_rx_wlast_gen_wready       ;
 
@@ -395,6 +416,7 @@ import packet_def_pkg::*;
 
     logic    [RP_COUNT-1:0][AXI_ID_WD-1:0]  w_early_bresp_ctrl_bid          ;
     logic    [RP_COUNT-1:0][1:0]            w_early_bresp_ctrl_bresp        ;
+    logic    [RP_COUNT-1:0][15:0]           w_early_bresp_ctrl_buser        ;
     logic    [RP_COUNT-1:0]                 w_early_bresp_ctrl_bvalid       ;
     logic    [RP_COUNT-1:0]                 w_early_bresp_ctrl_bready       ;
 
@@ -408,9 +430,13 @@ import packet_def_pkg::*;
     logic   [RP_COUNT-1:0][3:0]             w_aou_rx_axi_mm_arcache         ;
     logic   [RP_COUNT-1:0][2:0]             w_aou_rx_axi_mm_arprot          ;
     logic   [RP_COUNT-1:0][3:0]             w_aou_rx_axi_mm_arqos           ;
+    logic   [RP_COUNT-1:0][15:0]            w_aou_rx_axi_mm_aruser          ;
     logic   [RP_COUNT-1:0]                  w_aou_rx_axi_mm_arvalid         ;
     logic   [RP_COUNT-1:0]                  w_aou_rx_axi_mm_arready         ;
 
+//----------------------------------------------------------------------------
+    // WriteData FLEX: the legacy W data FIFO stores the data lane only; the
+    // granule store (AOU_RX_GRANULE_STORE) supplies the per-beat FLEX from here.
 //----------------------------------------------------------------------------
     logic                                   w_aou_rp0_aw_fifo_parity_error      ;
     logic                                   w_aou_rp0_w_fifo_parity_error       ;
@@ -418,24 +444,21 @@ import packet_def_pkg::*;
     logic                                   w_aou_rp0_r_fifo_parity_error       ;
     logic                                   w_aou_rp0_b_fifo_parity_error       ;
 //----------------------------------------------------------------------------
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]       w_rd_req_fifo_sdata;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                             w_rd_req_fifo_svalid;
+    logic [RP_COUNT-1:0][REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]   w_rd_req_fifo_sdata;
+    logic [RP_COUNT-1:0][REQ_LANES-1:0]                         w_rd_req_fifo_svalid;
 
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]       w_wr_req_fifo_sdata;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                             w_wr_req_fifo_svalid;
+    logic [RP_COUNT-1:0][REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]   w_wr_req_fifo_sdata;
+    logic [RP_COUNT-1:0][REQ_LANES-1:0]                         w_wr_req_fifo_svalid;
 
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0] w_wr_data_fifo_sdata;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_MAX_STRB_WD -1:0]         w_wr_data_fifo_sdata_strb;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                               w_wr_data_fifo_sdata_wdataf;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][1:0]                          w_wr_data_fifo_sdlen;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                               w_wr_data_fifo_svalid;
+    logic [RP_COUNT-1:0][B_LANES-1:0][B_FIFO_WIDTH-1:0]         w_wr_resp_fifo_sdata;
+    logic [RP_COUNT-1:0][B_LANES-1:0]                           w_wr_resp_fifo_svalid;
 
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0][B_FIFO_WIDTH-1:0]       w_wr_resp_fifo_sdata;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0]                         w_wr_resp_fifo_svalid;
-
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0] w_rd_data_fifo_sdata;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][R_FIFO_EXT_DATA_WIDTH -1:0]   w_rd_data_fifo_ext_sdata;
-    logic [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                               w_rd_data_fifo_svalid;
+    logic                                                       w_granule_valid;
+    logic [G_CNT-1:0][39:0]                                     w_granule;
+    logic [RP_COUNT-1:0][G_CNT-1:0]                             w_wr_data_cover;
+    logic [RP_COUNT-1:0][G_CNT-1:0]                             w_wr_data_start;
+    logic [RP_COUNT-1:0][G_CNT-1:0]                             w_rd_data_cover;
+    logic [RP_COUNT-1:0][G_CNT-1:0]                             w_rd_data_start;
 
 //----------------------------------------------------------------------------
     logic                                   w_err_info_rid_mismatch_err;
@@ -456,8 +479,15 @@ import packet_def_pkg::*;
     logic                                   w_DFTED_sw_resetn;
     logic                                   w_aou_sw_reset_scan_buf;
 
+    logic [RP_COUNT-1:0]                    w_aou_rx_fifo_rready;
+    logic [RP_COUNT-1:0][AXI_ID_WD-1:0]     w_aou_rx_axi_s_rid;
+    logic [RP_COUNT-1:0][1:0]               w_aou_rx_axi_s_rresp;
+    logic [RP_COUNT-1:0]                    w_aou_rx_axi_s_rlast;
+    logic [RP_COUNT-1:0][15:0]              w_aou_rx_axi_s_ruser;
     logic [RP_COUNT-1:0]                    w_aou_rx_axi_s_rvalid;
     logic [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    w_rd_data_fifo_mdata;
+    logic [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    w_aou_rx_axi_s_rdata;
+
     AOU_SOC_BUF dft_persistent_buf_scan_resetn_sw (
         .I_A   ( 1'b1                       ),
         .O_Y   ( w_aou_sw_reset_scan_buf    )
@@ -552,13 +582,28 @@ import packet_def_pkg::*;
         .APB_ADDR_WD                ( APB_ADDR_WD               ),
         .APB_DATA_WD                ( APB_DATA_WD               ),
 
-        .S_RD_MO_CNT                ( S_RD_MO_CNT               ),
-        .S_WR_MO_CNT                ( S_WR_MO_CNT               ),
 
         .TX_NXT_PACKING_EN          ( TX_NXT_PACKING_EN         ),
 
-        .M_RD_MO_CNT                ( M_RD_MO_CNT               ),
-        .M_WR_MO_CNT                ( M_WR_MO_CNT               ),
+        .RP0_S_RD_MO_CNT            ( RP0_S_RD_MO_CNT           ),
+        .RP0_S_WR_MO_CNT            ( RP0_S_WR_MO_CNT           ),
+        .RP0_M_RD_MO_CNT            ( RP0_M_RD_MO_CNT           ),
+        .RP0_M_WR_MO_CNT            ( RP0_M_WR_MO_CNT           ),
+
+        .RP1_S_RD_MO_CNT            ( RP1_S_RD_MO_CNT           ),
+        .RP1_S_WR_MO_CNT            ( RP1_S_WR_MO_CNT           ),
+        .RP1_M_RD_MO_CNT            ( RP1_M_RD_MO_CNT           ),
+        .RP1_M_WR_MO_CNT            ( RP1_M_WR_MO_CNT           ),
+
+        .RP2_S_RD_MO_CNT            ( RP2_S_RD_MO_CNT           ),
+        .RP2_S_WR_MO_CNT            ( RP2_S_WR_MO_CNT           ),
+        .RP2_M_RD_MO_CNT            ( RP2_M_RD_MO_CNT           ),
+        .RP2_M_WR_MO_CNT            ( RP2_M_WR_MO_CNT           ),
+
+        .RP3_S_RD_MO_CNT            ( RP3_S_RD_MO_CNT           ),
+        .RP3_S_WR_MO_CNT            ( RP3_S_WR_MO_CNT           ),
+        .RP3_M_RD_MO_CNT            ( RP3_M_RD_MO_CNT           ),
+        .RP3_M_WR_MO_CNT            ( RP3_M_WR_MO_CNT           ),
 
         .AW_AR_FIFO_WIDTH           ( AW_AR_FIFO_WIDTH          ),
         .B_FIFO_WIDTH               ( B_FIFO_WIDTH              ),
@@ -566,9 +611,7 @@ import packet_def_pkg::*;
 
         .FDI_IF_WD0                 ( FDI_IF_WD0                ),
         .FDI_IF_WD1                 ( FDI_IF_WD1                ),
-        .RP_COUNT                   ( RP_COUNT                  ),
-        .DEC_MULTI                  ( DEC_MULTI                 ),
-        .PHY_TYPE                   ( PHY_TYPE                  )
+        .RP_COUNT                   ( RP_COUNT                  )
 
     ) u_aou_core
     (
@@ -594,12 +637,14 @@ import packet_def_pkg::*;
         .O_AOU_RX_AXI_M_ARCACHE             ( O_AOU_RX_AXI_M_ARCACHE            ),
         .O_AOU_RX_AXI_M_ARPROT              ( O_AOU_RX_AXI_M_ARPROT             ),
         .O_AOU_RX_AXI_M_ARQOS               ( O_AOU_RX_AXI_M_ARQOS              ),
+        .O_AOU_RX_AXI_M_ARUSER              ( O_AOU_RX_AXI_M_ARUSER             ),
         .O_AOU_RX_AXI_M_ARVALID             ( O_AOU_RX_AXI_M_ARVALID            ),
         .I_AOU_RX_AXI_M_ARREADY             ( I_AOU_RX_AXI_M_ARREADY            ),
 
         .I_AOU_TX_AXI_M_RID                 ( I_AOU_TX_AXI_M_RID                ),
         .I_AOU_TX_AXI_M_RDATA               ( I_AOU_TX_AXI_M_RDATA              ),
         .I_AOU_TX_AXI_M_RRESP               ( I_AOU_TX_AXI_M_RRESP              ),
+        .I_AOU_TX_AXI_M_RUSER               ( I_AOU_TX_AXI_M_RUSER              ),
         .I_AOU_TX_AXI_M_RLAST               ( I_AOU_TX_AXI_M_RLAST              ),
         .I_AOU_TX_AXI_M_RVALID              ( I_AOU_TX_AXI_M_RVALID             ),
         .O_AOU_TX_AXI_M_RREADY              ( O_AOU_TX_AXI_M_RREADY             ),
@@ -613,17 +658,20 @@ import packet_def_pkg::*;
         .O_AOU_RX_AXI_M_AWCACHE             ( O_AOU_RX_AXI_M_AWCACHE            ),
         .O_AOU_RX_AXI_M_AWPROT              ( O_AOU_RX_AXI_M_AWPROT             ),
         .O_AOU_RX_AXI_M_AWQOS               ( O_AOU_RX_AXI_M_AWQOS              ),
+        .O_AOU_RX_AXI_M_AWUSER              ( O_AOU_RX_AXI_M_AWUSER             ),
         .O_AOU_RX_AXI_M_AWVALID             ( O_AOU_RX_AXI_M_AWVALID            ),
         .I_AOU_RX_AXI_M_AWREADY             ( I_AOU_RX_AXI_M_AWREADY            ),
 
         .O_AOU_RX_AXI_M_WDATA               ( O_AOU_RX_AXI_M_WDATA              ),
         .O_AOU_RX_AXI_M_WSTRB               ( O_AOU_RX_AXI_M_WSTRB              ),
         .O_AOU_RX_AXI_M_WLAST               ( O_AOU_RX_AXI_M_WLAST              ),
+        .O_AOU_RX_AXI_M_WUSER               ( O_AOU_RX_AXI_M_WUSER              ),
         .O_AOU_RX_AXI_M_WVALID              ( O_AOU_RX_AXI_M_WVALID             ),
         .I_AOU_RX_AXI_M_WREADY              ( I_AOU_RX_AXI_M_WREADY             ),
 
         .I_AOU_TX_AXI_M_BID                 ( I_AOU_TX_AXI_M_BID                ),
         .I_AOU_TX_AXI_M_BRESP               ( I_AOU_TX_AXI_M_BRESP              ),
+        .I_AOU_TX_AXI_M_BUSER               ( I_AOU_TX_AXI_M_BUSER              ),
         .I_AOU_TX_AXI_M_BVALID              ( I_AOU_TX_AXI_M_BVALID             ),
         .O_AOU_TX_AXI_M_BREADY              ( O_AOU_TX_AXI_M_BREADY             ),
 
@@ -636,16 +684,25 @@ import packet_def_pkg::*;
         .I_AOU_TX_AXI_S_ARCACHE             ( I_AOU_TX_AXI_S_ARCACHE            ),
         .I_AOU_TX_AXI_S_ARPROT              ( I_AOU_TX_AXI_S_ARPROT             ),
         .I_AOU_TX_AXI_S_ARQOS               ( I_AOU_TX_AXI_S_ARQOS              ),
+        .I_AOU_TX_AXI_S_ARUSER              ( I_AOU_TX_AXI_S_ARUSER             ),
         .I_AOU_TX_AXI_S_ARVALID             ( I_AOU_TX_AXI_S_ARVALID            ),
         .O_AOU_TX_AXI_S_ARREADY             ( O_AOU_TX_AXI_S_ARREADY            ),
-
-        .I_AOU_RX_AXI_S_RID                 ( O_AOU_RX_AXI_S_RID                ),
-        .I_AOU_RX_AXI_S_RRESP               ( O_AOU_RX_AXI_S_RRESP              ),
-        .I_AOU_RX_AXI_S_RLAST               ( O_AOU_RX_AXI_S_RLAST              ),
+             
+        .I_AOU_RX_AXI_S_RID                 ( w_aou_rx_axi_s_rid                ),
+        .I_AOU_RX_AXI_S_RDATA               ( w_rd_data_fifo_mdata              ),
+        .I_AOU_RX_AXI_S_RRESP               ( w_aou_rx_axi_s_rresp              ),
+        .I_AOU_RX_AXI_S_RLAST               ( w_aou_rx_axi_s_rlast              ),
+        .I_AOU_RX_AXI_S_RUSER               ( w_aou_rx_axi_s_ruser              ),
         .I_AOU_RX_AXI_S_RDLENGTH            ( w_aou_rx_axi_s_rdlength           ),
         .I_AOU_RX_AXI_S_RVALID              ( w_aou_rx_axi_s_rvalid             ),
         .I_AOU_RX_AXI_S_RREADY              ( I_AOU_RX_AXI_S_RREADY             ),
-
+        .O_AOU_RX_AXI_S_RID                 ( O_AOU_RX_AXI_S_RID                ),
+        .O_AOU_RX_AXI_S_RRESP               ( O_AOU_RX_AXI_S_RRESP              ),
+        .O_AOU_RX_AXI_S_RLAST               ( O_AOU_RX_AXI_S_RLAST              ),
+        .O_AOU_RX_AXI_S_RUSER               ( O_AOU_RX_AXI_S_RUSER              ),
+        .O_AOU_RX_AXI_S_RDATA               ( w_aou_rx_axi_s_rdata              ),
+        .O_AOU_RX_FIFO_RREADY               ( w_aou_rx_fifo_rready              ),
+ 
         .I_AOU_TX_AXI_S_AWID                ( I_AOU_TX_AXI_S_AWID               ),
         .I_AOU_TX_AXI_S_AWADDR              ( I_AOU_TX_AXI_S_AWADDR             ),
         .I_AOU_TX_AXI_S_AWLEN               ( I_AOU_TX_AXI_S_AWLEN              ),
@@ -655,17 +712,20 @@ import packet_def_pkg::*;
         .I_AOU_TX_AXI_S_AWCACHE             ( I_AOU_TX_AXI_S_AWCACHE            ),
         .I_AOU_TX_AXI_S_AWPROT              ( I_AOU_TX_AXI_S_AWPROT             ),
         .I_AOU_TX_AXI_S_AWQOS               ( I_AOU_TX_AXI_S_AWQOS              ),
+        .I_AOU_TX_AXI_S_AWUSER              ( I_AOU_TX_AXI_S_AWUSER             ),
         .I_AOU_TX_AXI_S_AWVALID             ( I_AOU_TX_AXI_S_AWVALID            ),
         .O_AOU_TX_AXI_S_AWREADY             ( O_AOU_TX_AXI_S_AWREADY            ),
 
         .I_AOU_TX_AXI_S_WDATA               ( I_AOU_TX_AXI_S_WDATA              ),
         .I_AOU_TX_AXI_S_WSTRB               ( I_AOU_TX_AXI_S_WSTRB              ),
         .I_AOU_TX_AXI_S_WLAST               ( I_AOU_TX_AXI_S_WLAST              ),
+        .I_AOU_TX_AXI_S_WUSER               ( I_AOU_TX_AXI_S_WUSER              ),
         .I_AOU_TX_AXI_S_WVALID              ( I_AOU_TX_AXI_S_WVALID             ),
         .O_AOU_TX_AXI_S_WREADY              ( O_AOU_TX_AXI_S_WREADY             ),
 
         .O_AOU_RX_AXI_S_BID                 ( O_AOU_RX_AXI_S_BID                ),
         .O_AOU_RX_AXI_S_BRESP               ( O_AOU_RX_AXI_S_BRESP              ),
+        .O_AOU_RX_AXI_S_BUSER               ( O_AOU_RX_AXI_S_BUSER              ),
         .O_AOU_RX_AXI_S_BVALID              ( O_AOU_RX_AXI_S_BVALID             ),
         .I_AOU_RX_AXI_S_BREADY              ( I_AOU_RX_AXI_S_BREADY             ),
 
@@ -677,6 +737,7 @@ import packet_def_pkg::*;
         .I_AOU_RX_WLAST_GEN_AWCACHE         ( w_aou_rx_wlast_gen_awcache        ),
         .I_AOU_RX_WLAST_GEN_AWPROT          ( w_aou_rx_wlast_gen_awprot         ),
         .I_AOU_RX_WLAST_GEN_AWQOS           ( w_aou_rx_wlast_gen_awqos          ),
+        .I_AOU_RX_WLAST_GEN_AWUSER          ( w_aou_rx_wlast_gen_awuser         ),
         .I_AOU_RX_WLAST_GEN_AWVALID         ( w_aou_rx_wlast_gen_awvalid        ),
         .O_AOU_RX_WLAST_GEN_AWREADY         ( w_aou_rx_wlast_gen_awready        ),
 
@@ -684,11 +745,13 @@ import packet_def_pkg::*;
         .I_AOU_RX_WLAST_GEN_WDATAF          ( w_aou_rx_wlast_gen_wdataf         ),
         .I_AOU_RX_WLAST_GEN_WDATA           ( w_aou_rx_wlast_gen_wdata          ),
         .I_AOU_RX_WLAST_GEN_WSTRB           ( w_aou_rx_wlast_gen_wstrb          ),
+        .I_AOU_RX_WLAST_GEN_WUSER           ( w_aou_rx_wlast_gen_wuser          ),
         .I_AOU_RX_WLAST_GEN_WVALID          ( w_aou_rx_wlast_gen_wvalid         ),
         .O_AOU_RX_WLAST_GEN_WREADY          ( w_aou_rx_wlast_gen_wready         ),
 
         .I_EARLY_BRESP_CTRL_BID             ( w_early_bresp_ctrl_bid            ),
         .I_EARLY_BRESP_CTRL_BRESP           ( w_early_bresp_ctrl_bresp          ),
+        .I_EARLY_BRESP_CTRL_BUSER           ( w_early_bresp_ctrl_buser          ),
         .I_EARLY_BRESP_CTRL_BVALID          ( w_early_bresp_ctrl_bvalid         ),
         .O_EARLY_BRESP_CTRL_BREADY          ( w_early_bresp_ctrl_bready         ),
 
@@ -700,6 +763,7 @@ import packet_def_pkg::*;
         .I_AOU_RX_AXI_MM_ARCACHE            ( w_aou_rx_axi_mm_arcache           ),
         .I_AOU_RX_AXI_MM_ARPROT             ( w_aou_rx_axi_mm_arprot            ),
         .I_AOU_RX_AXI_MM_ARQOS              ( w_aou_rx_axi_mm_arqos             ),
+        .I_AOU_RX_AXI_MM_ARUSER             ( w_aou_rx_axi_mm_aruser            ),
         .I_AOU_RX_AXI_MM_ARVALID            ( w_aou_rx_axi_mm_arvalid           ),
         .O_AOU_RX_AXI_MM_ARREADY            ( w_aou_rx_axi_mm_arready           ),
 
@@ -738,17 +802,15 @@ import packet_def_pkg::*;
         .O_WR_REQ_FIFO_SDATA                ( w_wr_req_fifo_sdata               ),
         .O_WR_REQ_FIFO_SVALID               ( w_wr_req_fifo_svalid              ),
 
-        .O_WR_DATA_FIFO_SDATA               ( w_wr_data_fifo_sdata              ),
-        .O_WR_DATA_FIFO_SDATA_STRB          ( w_wr_data_fifo_sdata_strb         ),
-        .O_WR_DATA_FIFO_SDATA_WDATAF        ( w_wr_data_fifo_sdata_wdataf       ),
-        .O_WR_DATA_FIFO_SVALID              ( w_wr_data_fifo_svalid             ),
-
         .O_WR_RESP_FIFO_SDATA               ( w_wr_resp_fifo_sdata              ),
         .O_WR_RESP_FIFO_SVALID              ( w_wr_resp_fifo_svalid             ),
 
-        .O_RD_DATA_FIFO_SDATA               ( w_rd_data_fifo_sdata              ),
-        .O_RD_DATA_FIFO_EXT_SDATA           ( w_rd_data_fifo_ext_sdata          ),
-        .O_RD_DATA_FIFO_SVALID              ( w_rd_data_fifo_svalid             ),
+        .O_GRANULE_VALID                    ( w_granule_valid                   ),
+        .O_GRANULE                          ( w_granule                         ),
+        .O_WR_DATA_COVER                    ( w_wr_data_cover                   ),
+        .O_WR_DATA_START                    ( w_wr_data_start                   ),
+        .O_RD_DATA_COVER                    ( w_rd_data_cover                   ),
+        .O_RD_DATA_START                    ( w_rd_data_start                   ),
 
         .O_ERR_INFO_RID_MISMATCH_ERR        ( w_err_info_rid_mismatch_err       ),
         .O_ERR_INFO_SPLIT_BID_MISMATCH_ERR  ( w_err_info_split_bid_mismatch_err ),
@@ -797,13 +859,11 @@ import packet_def_pkg::*;
                 .R_FIFO_DEPTH                       ( RP_R_FIFO_DEPTH[i]                    ),
                 .B_FIFO_DEPTH                       ( RP_B_FIFO_DEPTH[i]                    ),
 
-                .DEC_MULTI                          ( DEC_MULTI                             ),
+                .G_CNT                              ( G_CNT                                 ),
 
                 .AW_FWD_RS_EN                       ( RX_AW_FIFO_RS_EN                      ),
-                .W_FWD_RS_EN                        ( RX_W_FIFO_RS_EN                       ),
                 .B_FWD_RS_EN                        ( RX_B_FIFO_RS_EN                       ),
-                .AR_FWD_RS_EN                       ( RX_AR_FIFO_RS_EN                      ),
-                .R_FWD_RS_EN                        ( RX_R_FIFO_RS_EN                       )
+                .AR_FWD_RS_EN                       ( RX_AR_FIFO_RS_EN                      )
 
             ) u_aou_fifo_rp
             (
@@ -814,48 +874,48 @@ import packet_def_pkg::*;
                 .I_WR_REQ_FIFO_SDATA                ( w_wr_req_fifo_sdata[i]                ),
 
                 .I_WR_REQ_FIFO_MREADY               ( w_aou_rx_wlast_gen_awready[i]         ),
-                .O_WR_REQ_FIFO_MDATA                ( {w_aou_rx_wlast_gen_awid[i], w_aou_rx_wlast_gen_awaddr[i], w_aou_rx_wlast_gen_awlen[i], w_aou_rx_wlast_gen_awsize[i], w_aou_rx_wlast_gen_awlock[i], w_aou_rx_wlast_gen_awcache[i], w_aou_rx_wlast_gen_awprot[i], w_aou_rx_wlast_gen_awqos[i]} ),
+                .O_WR_REQ_FIFO_MDATA                ( {w_aou_rx_wlast_gen_awid[i], w_aou_rx_wlast_gen_awaddr[i], w_aou_rx_wlast_gen_awlen[i], w_aou_rx_wlast_gen_awsize[i], w_aou_rx_wlast_gen_awlock[i], w_aou_rx_wlast_gen_awcache[i], w_aou_rx_wlast_gen_awprot[i], w_aou_rx_wlast_gen_awqos[i], w_aou_rx_wlast_gen_awuser[i]} ),
                 .O_WR_REQ_FIFO_MVALID               ( w_aou_rx_wlast_gen_awvalid[i]         ),
 
-                .I_WR_DATA_FIFO_SVALID              ( w_wr_data_fifo_svalid[i]              ),
-                .I_WR_DATA_FIFO_SDATA               ( w_wr_data_fifo_sdata[i]               ),
-                .I_WR_DATA_FIFO_STRB                ( w_wr_data_fifo_sdata_strb[i]          ),
-                .I_WR_DATA_FIFO_WDATAF              ( w_wr_data_fifo_sdata_wdataf[i]        ),
+                .I_GRANULE_VALID                    ( w_granule_valid                       ),
+                .I_GRANULE                          ( w_granule                             ),
+                .I_WR_DATA_COVER                    ( w_wr_data_cover[i]                    ),
+                .I_WR_DATA_START                    ( w_wr_data_start[i]                    ),
+                .I_RD_DATA_COVER                    ( w_rd_data_cover[i]                    ),
+                .I_RD_DATA_START                    ( w_rd_data_start[i]                    ),
 
                 .I_WR_DATA_FIFO_MREADY              ( w_aou_rx_wlast_gen_wready[i]          ),
                 .O_WR_DATA_FIFO_MDATA               ( w_aou_rx_wlast_gen_wdata[i]           ),
                 .O_WR_DATA_FIFO_MSTRB               ( w_aou_rx_wlast_gen_wstrb[i]           ),
                 .O_WR_DATA_FIFO_MDLEN               ( w_aou_rx_wlast_gen_wdlength[i]        ),
                 .O_WR_DATA_FIFO_WDATAF              ( w_aou_rx_wlast_gen_wdataf[i]          ),
+                .O_WR_DATA_FIFO_MFLEX               ( w_aou_rx_wlast_gen_wuser[i]           ),
                 .O_WR_DATA_FIFO_MVALID              ( w_aou_rx_wlast_gen_wvalid[i]          ),
 
                 .I_RD_REQ_FIFO_SVALID               ( w_rd_req_fifo_svalid[i]               ),
                 .I_RD_REQ_FIFO_SDATA                ( w_rd_req_fifo_sdata[i]                ),
 
                 .I_RD_REQ_FIFO_MREADY               ( w_aou_rx_axi_mm_arready[i]            ),
-                .O_RD_REQ_FIFO_MDATA                ( {w_aou_rx_axi_mm_arid[i], w_aou_rx_axi_mm_araddr[i], w_aou_rx_axi_mm_arlen[i], w_aou_rx_axi_mm_arsize[i], w_aou_rx_axi_mm_arlock[i], w_aou_rx_axi_mm_arcache[i], w_aou_rx_axi_mm_arprot[i], w_aou_rx_axi_mm_arqos[i]} ),
+                .O_RD_REQ_FIFO_MDATA                ( {w_aou_rx_axi_mm_arid[i], w_aou_rx_axi_mm_araddr[i], w_aou_rx_axi_mm_arlen[i], w_aou_rx_axi_mm_arsize[i], w_aou_rx_axi_mm_arlock[i], w_aou_rx_axi_mm_arcache[i], w_aou_rx_axi_mm_arprot[i], w_aou_rx_axi_mm_arqos[i], w_aou_rx_axi_mm_aruser[i]} ),
                 .O_RD_REQ_FIFO_MVALID               ( w_aou_rx_axi_mm_arvalid[i]            ),
 
-                .I_RD_DATA_FIFO_SVALID              ( w_rd_data_fifo_svalid[i]              ),
-                .I_RD_DATA_FIFO_SDATA               ( w_rd_data_fifo_sdata[i]               ),
-                .I_RD_DATA_FIFO_EXT_SDATA           ( w_rd_data_fifo_ext_sdata[i]           ),
-
-                .I_RD_DATA_FIFO_MREADY              ( I_AOU_RX_AXI_S_RREADY[i]              ),
+                .I_RD_DATA_FIFO_MREADY              ( w_aou_rx_fifo_rready[i]               ),
                 .O_RD_DATA_FIFO_MDATA               ( w_rd_data_fifo_mdata[i]               ),
-                .O_RD_DATA_FIFO_EXT_MDATA           ( {O_AOU_RX_AXI_S_RID[i], O_AOU_RX_AXI_S_RRESP[i], O_AOU_RX_AXI_S_RLAST[i]} ),
+                .O_RD_DATA_FIFO_EXT_MDATA           ( {w_aou_rx_axi_s_rid[i], w_aou_rx_axi_s_rresp[i], w_aou_rx_axi_s_rlast[i]} ),
                 .O_RD_DATA_FIFO_MDLEN               ( w_aou_rx_axi_s_rdlength[i]            ),
+                .O_RD_DATA_FIFO_MFLEX               ( w_aou_rx_axi_s_ruser[i]               ),
                 .O_RD_DATA_FIFO_MVALID              ( w_aou_rx_axi_s_rvalid[i]              ),
 
                 .I_WR_RESP_FIFO_SVALID              ( w_wr_resp_fifo_svalid[i]              ),
                 .I_WR_RESP_FIFO_SDATA               ( w_wr_resp_fifo_sdata[i]               ),
 
                 .I_WR_RESP_FIFO_MREADY              ( w_early_bresp_ctrl_bready[i]          ),
-                .O_WR_RESP_FIFO_MDATA               ( {w_early_bresp_ctrl_bid[i], w_early_bresp_ctrl_bresp[i]}  ),
+                .O_WR_RESP_FIFO_MDATA               ( {w_early_bresp_ctrl_bid[i], w_early_bresp_ctrl_bresp[i], w_early_bresp_ctrl_buser[i]}  ),
                 .O_WR_RESP_FIFO_MVALID              ( w_early_bresp_ctrl_bvalid[i]          )
 
             );
 
-            assign  O_AOU_RX_AXI_S_RDATA[i] = w_rd_data_fifo_mdata[i][RP_AXI_DATA_WD_MAX-1:0];
+            assign  O_AOU_RX_AXI_S_RDATA[i] = w_aou_rx_axi_s_rdata[i][RP_AXI_DATA_WD_MAX-1:0];
 
         end
     endgenerate

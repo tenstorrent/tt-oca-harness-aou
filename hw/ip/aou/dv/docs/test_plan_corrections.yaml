@@ -258,6 +258,11 @@
   priority: P2
   title: 'Reserved ACTIVATIONOP (4-15) received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
+- id: '1.14'
+  added: 'AoU v0.8 Ch. 11; MAS software-operation 7.1 PROFILE_CFG_RPn / PROFILE_RMT_RPn'
+  priority: P1
+  title: 'ActivateReq profile exchange: the DUT announces the Basic Profile per RP (PROFILE_CFG_RPn read-only 0/0/0; 0 for an RP it does not have) and stores the received ProfileID/Rev/Opt in PROFILE_RMT_RPn with RCVD; kept through a deactivation, unchanged by an ActivateReq rejected in ENABLED, cleared by AOU_SW_RESET'
+  note: 'v0.8 replaces PropertyReq (1.4, dropped) with a four-granule ActivateReq carrying a profile per RP; nothing is negotiated and nothing acts on the values; the DUT implements the Basic Profile only, so its own side is fixed (aou_act_profile_test).'
 - id: '2.11'
   added: 'AoU 8.2/8.4'
   priority: P2
@@ -301,7 +306,7 @@
 - id: '4.30'
   added: 'AoU 5.2'
   priority: P2
-  title: 'AxUSER/FLEX carriage: the DUT has no USER ports, sends FLEX as 0 and ignores it on receive'
+  title: 'AxUSER/FLEX carriage: FLEX in every message the DUT sends is the AXI USER[15:0] its port got (first beat of a merged response); the FLEX of every message the DUT receives leaves on the USER outputs of its AXI ports (M-port AWUSER/ARUSER/WUSER, S-port BUSER/RUSER), except that an early write response carries BUSER 0'
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 - id: '4.31'
   added: 'AXI4 A3.3.1'
@@ -535,6 +540,12 @@
   priority: P2
   title: 'Restart after link-down is software''s on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset'
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (not a bug) when the owner assigned the restart to software.
+
+# Profiles: v0.8 removes PROF/PROFEXTLEN from the AXI messages (FLEX, 5.2) and
+# announces a profile per RP in the ActivateReq (Ch. 11).
+- id: '11.14'
+  title: 'ProfileID/ProfileRev/ProfileOpt values in the ActivateReq: the Basic Profile 0/0/0 (the DUT, always) beside the remote die''s non-zero fields and RPs the sender does not have'
+  note: 'The old item varied v0.7 PROF/PROFEXTLEN in the AXI messages, which v0.8 removes; the profile now travels in the ActivateReq (1.14, aou_act_profile_test).'
 
 # Stimulus-shape families: one item per family, its evidence the coverage bins
 # named in the note (AOU_FCOV.adoc). The old per-value items report through the

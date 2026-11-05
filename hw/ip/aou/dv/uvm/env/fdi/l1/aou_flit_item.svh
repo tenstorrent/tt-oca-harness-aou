@@ -53,6 +53,7 @@ class aou_flit_item extends uvm_sequence_item;
   int unsigned          gap_before;     // idle cycles since the previous flit
   time                  t_start;
   time                  t_end;
+  time                  t_beat[FLIT_BYTES/32];  // each beat's transfer (index: beat)
 
   function new(string name = "aou_flit_item");
     super.new(name);
@@ -66,6 +67,7 @@ class aou_flit_item extends uvm_sequence_item;
 
   function void put_beat(int unsigned beat_bytes, int unsigned idx, aou_fdi_beat_t b);
     for (int unsigned i = 0; i < beat_bytes; i++) data[idx*beat_bytes + i] = b[8*i +: 8];
+    if (idx < FLIT_BYTES/32) t_beat[idx] = $time;
   endfunction
 
   function void clear();

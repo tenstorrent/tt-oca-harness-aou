@@ -51,7 +51,9 @@ module AOU_TX_FDI_IF #(
   output logic                      O_FDI_LP_STALLACK
 
 );
-localparam PHASE_WD       = $clog2(256*8 / FDI_DATA_WD);
+// Beats per 256 B flit; one at 2048 bits, where the phase counter stays 0.
+localparam PHASE_CNT      = 256*8 / FDI_DATA_WD;
+localparam PHASE_WD       = (PHASE_CNT > 1) ? $clog2(PHASE_CNT) : 1;
 localparam ST_FDI_STS_RST = 4'b0000;
 localparam PL_STATE_STS_ACTIVE = 4'b0001;
 
@@ -66,7 +68,7 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if(~I_RESETN) begin
         r_phase_cnt <= 'd0;
     end else if (I_AOU_TX_FLIT_DATA_VALID & O_AOU_TX_FLIT_READY) begin
-        r_phase_cnt <= r_phase_cnt + 1;
+        r_phase_cnt <= (PHASE_CNT > 1) ? r_phase_cnt + 1'b1 : '0;
     end
 end
 

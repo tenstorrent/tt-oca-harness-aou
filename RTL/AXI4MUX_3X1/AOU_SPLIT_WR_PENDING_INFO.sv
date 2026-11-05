@@ -50,12 +50,14 @@ module AOU_SPLIT_WR_PENDING_INFO #(
 
     // Master I/F
     input    [AXI_ID_WD+1:0]        I_AXI_BId,
+    input    [15:0]                 I_AXI_BUser,
     input                           I_AXI_BValid,
     input                           I_AXI_BReady,
 
     output   [AXI_ADDR_WD-1:0]      O_CUR_AWADDR,
     output                          O_ReorderBuf_MValid,
     output   [AXI_ID_WD+3:0]        O_ReorderBuf_MData,
+    output   [15:0]                 O_ReorderBuf_MUser,
 
     output                          O_DEST_TABLE_ID_ERR
 
@@ -68,6 +70,12 @@ typedef struct  packed {
     logic [WR_MO_IDX_WD-1:0]        wid_numbering;
 
     logic [1:0]                     bresp;
+    // BUSER of the first sub-burst's B. The Bs of all sub-bursts of a split write
+    // become one response, and AXI defines no rule for USER in that case; the one
+    // response carries this value, which becomes the FLEX field of the WriteResp
+    // (AoU v0.8 Basic Profile: FLEX = USER[15:0]).
+    logic [15:0]                    buser;
+    logic                           buser_vld;
     logic [AXI_ADDR_WD-1:0]         awaddr;
     logic [1:0]                     muxid;
 } st_awtable;
@@ -127,6 +135,8 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
             awtable[i].wid_numbering     <= 'd0;
 
             awtable[i].bresp             <= 'd0;
+            awtable[i].buser             <= 'd0;
+            awtable[i].buser_vld         <= 'd0;
             awtable[i].muxid             <= 'd0;
             awtable[i].awaddr            <= 'd0;
         end
@@ -139,6 +149,8 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
                 awtable[w_awtable_wptr_cur].wid_numbering <= w_wid_numbering - 1;
 
                 awtable[w_awtable_wptr_cur].bresp         <= 'd0;
+                awtable[w_awtable_wptr_cur].buser         <= 'd0;
+                awtable[w_awtable_wptr_cur].buser_vld     <= 'd0;
                 awtable[w_awtable_wptr_cur].muxid         <= I_AXI_MuxId;
                 awtable[w_awtable_wptr_cur].awaddr        <= I_AXI_AwAddr;
 
@@ -149,6 +161,8 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
                 awtable[w_awtable_wptr_cur].wid_numbering <= w_wid_numbering;
 
                 awtable[w_awtable_wptr_cur].bresp         <= 'd0;
+                awtable[w_awtable_wptr_cur].buser         <= 'd0;
+                awtable[w_awtable_wptr_cur].buser_vld     <= 'd0;
                 awtable[w_awtable_wptr_cur].muxid         <= I_AXI_MuxId;
                 awtable[w_awtable_wptr_cur].awaddr        <= I_AXI_AwAddr;
             end
@@ -156,6 +170,10 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
 
         if (I_AXI_BValid & I_AXI_BReady) begin
             awtable[w_awtable_rptr_cur].bresp         <= awtable[w_awtable_rptr_cur].bresp | I_AXI_BId[AXI_ID_WD + 1:AXI_ID_WD];
+            if (~awtable[w_awtable_rptr_cur].buser_vld) begin
+                awtable[w_awtable_rptr_cur].buser     <= I_AXI_BUser;
+                awtable[w_awtable_rptr_cur].buser_vld <= 1'b1;
+            end
             if (|awtable[w_awtable_rptr_cur].burst_len)
                 awtable[w_awtable_rptr_cur].burst_len <= awtable[w_awtable_rptr_cur].burst_len - 'd1;
             else
@@ -195,6 +213,10 @@ end
 ///////////////////////////////////////////////////////////////////////////////////
 assign O_ReorderBuf_MData  = {(awtable[w_awtable_rptr_cur].bresp | I_AXI_BId[AXI_ID_WD + 1:AXI_ID_WD]), awtable[w_awtable_rptr_cur].id, awtable[w_awtable_rptr_cur].muxid};
 assign O_ReorderBuf_MValid = I_AXI_BValid & (awtable[w_awtable_rptr_cur].burst_len == 'd0);
+// A write that was not split answers with its only B in the cycle it arrives,
+// before the table has captured it: take the live BUSER then (the same shape as
+// the bresp OR above).
+assign O_ReorderBuf_MUser  = awtable[w_awtable_rptr_cur].buser_vld ? awtable[w_awtable_rptr_cur].buser : I_AXI_BUser;
 //------------------------------------------------------------------
 assign O_DEST_TABLE_ID_ERR = I_AXI_BValid & I_AXI_BReady & ~(|w_awtable_r_onehot);
 

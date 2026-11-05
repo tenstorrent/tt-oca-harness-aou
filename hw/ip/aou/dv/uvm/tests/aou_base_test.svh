@@ -124,6 +124,12 @@ class aou_base_test extends ocah_test;
       void'($value$plusargs("active_phy=%d", cfg.lsm_cfg.active_phy));
     end
     configure();
+    // AXI USER the local agents drive, which the DUT sends as FLEX (AoU v0.8
+    // 5.2 / 11.1); the plusarg wins over the test's configure().
+    if ($value$plusargs("user_mode=%s", rb) && !aou_axi_cfg::parse_user_mode(rb, cfg.user_mode))
+      `uvm_fatal(get_type_name(), {"+user_mode: zero, const_per_txn or per_beat, not ", rb})
+    // expected_fail.yaml scopes entries to a mode with when_re on this line.
+    `uvm_info(get_type_name(), {"user_mode=", aou_axi_cfg::user_mode_name(cfg.user_mode)}, UVM_LOW)
     void'($value$plusargs("wdata_first_pct=%d", cfg.l3_cfg.pol.wdata_first_pct));
     void'($value$plusargs("wdata_first_beats=%d", cfg.l3_cfg.pol.wdata_first_beats));
     void'($value$plusargs("act_share_pct=%d", cfg.l3_cfg.pol.act_share_pct));
@@ -177,13 +183,15 @@ class aou_base_test extends ocah_test;
   endtask
 
   // AOU-R31 (credits are sent in ENABLED): with nothing outstanding anywhere,
-  // every credit the DUT advertised must come back.
+  // every credit the DUT advertised must come back, and (T1-C40) it must have
+  // advertised all its RX FIFO allows; both get cred_return_cycles.
   task check_cred_return();
     string why;
     int unsigned n = 0;
     aou_l3_model m = env.l3.model;
     if (!m.cred_return_ready() || env.outstanding(why) != 0) return;
-    while (n < cfg.l3_cfg.cred_return_cycles && m.crd.tx_short(why) != 0) begin
+    while (n < cfg.l3_cfg.cred_return_cycles &&
+           (m.crd.tx_short(why) != 0 || m.adv_short() != 0)) begin
       @(env.lsm_vif.mon_cb);
       n++;
     end

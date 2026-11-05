@@ -5,7 +5,7 @@ class aou_fdi_cfg extends uvm_object;
   `uvm_object_utils(aou_fdi_cfg)
 
   int unsigned   phy = 0;
-  int unsigned   beat_bytes = 64;     // 32, 64 or 128 (FDI width of this PHY)
+  int unsigned   beat_bytes = 64;     // 32, 64, 128 or 256 (FDI width of this PHY)
   bit            is_active = 1'b1;    // 0: monitor only
 
   // TX responder

@@ -235,6 +235,10 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
 | `1x512-sp64-nxt` | 1 | 512 | FDI_CFG_SP_64B | 1 | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
+| `1x1024-sp128` | 1 | 1024 | FDI_CFG_SP_128B | 1 | One 1024-bit RP on a 128-byte FDI: the single-RP 128 B RX latency reference (fdi-rx-plan 13) |
+| `1x1024-sp256` | 1 | 1024 | FDI_CFG_SP_256B | 1 | 256-byte FDI: one flit per cycle, 48 granules decoded per cycle, whole-flit cancel |
+| `4xmix-sp256` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | Mixed widths, every local width, 256-byte FDI |
+| `4xmix-sp256-rxf` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | `4xmix-sp256` with non-default RX FIFO depths (`AOU_RX_FIFO_ALT`) |
 
 Reading a name:
 
@@ -248,8 +252,11 @@ Reading a name:
 - `-nxt`: `TX_NXT_PACKING_EN` 1 (`AOU_TX_NXT_PACKING=1`): the TX flit packer
   computes each chunk from its look-ahead state and registers it before the FDI
   output; the default (0) drives the chunk combinationally from the granule ring.
-- `-rxf`: non-default RX FIFO depths (`AOU_T1_RX_DEPTH` in `uvm/env/aou_t1_env_pkg.sv`) and
-  `RX_*_FIFO_RS_EN=0`, passed to `AOU_TOP` under the `AOU_RX_FIFO_ALT` define.
+- `-rxf`: non-default RX FIFO depths (`AOU_T1_RX_DEPTH` in `uvm/env/aou_t1_env_pkg.sv`,
+  W and R in granules), passed to `AOU_TOP` under the `AOU_RX_FIFO_ALT` define.
+- `sp256`: `FDI_CFG_SP_256B`, a 2048-bit FDI carrying one flit per cycle. The
+  `AOU_FDI_CHECKER` supports 32/64/128-byte beats only, so these builds have no
+  checker (`aou_t1_env_cfg.fdi_chk_en` is off).
 
 The set is pairwise rather than a cross product (DECISIONS.md D9). Testlist
 scenarios without `target` run on every configuration; scenarios that need
@@ -330,7 +337,9 @@ Traffic and remote-die knobs (run time, any T1 test):
 - `+remote_max_burst=2^n`: the remote splitter's longest burst (default 256).
   `+remote_max_burst_rand=1` re-picks it whenever the remote is idle.
 
-FDI corner knobs (run time, `testlists/fdi.toml`): `+fdi_trdy=always|random|holes|bursty`,
+FDI corner knobs (run time, `testlists/fdi.toml`; without them a seed takes HOLES
+mostly, sometimes RANDOM or BURSTY, and sometimes random stalls, see
+`aou_t1_env_cfg::fdi_knobs`): `+fdi_trdy=always|random|holes|bursty`,
 `+fdi_stall_pct=N` stand-alone stalls, `+fdi_stall_mid_pct=N` the share raised
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between
 `pl_stallreq` and `lp_stallack` (UCIe r1.1 8.3.2 rule 7), `+fdi_stall_hold_min=N` and

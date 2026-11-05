@@ -8,11 +8,22 @@
 // write's last AW/W handshake to BVALID), r_lat (cycles from the AR handshake
 // to the first RVALID) and r_beat (cycles between R beats). A delay of 0 means
 // back to back: ready held high, or B/R valid in the cycle after the handshake.
+// Response hold of the manager (stress, never for performance): BREADY
+// (b_fill_hold) or RREADY (r_fill_hold) goes low and stays low until the
+// manager has its outstanding limit of writes (reads) handed over, or none more
+// has been handed over for fill_hold_idle cycles, so the subordinate's
+// responses back up while the port fills. One hold in eight lasts at least
+// fill_hold_long cycles. Between holds b_ready/r_ready apply for a random
+// number of responses. apply() turns both holds off.
 class aou_axi_timing extends uvm_object;
   `uvm_object_utils(aou_axi_timing)
 
   aou_axi_delay aw_valid, w_valid, ar_valid, b_ready, r_ready;
   aou_axi_delay aw_ready, w_ready, ar_ready, b_lat, r_lat, r_beat;
+  bit           b_fill_hold;
+  bit           r_fill_hold;
+  int unsigned  fill_hold_idle = 100;
+  int unsigned  fill_hold_long = 1200;
 
   function new(string name = "aou_axi_timing");
     super.new(name);
@@ -33,6 +44,8 @@ class aou_axi_timing extends uvm_object;
     aou_axi_delay all[$] = '{aw_valid, w_valid, ar_valid, b_ready, r_ready,
                               aw_ready, w_ready, ar_ready, b_lat, r_lat, r_beat};
     foreach (all[i]) all[i].set_zero();
+    b_fill_hold = 1'b0;
+    r_fill_hold = 1'b0;
     case (profile)
       AOU_AXI_TIMING_ZERO: ;
       AOU_AXI_TIMING_RANDOM: foreach (all[i]) all[i].set_range(0, 3);

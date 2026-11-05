@@ -493,11 +493,17 @@ logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_starts_data;
 logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_starts_credited;
 
 // Reserved-field contents, evaluated for every granule and qualified
-// afterwards. PROPERTYREQ is only meaningful on ActivateReq and "must be 0b0
-// for other messages" (v0.7 Table 26), so it reads as reserved elsewhere. The
-// credited messages' RsvdZero is judged in their first granule only (Tables
-// 2, 3, 10-13); WriteData carries none there.
+// afterwards. The ActivateReq (v0.8 Ch. 11) has RsvdZero at stream bits
+// 11-13 of its first granule and 0-13 of its three others, and the profile
+// fields of an RP the sender does not have are reserved too; the checker knows
+// its own die's planes (RP_COUNT) and holds that stream to it. The other
+// Activation opcodes have RsvdZero at 11-39, which takes in v0.7's PROPERTYREQ
+// (v0.8 reserves it). The credited messages' RsvdZero is judged in their first
+// granule only (Tables 2, 3, 10-13); WriteData carries none there.
 logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_act_rsvd_nonzero;
+// Granules 1-3 of an ActivateReq at G0 (4.4 puts an Activation message there).
+logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_act_req_body;
+logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_act_req_body_rsvd_nonzero;
 logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_crdtgrant_rsvd_nonzero;
 logic [DIR_CNT-1:0][GRANULE_CNT-1:0]    w_msg_rsvd_nonzero;
 
@@ -536,9 +542,20 @@ always_comb begin
                                       (w_chk_msgtype[d][g] != MSG_MISC);
 
             w_act_rsvd_nonzero[d][g] =
-                (|(w_chk_granule[d][g] & ACT_RSVD_MASK)) |
-                (w_chk_granule[d][g][PROPREQ_BIT] &
-                 (w_chk_actop[d][g] != ACTOP_ACTIVATE_REQ));
+                (w_chk_actop[d][g] == ACTOP_ACTIVATE_REQ) ?
+                    (|(w_chk_granule[d][g] & ACT_REQ_RSVD_G0_MASK)) :
+                    (|(w_chk_granule[d][g] & ACT_RSVD_MASK));
+
+            // The body of an ActivateReq at G0: RsvdZero at stream bits 0-13,
+            // and the whole profile group of a plane this die does not have
+            // (its own stream only; the peer's plane count is not a parameter).
+            w_act_req_body[d][g] = (g >= 1) && (g < MISC_ACT_REQ_G) &&
+                                   w_starts_activation[d][0] &&
+                                   (w_chk_actop[d][0] == ACTOP_ACTIVATE_REQ);
+            w_act_req_body_rsvd_nonzero[d][g] =
+                (|(w_chk_granule[d][g] & ACT_REQ_RSVD_BODY_MASK)) |
+                ((d == DIR_LP) && (g >= RP_COUNT) &&
+                 (|(w_chk_granule[d][g] & ACT_REQ_PROFILE_MASK)));
 
             w_crdtgrant_rsvd_nonzero[d][g] = |(w_chk_granule[d][g] & CG_RSVD_G1_MASK);
 
@@ -589,7 +606,8 @@ always_comb begin
                 MSG_MISC: begin
                     case (w_chk_miscop[d][g])
                         MISCOP_ACTIVATION:
-                            w_msg_len[d][g] = MSG_G_WD'(MISC_ACT_G);
+                            w_msg_len[d][g] = (w_chk_actop[d][g] == ACTOP_ACTIVATE_REQ) ?
+                                              MSG_G_WD'(MISC_ACT_REQ_G) : MSG_G_WD'(MISC_ACT_G);
                         MISCOP_CRDTGRANT:
                             w_msg_len[d][g] = MSG_G_WD'(MISC_CG_G);
                         default:
@@ -1510,10 +1528,12 @@ always_comb begin
                 w_starts_data[d][g] & (w_chk_dlength[d][g] == DLENGTH_RESERVED);
 
             // Attributed to the granule whose bits are non-zero, which for the
-            // credit grant is its second granule.
+            // credit grant is its second granule and for the ActivateReq any
+            // of its four.
             w_granule_viol[d][g][VIOL_RSVD_NONZERO] =
                 w_chk_class_en[VIOL_RSVD_NONZERO] &
                 ((w_starts_activation[d][g] & w_act_rsvd_nonzero[d][g]) |
+                 (w_act_req_body[d][g]      & w_act_req_body_rsvd_nonzero[d][g]) |
                  (w_grant_body[d][g]        & w_crdtgrant_rsvd_nonzero[d][g]) |
                  (w_chk_msg_start[d][g]     & w_msg_rsvd_nonzero[d][g]));
 

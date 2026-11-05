@@ -18,6 +18,25 @@ class aou_axi_txn extends uvm_sequence_item;
   rand bit           lock;
   rand bit [3:0]     cache, qos;
   rand bit [2:0]     prot;
+  // AXI USER, 16 bits (AoU v0.8 Table 31). user is AWUSER or ARUSER; wuser[]
+  // holds one WUSER per W beat, ruser[] one RUSER per R beat; buser is BUSER.
+  // The manager driver fills user and wuser[] from its cfg.user_mode unless
+  // user_fixed says the sequence chose them; the monitors capture all five.
+  // On a far-side transaction built from the DUT's messages (aou_t1_l4a_adapter,
+  // aou_t1_remote_mgr_driver) they hold the FLEX fields of those messages.
+  rand bit [15:0]    user;
+  bit                user_fixed;
+  bit [15:0]         wuser[];
+  bit [15:0]         buser;
+  bit [15:0]         ruser[];
+  // How a write went on the link when the remote manager repacked it as a
+  // WriteReq of another size (AoU lets a writer raise the size above AWSIZE):
+  // the WriteReq's size and length, from addr, and the FLEX of each WriteData
+  // beat in message order. link_wuser is empty when the WriteData beats are
+  // the W beats (size, len and wuser[] then describe the link too).
+  bit [2:0]          link_size;
+  bit [7:0]          link_len;
+  bit [15:0]         link_wuser[];
   int unsigned       data_bytes = 64;
   bit [1023:0]       data[];
   bit [127:0]        strb[];
@@ -26,6 +45,8 @@ class aou_axi_txn extends uvm_sequence_item;
   time               t_addr, t_done;
   // Write: WLAST handshake (set by aou_axi_mgr_driver; 0 until then).
   time               t_wlast;
+  // Write: handshake of each W beat (set by aou_axi_monitor; empty otherwise).
+  time               t_w[];
   // Read: handshake of each R beat (set by aou_axi_monitor; empty otherwise).
   time               t_r[];
   // Set when a reset ended the transaction before its response (reset_flush);
@@ -109,6 +130,17 @@ class aou_axi_txn extends uvm_sequence_item;
     return beat_addr(i) & ~(64'(data_bytes) - 64'd1);
   endfunction
 
+  // Index of the beat whose transfer covers byte address a, counting from the
+  // aligned start of an INCR burst; -1 when a lies outside the burst.
+  function int beat_index_of(bit [63:0] a);
+    bit [63:0] nb    = 64'd1 << size;
+    bit [63:0] first = addr & ~(nb - 64'd1);
+    bit [63:0] base  = a & ~(nb - 64'd1);
+    if (base < first) return -1;
+    if ((base - first) / nb >= 64'(beats())) return -1;
+    return int'((base - first) / nb);
+  endfunction
+
   // First and last active byte lane of beat i (AXI4 A3.4.2 Lower/Upper_Byte_Lane).
   function int unsigned lane_lo(int unsigned i);
     return int'(beat_addr(i) & (64'(data_bytes) - 64'd1));
@@ -183,8 +215,26 @@ class aou_axi_txn extends uvm_sequence_item;
     s = $sformatf("%s rp%0d %s id=%0h addr=%0h len=%0d size=%0d burst=%0d lock=%0b",
                   dir == AOU_AXI_WR ? "WR" : "RD", rp, local_side ? "local" : "remote",
                   id, addr, len, size, burst, lock);
-    s = {s, $sformatf(" cache=%0h prot=%0h qos=%0h", cache, prot, qos)};
-    if (dir == AOU_AXI_WR) s = {s, $sformatf(" bresp=%0d", bresp)};
+    s = {s, $sformatf(" cache=%0h prot=%0h qos=%0h user=%04h", cache, prot, qos, user)};
+    if (dir == AOU_AXI_WR) s = {s, $sformatf(" bresp=%0d buser=%04h", bresp, buser)};
+    if (wuser.size() > 0) s = {s, " wuser=", user_list(wuser)};
+    if (ruser.size() > 0) s = {s, " ruser=", user_list(ruser)};
+    if (link_wuser.size() > 0)
+      s = {s, $sformatf(" link: size=%0d len=%0d wuser=", link_size, link_len),
+           user_list(link_wuser)};
+    return s;
+  endfunction
+
+  // "0001,0002,..." with the tail elided past eight entries.
+  static function string user_list(bit [15:0] u[]);
+    string s = "";
+    foreach (u[i]) begin
+      if (i == 8) begin
+        s = {s, $sformatf(",...(%0d)", u.size())};
+        break;
+      end
+      s = {s, (i == 0) ? "" : ",", $sformatf("%04h", u[i])};
+    end
     return s;
   endfunction
 
@@ -204,6 +254,14 @@ class aou_axi_txn extends uvm_sequence_item;
     cache      = t.cache;
     qos        = t.qos;
     prot       = t.prot;
+    user       = t.user;
+    user_fixed = t.user_fixed;
+    wuser      = t.wuser;
+    buser      = t.buser;
+    ruser      = t.ruser;
+    link_size  = t.link_size;
+    link_len   = t.link_len;
+    link_wuser = t.link_wuser;
     data_bytes = t.data_bytes;
     data       = t.data;
     strb       = t.strb;
@@ -212,6 +270,7 @@ class aou_axi_txn extends uvm_sequence_item;
     t_addr     = t.t_addr;
     t_done     = t.t_done;
     t_wlast    = t.t_wlast;
+    t_w        = t.t_w;
     t_r        = t.t_r;
     aborted    = t.aborted;
     reset_outstanding = t.reset_outstanding;

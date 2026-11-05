@@ -35,8 +35,10 @@ violate; [`../README.md`](../README.md) carries the user-facing summary.
 ## Overview
 
 A synthesizable AXI-over-UCIe protocol checker for one single-PHY UCIe FDI
-link: the AoU v0.7 wire format the design implements, judged by the v0.8
-activation and credit-ordering rules (v0.8 decides where the two differ).
+link: the AoU v0.7 wire format the design implements, with v0.8's Activation
+messages (the four-granule ActivateReq carrying a profile per plane, Ch. 11),
+judged by the v0.8 activation and credit-ordering rules (v0.8 decides where
+the two differ).
 Section numbers here are v0.8's unless marked v0.7; the wire-format package
 cites v0.7's. It observes either or both directions -- the LP stream the die
 under observation drives, the PL stream its peer drives -- reconstructs 256-byte
@@ -505,9 +507,14 @@ an illegal MSGTYPE breaks one rule rather than four. Legal values are
 `aou_fdi_wire_pkg`'s from Tables 1, 15, 27 and 5.4, and deliberately not
 `AOU_ACTIVATION_CTRL`'s.
 
-**Reserved fields.** The activation message's RsvdZero (stream bits 12-39,
-Figure 19) and PROPERTYREQ on any opcode but ActivateReq ("must be 0b0 for
-other messages", v0.7 Table 26); the credit grant's 17-bit RsvdZero tail, which lies
+**Reserved fields.** The Activation messages' RsvdZero as v0.8 lays them out
+(8.3.4, Ch. 11): on the ActivateReq, stream bits 11-13 of the first granule and
+0-13 of each of its three others, plus the profile fields (14-39) of a granule
+whose plane this die does not have (RP_COUNT; judged on the die's own stream
+only, the peer's plane count not being a parameter); on ActivateAck,
+DeactivateReq and DeactivateAck, bits 11-39, which take in v0.7's PROPERTYREQ.
+Each ActivateReq granule is reported by itself, the one whose bits are set;
+the credit grant's 17-bit RsvdZero tail, which lies
 in its second granule -- the granule the report names, since the first would
 show none of the offending bits; and the RsvdZero in the first granule of the
 credited messages that have one -- stream bit 6 on WriteReq and ReadReq, bits
@@ -569,7 +576,10 @@ A multi-bridge bench needs one instance per FDId.
 
 The counts are `aou_fdi_wire_pkg`'s, one per Table 2-13, 19 and 26; every
 message has the fixed length of its type under the Base Profile (v0.7 5.8),
-which ignores PROFEXTLEN; v0.8 has no PROFEXTLEN. `MAX_MSG_G` (30) sizes the overrun carry and must not exceed
+which ignores PROFEXTLEN; v0.8 has no PROFEXTLEN. The ActivateReq is the one
+Activation message of four granules (v0.8 Ch. 11, a profile per plane); the
+other three opcodes are one, so the Activation length is read from
+ACTIVATIONOP. `MAX_MSG_G` (30) sizes the overrun carry and must not exceed
 the flit.
 
 ## Message-start consistency

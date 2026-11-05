@@ -35,6 +35,7 @@ class aou_axi_sub_driver extends uvm_component;
   protected aou_axi_txn wb_q[$];   // complete W bursts whose AW has not arrived
   protected bit [1023:0] wd_q[$];  // beats of the W burst in progress
   protected bit [127:0]  ws_q[$];
+  protected bit [15:0]   wu_q[$];
 
   protected aou_axi_txn b_q[$];
   protected longint unsigned b_due[$];
@@ -113,6 +114,7 @@ class aou_axi_sub_driver extends uvm_component;
     wb_q.delete();
     wd_q.delete();
     ws_q.delete();
+    wu_q.delete();
     b_q.delete();
     b_due.delete();
     r_q.delete();
@@ -142,11 +144,13 @@ class aou_axi_sub_driver extends uvm_component;
     vif.sub_cb.bvalid  <= 1'b0;
     vif.sub_cb.bid     <= '0;
     vif.sub_cb.bresp   <= '0;
+    vif.sub_cb.buser   <= '0;
     vif.sub_cb.rvalid  <= 1'b0;
     vif.sub_cb.rid     <= '0;
     vif.sub_cb.rdata   <= '0;
     vif.sub_cb.rresp   <= '0;
     vif.sub_cb.rlast   <= 1'b0;
+    vif.sub_cb.ruser   <= '0;
   endfunction
 
   protected function aou_axi_txn new_req(aou_axi_dir_e dir);
@@ -166,6 +170,8 @@ class aou_axi_sub_driver extends uvm_component;
       t.cache = vif.sub_cb.awcache;
       t.prot  = vif.sub_cb.awprot;
       t.qos   = vif.sub_cb.awqos;
+      t.user  = vif.sub_cb.awuser;
+      t.buser = cfg.one_user();
     end else begin
       t.id    = vif.sub_cb.arid;
       t.addr  = vif.sub_cb.araddr;
@@ -176,6 +182,8 @@ class aou_axi_sub_driver extends uvm_component;
       t.cache = vif.sub_cb.arcache;
       t.prot  = vif.sub_cb.arprot;
       t.qos   = vif.sub_cb.arqos;
+      t.user  = vif.sub_cb.aruser;
+      cfg.fill_user(t.ruser, t.beats());
     end
     return t;
   endfunction
@@ -189,16 +197,20 @@ class aou_axi_sub_driver extends uvm_component;
     if (w_rdy && vif.sub_cb.wvalid === 1'b1) begin
       wd_q.push_back(vif.sub_cb.wdata);
       ws_q.push_back(vif.sub_cb.wstrb);
+      wu_q.push_back(vif.sub_cb.wuser);
       if (vif.sub_cb.wlast === 1'b1) begin
         t = aou_axi_txn::type_id::create("t");
-        t.data = new[wd_q.size()];
-        t.strb = new[ws_q.size()];
+        t.data  = new[wd_q.size()];
+        t.strb  = new[ws_q.size()];
+        t.wuser = new[wu_q.size()];
         foreach (wd_q[k]) begin
-          t.data[k] = wd_q[k];
-          t.strb[k] = ws_q[k];
+          t.data[k]  = wd_q[k];
+          t.strb[k]  = ws_q[k];
+          t.wuser[k] = wu_q[k];
         end
         wd_q.delete();
         ws_q.delete();
+        wu_q.delete();
         wb_q.push_back(t);
       end
       w_cnt = cfg.timing.w_ready.next();
@@ -246,8 +258,9 @@ class aou_axi_sub_driver extends uvm_component;
     while (aw_q.size() > 0 && wb_q.size() > 0) begin
       t = aw_q.pop_front();
       w = wb_q.pop_front();
-      t.data = w.data;
-      t.strb = w.strb;
+      t.data  = w.data;
+      t.strb  = w.strb;
+      t.wuser = w.wuser;
       t.bresp = execute_write(t);
       b_q.push_back(t);
       b_due.push_back(cyc + 64'(cfg.timing.b_lat.next()));
@@ -303,6 +316,7 @@ class aou_axi_sub_driver extends uvm_component;
         b_idx  = k;
         vif.sub_cb.bid   <= b_q[k].id;
         vif.sub_cb.bresp <= b_q[k].bresp;
+        vif.sub_cb.buser <= b_q[k].buser;
       end
       vif.sub_cb.bvalid <= b_busy;
     end
@@ -323,6 +337,7 @@ class aou_axi_sub_driver extends uvm_component;
         vif.sub_cb.rdata <= d;
         vif.sub_cb.rresp <= resp;
         vif.sub_cb.rlast <= (beat == t.beats() - 1);
+        vif.sub_cb.ruser <= (beat < t.ruser.size()) ? t.ruser[beat] : 16'h0;
       end
     end
     r_hidden = r_busy && fault_rvalid_pct > 0 && $urandom_range(99) < fault_rvalid_pct;
@@ -347,12 +362,14 @@ class aou_axi_sub_driver extends uvm_component;
     if (c == 0) begin
       vif.sub_cb.bid    <= orph_id[0][0];
       vif.sub_cb.bresp  <= orph_resp[0][0];
+      vif.sub_cb.buser  <= '0;
       vif.sub_cb.bvalid <= 1'b1;
     end else begin
       vif.sub_cb.rid    <= orph_id[1][0];
       vif.sub_cb.rdata  <= '0;
       vif.sub_cb.rresp  <= orph_resp[1][0];
       vif.sub_cb.rlast  <= 1'b1;
+      vif.sub_cb.ruser  <= '0;
       vif.sub_cb.rvalid <= 1'b1;
     end
   endfunction

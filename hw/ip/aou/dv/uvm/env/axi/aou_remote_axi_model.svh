@@ -7,6 +7,9 @@
 // Calls may overlap (fork one per request): responses come back
 // out of order across IDs and in call order within an ID, separately for reads
 // and writes. Every response is also published on ap with local_side = 0.
+// Like a local subordinate it gives each response a BUSER or one RUSER per
+// beat from cfg.user_mode; aou_t1_l4a_adapter sends them as the FLEX of the
+// WriteResp/ReadData and aou_t1_attr_chk checks the DUT's S port presents them.
 // Cycles are counted on cfg.vif's mon_cb; vif is needed only for nonzero latency
 // or same-ID waits.
 class aou_remote_axi_model extends uvm_component;
@@ -72,6 +75,7 @@ class aou_remote_axi_model extends uvm_component;
         `uvm_error(get_type_name(), $sformatf("write request needs %0d data/strb beats: %s",
                                               req.beats(), req.convert2string()))
       else rsp.bresp = cfg.mem.axi_write(rsp, cfg.exclusive_en);
+      rsp.buser = cfg.one_user();
       wait_cycles(cfg.timing.b_lat.next());
       while (wr_serve[id] != ticket) wait_cycles(1);
       wr_serve[id]++;
@@ -88,6 +92,7 @@ class aou_remote_axi_model extends uvm_component;
       rsp.data  = new[rsp.beats()];
       rsp.rresp = new[rsp.beats()];
       rsp.strb.delete();
+      cfg.fill_user(rsp.ruser, rsp.beats());
       for (int unsigned i = 0; i < rsp.beats(); i++) begin
         rsp.data[i]  = cfg.mem.read_beat(rsp, i);
         rsp.rresp[i] = cfg.mem.axi_read_resp(rsp, i, cfg.exclusive_en);

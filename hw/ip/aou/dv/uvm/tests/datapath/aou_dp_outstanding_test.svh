@@ -13,10 +13,16 @@
 // at the M port (FEAT-R22) and its cg_mo full bin records that the limit was
 // reached; the DUT must
 // back-pressure without an error or a lost transfer.
+// +dp_sfull=1: local-originated only, the S-port managers may keep the port's
+// outstanding limit (S_RD_MO_CNT, S_WR_MO_CNT) in flight and hold BREADY and
+// RREADY low until it is, sometimes for over 1000 cycles (aou_axi_timing
+// b_fill_hold, r_fill_hold), so each S port reaches its limit with its
+// responses backed up; the DUT must neither lose nor reorder a response.
 class aou_dp_outstanding_test extends aou_dp_base_test;
   `uvm_component_utils(aou_dp_outstanding_test)
 
   int unsigned mfull;
+  int unsigned sfull;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -29,6 +35,14 @@ class aou_dp_outstanding_test extends aou_dp_base_test;
     k.max_id = 15;
     k.n = 64;
     void'($value$plusargs("dp_mfull=%d", mfull));
+    void'($value$plusargs("dp_sfull=%d", sfull));
+    if (sfull != 0) begin
+      k.dir = AOU_T1_L2R;
+      k.batch = 64;
+      k.num_slots = 64;
+      k.max_id = 63;
+      k.n = 192;
+    end
     if (mfull != 0) begin
       k.dir = AOU_T1_R2L;
       k.lens = '{0, 1, 3};
@@ -42,6 +56,14 @@ class aou_dp_outstanding_test extends aou_dp_base_test;
   endfunction
 
   function void configure_test();
+    if (sfull != 0) begin
+      for (int unsigned r = 0; r < cfg.n_rp; r++) begin
+        cfg.s_mgr_cfg[r].max_wr_outstanding = AOU_T1_S_MO_CNT;
+        cfg.s_mgr_cfg[r].max_rd_outstanding = AOU_T1_S_MO_CNT;
+        cfg.s_mgr_cfg[r].timing.b_fill_hold = 1'b1;
+        cfg.s_mgr_cfg[r].timing.r_fill_hold = 1'b1;
+      end
+    end
     if (mfull == 0) return;
     for (int unsigned r = 0; r < cfg.n_rp; r++) begin
       cfg.m_sub_cfg[r].timing.b_lat.set_fixed(mfull);

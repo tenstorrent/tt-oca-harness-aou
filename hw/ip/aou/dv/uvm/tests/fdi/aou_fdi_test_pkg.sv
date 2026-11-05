@@ -30,7 +30,8 @@ package aou_fdi_test_pkg;
   localparam int FDI_CONFIG = 1;
 `endif
   // Beat bytes per PHY for each FDI_CONFIG (integrator guide §3.10)
-  localparam int BEAT0 = (FDI_CONFIG == 0 || FDI_CONFIG == 3) ? 32 : (FDI_CONFIG == 2) ? 128 : 64;
+  localparam int BEAT0 = (FDI_CONFIG == 0 || FDI_CONFIG == 3) ? 32 : (FDI_CONFIG == 2) ? 128 :
+                         (FDI_CONFIG == 5) ? 256 : 64;
   localparam int BEAT1 = (FDI_CONFIG == 4) ? 128 : 64;
 
   `include "aou_fdi_msg_log.svh"

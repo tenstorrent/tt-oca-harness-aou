@@ -63,8 +63,11 @@
 - test: aou_act_flit_test
   bug: tenstorrent/tt-oca-harness-aou#127
   check_re: 'AOU-R6: DUT->remote flit#\d+ G0: Activation message shares its flit: ActivateAck '
-  when_re: 'DUT rules: AoU v0\.9 draft \(\+v0p9draft\)[\s\S]*\[aou_act_flit_vseq\] requests while DISABLED'
+  when_re: 'DUT rules: AoU v0\.9 draft \(\+v0p9draft\)[\s\S]*fdi_beat_bytes=(32|64|128) [\s\S]*\[aou_act_flit_vseq\] requests while DISABLED'
   note: >-
     +v0p9draft +mode=act_req: the stimulus this test exists for. Requests held across the
     activation leave in the ActivateAck's flit; the DUT follows v0.7.1 (Activation at G0 only).
-    +mode=deact_rsp passes: its flits are the permitted layouts
+    +mode=deact_rsp passes: its flits are the permitted layouts. Not at the 256 B FDI width:
+    the one-step packer (FDI_CFG_SP_256B) builds the whole flit in the cycle it pops the
+    Activation message, while the request FIFOs are held, so the ActivateAck's flit carries
+    nothing else and the test passes there

@@ -125,6 +125,33 @@ run_modes = ["stress"]
 args = ["+pk=prof"]
 
 [[tests]]
+name = "aou_pack_test.pk-edge.pk_start-23"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=edge", "+pk_start=23"]
+
+[[tests]]
+name = "aou_pack_test.pk-edge.pk_start-47"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=edge", "+pk_start=47"]
+
+[[tests]]
+name = "aou_pack_test.pk-wreq8"
+module = { uvm = "aou_pack_test" }
+seed = 1
+reseed = 2
+tags = ["stress"]
+run_modes = ["stress"]
+args = ["+pk=wreq8"]
+
+[[tests]]
 name = "aou_pattern_test.dp_pattern-walk1"
 module = { uvm = "aou_pattern_test" }
 seed = 1
@@ -573,7 +600,7 @@ args = ["+st_bp=all", "+small_size_pct=5"]
 
 [[groups]]
 name = "stress"
-expected_count = 58
+expected_count = 61
 tests = [
   "aou_stress_test.st_bp-all.small_size_pct-5",
   "aou_pack_test.pk-crossflit.remote_bytes-32",
@@ -588,6 +615,9 @@ tests = [
   "aou_pack_test.pk-crdt",
   "aou_pack_test.pk-b2b",
   "aou_pack_test.pk-prof",
+  "aou_pack_test.pk-edge.pk_start-23",
+  "aou_pack_test.pk-edge.pk_start-47",
+  "aou_pack_test.pk-wreq8",
   "aou_pattern_test.dp_pattern-walk1",
   "aou_pattern_test.dp_pattern-walk0",
   "aou_pattern_test.dp_pattern-ones",

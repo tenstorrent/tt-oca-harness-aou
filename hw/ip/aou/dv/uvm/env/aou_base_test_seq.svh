@@ -368,6 +368,16 @@ class aou_base_test_seq extends ocah_sequence;
     end
   endtask
 
+  // The profile the remote die announces for its RP rp (its own configuration;
+  // the DUT stores it in PROFILE_RMT_RPn on each accepted ActivateReq). Takes
+  // effect at the remote's next ActivateReq. The DUT's own side has no knob:
+  // it announces the Basic Profile (PROFILE_CFG_RPn read-only 0/0/0, AOU-R12).
+  function void remote_profile(int unsigned rp, bit [4:0] id, bit [4:0] rev, bit [15:0] opt);
+    cfg.l3_cfg.profile_id[rp] = id;
+    cfg.l3_cfg.profile_rev[rp] = rev;
+    cfg.l3_cfg.profile_opt[rp] = opt;
+  endfunction
+
   // TX low-power mode. Static configuration: call it only while the DUT is
   // DISABLED (before activation, or after a deactivation has completed).
   task lp_mode(bit en, int threshold = -1);
