@@ -285,6 +285,10 @@ flits on an idle ENABLED link; with TX_LP_MODE=1 and threshold 0 it sends
 none without work (BUGS/017 interim: threshold 0 = no heartbeat). Traffic
 must pass in both modes. TX_LP_MODE is static configuration (T1-LP03), so
 each mode is its own activation session: deactivate, program, activate.
+The idle count is judged against the cycles the Adapter could take a beat
+(pl_trdy high, no stall), so the pl_trdy policy a seed draws doesn't
+decide it: with TX_LP_MODE=0 the DUT must send at least one flit per 16 such
+cycles, the same rate as one flit per 16 cycles with pl_trdy always high.
 
 *Rules named.* `T1-LP03`
 
