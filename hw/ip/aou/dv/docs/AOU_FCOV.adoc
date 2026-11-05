@@ -344,9 +344,19 @@ Areas), with the groups that serve as evidence for their stimulus-shape items.
 | Registers; resets, clocks, DFT and RTL assertions; performance | none (<<aou-fcov-not-covered>>)
 |===
 
-`fc.json` carries a `plan_ids` field per group and bin that is still empty;
-filling it so `fc_report` can report per plan item is open work in the plan's
-road-map.
+Each bin also names the plan items it is evidence for, in its `plan_ids`
+field in `fc.json` and `fc_merged.json` (a group's `plan_ids` are the items
+all its bins serve). The bench's groups set them where they are declared,
+with `aou_fc_group::plan()` calls (every bin of a group, of a coverpoint or
+cross, or the bins matching a pattern); the AXI4 monitors from the `FC_PLAN`
+table next to their bins, the same for every port. An ID is the text of a
+surviving item (`4.9`, not a merged `4.10`), and `make check-config` checks
+every one against `docs/test_plan_items.yaml`. Given the coverage
+(`scripts/plan_status.py --fc <fc_merged.json>`, which a coverage regression
+passes its union), the plan's status page lists each stimulus-shape item with
+its bins hit over total, per coverpoint, and its holes. Groups no plan item
+names: `cg_stray_dack` (out-of-protocol messages have no plan item),
+`split_cg` (the remote model's splitter, not the DUT's), and the AXI4 `cg_cmd`.
 
 === Goals and Closure
 
@@ -389,7 +399,9 @@ coverage model or its tooling.
   own way. Cross exclusions and tags are the service's alone.
 * A table entry is a value or range bin, an ignored bin (`IGN`), an illegal
   bin (`ILL`, with the rule that reports a hit, or none when a checker owns
-  it), a cross exclusion by pattern (`XIGN`, `XILL`) or a tag (`TAG`).
+  it), a cross exclusion by pattern (`XIGN`, `XILL`) or a tag (`TAG`). Plan
+  items are not in the tables (a table can serve several groups): the
+  service's declaration names them with `plan()` (Plan Traceability).
 * `make build COV=1` builds into `build/<build>-cov/` with code-coverage
   instrumentation of `RTL/` and the AXI4 monitors bound to every
   `AOU_CORE_TOP`. The bench covergroups always sample, but `fc.json` is written
@@ -400,7 +412,8 @@ coverage model or its tooling.
   judge; the AXI4 monitors one cycle after each channel handshake.
 * Each `COV=1` run writes `<run>/fc.json` (every group, coverpoint and cross,
   every bin with its count, zero-hit bins included, samples outside every bin,
-  tags and illegal marks) and `aou_axi4_fc.<run-id>.txt`.
+  tags, illegal marks and plan items) and `aou_axi4_fc.<run-id>.txt` (its
+  `PLAN` lines carry the monitors' plan items).
   `scripts/fc_report.py` (`--help`) union-merges the passing runs of a build
   into `summary.txt` (hit/total per group and point over the headline bins, and
   the `rare`, `v0.8` and `v0.9draft` totals apart),

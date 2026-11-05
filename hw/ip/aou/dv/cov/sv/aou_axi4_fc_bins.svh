@@ -36,6 +36,60 @@
                                         "cp_r_stall_len","cp_b_stall_len"};
   localparam string B4K_BINS[2]   = '{"within_page","ends_at_4k"};
 
+  // ---- test-plan items each bin is evidence for ----
+  // "<cg> <cp> <bins> <IDs>": the bins of <cg>|<cp> matching <bins> serve the plan
+  // items <IDs> (docs/test_plan_items.yaml, written as text). <bins> is an
+  // aou_fc_point::mark pattern over the names fc_report.py gives them (a cross
+  // bin "A,B"); <cp> "*" is every point of <cg>. Every port has the same items.
+  // check-config checks every ID.
+  localparam int N_PLAN = 44;
+  localparam string FC_PLAN[N_PLAN] = '{
+    "cg_aw cp_aw_size * 4.1",
+    "cg_aw cp_aw_len beat_1 11.13",
+    "cg_aw cp_aw_len beat_2|beat_4|beat_8|beat_16|beat_32|beat_64|beat_128|beat_256 4.9",
+    "cg_aw cx_size_x_len *,beat_1 4.1",
+    "cg_aw cx_size_x_len *,beat_2|beat_4|beat_8|beat_16|beat_32|beat_64|beat_128|beat_256 4.9",
+    "cg_aw cp_aw_cache * 4.26",
+    "cg_aw cp_aw_prot * 4.27",
+    "cg_aw cp_aw_qos * 4.28",
+    "cg_aw cp_aw_lock exclusive 4.25",
+    "cg_aw cp_aw_id * 8.15",
+    "cg_aw cp_aw_addr_align bus_aligned|size_aligned 7.10",
+    "cg_aw cp_aw_addr_align unaligned 7.11",
+    "cg_aw cx_size_x_align *,bus_aligned|size_aligned 7.10",
+    "cg_aw cx_size_x_align *,unaligned 7.11",
+    "cg_aw cp_aw_4k_boundary ends_at_4k 7.12",
+    "cg_ar cp_ar_size * 5.1",
+    "cg_ar cp_ar_len beat_1 11.13",
+    "cg_ar cp_ar_len beat_2|beat_4|beat_8|beat_16|beat_32|beat_64|beat_128|beat_256 5.9",
+    "cg_ar cx_size_x_len *,beat_1 5.1",
+    "cg_ar cx_size_x_len *,beat_2|beat_4|beat_8|beat_16|beat_32|beat_64|beat_128|beat_256 5.9",
+    "cg_ar cp_ar_cache * 5.24",
+    "cg_ar cp_ar_prot * 5.25",
+    "cg_ar cp_ar_qos * 5.26",
+    "cg_ar cp_ar_lock exclusive 5.23",
+    "cg_ar cp_ar_id * 8.15",
+    "cg_ar cp_ar_addr_align bus_aligned|size_aligned 7.10",
+    "cg_ar cp_ar_addr_align unaligned 7.11",
+    "cg_ar cx_size_x_align *,bus_aligned|size_aligned 7.10",
+    "cg_ar cx_size_x_align *,unaligned 7.11",
+    "cg_ar cp_ar_4k_boundary ends_at_4k 7.12",
+    "cg_w cp_w_strb_pattern all_set 4.18",
+    "cg_w cp_w_strb_pattern none_set 4.19",
+    "cg_w cp_w_strb_pattern partial 4.20",
+    "cg_r cp_r_resp okay 5.20",
+    "cg_r cp_r_resp slverr 5.21",
+    "cg_r cp_r_resp decerr 5.22",
+    "cg_r cp_r_last * 5.19",
+    "cg_b cp_b_resp okay 4.22",
+    "cg_b cp_b_resp slverr 4.23",
+    "cg_b cp_b_resp decerr 4.24",
+    "cg_r cp_r_resp exokay 5.23",
+    "cg_b cp_b_resp exokay 4.25",
+    "cg_os * * 8.1",
+    "cg_bp * * 10.15"
+  };
+
   // ---- value -> bin-name classifiers ("" => value falls in no counted bin) ----
   function automatic string fc_sz_name(input logic [2:0] s);
     return (s <= MAX_SIZE_CODE) ? $sformatf("bytes_%0d", s) : "";
@@ -247,6 +301,7 @@
     s = {s, $sformatf("#STAT total_wr=%0d total_rd=%0d max_wr_os=%0d max_rd_os=%0d\n",
                       total_wr_cmds, total_rd_cmds, max_wr_os_seen, max_rd_os_seen)};
     foreach (cov_hit[k]) s = {s, $sformatf("BIN %s %0d\n", k, cov_hit[k])};
+    foreach (FC_PLAN[i]) s = {s, "PLAN ", FC_PLAN[i], "\n"};
     s = {s, "#ENDIFACE\n"};
     return s;
   endfunction

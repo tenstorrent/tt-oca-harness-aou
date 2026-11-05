@@ -27,12 +27,21 @@ of its verdict.txt (scripts/check_run.py). Runs without one are unjudged and
 ignored unless --judge, which judges their sim.log with check_run.py's rules
 (read-only); a run whose sim.log is still being written is skipped. Merged items
 report through their surviving ID; dropped items are listed but not counted.
+
+--fc takes the functional coverage (fc_merged.json from scripts/fc_report.py, e.g.
+out/<build>/merged/fc/ or a regression's union/fc/; repeatable, unioned). Each bin
+names the plan items it is evidence for (plan_ids, set in the bench's coverage
+declarations), and the page then lists, per stimulus-shape item (one that bins
+name), its bins hit over total and its holes. Illegal bins aren't counted, and
+bins tagged with a spec revision the RTL doesn't implement (v0.8) are counted
+apart. This doesn't change an item's status.
 """
 
 import argparse
 import csv
 import glob
 import io
+import json
 import os
 import re
 import sys
@@ -41,6 +50,7 @@ from collections import Counter, defaultdict
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check_run  # noqa: E402
+import fc_report  # noqa: E402
 import listyaml  # noqa: E402
 import plan_areas  # noqa: E402
 import sim_cfg  # noqa: E402
@@ -267,7 +277,62 @@ def evaluate(args):
             status, ev = item_status(by_item.get(it["id"], []))
         rows.append({**it, "status": status, "evidence": ev,
                      "area": titles[area_of[it["id"]]], "area_rank": order.index(area_of[it["id"]])})
-    return rows, runs, unmatched, unknown, paths
+    fc = None
+    if args.fc:
+        fc = fc_by_item(load_fc(args.fc), aliases)
+        for pid in fc:
+            if pid not in known:
+                unknown[pid].add("coverage bins")
+    return rows, runs, unmatched, unknown, paths, fc
+
+
+def load_fc(paths):
+    """{(group, point, bin): bin} over fc_merged.json files: a bin is hit when any file hit it."""
+    bins = {}
+    for path in paths:
+        with open(path, encoding="utf-8") as fh:
+            db = json.load(fh)
+        for g, grp in db["groups"].items():
+            for pn, p in grp["points"].items():
+                for bn, b in p["bins"].items():
+                    m = bins.setdefault((g, pn, bn), {"hits": 0, "spec": "", "illegal": False, "plan_ids": []})
+                    m["hits"] += b.get("hits", 0)
+                    m["spec"] = m["spec"] or b.get("spec", "")
+                    m["illegal"] |= bool(b.get("illegal"))
+                    m["plan_ids"] += [i for i in b.get("plan_ids", []) if i not in m["plan_ids"]]
+    return bins
+
+
+AXI4_PORT = re.compile(r"^axi4\.[^.]+\.")
+
+
+def fc_by_item(bins, aliases):
+    """{item: [(group, point, bin, b)]} for the counted bins (not illegal) that name it."""
+    out = defaultdict(list)
+    for (g, pn, bn), b in sorted(bins.items()):
+        if b["illegal"]:
+            continue
+        for pid in dict.fromkeys(aliases.get(i, i) for i in b["plan_ids"]):
+            out[pid].append((g, pn, bn, b))
+    return out
+
+
+def fc_cells(entries):
+    """(hit/total, per-point counts, holes) of an item's bins; revision-tagged bins apart.
+    The AXI4 monitors' points are summed over their ports (axi4.*)."""
+    head = [e for e in entries if not fc_report.is_revision(e[3]["spec"])]
+    hit = sum(1 for e in head if e[3]["hits"])
+    pts = {}
+    for g, pn, bn, b in head:
+        c = pts.setdefault(f"{AXI4_PORT.sub('axi4.*.', g)}.{pn}", [0, 0])
+        c[0] += 1 if b["hits"] else 0
+        c[1] += 1
+    tagged = [e for e in entries if fc_report.is_revision(e[3]["spec"])]
+    total = f"{hit}/{len(head)}" + (f" (+{sum(1 for e in tagged if e[3]['hits'])}/{len(tagged)} "
+                                    f"{'/'.join(sorted({e[3]['spec'] for e in tagged}))})" if tagged else "")
+    holes = [f"{g}.{pn} {bn}" for g, pn, bn, b in head if not b["hits"]]
+    return (total, "; ".join(f"{k} {h}/{n}" for k, (h, n) in pts.items()),
+            "; ".join(holes[:6]) + (f" (+{len(holes) - 6} more)" if len(holes) > 6 else ""))
 
 
 def counts(rows):
@@ -279,7 +344,7 @@ def md_escape(s):
     return str(s).replace("|", "\\|")
 
 
-def render_md(rows, runs, unmatched, unknown, paths, args):
+def render_md(rows, runs, unmatched, unknown, paths, args, fc=None):
     out = io.StringIO()
     w = out.write
     active = [r for r in rows if r["status"] in STATUSES]
@@ -316,8 +381,19 @@ def render_md(rows, runs, unmatched, unknown, paths, args):
         title = r["title"] if len(r["title"]) <= 90 else r["title"][:87] + "..."
         w(f"| {r['id']} | {r['area']} | {r['priority']} | {md_escape(title)} | {r['status']} | "
           f"{md_escape(r['evidence'])} |\n")
+    if fc is not None:
+        w(f"\n## Coverage behind stimulus-shape items\n\nThe functional-coverage bins that name each item "
+          f"({', '.join(md_escape(p) for p in args.fc)}). Bins hit over total, illegal bins left out and "
+          f"spec-revision-tagged bins in parentheses; points sum the AXI4 ports (axi4.*); holes list the first "
+          f"bins no passing run hit.\n\n| ID | Title | Status | Bins hit | Points | Holes |\n|---|---|---|---|---|---|\n")
+        for r in rows:
+            if r["id"] in fc:
+                total, pts, holes = fc_cells(fc[r["id"]])
+                title = r["title"] if len(r["title"]) <= 60 else r["title"][:57] + "..."
+                w(f"| {r['id']} | {md_escape(title)} | {r['status']} | {total} | {md_escape(pts)} | "
+                  f"{md_escape(holes) or '-'} |\n")
     if unknown:
-        w("\n## Run-list plan IDs not in the plan\n\n")
+        w("\n## Plan IDs not in the plan\n\n")
         for pid, lists in sorted(unknown.items()):
             w(f"- {pid} ({', '.join(sorted(lists))})\n")
     if unmatched:
@@ -352,13 +428,16 @@ def main(argv=None):
     ap.add_argument("--settle", type=float, default=10,
                     help="with --judge: a sim.log without a report summary changed within this many minutes "
                          "is still running (default 10)")
+    ap.add_argument("--fc", action="append", metavar="FC_MERGED_JSON",
+                    help="functional coverage (fc_report.py's fc_merged.json; repeatable): list the bins "
+                         "behind each stimulus-shape item")
     ap.add_argument("--format", choices=["md", "csv"], default="md")
     ap.add_argument("-o", "--output", help="write here instead of stdout")
     args = ap.parse_args(argv)
     args.out_dir = os.path.abspath(args.out_dir)
 
-    rows, runs, unmatched, unknown, paths = evaluate(args)
-    text = render_csv(rows) if args.format == "csv" else render_md(rows, runs, unmatched, unknown, paths, args)
+    rows, runs, unmatched, unknown, paths, fc = evaluate(args)
+    text = render_csv(rows) if args.format == "csv" else render_md(rows, runs, unmatched, unknown, paths, args, fc)
     if args.output:
         with open(args.output, "w", encoding="utf-8") as fh:
             fh.write(text)

@@ -106,6 +106,13 @@ class aou_fdi_cov extends uvm_object;
       p = fc_fdi_xfer.cp("cp_gap"); `AOU_FDI_FC_GAP(AOU_FC_REG)
       void'(fc_fdi_xfer.add_cross("x_dir_stall", "cp_dir cp_stall"));
       void'(fc_fdi_xfer.add_cross("x_dir_gap", "cp_dir cp_gap"));
+      fc_fdi_xfer.plan("18.10");
+      fc_fdi_xfer.plan("18.1 18.11", "cp_width", "b32");
+      fc_fdi_xfer.plan("18.2 18.11", "cp_width", "b64");
+      fc_fdi_xfer.plan("18.3 18.11", "cp_width", "b128");
+      fc_fdi_xfer.plan("18.12", "x_dir_stall", "rx,*");
+      fc_fdi_xfer.plan("11.1", "x_dir_gap", "tx,b2b");
+      fc_fdi_xfer.plan("11.2", "x_dir_gap", "rx,b2b");
     end
     fc_fdi_cancel = db.group("l1.cg_fdi_cancel", fresh);
     if (fresh) begin
@@ -114,6 +121,15 @@ class aou_fdi_cov extends uvm_object;
       p = fc_fdi_cancel.cp("cp_repeat"); `AOU_FDI_FC_REPEAT(AOU_FC_REG)
       p = fc_fdi_cancel.cp("cp_stalled"); `AOU_FDI_FC_TX_STALLED(AOU_FC_REG)
       void'(fc_fdi_cancel.add_cross("x_half_kind", "cp_half cp_kind"));
+      fc_fdi_cancel.plan("18.12");
+      fc_fdi_cancel.plan("18.6", "cp_kind", "with_valid");
+      fc_fdi_cancel.plan("18.8", "cp_kind", "idle");
+      fc_fdi_cancel.plan("18.6", "x_half_kind", "*,with_valid");
+      fc_fdi_cancel.plan("18.8", "x_half_kind", "*,idle");
+      fc_fdi_cancel.plan("18.24", "cp_half", "h1");
+      fc_fdi_cancel.plan("18.24", "x_half_kind", "h1,*");
+      fc_fdi_cancel.plan("18.24", "cp_repeat", "second|more");
+      fc_fdi_cancel.plan("18.24", "cp_stalled", "tx_stalled");
     end
     fc_fdi_stall = db.group("l1.cg_fdi_stall", fresh);
     if (fresh) begin
@@ -125,10 +141,16 @@ class aou_fdi_cov extends uvm_object;
       `AOU_FDI_FC_X_WHERE_LAT(AOU_FC_REG)
       p = fc_fdi_stall.add_cross("x_where_trdy", "cp_where cp_trdy_at_req");
       `AOU_FDI_FC_X_WHERE_TRDY(AOU_FC_REG)
+      fc_fdi_stall.plan("18.9");
+      fc_fdi_stall.plan("18.22", "cp_where", "mid_flit");
+      fc_fdi_stall.plan("18.22", "cp_trdy_at_req", "trdy_low");
+      fc_fdi_stall.plan("18.22", "x_where_lat", "mid_flit,*");
+      fc_fdi_stall.plan("18.22", "x_where_trdy", "mid_flit,*");
     end
     fc_fdi_abandon = db.group("l1.cg_fdi_abandon", fresh);
     if (fresh) begin
       p = fc_fdi_abandon.cp("cp_dir"); `AOU_FDI_FC_ABANDON(AOU_FC_REG)
+      fc_fdi_abandon.plan("18.23");
     end
   endfunction
 

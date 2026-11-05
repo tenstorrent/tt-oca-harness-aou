@@ -189,6 +189,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
       p = fc_crd.cp("cp_cls"); `AOU_T1_CRD_FC_CLS(AOU_FC_REG)
       p = fc_crd.cp("cp_ev"); `AOU_T1_CRD_FC_EV(AOU_FC_REG)
       void'(fc_crd.add_cross("x_cls_ev", "cp_cls cp_ev"));
+      fc_crd.plan("3.15");
     end
   endfunction
 

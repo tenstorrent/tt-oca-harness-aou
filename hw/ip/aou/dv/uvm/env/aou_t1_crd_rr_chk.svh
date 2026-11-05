@@ -57,6 +57,7 @@ class aou_t1_crd_rr_chk extends uvm_component;
     fc_crd_rr = db.group("env.cg_crd_rr", fresh);
     if (fresh) begin
       p = fc_crd_rr.cp("cp_owed"); `AOU_T1_RR_FC_OWED(AOU_FC_REG)
+      fc_crd_rr.plan("3.19");
     end
   endfunction
 

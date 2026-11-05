@@ -297,7 +297,10 @@ The status page counts items per feature area. Each item is:
 Each row's evidence names the scenarios, configurations and issues behind its
 status, and the regression summary has every failing run; that is the
 drill-down. Merged items report through their surviving ID; dropped items are
-listed with their reason and not counted.
+listed with their reason and not counted. Given the functional coverage
+(`--fc`, the union's `fc_merged.json` in a coverage regression), the page
+also lists each stimulus-shape item with the bins that name it, hit over
+total, and its holes; the bins don't change an item's status.
 
 [[aou-vplan-areas]]
 === Feature Areas

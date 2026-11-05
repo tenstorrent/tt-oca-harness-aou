@@ -58,6 +58,8 @@ class aou_t1_early_tbl_chk extends uvm_component;
     fc_early_tbl = db.group("env.cg_early_tbl", fresh);
     if (fresh) begin
       p = fc_early_tbl.cp("cp_ev"); `AOU_T1_EARLY_FC_EV(AOU_FC_REG)
+      fc_early_tbl.plan("16.11", "cp_ev", "full_stall");
+      fc_early_tbl.plan("16.12", "cp_ev", "stall_resumed");
     end
   endfunction
 

@@ -23,8 +23,11 @@ import sys
 from collections import defaultdict
 
 
-def parse_file(path, counts, stats, run_names):
-    """Parse one per-run report; accumulate union bin counts and stats."""
+def parse_file(path, counts, stats, run_names, plans=None):
+    """Parse one per-run report; accumulate union bin counts and stats.
+
+    With plans (a dict), also collect each interface's "PLAN <cg> <cp> <bins> <IDs>"
+    lines (the test-plan items of its bins) as plans[iface] = {(cg, cp, bins, IDs)}."""
     in_bindata = False
     iface = None
     run = None
@@ -63,6 +66,10 @@ def parse_file(path, counts, stats, run_names):
                             stats[iface][k] = max(stats[iface].get(k, 0), v)
                         else:
                             stats[iface][k] = stats[iface].get(k, 0) + v
+                continue
+            if line.startswith("PLAN ") and iface is not None and plans is not None:
+                _, cg, cp, pat, ids = line.split(None, 4)
+                plans.setdefault(iface, set()).add((cg, cp, pat, ids))
                 continue
             if line.startswith("BIN ") and iface is not None:
                 # "BIN <cg|cp|bin> <count>"

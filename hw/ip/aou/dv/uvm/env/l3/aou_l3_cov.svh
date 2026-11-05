@@ -268,6 +268,8 @@ class aou_l3_cov extends uvm_object;
     fc_act_fsm = db.group("l3.cg_act_fsm", fresh);
     if (fresh) begin
       p = fc_act_fsm.cp("cp_trans"); `AOU_L3_FC_ACT_TRANS(AOU_FC_REG)
+      fc_act_fsm.plan("1.1", "cp_trans", "disabled_activate|activate_enabled");
+      fc_act_fsm.plan("2.1", "cp_trans", "enabled_deactivate|deactivate_disabled");
     end
     fc_act_op = db.group("l3.cg_act_op", fresh);
     if (fresh) begin
@@ -276,6 +278,12 @@ class aou_l3_cov extends uvm_object;
       p = fc_act_op.cp("cp_legal"); `AOU_L3_FC_LEGAL(AOU_FC_REG)
       p = fc_act_op.add_cross("x_op_dir_legal", "cp_op cp_dir cp_legal");
       `AOU_L3_FC_X_ACT_OP(AOU_FC_REG)
+      fc_act_op.plan("1.1", "cp_op", "op[0]|op[1]");
+      fc_act_op.plan("2.1", "cp_op", "op[2]|op[3]");
+      fc_act_op.plan("1.1", "x_op_dir_legal", "op[0]|op[1],*,legal");
+      fc_act_op.plan("2.1", "x_op_dir_legal", "op[2]|op[3],*,legal");
+      fc_act_op.plan("1.9", "x_op_dir_legal", "op[0],tx,illegal");
+      fc_act_op.plan("1.8", "x_op_dir_legal", "op[2],tx,illegal");
     end
     fc_msg = db.group("l3.cg_msg", fresh);
     if (fresh) begin
@@ -284,6 +292,26 @@ class aou_l3_cov extends uvm_object;
       p = fc_msg.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       p = fc_msg.add_cross("x_kind_rp_dir", "cp_kind cp_rp cp_dir");
       `AOU_L3_FC_X_KIND_RP(AOU_FC_REG)
+      fc_msg.plan("11.6", "cp_kind", "wreq|rreq");
+      fc_msg.plan("4.1", "cp_kind", "w256|w512|w1024|wf256|wf512|wf1024");
+      fc_msg.plan("4.29", "cp_kind", "wf256|wf512|wf1024");
+      fc_msg.plan("5.1", "cp_kind", "r256|r512|r1024");
+      fc_msg.plan("7.1", "cp_kind", "w256|wf256|r256");
+      fc_msg.plan("7.2", "cp_kind", "w512|wf512|r512");
+      fc_msg.plan("7.3", "cp_kind", "w1024|wf1024|r1024");
+      fc_msg.plan("6.20", "cp_kind", "act");
+      fc_msg.plan("11.5", "cp_kind", "crdt");
+      fc_msg.plan("12.1", "cp_rp", "rp[0]");
+      fc_msg.plan("12.2", "cp_rp", "rp[1]");
+      fc_msg.plan("12.3", "cp_rp", "rp[2]");
+      fc_msg.plan("12.4", "cp_rp", "rp[3]");
+      fc_msg.plan("4.1", "x_kind_rp_dir", "w256|w512|w1024|wf256|wf512|wf1024,*,*");
+      fc_msg.plan("4.29", "x_kind_rp_dir", "wf256|wf512|wf1024,*,*");
+      fc_msg.plan("5.1", "x_kind_rp_dir", "r256|r512|r1024,*,*");
+      fc_msg.plan("12.1", "x_kind_rp_dir", "*,rp[0],*");
+      fc_msg.plan("12.2", "x_kind_rp_dir", "*,rp[1],*");
+      fc_msg.plan("12.3", "x_kind_rp_dir", "*,rp[2],*");
+      fc_msg.plan("12.4", "x_kind_rp_dir", "*,rp[3],*");
     end
     fc_flit_layout = db.group("l3.cg_flit_layout", fresh);
     if (fresh) begin
@@ -295,12 +323,20 @@ class aou_l3_cov extends uvm_object;
       `AOU_L3_FC_X_START_SIZE(AOU_FC_REG)
       p = fc_flit_layout.add_cross("x_size_span", "cp_size cp_span");
       `AOU_L3_FC_X_SIZE_SPAN(AOU_FC_REG)
+      fc_flit_layout.plan("6.10", "cp_start");
+      fc_flit_layout.plan("6.10", "x_start_size");
+      fc_flit_layout.plan("11.5", "cp_size", "g2");
+      fc_flit_layout.plan("11.6", "cp_size", "g3");
+      fc_flit_layout.plan("6.4", "cp_span", "multi_flit");
+      fc_flit_layout.plan("6.4", "x_size_span", "*,multi_flit");
     end
     fc_span = db.group("l3.cg_span", fresh);
     if (fresh) begin
       p = fc_span.cp("cp_kind"); `AOU_L3_FC_SPAN_KIND(AOU_FC_REG)
       p = fc_span.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       void'(fc_span.add_cross("x_kind_dir", "cp_kind cp_dir"));
+      fc_span.plan("6.4", "cp_kind", "w256|w512|w1024|wf256|wf512|wf1024|r256|r512|r1024");
+      fc_span.plan("6.4", "x_kind_dir", "w256|w512|w1024|wf256|wf512|wf1024|r256|r512|r1024,*");
     end
     fc_flit_occ = db.group("l3.cg_flit_occ", fresh);
     if (fresh) begin
@@ -311,12 +347,23 @@ class aou_l3_cov extends uvm_object;
       p = fc_flit_occ.cp("cp_credit_only"); `AOU_L3_FC_CREDIT_ONLY(AOU_FC_REG)
       p = fc_flit_occ.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       void'(fc_flit_occ.add_cross("x_nmsgs_dir", "cp_nmsgs cp_dir"));
+      fc_flit_occ.plan("6.1 6.14", "cp_nmsgs", "one");
+      fc_flit_occ.plan("6.15", "cp_nmsgs", "few|many|dense");
+      fc_flit_occ.plan("6.1 6.14", "x_nmsgs_dir", "one,*");
+      fc_flit_occ.plan("6.15", "x_nmsgs_dir", "few|many|dense,*");
+      fc_flit_occ.plan("6.21", "cp_misc_half0", "n[1]|n[2]");
+      fc_flit_occ.plan("6.21", "cp_misc_half1", "n[1]|n[2]");
+      fc_flit_occ.plan("6.4", "cp_carry", "short_carry|long_carry");
     end
     fc_wresp_flit = db.group("l3.cg_wresp_flit", fresh);
     if (fresh) begin
       p = fc_wresp_flit.cp("cp_nwresp"); `AOU_L3_FC_NWRESP(AOU_FC_REG)
       p = fc_wresp_flit.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       void'(fc_wresp_flit.add_cross("x_nwresp_dir", "cp_nwresp cp_dir"));
+      fc_wresp_flit.plan("6.2", "cp_nwresp", "two|few|many|dense|full");
+      fc_wresp_flit.plan("6.2", "x_nwresp_dir", "two|few|many|dense|full,*");
+      fc_wresp_flit.plan("6.18 11.9", "cp_nwresp", "full");
+      fc_wresp_flit.plan("6.18 11.9", "x_nwresp_dir", "full,*");
     end
     fc_act_flit = db.group("l3.cg_act_flit", fresh);
     if (fresh) begin
@@ -324,6 +371,9 @@ class aou_l3_cov extends uvm_object;
       p = fc_act_flit.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       p = fc_act_flit.add_cross("x_layout_dir", "cp_layout cp_dir");
       `AOU_L3_FC_X_ACT_FLIT(AOU_FC_REG)
+      fc_act_flit.plan("6.20");
+      fc_act_flit.plan("2.9", "cp_layout", "dreq_rsp");
+      fc_act_flit.plan("2.9", "x_layout_dir", "dreq_rsp,*");
     end
     fc_credit = db.group("l3.cg_credit", fresh);
     if (fresh) begin
@@ -332,6 +382,18 @@ class aou_l3_cov extends uvm_object;
       p = fc_credit.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
       p = fc_credit.add_cross("x_ev_cls_dir", "cp_ev cp_cls cp_dir");
       `AOU_L3_FC_X_CREDIT(AOU_FC_REG)
+      fc_credit.plan("3.2", "cp_ev", "hdr_grant");
+      fc_credit.plan("3.1", "cp_ev", "crdt_grant");
+      fc_credit.plan("3.21", "cp_ev", "both");
+      fc_credit.plan("3.8", "cp_ev", "dut_zero_stall");
+      fc_credit.plan("3.22", "cp_ev", "dut_saturate");
+      fc_credit.plan("2.11", "cp_ev", "late_adv");
+      fc_credit.plan("3.2", "x_ev_cls_dir", "hdr_grant,*,*");
+      fc_credit.plan("3.1", "x_ev_cls_dir", "crdt_grant,*,*");
+      fc_credit.plan("3.21", "x_ev_cls_dir", "both,*,*");
+      fc_credit.plan("3.8", "x_ev_cls_dir", "dut_zero_stall,*,*");
+      fc_credit.plan("3.22", "x_ev_cls_dir", "dut_saturate,*,*");
+      fc_credit.plan("2.11", "x_ev_cls_dir", "late_adv,*,*");
     end
     fc_wr_order = db.group("l3.cg_wr_order", fresh);
     if (fresh) begin
@@ -342,6 +404,7 @@ class aou_l3_cov extends uvm_object;
       p = fc_wr_order.add_cross("x_ahead_whole_others", "cp_ahead cp_whole cp_others");
       `AOU_L3_FC_X_WF(AOU_FC_REG)
       void'(fc_wr_order.add_cross("x_ahead_rp", "cp_ahead cp_rp"));
+      fc_wr_order.plan("4.32");
     end
     fc_flex = db.group("l3.cg_flex", fresh);
     if (fresh) begin

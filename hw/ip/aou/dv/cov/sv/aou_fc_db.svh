@@ -6,7 +6,8 @@
 // sample() to both, so the counts don't depend on a simulator's covergroup
 // engine. write_json() dumps every declared bin, hit or not, except ignored
 // ones; a bin's spec names the spec revision it needs ("v0.8"), an illegal bin
-// is marked "illegal", and plan_ids is a placeholder for test-plan IDs.
+// is marked "illegal". plan_ids lists the test-plan items a group's bins all
+// serve (aou_fc_group::plan) and, per bin, every item that bin serves.
 class aou_fc_db;
   local static aou_fc_db inst;
 
@@ -49,8 +50,8 @@ class aou_fc_db;
     $fwrite(fd, "{\"format\": \"aou-fc/1\", \"test\": \"%s\", \"groups\": [", test);
     foreach (groups[g]) begin
       aou_fc_group grp = groups[g];
-      $fwrite(fd, "%s\n {\"group\": \"%s\", \"spec\": \"\", \"plan_ids\": [], \"samples\": %0d, ",
-              g == 0 ? "" : ",", grp.name, grp.samples);
+      $fwrite(fd, "%s\n {\"group\": \"%s\", \"spec\": \"\", \"plan_ids\": %s, \"samples\": %0d, ",
+              g == 0 ? "" : ",", grp.name, json_ids(grp.plan_ids), grp.samples);
       $fwrite(fd, "\"points\": [");
       foreach (grp.pts[p]) begin
         aou_fc_point pt = grp.pts[p];
@@ -59,10 +60,11 @@ class aou_fc_db;
         first = 1'b1;
         foreach (pt.hits[b]) begin
           if (pt.kind[b] == aou_fc_point::KIND_IGNORE) continue;
-          $fwrite(fd, "%s\n   {\"bin\": \"%s\", \"hits\": %0d, \"spec\": \"%s\", %s%s",
+          $fwrite(fd, {"%s\n   {\"bin\": \"%s\", \"hits\": %0d, \"spec\": \"%s\", ",
+                       "%s\"plan_ids\": %s}"},
                   first ? "" : ",", pt.bin_name[b], pt.hits[b], pt.spec[b],
                   pt.kind[b] == aou_fc_point::KIND_ILLEGAL ? "\"illegal\": true, " : "",
-                  "\"plan_ids\": []}");
+                  json_ids({grp.plan_ids, " ", pt.plan[b]}));
           first = 1'b0;
         end
         $fwrite(fd, "]}");
@@ -71,5 +73,20 @@ class aou_fc_db;
     end
     $fwrite(fd, "\n]}\n");
     $fclose(fd);
+  endfunction
+
+  // Space-separated IDs as a JSON array of strings, each once.
+  static function string json_ids(string ids);
+    string w[$];
+    bit seen[string];
+    string s = "";
+    aou_fc_point::split(ids, " ", w);
+    foreach (w[i]) begin
+      if (w[i] == "" || seen.exists(w[i])) continue;
+      seen[w[i]] = 1'b1;
+      if (s != "") s = {s, ", "};
+      s = {s, "\"", w[i], "\""};
+    end
+    return {"[", s, "]"};
   endfunction
 endclass

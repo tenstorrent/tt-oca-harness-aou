@@ -26,6 +26,16 @@ and a digit) or a stimulus note ("rare"). Revision-tagged bins are left out of
 every total and percentage and totalled apart, so the headline figure counts
 only what this RTL can reach; they join it when the DUT targets that revision.
 Other tags stay in the totals and are also totalled apart.
+
+A bin's plan_ids are the test-plan items (docs/test_plan_items.yaml) it is
+evidence for, set where the bins are declared: aou_fc_group::plan() calls for
+the bench's groups, the FC_PLAN table of cov/sv/aou_axi4_fc_bins.svh for the
+AXI4 monitors (the PLAN lines of their report). scripts/plan_status.py --fc
+lists the bins behind each item. --check-plan-ids (make check-config) checks
+that every ID those declarations name is an item of the plan, neither merged
+nor dropped:
+
+  fc_report.py --check-plan-ids
 """
 
 import argparse
@@ -85,15 +95,34 @@ def merge_fc_json(db, path):
 
 
 def merge_axi4_txt(db, path):
-    """aou_axi4_fc.<run>.txt BIN lines "cg|cp|bin" per interface, as groups axi4.<if>.<cg>."""
-    counts, stats, names = {}, {}, []
-    merge_axi4_fc.parse_file(path, counts, _Stats(stats), names)
+    """aou_axi4_fc.<run>.txt BIN lines "cg|cp|bin" per interface, as groups axi4.<if>.<cg>,
+    with the plan items its PLAN lines give the bins."""
+    counts, stats, names, plans = {}, {}, [], {}
+    merge_axi4_fc.parse_file(path, counts, _Stats(stats), names, plans)
     for iface in sorted(counts):
         for key in sorted(counts[iface]):
             cg, cp, b = key.split("|", 2)
             _, pt = point_of(db, f"axi4.{iface}.{cg}", cp, "cross" if cp.startswith("cx_")
                              else "coverpoint")
             add_bin(pt, b.replace("_X_", ","), counts[iface][key])
+        for cg, cp, pat, ids in sorted(plans.get(iface, ())):
+            grp = db["groups"].get(f"axi4.{iface}.{cg}", {"points": {}})
+            bins = [b for pn, p in grp["points"].items() if cp in ("*", pn)
+                    for bn, b in p["bins"].items() if match_bin(pat, bn)]
+            if not bins:
+                print(f"fc_report: {path}: PLAN {cg} {cp} {pat} matches no bin", file=sys.stderr)
+            for b in bins:
+                b["plan_ids"] += [i for i in ids.split() if i not in b["plan_ids"]]
+
+
+def match_bin(pat, name):
+    """The coverage service's bin pattern (aou_fc_point::match_bin): one glob per
+    coverpoint of a cross, comma-separated, each with '|'-separated alternatives in
+    which only '*' is special."""
+    pf, nf = pat.split(","), name.split(",")
+    return len(pf) == len(nf) and all(
+        any(re.fullmatch(".*".join(map(re.escape, alt.split("*"))), f) for alt in p.split("|"))
+        for p, f in zip(pf, nf))
 
 
 class _Stats(dict):
@@ -306,13 +335,66 @@ def write_html(fh, db, counts, build):
     fh.write("\n".join(out))
 
 
+UVM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+# A plan-ID list as the coverage declarations write it: "4.1 5.1", or an AXI4
+# FC_PLAN entry "<cg> <cp> <bins> 4.1 5.1".
+PLAN_LITERAL = re.compile(r'"(?:cg_\w+ \S+ \S+ )?(\d+\.\d+(?: \d+\.\d+)*)"')
+
+
+def declared_plan_ids(root=UVM_ROOT):
+    """{id: [file, ...]} for every plan ID in the coverage declarations: the string
+    literals of the SV files that call plan() or hold the AXI4 FC_PLAN table."""
+    out = {}
+    for d in ("cov", "uvm"):
+        for path in sorted(glob.glob(os.path.join(root, d, "**", "*.sv*"), recursive=True)):
+            with open(path, encoding="utf-8", errors="replace") as fh:
+                text = fh.read()
+            if ".plan(" not in text and "FC_PLAN" not in text:
+                continue
+            for m in PLAN_LITERAL.finditer(text):
+                for pid in m.group(1).split():
+                    out.setdefault(pid, []).append(os.path.relpath(path, root))
+    return out
+
+
+def check_plan_ids(items_path, root=UVM_ROOT):
+    """Problems with the declared plan IDs: unknown, merged or dropped items."""
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import listyaml
+    items = {i["id"]: i for i in listyaml.load(items_path)}
+    problems = []
+    for pid, files in sorted(declared_plan_ids(root).items()):
+        where = ", ".join(sorted(set(files)))
+        it = items.get(pid)
+        if it is None:
+            problems.append(f"{where}: plan ID {pid} is not an item of {os.path.basename(items_path)}")
+        elif it.get("merged_into"):
+            problems.append(f"{where}: plan ID {pid} is merged into {it['merged_into']}; name that")
+        elif it.get("dropped"):
+            problems.append(f"{where}: plan ID {pid} is dropped ({it['dropped']})")
+    return problems
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("out_dir", help="out/<build>, holding the run directories")
-    ap.add_argument("-o", "--report-dir", required=True)
+    ap.add_argument("out_dir", nargs="?", help="out/<build>, holding the run directories")
+    ap.add_argument("-o", "--report-dir")
     ap.add_argument("--rid", help="only the runs of this RID (default: every run)")
+    ap.add_argument("--check-plan-ids", action="store_true",
+                    help="check the plan IDs of the coverage declarations against the plan items, then exit")
+    ap.add_argument("--items", default=os.path.join(UVM_ROOT, "docs", "test_plan_items.yaml"),
+                    help="the plan items for --check-plan-ids (default docs/test_plan_items.yaml)")
     args = ap.parse_args()
+    if args.check_plan_ids:
+        problems = check_plan_ids(args.items)
+        for p in problems:
+            print(f"fc_report: {p}", file=sys.stderr)
+        print(f"fc_report: {len(declared_plan_ids())} plan IDs in the coverage declarations, "
+              f"{len(problems)} problem(s)")
+        sys.exit(1 if problems else 0)
+    if not args.out_dir or not args.report_dir:
+        ap.error("out_dir and -o/--report-dir are required")
 
     build = os.path.basename(os.path.normpath(args.out_dir))
     db, counts = merge(args.out_dir, args.rid)
