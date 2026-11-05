@@ -12,9 +12,12 @@
 //   exclusive read A, exclusive write A (same ID)           -> EXOKAY, EXOKAY
 //   exclusive read B, plain write into B, exclusive write B -> EXOKAY, OKAY
 //   exclusive write C with no exclusive read                -> OKAY
+// A round that lands on a page without an exclusive monitor (aou_mem
+// no_excl_pct) gets OKAY throughout, and its exclusive writes land like
+// normal ones (AXI4 A7.2.4).
 // aou_t1_attr_chk checks that the requester gets the subordinate's answer
 // (DP-R07) and xfer_cov counts both outcomes; the scoreboard checks that only
-// the EXOKAY write changed memory.
+// the EXOKAY writes, and the writes where there is no monitor, changed memory.
 class aou_attr_vseq extends aou_dp_vseq;
   `uvm_object_utils(aou_attr_vseq)
 

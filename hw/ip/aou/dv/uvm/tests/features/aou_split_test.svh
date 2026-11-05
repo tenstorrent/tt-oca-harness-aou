@@ -4,8 +4,10 @@
 // Splitter (plan 15.1-15.10, 15.12, 15.16, 15.17, 20.9; old F2). +split_aw/+split_ar
 // take a value (AxLEN), "sweep" (a random legal 2^n-1), "illegal" (a random
 // value that is not 2^n-1, stored as 0xF) or "per_rp" (a different random
-// legal value on each RP, 15.16). Remote-originated 64-byte-beat bursts of
-// +dp_len lengths; aou_split_chk checks the M-port bursts against each RP's
+// legal value on each RP, 15.16, half of them 16 beats or less and half 32 or
+// more, so each RP sees both short and long limits). Remote-originated bursts of
+// +dp_len lengths, 32 bytes per beat up to the bus width (+dp_full_size=1 for
+// the bus width only); aou_split_chk checks the M-port bursts against each RP's
 // limit, counting the beats after the downsizer on RPs narrower than 512 bits
 // (15.17), and the scoreboard the reassembled data, RLAST and merged BRESP at
 // the remote side.
@@ -34,12 +36,18 @@ class aou_split_test extends aou_dp_base_test;
     endcase
   endfunction
 
-  // per_rp: legal values, all different when there are enough RPs to tell.
+  // per_rp: legal values, all different, two up to 16 beats and two of 32 or
+  // more, in random RP order.
   static function void pick_rps(string s, ref int v[4]);
     if (s == "per_rp") begin
-      int legal[$] = '{0, 1, 3, 7, 15, 31, 63, 127, 255};
-      legal.shuffle();
-      foreach (v[r]) v[r] = legal[r];
+      int short_l[$] = '{0, 1, 3, 7, 15};
+      int long_l[$] = '{31, 63, 127, 255};
+      int pick4[$];
+      short_l.shuffle();
+      long_l.shuffle();
+      pick4 = '{short_l[0], short_l[1], long_l[0], long_l[1]};
+      pick4.shuffle();
+      foreach (v[r]) v[r] = pick4[r];
     end else begin
       int x = pick(s);
       foreach (v[r]) v[r] = x;
@@ -56,7 +64,6 @@ class aou_split_test extends aou_dp_base_test;
       k.feat.split_ar[r] = ar[r];
     end
     k.dir = AOU_T1_R2L;
-    k.full_size = 1'b1;
     k.lens = '{15, 31, 63};
     k.align = aou_dp_knobs::DP_ALIGN_ALIGNED;
     k.loopback = 1'b1;

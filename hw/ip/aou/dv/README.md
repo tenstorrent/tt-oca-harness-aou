@@ -330,7 +330,9 @@ Traffic and remote-die knobs (run time, any T1 test):
 - `+remote_max_burst=2^n`: the remote splitter's longest burst (default 256).
   `+remote_max_burst_rand=1` re-picks it whenever the remote is idle.
 
-FDI corner knobs (run time, `testlists/fdi.toml`): `+fdi_trdy=always|random|holes|bursty`,
+FDI corner knobs (run time, `testlists/fdi.toml`; without them a seed takes HOLES
+mostly, sometimes RANDOM or BURSTY, and sometimes random stalls, see
+`aou_t1_env_cfg::fdi_knobs`): `+fdi_trdy=always|random|holes|bursty`,
 `+fdi_stall_pct=N` stand-alone stalls, `+fdi_stall_mid_pct=N` the share raised
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between
 `pl_stallreq` and `lp_stallack` (UCIe r1.1 8.3.2 rule 7), `+fdi_stall_hold_min=N` and

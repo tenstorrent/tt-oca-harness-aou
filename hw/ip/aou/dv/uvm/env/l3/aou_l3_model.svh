@@ -565,6 +565,17 @@ class aou_l3_model extends uvm_object;
            our_requests_outstanding() == 0 && rx_q.size() == 0;
   endfunction
 
+  // Classes the DUT has not yet advertised in full since entering DISABLED
+  // (T1-C40). After an activation the DUT sends its credit over many flits,
+  // more slowly while the Adapter holds pl_trdy low.
+  function int unsigned adv_short();
+    int unsigned n = 0;
+    for (int unsigned r = 0; r < cfg.rp_count; r++)
+      for (int unsigned c = 0; c < AOU_CC_NUM; c++)
+        if (crd.tx_full[r][c] < cfg.dut_max_cred[r][c]) n++;
+    return n;
+  endfunction
+
   function void check_cred_return(int unsigned waited);
     string why;
     ledger_chk("AOU-R31");

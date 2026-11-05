@@ -98,7 +98,10 @@ class aou_pack_test extends aou_dp_base_test;
         pol.grant_span_pct = 25;
       end
       "b2b": begin
-        foreach (cfg.fdi_cfg[p]) cfg.fdi_cfg[p].trdy_policy = AOU_TRDY_ALWAYS;
+        foreach (cfg.fdi_cfg[p]) begin
+          cfg.fdi_cfg[p].trdy_policy = AOU_TRDY_ALWAYS;
+          cfg.fdi_cfg[p].stall_pct = 0;
+        end
         cfg.l1_cancel_pct = 0;
         cfg.l1_gap_pct = 0;
         cfg.l1_bubble_pct = 0;

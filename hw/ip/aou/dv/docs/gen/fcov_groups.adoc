@@ -45,5 +45,5 @@
 | `cg_b` | `axi4.<port>.cg_b` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_b_resp` | -
 | `cg_cmd` | `axi4.<port>.cg_cmd` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_cmd_read`, `cp_cmd_write` | -
 | `cg_os` | `axi4.<port>.cg_os` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_rd_outstanding`, `cp_wr_outstanding` | -
-| `cg_bp` | `axi4.<port>.cg_bp` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_r_stall_len`, `cp_b_stall_len`, `cp_r_stall_at_max_os`, `cp_b_stall_at_max_os` | -
+| `cg_bp` | `axi4.<port>.cg_bp` | `aou_axi4_coverage_mod` | `cov/sv/aou_axi4_coverage_mod.sv` | `cp_aw_stall_len`, `cp_w_stall_len`, `cp_ar_stall_len`, `cp_r_stall_len`, `cp_b_stall_len`, `cp_r_stall_at_max_os`, `cp_b_stall_at_max_os` | -
 |===

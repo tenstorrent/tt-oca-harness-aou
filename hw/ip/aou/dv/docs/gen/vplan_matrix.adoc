@@ -235,7 +235,7 @@
 | 7.14 | Access at maximum address (configured range - 1). AOU has no memory map | P1 | `aou_addr_test.dp_addr-top`
 | 7.15 | Sequential access across entire configured address space. AOU has no memory map | P2 | `aou_addr_test.dp_addr-sweep`
 | 7.16 | Random data with random addresses | P1 | `aou_dp_random_test.dp_dir-both`, `aou_dp_random_test.dp_dir-both.1x512-sp64-nxt`, `aou_dp_random_test.dp_dir-both.dp_profile-stall`, `aou_dp_random_test.dp_dir-r2l`, `aou_stress_test.st_bp-all`, `aou_stress_test.st_bp-all.1x512-sp64-nxt`, `aou_stress_test.st_bp-all.st_stall_max-1500.4x512-sp64`, `aou_stress_test.st_bp-ar`, `aou_stress_test.st_bp-aw`, `aou_stress_test.st_bp-b`, `aou_stress_test.st_bp-fdi`, `aou_stress_test.st_bp-r`, `aou_stress_test.st_bp-w`, `aou_stress_test.st_pol-max.st_bp-none`, `aou_stress_test.st_pol-min.st_crd-hdr`, `aou_stress_test.st_pol-random.st_crd-slow`, `aou_stress_test.st_pol-sparse.st_crd-mixed`, `aou_stress_test.st_pol-sparse.wdata_first_pct-100`, `aou_stress_test.st_pol-split.st_crd-grant`, `aou_t1_deact_test`, `aou_t1_slice_test`
-| 8.1 | Writes and reads outstanding from one up to the limit at every S and M port | P0 | `aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-100`, `aou_t1_slice_test`
+| 8.1 | Writes and reads outstanding from one up to the limit at every S and M port | P0 | `aou_dp_outstanding_test.dp_batch-2.dp_wr_pct-100`, `aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-0`, `aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-100`, `aou_t1_slice_test`
 | 8.2 | Send 4 write requests before receiving responses | P1 | merged into 8.1
 | 8.3 | Send maximum outstanding writes per credit limit | P1 | merged into 8.1
 | 8.4 | Send 2 read requests before receiving data | P0 | merged into 8.1
