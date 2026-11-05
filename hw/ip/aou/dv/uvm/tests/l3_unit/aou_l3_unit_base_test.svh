@@ -2,22 +2,34 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Base of the L3 unit tests: one rule checker shared by everything, and a
-// failure counter for the tests' own assertions.
+// failure counter for the tests' own assertions. +L3_SPEC=v0.8 makes AoU v0.8
+// the revision of every model a test builds without naming one (mk_cfg): its
+// wire format (the 4-granule ActivateReq) and its rules (the ERROR state).
+// The DUT implements v0.7's wire format, so these models-only runs are where
+// the v0.8 rule set runs until it does.
 class aou_l3_unit_base_test extends uvm_test;
   `uvm_component_utils(aou_l3_unit_base_test)
 
   aou_l3_rule_chk chk;
   int unsigned    checks;
   int unsigned    fails;
+  aou_spec_rev_e  spec_rev = AOU_SPEC_V07;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
   endfunction
 
   function void build_phase(uvm_phase phase);
+    string spec;
     super.build_phase(phase);
     chk = aou_l3_rule_chk::type_id::create("chk");
     uvm_config_db#(aou_l3_rule_chk)::set(this, "*", "chk", chk);
+    if ($value$plusargs("L3_SPEC=%s", spec)) begin
+      if (spec == "v0.8") spec_rev = AOU_SPEC_V08;
+      else if (spec != "v0.7") `uvm_fatal(get_type_name(), {"+L3_SPEC=", spec, ": v0.7 or v0.8"})
+    end
+    `uvm_info(get_type_name(), $sformatf("model revision: %s",
+              spec_rev == AOU_SPEC_V08 ? "v0.8" : "v0.7"), UVM_LOW)
   endfunction
 
   // Message kinds in aou_l3_cov::msg_kind() order, with their granule counts.
@@ -106,10 +118,12 @@ class aou_l3_unit_base_test extends uvm_test;
     end
   endfunction
 
+  // A model configuration. rev v0.7 (the default) means the test's revision,
+  // +L3_SPEC; a test that needs v0.8 names it.
   function aou_l3_cfg mk_cfg(string name, aou_spec_rev_e rev = AOU_SPEC_V07,
                              int unsigned rp_count = 4);
     aou_l3_cfg c = aou_l3_cfg::type_id::create(name);
-    c.spec_rev = rev;
+    c.spec_rev = rev == AOU_SPEC_V07 ? spec_rev : rev;
     c.rp_count = rp_count;
     c.chk = chk;
     return c;

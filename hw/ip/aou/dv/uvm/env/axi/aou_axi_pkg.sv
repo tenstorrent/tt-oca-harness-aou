@@ -42,6 +42,24 @@ package aou_axi_pkg;
     AOU_AXI_TIMING_SLOW_MGR   // slow valid and slow B/R ready
   } aou_axi_timing_e;
 
+  // AXI USER stimulus of an agent (aou_axi_cfg::user_mode). The manager fills
+  // AWUSER/ARUSER and every WUSER of the transactions it drives (unless the
+  // sequence fixed them), the subordinate BUSER and every RUSER of its
+  // responses. In the Basic Profile the DUT carries USER[15:0] as FLEX
+  // (AoU v0.8 5.2 / 11.1).
+  typedef enum {
+    AOU_AXI_USER_ZERO,      // every USER signal 0
+    AOU_AXI_USER_CONST,     // one value per transaction, the same on every beat of it
+    AOU_AXI_USER_PER_BEAT   // a new value per W or R beat
+  } aou_axi_user_mode_e;
+
+  // Where the nonzero user modes take their values (aou_axi_cfg::next_user()).
+  typedef enum {
+    AOU_AXI_USER_PAT_RANDOM,   // $urandom
+    AOU_AXI_USER_PAT_ONES,     // 16'hFFFF
+    AOU_AXI_USER_PAT_WALK      // a walking one, 0001, 0002, ... 8000, 0001
+  } aou_axi_user_pat_e;
+
   typedef virtual aou_axi_bus_if #(.DATA_W(1024)) aou_axi_vif_t;
 
   `include "aou_axi_txn.svh"

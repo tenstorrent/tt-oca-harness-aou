@@ -172,7 +172,8 @@ localparam int WF1024B_G    = 27;
 localparam int R256B_G      = 8;
 localparam int R512B_G      = 14;
 localparam int R1024B_G     = 27;
-localparam int MISC_ACT_G   = 1;
+localparam int MISC_ACT_G   = 1;    // ActivateAck, DeactivateReq, DeactivateAck
+localparam int MISC_ACT_REQ_G = 4;  // ActivateReq (v0.8 Ch. 11: a profile per RP)
 localparam int MISC_CG_G    = 2;
 // The longest of them, which sizes the message-start carry.
 localparam int MAX_MSG_G    = W1024B_G;
@@ -207,13 +208,23 @@ localparam logic [GRANULE_WD-1:0] R_RSVD_MASK =
     granule_stream_mask(R_RSVD_S, GRANULE_WD - 1);
 
 // -----------------------------------------------------------------------------
-// Activation message (8.3.4, Table 26, Figure 19). After MSGTYPE and MISCOP:
-// ACTIVATIONOP at stream bits 7-10, PROPERTYREQ at 11, RsvdZero at 12-39.
+// Activation messages (v0.8 8.3.4, Tables 26/27; Ch. 11). After MSGTYPE and
+// MISCOP, ACTIVATIONOP at stream bits 7-10. The ActivateReq is four granules:
+// in the first, RsvdZero at 11-13 and RP0's ProfileID (5), ProfileRev (5) and
+// ProfileOpt (16) at 14-39; granules 1-3 carry RsvdZero at 0-13 and the same
+// three fields for RP1-RP3 at 14-39 (reserved when the sender has no such
+// RP). The other opcodes are one granule with RsvdZero at 11-39; v0.7's
+// PROPERTYREQ at 11 is among those reserved bits.
 // -----------------------------------------------------------------------------
 localparam int ACTOP_WD         = 4;
 localparam int ACTOP_S          = MSGTYPE_WD + MISCOP_WD;
-localparam int PROPREQ_S        = ACTOP_S + ACTOP_WD;
-localparam int ACT_RSVD_FIRST_S = PROPREQ_S + 1;
+localparam int PROPREQ_S        = ACTOP_S + ACTOP_WD;       // v0.7 PROPERTYREQ
+localparam int ACT_RSVD_FIRST_S = PROPREQ_S;
+localparam int PROFILE_ID_WD    = 5;
+localparam int PROFILE_REV_WD   = 5;
+localparam int PROFILE_OPT_WD   = 16;
+localparam int PROFILE_WD       = PROFILE_ID_WD + PROFILE_REV_WD + PROFILE_OPT_WD;   // 26
+localparam int ACT_PROFILE_S    = GRANULE_WD - PROFILE_WD;                            // 14
 
 // ACTIVATIONOP (Table 27). 0b0100 and above are reserved.
 localparam logic [ACTOP_WD-1:0]  ACTOP_ACTIVATE_REQ   = 4'd0;
@@ -227,10 +238,18 @@ function automatic logic [ACTOP_WD-1:0] actop_of(input logic [GRANULE_WD-1:0] g)
     end
 endfunction
 
-localparam int PROPREQ_BIT = wire_bit(PROPREQ_S);
-
+// ActivateAck, DeactivateReq, DeactivateAck: stream bits 11-39.
 localparam logic [GRANULE_WD-1:0] ACT_RSVD_MASK =
     granule_stream_mask(ACT_RSVD_FIRST_S, GRANULE_WD - 1);
+// ActivateReq: stream bits 11-13 of its first granule, 0-13 of the others.
+localparam logic [GRANULE_WD-1:0] ACT_REQ_RSVD_G0_MASK =
+    granule_stream_mask(ACT_RSVD_FIRST_S, ACT_PROFILE_S - 1);
+localparam logic [GRANULE_WD-1:0] ACT_REQ_RSVD_BODY_MASK =
+    granule_stream_mask(0, ACT_PROFILE_S - 1);
+// The profile fields of an ActivateReq granule, as wire bits: reserved in the
+// granule of an RP the sender does not have.
+localparam logic [GRANULE_WD-1:0] ACT_REQ_PROFILE_MASK =
+    granule_stream_mask(ACT_PROFILE_S, GRANULE_WD - 1);
 
 // -----------------------------------------------------------------------------
 // Credit encoding (Table 18) and the CrdtGrant message (6.3.2, Table 19,

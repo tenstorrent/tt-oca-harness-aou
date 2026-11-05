@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Byte-level AXI scoreboard (docs/ARCHITECTURE.md, "Scoreboard rule").
+// Byte-level AXI scoreboard (docs/AOU_TB_ARCH.adoc, "Scoreboard rule").
 //
 // - local_mgr_imp: transactions the local managers completed at the DUT's S
 //   ports. They target the remote memory.
@@ -193,7 +193,12 @@ class aou_scoreboard extends uvm_scoreboard;
       if (t.bresp != exp)
         fail("AXI-S01", $sformatf("BRESP %0d, memory error region gives %0d", t.bresp, exp),
              t, path);
-      apply = !t.lock;
+      apply = !t.lock || !gold.excl_supported(t.addr);
+    end else if (t.lock && !gold.excl_supported(t.addr)) begin
+      // No exclusive monitor there: the subordinate ignores AxLOCK (AXI4 A7.2.4).
+      if (t.bresp != AOU_AXI_OKAY)
+        fail("AXI-S01", $sformatf("exclusive write BRESP %0d where there is no exclusive monitor",
+                                  t.bresp), t, path);
     end else if (t.lock) begin
       apply = (t.bresp == AOU_AXI_EXOKAY);
       if (t.bresp != AOU_AXI_OKAY && t.bresp != AOU_AXI_EXOKAY)
@@ -241,7 +246,9 @@ class aou_scoreboard extends uvm_scoreboard;
                                     t.rresp[i], exp), t, path);
         continue;
       end
-      if (!(t.rresp[i] == AOU_AXI_OKAY || (t.lock && t.rresp[i] == AOU_AXI_EXOKAY))) begin
+      // EXOKAY only for an exclusive read where the subordinate has a monitor.
+      if (!(t.rresp[i] == AOU_AXI_OKAY ||
+            (t.lock && gold.excl_supported(t.addr) && t.rresp[i] == AOU_AXI_EXOKAY))) begin
         fail("AXI-S03", $sformatf("beat %0d RRESP %0d, expected OKAY", i, t.rresp[i]), t, path);
         continue;
       end

@@ -21,7 +21,7 @@ lint_off -rule UNUSEDPARAM -file "*/hw/ip/aou/dv/*"
 // Packages include many class files, so declarations never match file names.
 lint_off -rule DECLFILENAME -file "*/hw/ip/aou/dv/*"
 
-// One aou_axi_bus_if type serves both ends of a port (ARCHITECTURE.md): on
+// One aou_axi_bus_if type serves both ends of a port (AOU_TB_ARCH.adoc): on
 // the T1 top the DUT side of each instance is wired with assigns, while the
 // clocking block of the other end exists but is never used there.
 lint_off -rule MULTIDRIVENPROC -file "*/hw/ip/aou/dv/uvm/env/axi/aou_axi_bus_if.sv"

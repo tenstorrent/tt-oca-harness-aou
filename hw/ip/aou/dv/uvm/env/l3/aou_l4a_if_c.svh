@@ -11,20 +11,23 @@ virtual class aou_l4a_if_c extends uvm_object;
   endfunction
 
   // A DUT WriteReq and its AWLEN+1 WriteData/WriteDataFull messages, in
-  // order. Return BRESP.
+  // order. Return BRESP and the WriteResp's FLEX (the subordinate's BUSER).
   virtual task handle_write(input aou_msg_wreq req, input aou_msg_wdata data[$],
-                            output bit [1:0] bresp);
+                            output bit [1:0] bresp, output bit [15:0] bflex);
     bresp = 2'b00;
+    bflex = '0;
     `uvm_fatal("aou_l4a_if_c", "handle_write not implemented")
   endtask
 
   // A DUT ReadReq. Return ARLEN+1 beats: data[i] holds beat i in the lanes
   // AXI4 addressing selects on a bus as wide as the ReadData DLENGTH, resp[i]
-  // its RRESP. L3 fills RP, RID, RLAST and DLENGTH (from ARSIZE, spec 5.7).
+  // its RRESP and flex[i] its FLEX (the subordinate's RUSER). L3 fills RP,
+  // RID, RLAST and DLENGTH (from ARSIZE, spec 5.7).
   virtual task handle_read(input aou_msg_rreq req, output bit [1023:0] data[$],
-                           output bit [1:0] resp[$]);
+                           output bit [1:0] resp[$], output bit [15:0] flex[$]);
     data.delete();
     resp.delete();
+    flex.delete();
     `uvm_fatal("aou_l4a_if_c", "handle_read not implemented")
   endtask
 endclass

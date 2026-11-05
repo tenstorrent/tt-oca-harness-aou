@@ -82,6 +82,27 @@ seed = 1
 tags = ["l3_unit"]
 run_modes = ["l3_unit"]
 
+# AoU v0.8, models only: credit and packing with both models on the v0.8 wire
+# format and rules (+L3_SPEC=v0.8; the 4-granule ActivateReq). The DUT
+# implements v0.7's wire format, so the v0.8 rule set runs here until the DUT
+# targets v0.8. Group v0p8 adds the codec's v0.8 round trip and the link
+# test's v0.8 ERROR state; the link test's other cases state v0.7 outcomes.
+[[tests]]
+name = "aou_l3_credit_test.L3_SPEC-v0.8"
+module = { uvm = "aou_l3_credit_test" }
+seed = 1
+tags = ["l3_unit", "v0p8"]
+run_modes = ["l3_unit"]
+args = ["+L3_SPEC=v0.8"]
+
+[[tests]]
+name = "aou_l3_crossflit_test.L3_SPEC-v0.8"
+module = { uvm = "aou_l3_crossflit_test" }
+seed = 1
+tags = ["l3_unit", "v0p8"]
+run_modes = ["l3_unit"]
+args = ["+L3_SPEC=v0.8"]
+
 [[tests]]
 name = "aou_l3_loopback_test"
 module = { uvm = "aou_l3_loopback_test" }
@@ -98,7 +119,7 @@ run_modes = ["l3_unit"]
 
 [[groups]]
 name = "l3_unit"
-expected_count = 11
+expected_count = 13
 tests = [
   "aou_l3_codec_test",
   "aou_l3_credit_test",
@@ -109,8 +130,20 @@ tests = [
   "aou_l3_inject_test.L3_INJECT-crd_in_disabled",
   "aou_l3_late_adv_test",
   "aou_l3_link_test",
+  "aou_l3_credit_test.L3_SPEC-v0.8",
+  "aou_l3_crossflit_test.L3_SPEC-v0.8",
   "aou_l3_loopback_test",
   "aou_l3_unit_env_test",
+]
+
+[[groups]]
+name = "v0p8"
+expected_count = 4
+tests = [
+  "aou_l3_codec_test",
+  "aou_l3_link_test",
+  "aou_l3_credit_test.L3_SPEC-v0.8",
+  "aou_l3_crossflit_test.L3_SPEC-v0.8",
 ]
 
 [[groups]]
@@ -122,7 +155,7 @@ tests = [
 
 [[groups]]
 name = "all"
-expected_count = 11
+expected_count = 13
 tests = [
   "aou_l3_codec_test",
   "aou_l3_credit_test",
@@ -133,6 +166,8 @@ tests = [
   "aou_l3_inject_test.L3_INJECT-crd_in_disabled",
   "aou_l3_late_adv_test",
   "aou_l3_link_test",
+  "aou_l3_credit_test.L3_SPEC-v0.8",
+  "aou_l3_crossflit_test.L3_SPEC-v0.8",
   "aou_l3_loopback_test",
   "aou_l3_unit_env_test",
 ]

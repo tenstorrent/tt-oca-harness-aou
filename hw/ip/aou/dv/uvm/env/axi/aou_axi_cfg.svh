@@ -37,11 +37,65 @@ class aou_axi_cfg extends uvm_object;
   bit checks_en = 1'b1;
   bit cov_en    = 1'b1;
 
+  // AXI USER stimulus (aou_axi_user_mode_e): the manager's AWUSER/ARUSER and
+  // WUSER per W beat, the subordinate's BUSER and RUSER per R beat. The
+  // default gives every transaction one random value on all its beats, so
+  // the DUT's FLEX = USER check (aou_t1_attr_chk) sees a nonzero value on
+  // every message while merged beats still agree. user_pat picks the values.
+  aou_axi_user_mode_e user_mode = AOU_AXI_USER_CONST;
+  aou_axi_user_pat_e  user_pat  = AOU_AXI_USER_PAT_RANDOM;
+  protected int unsigned user_walk;
+
   aou_axi_timing timing;
 
   function new(string name = "aou_axi_cfg");
     super.new(name);
     timing = aou_axi_timing::type_id::create("timing");
+  endfunction
+
+  // The next USER value for the nonzero modes.
+  function bit [15:0] next_user();
+    case (user_pat)
+      AOU_AXI_USER_PAT_ONES: return 16'hFFFF;
+      AOU_AXI_USER_PAT_WALK: begin
+        user_walk = (user_walk + 1) % 16;
+        return 16'd1 << user_walk;
+      end
+      default: return 16'($urandom());
+    endcase
+  endfunction
+
+  // Fills n values per user_mode: all zero, one value for all, or one each.
+  function void fill_user(ref bit [15:0] u[], input int unsigned n);
+    bit [15:0] v = 16'h0;
+    u = new[n];
+    if (user_mode == AOU_AXI_USER_CONST) v = next_user();
+    foreach (u[i]) u[i] = (user_mode == AOU_AXI_USER_PER_BEAT) ? next_user() : v;
+  endfunction
+
+  // One value for a request or a B: zero in the zero mode.
+  function bit [15:0] one_user();
+    return (user_mode == AOU_AXI_USER_ZERO) ? 16'h0 : next_user();
+  endfunction
+
+  static function string user_mode_name(aou_axi_user_mode_e m);
+    case (m)
+      AOU_AXI_USER_ZERO:     return "zero";
+      AOU_AXI_USER_CONST:    return "const_per_txn";
+      AOU_AXI_USER_PER_BEAT: return "per_beat";
+      default:               return "?";
+    endcase
+  endfunction
+
+  // "zero", "const_per_txn" or "per_beat" (the +user_mode= plusarg); 0 if unknown.
+  static function bit parse_user_mode(string s, ref aou_axi_user_mode_e m);
+    case (s)
+      "zero":          m = AOU_AXI_USER_ZERO;
+      "const_per_txn": m = AOU_AXI_USER_CONST;
+      "per_beat":      m = AOU_AXI_USER_PER_BEAT;
+      default:         return 1'b0;
+    endcase
+    return 1'b1;
   endfunction
 
   function int unsigned max_size();

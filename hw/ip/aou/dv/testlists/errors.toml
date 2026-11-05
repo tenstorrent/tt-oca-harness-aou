@@ -3,9 +3,9 @@
 
 schema_version = 1
 
-# Error injection (stream G).
+# Error injection.
 #
-# Error-injection tests (TB=t1); format as in link.yaml.
+# Error-injection tests (TB=t1); format as in link.toml.
 #
 # Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
 # every list all.toml includes; a name carries the plusargs, target or area only

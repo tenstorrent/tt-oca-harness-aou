@@ -290,9 +290,36 @@ tags = ["assertions"]
 run_modes = ["assertions"]
 args = ["+remote_bytes=64", "+rtl_asserts=1"]
 
+[[tests]]
+name = "aou_t1_slice_test.rtl_asserts-1.1x1024-sp256-assert"
+module = { uvm = "aou_t1_slice_test" }
+target = "1x1024-sp256-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.rtl_asserts-1.1x1024-sp256-assert"
+module = { uvm = "aou_dp_random_test" }
+target = "1x1024-sp256-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+dp_dir=both", "+rtl_asserts=1"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32.rtl_asserts-1.1x1024-sp256-assert"
+module = { uvm = "aou_dw_test" }
+target = "1x1024-sp256-assert"
+seed = 1
+tags = ["assertions"]
+run_modes = ["assertions"]
+args = ["+remote_bytes=32", "+rtl_asserts=1"]
+
 [[groups]]
 name = "assertions"
-expected_count = 29
+expected_count = 32
 tests = [
   "aou_t1_slice_test.rtl_asserts-1.1x512-sp64-assert",
   "aou_dp_random_test.dp_dir-both.dp_profile-stall.rtl_asserts-1",
@@ -323,4 +350,7 @@ tests = [
   "aou_t1_slice_test.rtl_asserts-1.1x256-sp32-assert",
   "aou_dp_random_test.dp_dir-both.rtl_asserts-1",
   "aou_dw_test.remote_bytes-64.rtl_asserts-1",
+  "aou_t1_slice_test.rtl_asserts-1.1x1024-sp256-assert",
+  "aou_dp_random_test.dp_dir-both.rtl_asserts-1.1x1024-sp256-assert",
+  "aou_dw_test.remote_bytes-32.rtl_asserts-1.1x1024-sp256-assert",
 ]

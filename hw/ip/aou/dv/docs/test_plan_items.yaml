@@ -41,7 +41,7 @@
   priority: P2
   old_test: aou_activation_property_test
   dropped: PropertyReq on ActivateReq has no defined effect in v0.7 and is replaced by ProfileID/Rev/Opt in v0.8.
-  note: 'Coverage-closure decision D9. v0.8 makes PropertyReq RsvdZero; 2.7 keeps the DUT''s own DeactivateReq and 2.10 the register with PropertyReq 0 only.'
+  note: 'Dropped by the coverage-closure review (2026-10-14). v0.8 makes PropertyReq RsvdZero; 2.7 keeps the DUT''s own DeactivateReq and 2.10 the register with PropertyReq 0 only.'
 
 - id: '1.5'
   section: '2.1'
@@ -90,7 +90,7 @@
   title: 'Activation waits while the RX FIFO holds data: ACTIVATE_START is not acted on until the RX FIFO drains (re-activation with the M port back-pressured)'
   priority: P2
   added: MAS 7.3.2/7.3.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '1.11'
   section: '2.1'
@@ -98,7 +98,7 @@
   title: 'ACTIVATE_START set before FDI Active: activation starts on link-up and the bit self-clears'
   priority: P2
   added: MAS 7.3.2
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '1.12'
   section: '2.1'
@@ -106,7 +106,7 @@
   title: 'Each INT_ACTIVATE_START source: a pending TX request, the slave side not clean, a remote ActivateReq in DISABLED or ACTIVATE'
   priority: P2
   added: MAS 7.3.5
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '1.13'
   section: '2.1'
@@ -114,7 +114,15 @@
   title: 'Reserved ACTIVATIONOP (4-15) received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   priority: P2
   added: AoU Table 27; v0.8 8.3.3
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
+
+- id: '1.14'
+  section: '2.1'
+  section_title: Link Activation Tests
+  title: 'ActivateReq profile exchange: the DUT announces the Basic Profile per RP (PROFILE_CFG_RPn read-only 0/0/0; 0 for an RP it does not have) and stores the received ProfileID/Rev/Opt in PROFILE_RMT_RPn with RCVD; kept through a deactivation, unchanged by an ActivateReq rejected in ENABLED, cleared by AOU_SW_RESET'
+  priority: P1
+  added: AoU v0.8 Ch. 11; MAS software-operation 7.1 PROFILE_CFG_RPn / PROFILE_RMT_RPn
+  note: 'v0.8 replaces PropertyReq (1.4, dropped) with a four-granule ActivateReq carrying a profile per RP; nothing is negotiated and nothing acts on the values; the DUT implements the Basic Profile only, so its own side is fixed (aou_act_profile_test).'
 
 - id: '2.1'
   section: '2.2'
@@ -165,9 +173,11 @@
 - id: '2.7'
   section: '2.2'
   section_title: Link Deactivation Tests
-  title: 'Test `deactivate_force` CSR field; verify immediate deactivation'
+  title: 'DEACTIVATE_FORCE: a DeactivateReq leaves promptly; nothing more is guaranteed, and each case ends with a software reset'
   priority: P2
   old_test: aou_force_deactivation_test
+  old_title: 'Test `deactivate_force` CSR field; verify immediate deactivation'
+  note: 'Was "verify immediate deactivation". DEACTIVATE_FORCE is an escape hatch with no guarantees beyond the request.'
 
 - id: '2.8'
   section: '2.2'
@@ -200,7 +210,7 @@
   title: 'No credit message in DISABLED; credits of every class are permitted after the sender''s DeactivateAck (v0.8 8.4, MAS 7.3.1), including in the flit whose Ack completes the teardown'
   priority: P2
   added: AoU 8.2/8.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
 
 - id: '2.12'
   section: '2.2'
@@ -208,7 +218,7 @@
   title: 'DEACTIVATE_TIME_OUT_VALUE sweep: a quiet window of 2^(v+3) cycles with nothing to transmit'
   priority: P2
   added: MAS 7.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '2.13'
   section: '2.2'
@@ -216,7 +226,7 @@
   title: 'No DeactivateReq while the DUT''s own requests are outstanding'
   priority: P2
   added: AoU 8.3.2/8.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '2.14'
   section: '2.2'
@@ -224,7 +234,7 @@
   title: Requests received after DeactivateReq are still answered in DEACTIVATE
   priority: P2
   added: AoU 8.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '3.1'
   section: '2.3'
@@ -245,10 +255,12 @@
 - id: '3.3'
   section: '2.3'
   section_title: Credit Management Tests
-  title: 'Verify WREQ credit encoding (0,1,4,8,16,32,64,128)'
+  title: 'Credit encodings decode correctly for every class: WriteReq, ReadReq, WriteData and ReadData 0, 1, 4, 8, 16, 32, 64 and 128; WriteResp 0, 1, 4 and 8 (two-bit field); returned in steps of any size'
   priority: P0
   old_test: aou_credit_encoding_test
   old_status: '100%'
+  old_title: 'Verify WREQ credit encoding (0,1,4,8,16,32,64,128)'
+  note: 'Merges 3.4-3.7 and 3.17 (one item per class, and incremental return). No coverage bin records which encodings were sent or received; the evidence is the credit accounting checks of both models in every traffic run. A bin of encodings per class is a coverage gap in the plan''s road-map.'
 
 - id: '3.4'
   section: '2.3'
@@ -257,6 +269,8 @@
   priority: P0
   old_test: aou_credit_encoding_test
   old_status: '100%'
+  merged_into: '3.3'
+  note: 'One class of 3.3''s credit encodings.'
 
 - id: '3.5'
   section: '2.3'
@@ -265,6 +279,8 @@
   priority: P0
   old_test: aou_credit_encoding_test
   old_status: '100%'
+  merged_into: '3.3'
+  note: 'One class of 3.3''s credit encodings.'
 
 - id: '3.6'
   section: '2.3'
@@ -273,6 +289,8 @@
   priority: P0
   old_test: aou_credit_encoding_test
   old_status: '100%'
+  merged_into: '3.3'
+  note: 'One class of 3.3''s credit encodings.'
 
 - id: '3.7'
   section: '2.3'
@@ -281,14 +299,18 @@
   priority: P0
   old_test: aou_credit_encoding_test
   old_status: '100%'
+  merged_into: '3.3'
+  note: 'One class of 3.3''s credit encodings.'
 
 - id: '3.8'
   section: '2.3'
   section_title: Credit Management Tests
-  title: 'Verify TX queue behavior when WREQ credits exhausted (WriteReq queued, not dropped)'
+  title: 'A message of each class (WriteReq, ReadReq, WriteData, ReadData, WriteResp) waits in the TX queue, never dropped, while its class has no credit'
   priority: P0
   old_test: aou_zero_wreq_credit_test
   old_status: '100%'
+  old_title: 'Verify TX queue behavior when WREQ credits exhausted (WriteReq queued, not dropped)'
+  note: 'Merges 3.9-3.12 (one item per class). Evidence: l3.cg_credit, the DUT waiting on zero credit (dut_zero_stall) for each class. Which class alone is held back is 3.16, a check, so it stays apart.'
 
 - id: '3.9'
   section: '2.3'
@@ -297,6 +319,8 @@
   priority: P0
   old_test: aou_zero_rreq_credit_test
   old_status: '100%'
+  merged_into: '3.8'
+  note: 'One class of 3.8''s family.'
 
 - id: '3.10'
   section: '2.3'
@@ -305,6 +329,8 @@
   priority: P0
   old_test: aou_zero_wdata_credit_test
   old_status: '100%'
+  merged_into: '3.8'
+  note: 'One class of 3.8''s family.'
 
 - id: '3.11'
   section: '2.3'
@@ -313,6 +339,8 @@
   priority: P0
   old_test: aou_zero_rdata_credit_test
   old_status: '100%'
+  merged_into: '3.8'
+  note: 'One class of 3.8''s family.'
 
 - id: '3.12'
   section: '2.3'
@@ -321,6 +349,8 @@
   priority: P0
   old_test: aou_zero_wresp_credit_test
   old_status: '100%'
+  merged_into: '3.8'
+  note: 'One class of 3.8''s family.'
 
 - id: '3.13'
   section: '2.3'
@@ -362,6 +392,8 @@
   priority: P1
   old_test: aou_incremental_credit_test
   old_status: '80%'
+  merged_into: '3.3'
+  note: 'Credits returned in steps of 1 to 128 are 3.3''s encodings.'
 
 - id: '3.18'
   section: '2.3'
@@ -397,7 +429,7 @@
   title: TX credit saturates on a remote over-grant (no wrap); TX max credit
   priority: P2
   added: AoU v0.7.1 6.4; MAS 3.9
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '3.23'
   section: '2.3'
@@ -405,7 +437,7 @@
   title: 'Credit is returned only at RX FIFO dequeue: a back-pressured M port withholds credit'
   priority: P2
   added: MAS 3.9
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '3.24'
   section: '2.3'
@@ -413,7 +445,7 @@
   title: The initial CrdtGrant covers every class of every RP; header MsgCredit only afterwards
   priority: P2
   added: AoU 6.4.3; MAS 3.9
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '3.25'
   section: '2.3'
@@ -421,15 +453,17 @@
   title: 'Non-default RX FIFO depths and RS_EN=0: maximum credit follows the depth'
   priority: P2
   added: MAS 3.4/3.9; integration guide parameters
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '4.1'
   section: '2.4'
   section_title: Write Transaction Tests
-  title: Single 1-byte write request with WriteData and WriteResp
+  title: 'Single writes of every AxSIZE from 1 to 128 bytes, each carried in the WriteData message for its DLENGTH (256, 512 or 1024 bits) and answered by a WriteResp'
   priority: P0
   old_test: ucie_axi_fdi_aou_wr1b_test
   old_status: '100%'
+  old_title: Single 1-byte write request with WriteData and WriteResp
+  note: 'Merges 4.2-4.8 (one item per size). Evidence: the AXI4 port monitors'' AxSIZE x length cross (cx_size_x_len, one beat at every size), xfer.small_cg (1-16 bytes) and l3.cg_msg (WriteData256/512/1024).'
 
 - id: '4.2'
   section: '2.4'
@@ -437,6 +471,8 @@
   title: Single 2-byte write request
   priority: P1
   old_test: aou_write_2b_test
+  merged_into: '4.1'
+  note: 'One write size of 4.1''s family.'
 
 - id: '4.3'
   section: '2.4'
@@ -445,6 +481,8 @@
   priority: P0
   old_test: aou_write_4b_test
   old_status: '100%'
+  merged_into: '4.1'
+  note: 'One write size of 4.1''s family.'
 
 - id: '4.4'
   section: '2.4'
@@ -453,6 +491,8 @@
   priority: P0
   old_test: aou_write_8b_test
   old_status: '100%'
+  merged_into: '4.1'
+  note: 'One write size of 4.1''s family.'
 
 - id: '4.5'
   section: '2.4'
@@ -461,6 +501,8 @@
   priority: P1
   old_test: aou_write_16b_test
   old_status: '100%'
+  merged_into: '4.1'
+  note: 'One write size of 4.1''s family.'
 
 - id: '4.6'
   section: '2.4'
@@ -469,6 +511,8 @@
   priority: P0
   old_test: aou_write_32b_test
   old_status: '100%'
+  merged_into: '4.1'
+  note: 'One write size of 4.1''s family; 11.7 merged with it.'
 
 - id: '4.7'
   section: '2.4'
@@ -477,6 +521,8 @@
   priority: P0
   old_test: ucie_axi_fdi_aou_1wrrd_test
   old_status: '100%'
+  merged_into: '4.1'
+  note: 'One write size of 4.1''s family.'
 
 - id: '4.8'
   section: '2.4'
@@ -485,16 +531,19 @@
   priority: P0
   old_test: aou_write_128b_test
   old_status: '100%'
+  merged_into: '4.1'
   old_title: Single 128-byte write with DLENGTH_1024 (28 granules)
-  note: The old plan said 28 granules; AoU v0.8 Table 6 says 30. 11.8 merged here.
+  note: 'The old plan said 28 granules; AoU v0.8 Table 6 says 30. One write size of 4.1''s family; 11.8 merged with it.'
 
 - id: '4.9'
   section: '2.4'
   section_title: Write Transaction Tests
-  title: 2-beat incrementing burst write
+  title: Incrementing write bursts of 2 to 256 beats (AWLEN 1 to 255)
   priority: P0
   old_test: aou_burst_write_2_test
   old_status: '100%'
+  old_title: 2-beat incrementing burst write
+  note: 'Merges 4.10-4.15 (one item per length). Evidence: the AXI4 port monitors'' AWLEN bins (1, 2, 4, ..., 256 beats) and AxSIZE x length cross at every port, and axi.txn_cg lengths.'
 
 - id: '4.10'
   section: '2.4'
@@ -503,6 +552,8 @@
   priority: P0
   old_test: aou_burst_write_4_test
   old_status: '100%'
+  merged_into: '4.9'
+  note: 'One write burst length of 4.9''s family.'
 
 - id: '4.11'
   section: '2.4'
@@ -511,6 +562,8 @@
   priority: P1
   old_test: aou_burst_write_8_test
   old_status: '100%'
+  merged_into: '4.9'
+  note: 'One write burst length of 4.9''s family.'
 
 - id: '4.12'
   section: '2.4'
@@ -519,6 +572,8 @@
   priority: P1
   old_test: aou_burst_write_16_test
   old_status: '100%'
+  merged_into: '4.9'
+  note: 'One write burst length of 4.9''s family.'
 
 - id: '4.13'
   section: '2.4'
@@ -527,6 +582,8 @@
   priority: P1
   old_test: ucie_axi_fdi_aou_wrrd_long_test
   old_status: '100%'
+  merged_into: '4.9'
+  note: 'One write burst length of 4.9''s family.'
 
 - id: '4.14'
   section: '2.4'
@@ -535,6 +592,8 @@
   priority: P1
   old_test: ucie_axi_fdi_aou_wrrd_long_test
   old_status: '100%'
+  merged_into: '4.9'
+  note: 'One write burst length of 4.9''s family.'
 
 - id: '4.15'
   section: '2.4'
@@ -542,6 +601,8 @@
   title: Write burst with AWLEN=255 (256 beats)
   priority: P1
   old_test: aou_max_burst_write_test
+  merged_into: '4.9'
+  note: 'One write burst length of 4.9''s family (256 beats, narrow AxSIZE to stay within 4 KB).'
 
 - id: '4.16'
   section: '2.4'
@@ -551,7 +612,7 @@
   old_test: aou_wrap_burst_rejected_test
   old_status: Need behavior clarity
   dropped: 'The DUT supports INCR bursts only; AoU carries no AxBURST, so WRAP is out of scope (AXI-R19 flags it as a stimulus error).'
-  note: 'Owner decision D1 of the coverage-closure plan. Was "WRAP carried as INCR"; 5.16 goes with it.'
+  note: 'Owner decision (2026-10-14): INCR bursts only. Was "WRAP carried as INCR"; 5.16 goes with it.'
 
 - id: '4.17'
   section: '2.4'
@@ -561,7 +622,7 @@
   old_test: aou_fixed_burst_rejected_test
   old_status: Need behavior clarity
   dropped: 'The DUT supports INCR bursts only; AoU carries no AxBURST, so FIXED is out of scope (AXI-R19 flags it as a stimulus error).'
-  note: 'Owner decision D1 of the coverage-closure plan. Was "FIXED carried as INCR"; 5.17 goes with it.'
+  note: 'Owner decision (2026-10-14): INCR bursts only. Was "FIXED carried as INCR"; 5.17 goes with it.'
 
 - id: '4.18'
   section: '2.4'
@@ -653,10 +714,10 @@
 - id: '4.30'
   section: '2.4'
   section_title: Write Transaction Tests
-  title: 'AxUSER/FLEX carriage: the DUT has no USER ports, sends FLEX as 0 and ignores it on receive'
+  title: 'AxUSER/FLEX carriage: FLEX in every message the DUT sends is the AXI USER[15:0] its port got (first beat of a merged response); the FLEX of every message the DUT receives leaves on the USER outputs of its AXI ports (M-port AWUSER/ARUSER/WUSER, S-port BUSER/RUSER), except that an early write response carries BUSER 0'
   priority: P2
   added: AoU 5.2
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '4.31'
   section: '2.4'
@@ -664,7 +725,7 @@
   title: W data presented before its AW on the S port is accepted once the AW arrives
   priority: P2
   added: AXI4 A3.3.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '4.32'
   section: '2.4'
@@ -677,10 +738,12 @@
 - id: '5.1'
   section: '2.5'
   section_title: Read Transaction Tests
-  title: Single 1-byte read
+  title: 'Single reads of every ARSIZE from 1 to 128 bytes, each answered by the ReadData message for its DLENGTH (256, 512 or 1024 bits)'
   priority: P0
   old_test: ucie_axi_fdi_aou_rd1b_test
   old_status: '100%'
+  old_title: Single 1-byte read
+  note: 'Merges 5.2-5.8 (one item per size). Evidence: the AXI4 port monitors'' AxSIZE x length cross (one beat at every size), xfer.small_cg (1-16 bytes) and l3.cg_msg (ReadData256/512/1024).'
 
 - id: '5.2'
   section: '2.5'
@@ -689,6 +752,8 @@
   priority: P1
   old_test: aou_read_2b_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.3'
   section: '2.5'
@@ -697,6 +762,8 @@
   priority: P0
   old_test: aou_read_4b_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.4'
   section: '2.5'
@@ -705,6 +772,8 @@
   priority: P0
   old_test: aou_read_8b_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.5'
   section: '2.5'
@@ -713,6 +782,8 @@
   priority: P1
   old_test: aou_read_16b_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.6'
   section: '2.5'
@@ -721,6 +792,8 @@
   priority: P0
   old_test: ucie_axi_fdi_aou_1wrrd_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.7'
   section: '2.5'
@@ -729,6 +802,8 @@
   priority: P0
   old_test: ucie_axi_fdi_aou_1wrrd_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.8'
   section: '2.5'
@@ -737,14 +812,18 @@
   priority: P0
   old_test: aou_read_128b_test
   old_status: '100%'
+  merged_into: '5.1'
+  note: 'One read size of 5.1''s family.'
 
 - id: '5.9'
   section: '2.5'
   section_title: Read Transaction Tests
-  title: 2-beat incrementing burst read
+  title: Incrementing read bursts of 2 to 256 beats (ARLEN 1 to 255)
   priority: P0
   old_test: aou_burst_read_2_test
   old_status: '100%'
+  old_title: 2-beat incrementing burst read
+  note: 'Merges 5.10-5.15 (one item per length). Evidence: the AXI4 port monitors'' ARLEN bins (1, 2, 4, ..., 256 beats) and AxSIZE x length cross at every port, and axi.txn_cg lengths.'
 
 - id: '5.10'
   section: '2.5'
@@ -753,6 +832,8 @@
   priority: P0
   old_test: aou_burst_read_4_test
   old_status: '100%'
+  merged_into: '5.9'
+  note: 'One read burst length of 5.9''s family.'
 
 - id: '5.11'
   section: '2.5'
@@ -761,6 +842,8 @@
   priority: P1
   old_test: aou_burst_read_8_test
   old_status: '100%'
+  merged_into: '5.9'
+  note: 'One read burst length of 5.9''s family.'
 
 - id: '5.12'
   section: '2.5'
@@ -769,6 +852,8 @@
   priority: P1
   old_test: aou_burst_read_16_test
   old_status: '100%'
+  merged_into: '5.9'
+  note: 'One read burst length of 5.9''s family.'
 
 - id: '5.13'
   section: '2.5'
@@ -777,6 +862,8 @@
   priority: P1
   old_test: ucie_axi_fdi_aou_wrrd_long_test
   old_status: '100%'
+  merged_into: '5.9'
+  note: 'One read burst length of 5.9''s family.'
 
 - id: '5.14'
   section: '2.5'
@@ -785,6 +872,8 @@
   priority: P1
   old_test: ucie_axi_fdi_aou_wrrd_long_test
   old_status: '100%'
+  merged_into: '5.9'
+  note: 'One read burst length of 5.9''s family.'
 
 - id: '5.15'
   section: '2.5'
@@ -792,6 +881,8 @@
   title: Read burst with ARLEN=255 (256 beats)
   priority: P1
   old_test: aou_max_burst_read_test
+  merged_into: '5.9'
+  note: 'One read burst length of 5.9''s family (256 beats, narrow AxSIZE to stay within 4 KB).'
 
 - id: '5.16'
   section: '2.5'
@@ -801,7 +892,7 @@
   old_test: aou_wrap_burst_rejected_test
   old_status: Need behavior clarity
   dropped: Read side of 4.16; the DUT supports INCR bursts only.
-  note: 'Was merged into 4.16, which is dropped (decision D1).'
+  note: 'Was merged into 4.16, which is dropped (INCR bursts only).'
 
 - id: '5.17'
   section: '2.5'
@@ -811,7 +902,7 @@
   old_test: aou_fixed_burst_rejected_test
   old_status: Need behavior clarity
   dropped: Read side of 4.17; the DUT supports INCR bursts only.
-  note: 'Was merged into 4.17, which is dropped (decision D1).'
+  note: 'Was merged into 4.17, which is dropped (INCR bursts only).'
 
 - id: '5.18'
   section: '2.5'
@@ -906,10 +997,12 @@
 - id: '6.4'
   section: '2.6'
   section_title: Flit Packing Tests
-  title: WriteData256 (8 granules) spanning flit boundary
+  title: 'Every data message crosses a flit boundary, each way: WriteData and WriteDataFull at 256, 512 and 1024 bits, ReadData at 256, 512 and 1024 bits'
   priority: P1
   old_test: aou_crossflit_wdata256_test
   old_status: '80%'
+  old_title: WriteData256 (8 granules) spanning flit boundary
+  note: 'Merges 6.5-6.8 (one item per message type). Evidence: l3.cg_span (message type x tx/rx) and l3.cg_flit_layout (size x spans a flit). Reassembly on receive is 6.9, a check, so it stays apart.'
 
 - id: '6.5'
   section: '2.6'
@@ -918,6 +1011,8 @@
   priority: P0
   old_test: aou_crossflit_wdata512_test
   old_status: '80%'
+  merged_into: '6.4'
+  note: 'One message type of 6.4''s family.'
 
 - id: '6.6'
   section: '2.6'
@@ -925,8 +1020,9 @@
   title: WriteData1024 (30 granules) spanning flit boundary
   priority: P0
   old_test: aou_crossflit_wdata1024_test
+  merged_into: '6.4'
   old_title: WriteData1024 (28 granules) spanning flit boundary
-  note: The old plan said 28 granules; AoU v0.8 Table 6 says 30.
+  note: 'The old plan said 28 granules; AoU v0.8 Table 6 says 30. One message type of 6.4''s family.'
 
 - id: '6.7'
   section: '2.6'
@@ -935,6 +1031,8 @@
   priority: P0
   old_test: aou_crossflit_rdata512_test
   old_status: '80%'
+  merged_into: '6.4'
+  note: 'One message type of 6.4''s family.'
 
 - id: '6.8'
   section: '2.6'
@@ -942,6 +1040,8 @@
   title: ReadData1024 (27 granules) spanning flit boundary
   priority: P0
   old_test: aou_crossflit_rdata1024_test
+  merged_into: '6.4'
+  note: 'One message type of 6.4''s family.'
 
 - id: '6.9'
   section: '2.6'
@@ -954,10 +1054,12 @@
 - id: '6.10'
   section: '2.6'
   section_title: Flit Packing Tests
-  title: Verify granules 0-11 positioned at byte offset 2. All granules are verified when decoded
+  title: 'Messages start at every granule 0-47 of the flit, so each 12-granule quarter (from byte 2, 66, 130 and 194) is filled and decoded'
   priority: P0
   old_test: ucie_axi_fdi_aou_random_test
   old_status: '100%'
+  old_title: Verify granules 0-11 positioned at byte offset 2. All granules are verified when decoded
+  note: 'Merges 6.11-6.13 (one item per quarter). Evidence: l3.cg_flit_layout start granule (0-47) and start x size.'
 
 - id: '6.11'
   section: '2.6'
@@ -966,6 +1068,8 @@
   priority: P0
   old_test: ucie_axi_fdi_aou_random_test
   old_status: '100%'
+  merged_into: '6.10'
+  note: 'One quarter of 6.10''s family.'
 
 - id: '6.12'
   section: '2.6'
@@ -974,6 +1078,8 @@
   priority: P0
   old_test: ucie_axi_fdi_aou_random_test
   old_status: '100%'
+  merged_into: '6.10'
+  note: 'One quarter of 6.10''s family.'
 
 - id: '6.13'
   section: '2.6'
@@ -982,6 +1088,8 @@
   priority: P0
   old_test: ucie_axi_fdi_aou_random_test
   old_status: '100%'
+  merged_into: '6.10'
+  note: 'One quarter of 6.10''s family.'
 
 - id: '6.14'
   section: '2.6'
@@ -1131,10 +1239,12 @@
 - id: '7.12'
   section: '2.7'
   section_title: Data Integrity Tests
-  title: Test accesses crossing 4KB boundary (should be split or error)
+  title: Bursts that end exactly at a 4 KB boundary or start right after one (a burst across it is illegal AXI and not run)
   priority: P1
   old_test: aou_4kb_boundary_test
   old_status: '50%'
+  old_title: Test accesses crossing 4KB boundary (should be split or error)
+  note: 'Was "accesses crossing 4KB boundary (should be split or error)"; aou_addr_test runs the boundary cases.'
 
 - id: '7.13'
   section: '2.7'
@@ -1167,10 +1277,12 @@
 - id: '8.1'
   section: '2.8'
   section_title: Outstanding Transaction Tests
-  title: Send 2 write requests before receiving responses
+  title: Writes and reads outstanding from one up to the limit at every S and M port
   priority: P0
   old_test: aou_outstanding_2wr_test
   old_status: '100%'
+  old_title: Send 2 write requests before receiving responses
+  note: 'Merges 8.2-8.6 (2, 4 and the maximum, writes and reads). Evidence: the AXI4 port monitors'' outstanding bins (1, 2-15, up to half, up to the limit less one, at the limit) per port and env.cg_mo. The S-port write limit is not reached yet (a hole and a gap in the road-map).'
 
 - id: '8.2'
   section: '2.8'
@@ -1178,6 +1290,8 @@
   title: Send 4 write requests before receiving responses
   priority: P1
   old_test: aou_outstanding_4wr_test
+  merged_into: '8.1'
+  note: 'One depth of 8.1''s family.'
 
 - id: '8.3'
   section: '2.8'
@@ -1185,6 +1299,8 @@
   title: Send maximum outstanding writes per credit limit
   priority: P1
   old_test: aou_max_outstanding_wr_test
+  merged_into: '8.1'
+  note: 'The write limit of 8.1''s family.'
 
 - id: '8.4'
   section: '2.8'
@@ -1193,6 +1309,8 @@
   priority: P0
   old_test: aou_outstanding_2rd_test
   old_status: '100%'
+  merged_into: '8.1'
+  note: 'One depth of 8.1''s family.'
 
 - id: '8.5'
   section: '2.8'
@@ -1200,6 +1318,8 @@
   title: Send 4 read requests before receiving data
   priority: P1
   old_test: aou_outstanding_4rd_test
+  merged_into: '8.1'
+  note: 'One depth of 8.1''s family.'
 
 - id: '8.6'
   section: '2.8'
@@ -1207,14 +1327,18 @@
   title: Send maximum outstanding reads per credit limit
   priority: P1
   old_test: aou_max_outstanding_rd_test
+  merged_into: '8.1'
+  note: 'The read limit of 8.1''s family.'
 
 - id: '8.7'
   section: '2.8'
   section_title: Outstanding Transaction Tests
-  title: 2 outstanding writes + 2 outstanding reads
+  title: Writes and reads outstanding at the same time
   priority: P0
   old_test: aou_mixed_outstanding_2w2r_test
   old_status: '100%'
+  old_title: 2 outstanding writes + 2 outstanding reads
+  note: 'Merges 8.8 (4 + 4 beside 2 + 2). Kept apart from 8.1: no bin crosses write with read outstanding, so the evidence is the scenarios that list it.'
 
 - id: '8.8'
   section: '2.8'
@@ -1222,6 +1346,8 @@
   title: 4 outstanding writes + 4 outstanding reads
   priority: P1
   old_test: aou_mixed_outstanding_4w4r_test
+  merged_into: '8.7'
+  note: A deeper case of 8.7.
 
 - id: '8.9'
   section: '2.8'
@@ -1310,7 +1436,7 @@
   old_test: aou_credit_underflow_test
   dropped: 'AoU v0.8 6.1 binds the sender only; the receiver''s reaction to a credit overrun is undefined.'
   old_title: Internal check for negative credit count
-  note: 'Spec v0.8 decision (2026-10-20): aou_credit_violation_test removed. Coverage-closure D9 had retitled it "Remote RX credit overrun".'
+  note: 'Spec v0.8 decision (2026-10-20): aou_credit_violation_test removed. The coverage-closure review had retitled it "Remote RX credit overrun".'
 
 - id: '9.6'
   section: '2.9'
@@ -1335,7 +1461,7 @@
   priority: P2
   old_test: aou_partial_flit_test
   dropped: 'The RTL has no RX incomplete-flit time-out, and on FDI the Adapter completes or cancels every flit (UCIe r1.1 8.2.4).'
-  note: 'Coverage-closure decision D9. The run-list entry was blocked on the L1 driver''s gap cap.'
+  note: 'Dropped by the coverage-closure review (2026-10-14). The run-list entry was blocked on the L1 driver''s gap cap.'
 
 - id: '9.9'
   section: '2.9'
@@ -1389,7 +1515,7 @@
   title: 'A received message naming an RP at or above RP_COUNT (WriteResp, header MsgCredit, CrdtGrant): the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   priority: P2
   added: AoU 6.4.1; v0.8 8.3.3
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '9.16'
   section: '2.9'
@@ -1397,7 +1523,7 @@
   title: 'Reserved MISCOP/DLENGTH, RsvdZero set or a stray MsgStart received: the testbench checkers report it; the DUT reaction is undefined (v0.8 8.3.3) and software recovers'
   priority: P2
   added: 'AoU Table 15, 4.4; v0.8 8.3.3'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '9.17'
   section: '2.9'
@@ -1405,7 +1531,7 @@
   title: Debug FIFO holds four entries and drops the fifth; B and R pushed in one cycle
   priority: P2
   added: MAS 7.2.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '9.18'
   section: '2.9'
@@ -1413,7 +1539,7 @@
   title: 'Debug FIFO access disabled: with RPn_ERROR_INFO_ACCESS_EN=0 the debug address is ordinary memory'
   priority: P2
   added: MAS 7.2.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '9.19'
   section: '2.9'
@@ -1421,7 +1547,7 @@
   title: Debug FIFO read through an RP narrower than the remote die (two-beat read)
   priority: P2
   added: MAS 7.2.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '9.20'
   section: '2.9'
@@ -1429,7 +1555,7 @@
   title: 'M-port ID and split tables full: back-pressure, no error'
   priority: P2
   added: 'MAS 7.2.2; integration guide M_*_MO_CNT'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '9.21'
   section: '2.9'
@@ -1438,7 +1564,7 @@
   priority: P2
   added: MAS overview 2.1
   dropped: AoU v0.8 5.7 makes ReadData wider than ARSIZE a peer violation with no defined reaction.
-  note: Coverage-closure gap analysis 4.3 (decision D9). Spec v0.8 decision (2026-10-20) removed aou_rdata_wide_test.
+  note: Added by the coverage-closure review (2026-10-14). Spec v0.8 decision (2026-10-20) removed aou_rdata_wide_test.
 
 - id: '9.22'
   section: '2.9'
@@ -1446,7 +1572,7 @@
   title: 'Subordinate ID-check enable bit (AXI_SLV_ID_MISMATCH_ERR_RPn[22]) off and on'
   priority: P2
   added: MAS 7.2.2
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '10.1'
   section: '2.10'
@@ -1479,30 +1605,38 @@
 - id: '10.4'
   section: '2.10'
   section_title: Performance Tests
-  title: Measure single write request-to-response latency
+  title: 'Write request-to-response latency, measured and reported (no bound yet)'
   priority: P1
   old_test: aou_write_latency_test
+  old_title: Measure single write request-to-response latency
+  note: 'Was "Measure single write request-to-response latency". Report-only: any run that completes passes.'
 
 - id: '10.5'
   section: '2.10'
   section_title: Performance Tests
-  title: Measure single read request-to-data latency
+  title: 'Read request-to-data latency, measured and reported (no bound yet)'
   priority: P1
   old_test: aou_read_latency_test
+  old_title: Measure single read request-to-data latency
+  note: 'Was "Measure single read request-to-data latency". Report-only.'
 
 - id: '10.6'
   section: '2.10'
   section_title: Performance Tests
-  title: Measure credit consumption to credit return delay
+  title: 'Credit consumption to credit return delay, measured and reported (no bound yet)'
   priority: P2
   old_test: aou_credit_return_latency_test
+  old_title: Measure credit consumption to credit return delay
+  note: 'Was "Measure credit consumption to credit return delay". Report-only.'
 
 - id: '10.7'
   section: '2.10'
   section_title: Performance Tests
-  title: Time to drain full TX queue when credits granted
+  title: 'Time to drain a full TX queue once credits are granted, measured and reported (no bound yet)'
   priority: P2
   old_test: aou_queue_drain_test
+  old_title: Time to drain full TX queue when credits granted
+  note: 'Was "Time to drain full TX queue when credits granted". Report-only.'
 
 - id: '10.8'
   section: '2.10'
@@ -1516,9 +1650,11 @@
 - id: '10.9'
   section: '2.10'
   section_title: Performance Tests
-  title: Measure full RTT (AXI read request to read response)
+  title: 'Read round trip, AXI read request to read data, measured and reported (no bound yet)'
   priority: P1
   old_test: aou_rtt_test
+  old_title: Measure full RTT (AXI read request to read response)
+  note: 'Was "Measure full RTT". Report-only.'
 
 - id: '10.10'
   section: '2.10'
@@ -1553,8 +1689,8 @@
   section_title: Performance Tests
   title: 'Numeric performance bounds: latency and efficiency per FDI width from the PPA tables'
   priority: P2
-  added: MAS PPA tables 8/9; BUGS/006
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  added: MAS PPA tables 8/9
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '10.15'
   section: '2.10'
@@ -1562,7 +1698,7 @@
   title: 'Back-pressure on every AXI channel and on FDI trdy: throughput and correctness under stall'
   priority: P2
   added: AXI4 A3.2.1; UCIe r1.1 8.2.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '11.1'
   section: '2.11'
@@ -1618,8 +1754,8 @@
   priority: P0
   old_test: aou_eight_granule_test
   old_status: '100%'
-  merged_into: '4.6'
-  note: WriteData256 (8 granules) is the 32-byte write of 4.6; ReadData256 is 5.6.
+  merged_into: '4.1'
+  note: 'WriteData256 (8 granules) is the 32-byte write of 4.1''s family; ReadData256 is in 5.1''s.'
 
 - id: '11.8'
   section: '2.11'
@@ -1627,7 +1763,7 @@
   title: WriteData1024 (28 granules) - maximum
   priority: P1
   old_test: aou_max_granule_test
-  merged_into: '4.8'
+  merged_into: '4.1'
   note: 'Same message as 4.8 (WriteData1024, the largest message), which is 30 granules, not 28.'
 
 - id: '11.9'
@@ -1669,9 +1805,11 @@
 - id: '11.14'
   section: '2.11'
   section_title: Corner Case Tests
-  title: 'Test various `prof` and `profextlen` values'
+  title: 'ProfileID/ProfileRev/ProfileOpt values in the ActivateReq: the Basic Profile 0/0/0 (the DUT, always) beside the remote die''s non-zero fields and RPs the sender does not have'
   priority: P2
   old_test: aou_profile_field_test
+  old_title: 'Test various `prof` and `profextlen` values'
+  note: 'The old item varied v0.7 PROF/PROFEXTLEN in the AXI messages, which v0.8 removes; the profile now travels in the ActivateReq (1.14, aou_act_profile_test).'
 
 - id: '11.15'
   section: '2.11'
@@ -1686,7 +1824,7 @@
   title: 'I_RESETN and I_PRESETN independent: each alone, in each order'
   priority: P2
   added: integration guide 3.1.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '11.17'
   section: '2.11'
@@ -1694,7 +1832,7 @@
   title: 'PCLK:CLK ratios through the asynchronous APB bridge: slow, fast and near-equal PCLK'
   priority: P2
   added: 'integration guide (APB bridge, CDC)'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '11.18'
   section: '2.11'
@@ -1702,7 +1840,7 @@
   title: 'Regression on a build with the RTL''s embedded ASSERTION_ON checks'
   priority: P2
   added: RTL ASSERTION_ON sites
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '11.19'
   section: '2.11'
@@ -1710,7 +1848,7 @@
   title: 'DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path'
   priority: P2
   added: integration guide 8.7/3.13.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '12.1'
   section: '2.12'
@@ -1808,7 +1946,7 @@
   priority: P2
   old_test: aou_rp_remap_asym_test
   dropped: 'An asymmetric DEST_RP is a misconfiguration MAS 3.10.1 forbids, with undefined behaviour.'
-  note: 'Coverage-closure decision D9. aou_dest_rp_asym_test removed (spec v0.8 decision, 2026-10-20).'
+  note: 'Dropped by the coverage-closure review (2026-10-14). aou_dest_rp_asym_test removed (spec v0.8 decision, 2026-10-20).'
 
 - id: '12.14'
   section: '2.12'
@@ -1867,7 +2005,7 @@
   title: 'Local and remote RP_COUNT differ: the effective count is the smaller, and a larger remote die is configured down to it (AoU v0.8 6.2)'
   priority: P2
   added: MAS 3.10.1; AoU 6.2
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '12.21'
   section: '2.12'
@@ -2013,7 +2151,7 @@
   title: ARB_MODE=3 (reserved) behaves as round-robin
   priority: P2
   added: RDL ARB_MODE; MAS 3.2.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '13.20'
   section: '2.13'
@@ -2021,7 +2159,7 @@
   title: PRx_PRIOR=0 is treated as 1
   priority: P2
   added: MAS 3.2.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '13.21'
   section: '2.13'
@@ -2029,7 +2167,7 @@
   title: 'AXI_QOS_TO_HP at or below AXI_QOS_TO_NP (misconfiguration: the normal tier is empty)'
   priority: P2
   added: MAS 3.2.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '13.22'
   section: '2.13'
@@ -2037,7 +2175,7 @@
   title: 'QoS timer extremes: TIMER_RESOLUTION and TIMER_THRESHOLD at 0 and at maximum'
   priority: P2
   added: RDL PRIOR_TIMER; MAS 3.2.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '14.1'
   section: '2.14'
@@ -2159,7 +2297,7 @@
   priority: P2
   added: integration guide parameters
   dropped: 'AXI_PEER_DIE_MAX_DATA_WD is a localparam fixed at 1024, the widest AoU data message; the RX data path is always sized for a 1024-bit remote die and there is no narrower build to test.'
-  note: 'Coverage-closure gap analysis 4.3 (decision D9) added it when the parameter was configurable; retired with the parameter (DECISIONS D9 amendment, 2026-10-20).'
+  note: 'The coverage-closure review (2026-10-14) added it when the parameter was configurable; retired with the parameter (DECISIONS D9 amendment, 2026-10-20).'
 
 - id: '15.1'
   section: '2.15'
@@ -2405,18 +2543,18 @@
 - id: '16.16'
   section: '2.16'
   section_title: Write Early Response Tests
-  title: B response presented zero cycles after the AW/W handshakes complete (issue 64)
+  title: 'B response in the first cycle after the AW/W handshakes (minimum latency, no idle cycle; issue 64)'
   priority: P1
   old_title: 'gh issue #64 write response (B) presented zero cycles after the AW/W handshakes complete'
-  note: The old row had no Test File column.
+  note: 'The old row had no Test File column. "Zero cycles after" meant no idle cycle between; a response in the handshake''s own cycle is illegal AXI.'
 
 - id: '16.17'
   section: '2.16'
   section_title: Write Early Response Tests
-  title: 'Write kept waiting at the early-response limit (O_PENDING_CNT_OVER removed by PR #89; the write watchdog that replaced it is 16.18-16.23)'
+  title: A write kept waiting at the early-response limit; the write watchdog (16.18-16.23) reports a hung RP
   priority: P2
   added: MAS 3.7.5
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. With +early_over the early-table checker reports the watchdog pin while an AW waits at the limit.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed. With +early_over the early-table checker reports the watchdog pin while an AW waits at the limit.
 
 - id: '16.18'
   section: '2.16'
@@ -2641,16 +2779,20 @@
 - id: '18.11'
   section: '2.18'
   section_title: UCIe FDI Interface Tests
-  title: 'Verify `r_phase` increments correctly across chunks'
+  title: RX reassembles each flit correctly from the chunks of every FDI width
   priority: P1
   old_test: aou_phase_counter_test
+  old_title: 'Verify `r_phase` increments correctly across chunks'
+  note: 'Was "r_phase increments correctly across chunks", an RTL internal. Evidence: end-to-end data checks under traffic, and l1.cg_fdi_xfer per FDI width.'
 
 - id: '18.12'
   section: '2.18'
   section_title: UCIe FDI Interface Tests
-  title: 'Verify `AOU_RX_FDI_IF` staging buffer operation'
+  title: RX keeps a partly received flit correct across pl_trdy gaps and flit cancels
   priority: P1
   old_test: aou_rx_staging_buf_test
+  old_title: 'Verify `AOU_RX_FDI_IF` staging buffer operation'
+  note: 'Was "AOU_RX_FDI_IF staging buffer operation", an RTL internal. Evidence: end-to-end data checks under the default flit-cancel rate, and l1.cg_fdi_cancel.'
 
 - id: '18.13'
   section: '2.18'
@@ -2658,7 +2800,7 @@
   title: Retrain while ENABLED with traffic is transparent to AoU
   priority: P2
   added: UCIe r1.1 8.3.3.4; MAS software-operation 7.3.7
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.14'
   section: '2.18'
@@ -2666,7 +2808,7 @@
   title: 'LinkError, Adapter- and DUT-initiated: lp_linkerror raise, hold and recovery'
   priority: P2
   added: 'UCIe r1.1 8.3.3.7, Table 8-2'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.15'
   section: '2.18'
@@ -2674,7 +2816,7 @@
   title: 'L1 entry and exit with the MAS power-management sequence, including the clk_req wake'
   priority: P2
   added: UCIe r1.1 8.2.9; MAS 7.3.6
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.16'
   section: '2.18'
@@ -2682,15 +2824,15 @@
   title: 'L2 is not implemented: the DUT never requests L2 (FDI-R56); without that request the Adapter cannot enter L2 (UCIe r1.1 §8.2.9), so DUT behaviour in L2 cannot be tested'
   priority: P2
   added: UCIe r1.1 8.2.9; integration guide bringup gaps
-  note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "L2 is not supported (documented bringup gap)" when the FDI corner runs showed the DUT never requests L2.'
+  note: 'Added by the coverage-closure review (2026-10-14); priority to be reviewed. Retitled from "L2 is not supported (documented bringup gap)" when the FDI corner runs showed the DUT never requests L2.'
 
 - id: '18.17'
   section: '2.18'
   section_title: UCIe FDI Interface Tests
   title: 'LinkReset: Adapter state and the DUT''s request, O_AOU_REQ_LINKRESET and its mask'
   priority: P2
-  added: UCIe r1.1 8.3.3.5; BUGS/014
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  added: UCIe r1.1 8.3.3.5
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.18'
   section: '2.18'
@@ -2698,7 +2840,7 @@
   title: 'Disabled: Adapter-initiated entry and exit'
   priority: P2
   added: UCIe r1.1 8.3.3.6; integration guide bringup gaps
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.19'
   section: '2.18'
@@ -2706,7 +2848,7 @@
   title: 'rx_active request/status handshake: raise and fall rules'
   priority: P2
   added: UCIe r1.1 8.2.7
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.20'
   section: '2.18'
@@ -2714,7 +2856,7 @@
   title: wake_req/wake_ack handshake
   priority: P2
   added: UCIe r1.1 8.2.3.1
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.21'
   section: '2.18'
@@ -2722,7 +2864,7 @@
   title: pl_inband_pres drop
   priority: P2
   added: 'UCIe r1.1 8.2.8, Table 8-2'
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.22'
   section: '2.18'
@@ -2730,7 +2872,7 @@
   title: 'Stall corners: stallreq mid-flit (ack at the boundary), stallreq while trdy=0, stallreq with LP mode'
   priority: P2
   added: UCIe r1.1 8.3.2
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.23'
   section: '2.18'
@@ -2738,7 +2880,7 @@
   title: pl_state_sts leaves Active mid-flit
   priority: P2
   added: UCIe r1.1 8.2.4/8.3.3
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.24'
   section: '2.18'
@@ -2746,7 +2888,7 @@
   title: 'Flit-cancel corners: during a multi-flit message, repeated cancel, cancel of the second half, cancel with stall'
   priority: P2
   added: UCIe r1.1 Table 8-2; MAS 3.11
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.25'
   section: '2.18'
@@ -2754,7 +2896,7 @@
   title: 'Two-PHY I_PHY_TYPE selection with PHY1 active: state and stall muxing for the second PHY'
   priority: P2
   added: MAS 2.1; integration guide TWO_PHY
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '18.26'
   section: '2.18'
@@ -2762,7 +2904,7 @@
   title: 'Flit header fields: protocol ID, other header bits and CRC bytes are zero'
   priority: P2
   added: UCIe r1.1 2.4.4/3.3.4
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '19.1'
   section: '2.19'
@@ -3070,7 +3212,7 @@
   priority: P2
   old_test: aou_top_integration_test
   dropped: 'The bench integrates only AOU_TOP; AOU_CORE_TOP shares the same core, and 22.1-22.4 cover the bringup controller.'
-  note: Coverage-closure decision D9.
+  note: Dropped by the coverage-closure review (2026-10-14).
 
 - id: '22.6'
   section: '2.22'
@@ -3078,7 +3220,7 @@
   title: 'Every AOU_FDI_BRINGUP_CTRL transition, with the documented gaps as expected failures or waivers'
   priority: P2
   added: integration guide 6.6
-  note: Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed.
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 
 - id: '22.7'
   section: '2.22'
@@ -3086,4 +3228,4 @@
   title: 'Restart after link-down is software''s on the UCIe controller: the DUT requests nothing in LinkError, LinkReset, Disabled or Reset'
   priority: P2
   added: UCIe r1.1 8.3.3.8 (owner decision 7)
-  note: 'Coverage-closure gap analysis 4.3 (decision D9); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (not a bug) when the owner assigned the restart to software.'
+  note: 'Added by the coverage-closure review (2026-10-14); priority to be reviewed. Retitled from "Restart after link-down needs NOP to Active on lp_state_req" (not a bug) when the owner assigned the restart to software.'

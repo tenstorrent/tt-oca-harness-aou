@@ -7,7 +7,8 @@
 // once started it runs to completion, cancels and replays included. A
 // cancel comes in the cycle after the last beat of its 128B half
 // (FDI-R05), either with pl_valid low or with the replay's first beat. A
-// LinkError mid-flit (gate abort) abandons the flit at once.
+// LinkError mid-flit (gate abort) abandons the flit at once. At 256 B the
+// flit is one beat and the cancel unit is the whole flit.
 class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
   `uvm_component_utils(aou_fdi_pl_driver)
 
@@ -64,7 +65,19 @@ class aou_fdi_pl_driver extends uvm_driver #(aou_flit_item);
     poison.randomize_payload();
     poison.randomize_adapter_bytes();
 
-    if (it.cancel_h0 != AOU_CANCEL_NONE) begin
+    if (halves_per_flit(cfg.beat_bytes) == 1) begin
+      // 256 B: the flit is one beat and the cancel unit (fdi-rx-plan 1.3). Any
+      // half cancel in the plan becomes whole-flit cancels, repeated as asked,
+      // in the kind of the first cancelled half; then the clean copy.
+      aou_fdi_cancel_e kind = it.cancel_h0 != AOU_CANCEL_NONE ? it.cancel_h0 : it.cancel_h1;
+      if (kind != AOU_CANCEL_NONE) begin
+        int unsigned rep = it.cancel_repeat;
+        repeat (rep < 1 ? 1 : rep) begin
+          seg_half.push_back(0); seg_cancel.push_back(kind);
+        end
+      end
+      seg_half.push_back(0); seg_cancel.push_back(AOU_CANCEL_NONE);
+    end else if (it.cancel_h0 != AOU_CANCEL_NONE) begin
       int unsigned rep = it.cancel_h1 != AOU_CANCEL_NONE ? 1 : it.cancel_repeat;
       repeat (rep < 1 ? 1 : rep) begin
         seg_half.push_back(0); seg_cancel.push_back(it.cancel_h0);

@@ -57,17 +57,20 @@ module AOU_AXI_DOWN #(
     input        [CACHE_WD-1:0]                            I_S_AWCACHE,
     input        [PROT_WD-1:0]                             I_S_AWPROT,
     input        [3:0]                                     I_S_AWQOS,
+    input        [15:0]                                    I_S_AWUSER,
     input                                                  I_S_AWVALID,
     output                                                 O_S_AWREADY,
 
     input        [I_DATA_WD-1:0]                           I_S_WDATA,
     input        [STRB_WD-1:0]                             I_S_WSTRB,  
     input                                                  I_S_WLAST,
+    input        [15:0]                                    I_S_WUSER,
     input                                                  I_S_WVALID,
     output                                                 O_S_WREADY,
     
     output       [ID_WD-1:0]                               O_S_BID,
     output       [RESP_WD-1:0]                             O_S_BRESP,
+    output       [15:0]                                    O_S_BUSER,
     output                                                 O_S_BVALID,
     input                                                  I_S_BREADY,
 
@@ -80,12 +83,14 @@ module AOU_AXI_DOWN #(
     input        [LEN_WD-1:0]                              I_S_ARLEN,
     input                                                  I_S_ARLOCK,
     input        [3:0]                                     I_S_ARQOS,
+    input        [15:0]                                    I_S_ARUSER,
     input                                                  I_S_ARVALID,
     output                                                 O_S_ARREADY,
 
     output       [ID_WD-1:0]                               O_S_RID,
     output       [I_DATA_WD-1:0]                           O_S_RDATA,
     output       [RESP_WD-1:0]                             O_S_RRESP,
+    output       [15:0]                                    O_S_RUSER,
     output                                                 O_S_RLAST,
     output                                                 O_S_RVALID,
     input                                                  I_S_RREADY,
@@ -100,17 +105,20 @@ module AOU_AXI_DOWN #(
     output       [CACHE_WD-1:0]                            O_M_AWCACHE,
     output       [PROT_WD-1:0]                             O_M_AWPROT,
     output       [3:0]                                     O_M_AWQOS,
+    output       [15:0]                                    O_M_AWUSER,
     output                                                 O_M_AWVALID,
     input                                                  I_M_AWREADY,
 
     output       [O_DATA_WD-1:0]                           O_M_WDATA,
     output       [O_STRB_WD-1:0]                           O_M_WSTRB,
     output                                                 O_M_WLAST,
+    output       [15:0]                                    O_M_WUSER,
     output                                                 O_M_WVALID,
     input                                                  I_M_WREADY,
 
     input        [ID_WD-1:0]                               I_M_BID,
     input        [RESP_WD-1:0]                             I_M_BRESP,
+    input        [15:0]                                    I_M_BUSER,
     input                                                  I_M_BVALID,
     output                                                 O_M_BREADY,
      
@@ -123,12 +131,14 @@ module AOU_AXI_DOWN #(
     output       [LEN_WD-1:0]                              O_M_ARLEN,
     output                                                 O_M_ARLOCK,
     output       [3:0]                                     O_M_ARQOS,
+    output       [15:0]                                    O_M_ARUSER,
     output                                                 O_M_ARVALID,
     input                                                  I_M_ARREADY,
 
     input        [ID_WD-1:0]                               I_M_RID,
     input        [O_DATA_WD-1:0]                           I_M_RDATA,
     input        [RESP_WD-1:0]                             I_M_RRESP,
+    input        [15:0]                                    I_M_RUSER,
     input                                                  I_M_RLAST,
     input                                                  I_M_RVALID,
     output                                                 O_M_RREADY,
@@ -204,8 +214,8 @@ u_aw_fifo (
     .O_FULL_CNT             ()   
 );
 
-assign  {O_M_AWID, O_M_AWBURST, O_M_AWLOCK, O_M_AWCACHE, O_M_AWPROT, O_M_AWQOS} = 
-            {I_S_AWID, I_S_AWBURST, I_S_AWLOCK, I_S_AWCACHE, I_S_AWPROT, I_S_AWQOS};
+assign  {O_M_AWID, O_M_AWBURST, O_M_AWLOCK, O_M_AWCACHE, O_M_AWPROT, O_M_AWQOS, O_M_AWUSER} = 
+            {I_S_AWID, I_S_AWBURST, I_S_AWLOCK, I_S_AWCACHE, I_S_AWPROT, I_S_AWQOS, I_S_AWUSER};
 
 generate
     if($clog2(I_DATA_WD/8)==0) begin
@@ -314,6 +324,29 @@ AOU_SYNC_FIFO_NS1M #(
     .O_M_DATA_CNT                       (                           )
 );
 
+// One wide local beat becomes several narrow beats: each of them carries the
+// beat's WUSER, the way it carries that beat's strobes.
+AOU_SYNC_FIFO_NS1M #(
+    .FIFO_WIDTH                         (16                         ),
+    .FIFO_DEPTH                         (FIFO_DEPTH                 ),
+    .ICH_CNT                            (I_DATA_WD/O_DATA_WD        )
+) u_wuser_fifo
+(
+    .I_CLK                              (I_CLK                      ),
+    .I_RESETN                           (I_RESETN                   ),
+    // write transaction
+    .I_SVALID                           (w_ns1m_wdata_svalid & {(I_DATA_WD/O_DATA_WD){I_S_WVALID && I_M_WREADY}}),
+    .I_SDATA                            ({(I_DATA_WD/O_DATA_WD){I_S_WUSER}}),
+    .O_SREADY                           (                           ),
+    // read transaction
+    .I_MREADY                           (I_M_WREADY && O_M_WVALID   ),
+    .O_MDATA                            (O_M_WUSER                  ),
+    .O_MVALID                           (                           ),
+
+    .O_S_EMPTY_CNT                      (                           ),
+    .O_M_DATA_CNT                       (                           )
+);
+
 
 // ================================================================================================
 //  READ STAGE ====================================================================================
@@ -361,6 +394,7 @@ AOU_AXI_DOWN_RDATA_ORDER #(
     .I_AXI_RId                       (I_M_RID),
     .I_AXI_RLast                     (I_M_RLAST),
     .I_AXI_RResp                     (I_M_RRESP),
+    .I_AXI_RUser                     (I_M_RUSER),
     .I_AXI_RData                     (I_M_RDATA),
     .I_AXI_RValid                    (I_M_RVALID),
     .I_AXI_RReady                    (O_M_RREADY),
@@ -369,6 +403,7 @@ AOU_AXI_DOWN_RDATA_ORDER #(
     .O_ReorderBuf_MValid             (w_rch_no_stop),
     .O_ReorderBuf_MData              (O_S_RDATA),
     .O_ReorderBuf_MResp              (O_S_RRESP),
+    .O_ReorderBuf_MUser              (O_S_RUSER),
     .O_ReorderBuf_MId                (O_S_RID),
     .O_RReadyNonBlocking             (w_rch_ready_nonblocking),
     .O_DEST_TABLE_ID_ERR             (O_DEST_TABLE_RID_ERR)             
@@ -396,9 +431,11 @@ assign O_S_BVALID = I_M_BVALID;
 assign O_M_BREADY = I_S_BREADY;
 assign O_S_BID    = I_M_BID;
 assign O_S_BRESP  = I_M_BRESP;
+assign O_S_BUSER  = I_M_BUSER;
 
 //  AR channel ================================================
 assign O_S_ARREADY = I_M_ARREADY & w_arch_no_stop;
 assign O_M_ARVALID = I_S_ARVALID & w_arch_no_stop; 
+assign O_M_ARUSER  = I_S_ARUSER;
 
 endmodule

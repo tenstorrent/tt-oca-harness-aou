@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// T1 environment: one AOU_TOP against layered models (docs/ARCHITECTURE.md,
+// T1 environment: one AOU_TOP against layered models (docs/AOU_TB_ARCH.adoc,
 // "Topology" and "Test layer API"). The env, its configuration, the virtual
 // sequencer and the base virtual sequence every T1 test composes.
 `timescale 1ns/1ps
@@ -84,18 +84,19 @@ package aou_t1_env_pkg;
     endcase
   endfunction
   // RX FIFO depth per RP and credit class (AW, AR, W, R, B, in aou_cred_class_e
-  // order). AOU_RX_FIFO_ALT (CONFIG *-rxf) gives every RP and class its own
-  // non-default depth, which the top passes to AOU_TOP with the RX FIFO register
-  // slices off; otherwise these are the integration guide's defaults (section 2:
-  // 44, and 88 or 140 for W and R with a 1024-bit FDI), which the top leaves to
-  // the RTL. W depths are multiples of 4 and R depths of RP width / 256 (the
-  // MAS 3.9 formulas divide by them).
+  // order). AW, AR and B hold one message per entry; W and R are granule
+  // stores, so their depth is in granules (one credit each). AOU_RX_FIFO_ALT
+  // (CONFIG *-rxf) gives every RP and class its own non-default depth, which
+  // the top passes to AOU_TOP with the request/response register slices off;
+  // otherwise these are the integration guide's defaults (section 2: 44, and
+  // 600 granules for W and R, 960 with a 256 B FDI), which the top leaves to
+  // the RTL.
 `ifdef AOU_RX_FIFO_ALT
-  localparam int AOU_T1_RX_DEPTH[4][5] = '{'{24, 16, 64, 48, 20}, '{12, 30, 40, 26, 13},
-                                          '{20, 20, 52, 44, 16}, '{16, 12, 44, 38, 14}};
+  localparam int AOU_T1_RX_DEPTH[4][5] = '{'{24, 16, 300, 240, 20}, '{12, 30, 150, 120, 13},
+                                          '{20, 20, 420, 360, 16}, '{16, 12, 210, 180, 14}};
   localparam int AOU_T1_RX_RS_EN = 0;
 `else
-  localparam int AOU_T1_RX_WR_DEPTH = (AOU_T1_FDI_CONFIG == 2 || AOU_T1_FDI_CONFIG == 4) ? 140 : 88;
+  localparam int AOU_T1_RX_WR_DEPTH = (AOU_T1_FDI_CONFIG == 5) ? 960 : 600;
   localparam int AOU_T1_RX_DEPTH[4][5] =
       '{4{'{44, 44, AOU_T1_RX_WR_DEPTH, AOU_T1_RX_WR_DEPTH, 44}}};
   localparam int AOU_T1_RX_RS_EN = 1;
@@ -117,21 +118,18 @@ package aou_t1_env_pkg;
 
   // FDI beat bytes per PHY for each FDI_CONFIG (integrator guide §3.10)
   localparam int AOU_T1_BEAT0 = (AOU_T1_FDI_CONFIG == 0 || AOU_T1_FDI_CONFIG == 3) ? 32 :
-                                (AOU_T1_FDI_CONFIG == 2) ? 128 : 64;
+                                (AOU_T1_FDI_CONFIG == 2) ? 128 :
+                                (AOU_T1_FDI_CONFIG == 5) ? 256 : 64;
   localparam int AOU_T1_BEAT1 = (AOU_T1_FDI_CONFIG == 4) ? 128 : 64;
 
   // The most credit the DUT may advertise for RP r and class c (MAS 3.9, all
   // PROFEXTLEN 0): request and response FIFO entries hold one message each
-  // (WriteReq and ReadReq 3 granules, WriteResp 1); four 256-bit W entries
-  // hold the worst case, a 27-granule WriteDataFull1024; R entries per message
-  // and its granules follow the RP's own AXI data width.
+  // (WriteReq and ReadReq 3 granules, WriteResp 1); the W and R granule
+  // stores give one credit per granule of depth.
   function automatic int unsigned aou_t1_rx_max_credit(int unsigned r, int unsigned c);
     int unsigned d = AOU_T1_RX_DEPTH[r][c];
-    int unsigned w = aou_t1_rp_bytes(r) * 8;
     case (c)
       0, 1:    return d * 3;
-      2:       return (d / 4) * 27;
-      3:       return (d / (w / 256)) * ((w >= 1024) ? 27 : (w >= 512) ? 14 : 8);
       default: return d;
     endcase
   endfunction
@@ -208,6 +206,7 @@ package aou_t1_env_pkg;
   `include "aou_t1_attr_chk.svh"
   `include "aou_t1_rx_fifo_chk.svh"
   `include "aou_t1_rx_align_chk.svh"
+  `include "aou_t1_rx_granule_chk.svh"
   // Checkers and performance model classes the virtual sequences compose
   // (uvm/env/chk, uvm/env/perf); the tests that configure them live in uvm/tests.
   `include "chk/aou_early_bresp_chk.svh"
@@ -220,6 +219,8 @@ package aou_t1_env_pkg;
   `include "perf/aou_perf_windows.svh"
   `include "perf/aou_perf_targets.svh"
   `include "perf/aou_perf_mon.svh"
+  `include "perf/aou_rx_lat_mon.svh"
+  `include "perf/aou_tx_lat_mon.svh"
   `include "perf/aou_perf_chk.svh"
   typedef class aou_t1_env;
   `include "aou_t1_vseqr.svh"

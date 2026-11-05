@@ -585,7 +585,7 @@ class aou_perf_mon extends uvm_component;
     json_win.push_back(j);
     if (n_txn[0] + n_txn[1] == 0)
       `uvm_error(get_type_name(), {"T1-P01: no transaction completed in window ", win})
-    else if (!(win_scenario inside {"lat", "drain"}))
+    else if (!(win_scenario inside {"lat", "drain", "rxlat"}))
       res_ap.write(res);
     win = "";
   endfunction

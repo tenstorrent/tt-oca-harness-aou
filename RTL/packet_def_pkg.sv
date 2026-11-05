@@ -46,6 +46,16 @@ parameter AR_G              = 3;
 parameter R256b_G           = 8;
 parameter R512b_G           = 14;
 parameter R1024b_G          = 27;
+// Misc messages. The ActivateReq is four granules in AoU v0.8 (Table
+// "Activation Req Message Format"): granule 0 carries MSGTYPE, MISCOP,
+// ACTIVATIONOP, RsvdZero3 and RP0's ProfileID5/ProfileRev5/ProfileOpt16;
+// granules 1-3 carry RsvdZero14 and the same three fields for RP1-RP3. Every
+// other Activation opcode and the CrdtGrant keep their lengths.
+parameter ACT_REQ_G         = 4;
+parameter ACT_OTHER_G       = 1;
+parameter CRDTGRANT_G       = 2;
+parameter PROFILE_WD        = 26;       // {ProfileID[4:0], ProfileRev[4:0], ProfileOpt[15:0]}
+parameter ACTOP_ACTIVATE_REQ = 4'b0000;
 
 // ----------------------------------------------------------------------------
 // FDI configuration selectors.
@@ -66,6 +76,9 @@ parameter R1024b_G          = 27;
 //   FDI_CFG_SP_128B     -> WD0=1024, WD1=1024  (single PHY)
 //   FDI_CFG_TP_32B_64B  -> WD0=256,  WD1=512   (two PHY)
 //   FDI_CFG_TP_64B_128B -> WD0=512,  WD1=1024  (two PHY)
+//   FDI_CFG_SP_256B     -> WD0=2048, WD1=2048  (single PHY, one 256 B flit per
+//                                                beat; pl_flit_cancel cancels the
+//                                                whole flit)
 //
 // Note: SP_32B and TP_32B_64B produce identical width pairs; only
 // `+define+TWO_PHY` distinguishes them. Consistency between FDI_CONFIG and
@@ -77,6 +90,7 @@ parameter int FDI_CFG_SP_64B      = 1;
 parameter int FDI_CFG_SP_128B     = 2;
 parameter int FDI_CFG_TP_32B_64B  = 3;
 parameter int FDI_CFG_TP_64B_128B = 4;
+parameter int FDI_CFG_SP_256B     = 5;
 
 parameter logic [7:0] CREDIT_TABLE [7:0] = '{
     8'd128,
@@ -156,6 +170,13 @@ typedef struct packed {
     logic                           rsvd;
 } st_misc_packet;                   //misc packet including misc grantcredit_packet
 
+// First granule of an Activation message, in wire byte order (byte 0 in bits
+// [7:0]). property_req is the v0.7 PropertyReq position: in AoU v0.8 it is a
+// RsvdZero bit, and in an ActivateReq the 29 bits after ACTIVATIONOP are
+// RsvdZero3 followed by RP0's ProfileID/Rev/Opt (see ACT_REQ_G), which the
+// TX and RX cores handle in spec bit order ({<<8{granule}}) rather than through
+// this struct. The DUT still sets property_req on the DeactivateReq that
+// AOU_CON0.DEACTIVATE_FORCE sends (MAS 7.1).
 typedef struct packed {
     logic [23:0]                    rsvd;
     logic [2:0]                     activation_op_0;
@@ -175,9 +196,8 @@ typedef struct packed {
     logic [2:0]                     awsize;
     logic [2:0]                     awprot;
     logic [7:0]                     awid_1;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic                           rsvd;
@@ -185,8 +205,7 @@ typedef struct packed {
 } st_write_req_packet_tmp;
   
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic                           rsvd;
     logic [3:0]                     awqos;
     logic [2:0]                     awprot;
@@ -209,9 +228,8 @@ typedef struct packed {
     logic [2:0]                     arsize;
     logic [2:0]                     arprot;
     logic [7:0]                     arid_1;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic                           rsvd;
@@ -219,8 +237,7 @@ typedef struct packed {
 } st_read_req_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic                           rsvd;
     logic [3:0]                     arqos;
     logic [2:0]                     arprot;
@@ -238,17 +255,15 @@ typedef struct packed {
     logic [7:0]                     rsvd;
     logic [0:3][7:0]                wstrb;
     logic [0:31][7:0]               wdata;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     dlength;
 } st_write_data256_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [7:0]                     rsvd;
     logic [31:0]                    wstrb;
     logic [255:0]                   wdata;
@@ -260,17 +275,15 @@ typedef struct packed {
 typedef struct packed {
     logic [0:7][7:0]                wstrb;
     logic [0:63][7:0]               wdata;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     dlength;
 } st_write_data512_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [63:0]                    wstrb;
     logic [511:0]                   wdata;
     logic [1:0]                     dlength;
@@ -282,17 +295,15 @@ typedef struct packed {
     logic [23:0]                    rsvd;
     logic [0:15][7:0]               wstrb;
     logic [0:127][7:0]              wdata;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     dlength;
 } st_write_data1024_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [23:0]                    rsvd;
     logic [127:0]                   wstrb;
     logic [1023:0]                  wdata;
@@ -309,17 +320,15 @@ typedef struct packed {
     logic                           rlast;
     logic [2:0]                     rsvd_1;
     logic [7:0]                     rid_1;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     dlength;
 } st_read_data256_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [26:0]                    rsvd;
     logic                           rlast;
     logic [255:0]                   rdata;
@@ -338,17 +347,15 @@ typedef struct packed {
     logic                           rlast;
     logic [2:0]                     rsvd_1;
     logic [7:0]                     rid_1;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     dlength;
 } st_read_data512_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [10:0]                    rsvd;
     logic                           rlast;
     logic [511:0]                   rdata;
@@ -367,17 +374,15 @@ typedef struct packed {
     logic                           rlast;
     logic [2:0]                     rsvd_1;
     logic [7:0]                     rid_1;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     dlength;
 } st_read_data1024_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [18:0]                    rsvd;
     logic                           rlast;
     logic [1023:0]                  rdata;
@@ -393,17 +398,15 @@ typedef struct packed {
     logic [1:0]                     bresp;
     logic [3:0]                     rsvd_0;
     logic [7:0]                     bid_1;
-    logic [7:0]                     prof_0;
-    logic [3:0]                     profextlen;
-    logic [3:0]                     prof_1;
+    logic [7:0]                     flex_lo;    // message byte 2 = FLEX[7:0]
+    logic [7:0]                     flex_hi;    // message byte 1 = FLEX[15:8]
     logic [3:0]                     msg_type;
     logic [1:0]                     rp;
     logic [1:0]                     rsvd_1;
 } st_write_resp_packet_tmp;
 
 typedef struct packed {
-    logic [11:0]                    prof;
-    logic [3:0]                     profextlen;
+    logic [15:0]                    flex;
     logic [5:0]                     rsvd;
     logic [1:0]                     bresp;
     logic [9:0]                     bid;

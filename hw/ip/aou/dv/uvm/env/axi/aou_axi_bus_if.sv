@@ -6,7 +6,9 @@
 
 // One AXI4 port. Instantiate at DATA_W=1024 so every agent shares one virtual
 // interface type; the agent config carries the real width, and the unused upper
-// lanes stay zero.
+// lanes stay zero. The five USER signals are 16 bits, the Basic Profile's
+// width (AoU v0.8 Table 31): the DUT carries them in the FLEX field of the
+// messages it sends (FLEX = USER[15:0], v0.8 5.2 / 11.1).
 interface aou_axi_bus_if #(
   parameter int DATA_W = 1024
 ) (
@@ -17,6 +19,7 @@ interface aou_axi_bus_if #(
   localparam int ADDR_W = 64;
   localparam int LEN_W  = 8;
   localparam int STRB_W = DATA_W / 8;
+  localparam int USER_W = 16;
 
   logic [ID_W-1:0]   awid;
   logic [ADDR_W-1:0] awaddr;
@@ -27,17 +30,20 @@ interface aou_axi_bus_if #(
   logic [3:0]        awcache;
   logic [2:0]        awprot;
   logic [3:0]        awqos;
+  logic [USER_W-1:0] awuser;
   logic              awvalid;
   logic              awready;
 
   logic [DATA_W-1:0] wdata;
   logic [STRB_W-1:0] wstrb;
   logic              wlast;
+  logic [USER_W-1:0] wuser;
   logic              wvalid;
   logic              wready;
 
   logic [ID_W-1:0]   bid;
   logic [1:0]        bresp;
+  logic [USER_W-1:0] buser;
   logic              bvalid;
   logic              bready;
 
@@ -50,6 +56,7 @@ interface aou_axi_bus_if #(
   logic [3:0]        arcache;
   logic [2:0]        arprot;
   logic [3:0]        arqos;
+  logic [USER_W-1:0] aruser;
   logic              arvalid;
   logic              arready;
 
@@ -57,46 +64,49 @@ interface aou_axi_bus_if #(
   logic [DATA_W-1:0] rdata;
   logic [1:0]        rresp;
   logic              rlast;
+  logic [USER_W-1:0] ruser;
   logic              rvalid;
   logic              rready;
 
   // Manager: drives AW/W/AR and the B/R ready signals.
   clocking mgr_cb @(posedge clk);
     input  resetn;
-    output awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awvalid;
+    output awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awuser, awvalid;
     input  awready;
-    output wdata, wstrb, wlast, wvalid;
+    output wdata, wstrb, wlast, wuser, wvalid;
     input  wready;
-    input  bid, bresp, bvalid;
+    input  bid, bresp, buser, bvalid;
     output bready;
-    output arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, arvalid;
+    output arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, aruser, arvalid;
     input  arready;
-    input  rid, rdata, rresp, rlast, rvalid;
+    input  rid, rdata, rresp, rlast, ruser, rvalid;
     output rready;
   endclocking
 
   // Subordinate: drives the AW/W/AR ready signals and B/R.
   clocking sub_cb @(posedge clk);
     input  resetn;
-    input  awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awvalid;
+    input  awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awuser, awvalid;
     output awready;
-    input  wdata, wstrb, wlast, wvalid;
+    input  wdata, wstrb, wlast, wuser, wvalid;
     output wready;
-    output bid, bresp, bvalid;
+    output bid, bresp, buser, bvalid;
     input  bready;
-    input  arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, arvalid;
+    input  arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, aruser, arvalid;
     output arready;
-    output rid, rdata, rresp, rlast, rvalid;
+    output rid, rdata, rresp, rlast, ruser, rvalid;
     input  rready;
   endclocking
 
   clocking mon_cb @(posedge clk);
     input resetn;
-    input awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awvalid, awready;
-    input wdata, wstrb, wlast, wvalid, wready;
-    input bid, bresp, bvalid, bready;
-    input arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, arvalid, arready;
-    input rid, rdata, rresp, rlast, rvalid, rready;
+    input awid, awaddr, awlen, awsize, awburst, awlock, awcache, awprot, awqos, awuser, awvalid,
+          awready;
+    input wdata, wstrb, wlast, wuser, wvalid, wready;
+    input bid, bresp, buser, bvalid, bready;
+    input arid, araddr, arlen, arsize, arburst, arlock, arcache, arprot, arqos, aruser, arvalid,
+          arready;
+    input rid, rdata, rresp, rlast, ruser, rvalid, rready;
   endclocking
 
   modport mgr (clocking mgr_cb);

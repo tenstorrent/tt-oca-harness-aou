@@ -4,7 +4,8 @@
 // Bins tables of aou_fdi_cov's covergroups (aou_fc_macros.svh), shared by the
 // covergroups and the service. The top bin of each clamped value is "that
 // many or more".
-`define AOU_FDI_FC_WIDTH(B) `B``_BIN(b32, 32, 32) `B``_BIN(b64, 64, 64) `B``_BIN(b128, 128, 128)
+`define AOU_FDI_FC_WIDTH(B) \
+  `B``_BIN(b32, 32, 32) `B``_BIN(b64, 64, 64) `B``_BIN(b128, 128, 128) `B``_BIN(b256, 256, 256)
 `define AOU_FDI_FC_STALL(B) \
   `B``_BIN(none, 0, 0) `B``_BIN(one, 1, 1) `B``_BIN(few, 2, 4) `B``_BIN(many, 5, 5)
 `define AOU_FDI_FC_GAP(B) `B``_BIN(b2b, 0, 0) `B``_BIN(short_gap, 1, 3) `B``_BIN(long_gap, 4, 4)

@@ -25,6 +25,8 @@ class aou_axi_monitor extends uvm_monitor;
   protected aou_axi_mon_item wb_q[$];   // complete W bursts with no AW yet
   protected bit [1023:0]     wd_q[$];   // W burst in progress
   protected bit [127:0]      ws_q[$];
+  protected bit [15:0]       wu_q[$];
+  protected time             wt_q[$];
   protected aou_axi_mon_item b_q[$];    // waiting for B
   protected aou_axi_mon_item r_q[$];    // waiting for R
   // Responses still owed for transactions a reset aborted (reset_flush):
@@ -48,10 +50,10 @@ class aou_axi_monitor extends uvm_monitor;
   // Previous cycle, for the handshake stability rules.
   protected logic        p_awvalid, p_awready, p_wvalid, p_wready, p_bvalid, p_bready;
   protected logic        p_arvalid, p_arready, p_rvalid, p_rready;
-  protected logic [98:0] p_aw, p_ar;
-  protected logic [1152:0] p_w;
-  protected logic [11:0] p_b;
-  protected logic [1036:0] p_r;
+  protected logic [114:0] p_aw, p_ar;
+  protected logic [1168:0] p_w;
+  protected logic [27:0] p_b;
+  protected logic [1052:0] p_r;
 
   // Sampled values for the covergroups.
   protected bit       cv_is_rd;
@@ -76,7 +78,10 @@ class aou_axi_monitor extends uvm_monitor;
     x_txn: cross cp_dir, cp_size, cp_len, cp_align;
   endgroup
 
-  // #64: B presented zero cycles after the AW/W handshakes; R likewise after AR.
+  // #64: a response at the minimum legal latency. zero_cycle is B's BVALID
+  // rising in the first cycle after the later of the AW and W handshakes, or
+  // the first R beat in the first cycle after AR: no idle cycle between. A
+  // response in the handshake's own cycle would be illegal AXI.
   covergroup zero_cg;
     cp_dir: coverpoint cv_is_rd {
       `AOU_AXI_FC_DIR(AOU_FC_CG)
@@ -231,6 +236,8 @@ class aou_axi_monitor extends uvm_monitor;
     wb_q.delete();
     wd_q.delete();
     ws_q.delete();
+    wu_q.delete();
+    wt_q.delete();
     b_q.delete();
     r_q.delete();
     rst_w_first = 0;
@@ -241,28 +248,29 @@ class aou_axi_monitor extends uvm_monitor;
     p_rvalid  = 1'b0;
   endfunction
 
-  protected function logic [98:0] aw_payload();
+  protected function logic [114:0] aw_payload();
     return {vif.mon_cb.awid, vif.mon_cb.awaddr, vif.mon_cb.awlen, vif.mon_cb.awsize,
             vif.mon_cb.awburst, vif.mon_cb.awlock, vif.mon_cb.awcache, vif.mon_cb.awprot,
-            vif.mon_cb.awqos};
+            vif.mon_cb.awqos, vif.mon_cb.awuser};
   endfunction
 
-  protected function logic [98:0] ar_payload();
+  protected function logic [114:0] ar_payload();
     return {vif.mon_cb.arid, vif.mon_cb.araddr, vif.mon_cb.arlen, vif.mon_cb.arsize,
             vif.mon_cb.arburst, vif.mon_cb.arlock, vif.mon_cb.arcache, vif.mon_cb.arprot,
-            vif.mon_cb.arqos};
+            vif.mon_cb.arqos, vif.mon_cb.aruser};
   endfunction
 
-  protected function logic [1152:0] w_payload();
-    return {vif.mon_cb.wdata, vif.mon_cb.wstrb, vif.mon_cb.wlast};
+  protected function logic [1168:0] w_payload();
+    return {vif.mon_cb.wdata, vif.mon_cb.wstrb, vif.mon_cb.wlast, vif.mon_cb.wuser};
   endfunction
 
-  protected function logic [11:0] b_payload();
-    return {vif.mon_cb.bid, vif.mon_cb.bresp};
+  protected function logic [27:0] b_payload();
+    return {vif.mon_cb.bid, vif.mon_cb.bresp, vif.mon_cb.buser};
   endfunction
 
-  protected function logic [1036:0] r_payload();
-    return {vif.mon_cb.rid, vif.mon_cb.rdata, vif.mon_cb.rresp, vif.mon_cb.rlast};
+  protected function logic [1052:0] r_payload();
+    return {vif.mon_cb.rid, vif.mon_cb.rdata, vif.mon_cb.rresp, vif.mon_cb.rlast,
+            vif.mon_cb.ruser};
   endfunction
 
   protected function void save_prev();
@@ -341,6 +349,7 @@ class aou_axi_monitor extends uvm_monitor;
     it.txn.cache = vif.mon_cb.awcache;
     it.txn.prot  = vif.mon_cb.awprot;
     it.txn.qos   = vif.mon_cb.awqos;
+    it.txn.user  = vif.mon_cb.awuser;
     if (rst_w_first > 0) begin
       it.txn.reset_outstanding = 1'b1;
       rst_w_first--;
@@ -360,8 +369,10 @@ class aou_axi_monitor extends uvm_monitor;
     it.txn.cache = vif.mon_cb.arcache;
     it.txn.prot  = vif.mon_cb.arprot;
     it.txn.qos   = vif.mon_cb.arqos;
+    it.txn.user  = vif.mon_cb.aruser;
     it.txn.data  = new[it.txn.beats()];
     it.txn.rresp = new[it.txn.beats()];
+    it.txn.ruser = new[it.txn.beats()];
     it.txn.t_r   = new[it.txn.beats()];
     check_addr(it.txn, "AR");
     r_q.push_back(it);
@@ -405,6 +416,8 @@ class aou_axi_monitor extends uvm_monitor;
     if (rst_win && wd_q.size() == 0 && aw_q.size() == 0) rst_w_first++;
     wd_q.push_back(vif.mon_cb.wdata & data_mask);
     ws_q.push_back(vif.mon_cb.wstrb);
+    wu_q.push_back(vif.mon_cb.wuser);
+    wt_q.push_back($time);
     // The burst in progress belongs to the first AW still without W data.
     if (cfg.checks_en && aw_q.size() > wb_q.size() && wb_q.size() == 0 &&
         wd_q.size() == aw_q[0].txn.beats() + 1)
@@ -413,15 +426,21 @@ class aou_axi_monitor extends uvm_monitor;
     if (vif.mon_cb.wlast === 1'b1) begin
       it = aou_axi_mon_item::type_id::create("it");
       it.txn = aou_axi_txn::type_id::create("txn");
-      it.txn.data = new[wd_q.size()];
-      it.txn.strb = new[ws_q.size()];
+      it.txn.data  = new[wd_q.size()];
+      it.txn.strb  = new[ws_q.size()];
+      it.txn.wuser = new[wu_q.size()];
+      it.txn.t_w   = new[wt_q.size()];
       foreach (wd_q[k]) begin
-        it.txn.data[k] = wd_q[k];
-        it.txn.strb[k] = ws_q[k];
+        it.txn.data[k]  = wd_q[k];
+        it.txn.strb[k]  = ws_q[k];
+        it.txn.wuser[k] = wu_q[k];
+        it.txn.t_w[k]   = wt_q[k];
       end
       it.w_cyc = cyc;
       wd_q.delete();
       ws_q.delete();
+      wu_q.delete();
+      wt_q.delete();
       wb_q.push_back(it);
     end
   endfunction
@@ -432,9 +451,11 @@ class aou_axi_monitor extends uvm_monitor;
     while (aw_q.size() > 0 && wb_q.size() > 0) begin
       it = aw_q.pop_front();
       w  = wb_q.pop_front();
-      it.txn.data = w.txn.data;
-      it.txn.strb = w.txn.strb;
-      it.w_cyc    = w.w_cyc;
+      it.txn.data  = w.txn.data;
+      it.txn.strb  = w.txn.strb;
+      it.txn.wuser = w.txn.wuser;
+      it.txn.t_w   = w.txn.t_w;
+      it.w_cyc     = w.w_cyc;
       if (cfg.checks_en) begin
         if (it.txn.data.size() != it.txn.beats())
           `uvm_error(get_type_name(), $sformatf(
@@ -464,6 +485,7 @@ class aou_axi_monitor extends uvm_monitor;
         it = b_q[k];
         b_q.delete(k);
         it.txn.bresp  = vif.mon_cb.bresp;
+        it.txn.buser  = vif.mon_cb.buser;
         it.txn.t_done = $time;
         last_hs = it.addr_cyc > it.w_cyc ? it.addr_cyc : it.w_cyc;
         if (b_start == last_hs + 1) n_b_zero++;
@@ -497,6 +519,7 @@ class aou_axi_monitor extends uvm_monitor;
         if (it.beats < it.txn.beats()) begin
           it.txn.data[it.beats]  = vif.mon_cb.rdata & data_mask;
           it.txn.rresp[it.beats] = vif.mon_cb.rresp;
+          it.txn.ruser[it.beats] = vif.mon_cb.ruser;
           it.txn.t_r[it.beats]   = $time;
         end
         it.beats++;

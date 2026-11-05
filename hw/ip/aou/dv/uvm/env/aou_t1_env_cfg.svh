@@ -15,7 +15,16 @@ class aou_t1_env_cfg extends uvm_object;
   aou_t1_rwreq_e remote_wreq = AOU_RWREQ_AWSIZE;  // remote WriteReq sizing (remote_mgr_driver)
   int unsigned   remote_max_burst = 256;   // remote splitter's longest burst (2^n beats)
   bit            remote_max_burst_rand = 1'b0;  // re-pick it while the remote is idle
-  aou_spec_rev_e spec_rev = AOU_SPEC_V07;
+  // Activation message format the DUT and the remote die use. v0.8: the
+  // ActivateReq is 4 granules and carries the profile of each RP (Ch. 11,
+  // PROFILE_CFG_RPn / PROFILE_RMT_RPn); the other Activation messages are
+  // unchanged but for PropertyReq, which v0.8 reserves.
+  aou_spec_rev_e spec_rev = AOU_SPEC_V08;
+  // v0.8 8.3.3 ERROR state in the remote model on an out-of-sequence Req/Ack.
+  // Off: the DUT does not implement ERROR (it answers a late ActivateReq, MAS
+  // 7.2.3), so the model keeps the v0.7 reaction and the tests their
+  // expectations.
+  bit            error_state_en = 1'b0;
 
   // Agent configs
   aou_fdi_cfg    fdi_cfg[AOU_T1_N_PHY];
@@ -31,6 +40,12 @@ class aou_t1_env_cfg extends uvm_object;
   // Timing profiles applied at build (local agents; remote model latency)
   aou_axi_timing_e local_timing = AOU_AXI_TIMING_RANDOM;
   int unsigned     remote_lat_max = 20;
+
+  // AXI USER on the DUT's local ports (S-port AWUSER/ARUSER/WUSER from the
+  // managers, M-port BUSER/RUSER from the subordinates), which the DUT sends
+  // as FLEX (AoU v0.8 5.2 / 11.1). finalize() pushes it into every local
+  // agent; +user_mode=zero|const_per_txn|per_beat sets it (aou_base_test).
+  aou_axi_user_mode_e user_mode = AOU_AXI_USER_CONST;
 
   // L1 stimulus of the flits L3 sends to the DUT
   int unsigned   l1_cancel_pct = 10;
@@ -54,8 +69,9 @@ class aou_t1_env_cfg extends uvm_object;
   bit            sb_en = 1'b1;
   // aou_t1_attr_chk: request attributes, exclusive responses and FLEX across the link.
   bit            attr_chk_en = 1'b1;
-  // AOU_FDI_CHECKER on the PHY the test selects (tb_top).
-  bit            fdi_chk_en = 1'b1;
+  // AOU_FDI_CHECKER on the PHY the test selects (tb_top). The checker supports
+  // 32/64/128 B beats only, so a 256 B build (FDI_CONFIG 5) has none.
+  bit            fdi_chk_en = AOU_T1_BEAT0 <= 128;
   bit            status_en = 1'b1;
   // Local software answers INT_ACTIVATE_START / INT_DEACTIVATE_START.
   bit            sw_isr_en = 1'b1;
@@ -120,6 +136,10 @@ class aou_t1_env_cfg extends uvm_object;
     remote_cfg = aou_axi_cfg::type_id::create("remote_cfg");
     remote_cfg.vif_key = "s_axi0";
     remote_cfg.mem = aou_mem::type_id::create("remote_mem");
+    // A tenth of each memory's pages has no exclusive monitor, so exclusive
+    // reads also see the OKAY of a subordinate without exclusive support.
+    local_mem.no_excl_pct = 10;
+    remote_cfg.mem.no_excl_pct = 10;
     set_rp_count(n_rp);
   endfunction
 
@@ -160,6 +180,7 @@ class aou_t1_env_cfg extends uvm_object;
     foreach (rp_remote_bytes[r])
       if (rp_remote_bytes[r] > AOU_T1_PEER_MAX_BYTES) rp_remote_bytes[r] = AOU_T1_PEER_MAX_BYTES;
     l3_cfg.spec_rev = spec_rev;
+    l3_cfg.error_state_en = error_state_en;
     l3_cfg.rp_count = (remote_rp_count != 0) ? remote_rp_count : n_rp;
     l3_cfg.peer_rp_count = n_rp;
     // The credit the DUT may advertise (MAS 3.9) on the RPs both dies have.
@@ -170,8 +191,10 @@ class aou_t1_env_cfg extends uvm_object;
     remote_cfg.timing.r_lat.set_range(0, remote_lat_max);
     for (int unsigned r = 0; r < n_rp; r++) begin
       s_mgr_cfg[r].data_bytes = rp_bytes[r];
+      s_mgr_cfg[r].user_mode = user_mode;
       m_sub_cfg[r].data_bytes = rp_bytes[r];
       m_sub_cfg[r].mem = local_mem;
+      m_sub_cfg[r].user_mode = user_mode;
       r_mgr_cfg[r].data_bytes = remote_bytes_of(r);
     end
   endfunction
@@ -235,7 +258,11 @@ class aou_t1_env_cfg extends uvm_object;
     if ($value$plusargs("l1_cancel_mix=%d", v)) l1_cancel_mix = v != 0;
   endfunction
 
-  // Random choices a test usually wants per seed.
+  // Random choices a test usually wants per seed. On a tenth of the S ports
+  // each, the local manager holds BREADY or RREADY low while the port fills
+  // to its outstanding limit (aou_axi_timing b_fill_hold, r_fill_hold), and
+  // may then keep as many requests in flight as the port accepts; applying a
+  // timing profile turns the holds off again.
   function void randomize_knobs();
     local_timing = aou_axi_timing_e'($urandom_range(4));
     for (int unsigned r = 0; r < n_rp; r++) begin
@@ -243,20 +270,56 @@ class aou_t1_env_cfg extends uvm_object;
       m_sub_cfg[r].timing.apply(local_timing);
       s_mgr_cfg[r].w_before_aw_en = 1'($urandom_range(1));
       m_sub_cfg[r].r_interleave_en = 1'($urandom_range(1));
+      s_mgr_cfg[r].timing.b_fill_hold = ($urandom_range(9) == 0);
+      s_mgr_cfg[r].timing.r_fill_hold = ($urandom_range(9) == 0);
+      if (s_mgr_cfg[r].timing.b_fill_hold) s_mgr_cfg[r].max_wr_outstanding = AOU_T1_S_MO_CNT;
+      if (s_mgr_cfg[r].timing.r_fill_hold) s_mgr_cfg[r].max_rd_outstanding = AOU_T1_S_MO_CNT;
     end
     l3_cfg.resp_fork = 1'($urandom_range(1));
     remote_lat_max = $urandom_range(30);
+    fdi_knobs();
+  endfunction
+
+  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r1.1 8.3.2), per
+  // seed on every PHY. HOLES without stalls stays the common case; a fifth of
+  // the seeds take RANDOM or BURSTY pl_trdy (so pl_trdy can also be low at a
+  // flit boundary), and a fifth add stand-alone stalls at a boundary or
+  // mid-flit, with pl_trdy held high or left to its policy during the
+  // handshake. +fdi_trdy and the +fdi_stall_* plusargs override this; a test
+  // that measures performance or depends on the timing sets its own.
+  function void fdi_knobs();
+    aou_fdi_trdy_e pol = AOU_TRDY_HOLES;
+    bit            stalls = ($urandom_range(4) == 0);
+    int unsigned   pct = $urandom_range(5, 1);
+    int unsigned   mid = $urandom_range(90);
+    bit            free = 1'($urandom_range(1));
+    int unsigned   hmin = $urandom_range(1);
+    if ($urandom_range(4) == 0) pol = ($urandom_range(1) == 0) ? AOU_TRDY_RANDOM : AOU_TRDY_BURSTY;
+    foreach (fdi_cfg[p]) begin
+      fdi_cfg[p].trdy_policy = pol;
+      if (!stalls) continue;
+      fdi_cfg[p].stall_pct = pct;
+      fdi_cfg[p].stall_mid_pct = mid;
+      fdi_cfg[p].stall_trdy_free = free;
+      fdi_cfg[p].stall_hold_min = hmin;
+    end
   endfunction
 
   function string convert2string();
+    bit [3:0] bh = '0;
+    bit [3:0] rh = '0;
+    foreach (s_mgr_cfg[r]) begin
+      bh[r] = s_mgr_cfg[r].timing.b_fill_hold;
+      rh[r] = s_mgr_cfg[r].timing.r_fill_hold;
+    end
     return $sformatf({"n_rp=%0d remote_rp_count=%0d rp_bytes=%p remote_bytes=%0d ",
-                      "rp_remote_bytes=%p phy=%0d/%0d ",
+                      "rp_remote_bytes=%p phy=%0d/%0d fdi_beat_bytes=%0d ",
                       "spec=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
-                      "l1 cancel/bubble=%0d/%0d"},
+                      "l1 cancel/bubble=%0d/%0d fill_hold b/r=%4b/%4b"},
                      n_rp, remote_rp_count, rp_bytes, remote_bytes, rp_remote_bytes,
                      lsm_cfg.active_phy,
-                     lsm_cfg.n_phy, spec_rev.name(),
+                     lsm_cfg.n_phy, fdi_cfg[lsm_cfg.active_phy].beat_bytes, spec_rev.name(),
                      local_timing.name(), remote_lat_max, l3_cfg.resp_fork, l1_cancel_pct,
-                     l1_bubble_pct);
+                     l1_bubble_pct, bh, rh);
   endfunction
 endclass

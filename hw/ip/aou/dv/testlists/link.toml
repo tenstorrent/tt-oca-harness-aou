@@ -3,7 +3,7 @@
 
 schema_version = 1
 
-# Credits and link (stream G).
+# Credits and link.
 #
 # Credits/link tests (TB=t1). One entry per run-list line: the test, its
 # plusargs, how many seeds and the test-plan IDs it covers
@@ -425,6 +425,16 @@ tags = ["link"]
 run_modes = ["link"]
 args = ["+loops=3"]
 
+[[tests]]
+name = "aou_rx_credit_test.loops-3.4xmix-sp256-rxf"
+module = { uvm = "aou_rx_credit_test" }
+target = "4xmix-sp256-rxf"
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+args = ["+loops=3"]
+
 # 2.5: DEACTIVATE_START while traffic waits for credit (AOU-R33/AOU-R34, scoreboard).
 [[tests]]
 name = "aou_zero_credit_test.credit-wreq.deact-1"
@@ -539,7 +549,7 @@ args = ["+mode=deact_rsp", "+v0p9draft"]
 
 [[groups]]
 name = "link"
-expected_count = 52
+expected_count = 55
 tests = [
   "aou_link_act_deact_test",
   "aou_link_act_deact_test.who-both.order-simul.deact_who-both.busy-0",
@@ -593,4 +603,24 @@ tests = [
   "aou_remote_react_test",
   "aou_act_flit_test.mode-act_req.v0p9draft",
   "aou_act_flit_test.mode-deact_rsp.v0p9draft",
+  "aou_rx_credit_test.loops-3.4xmix-sp256-rxf",
+  "aou_act_profile_test",
+  "aou_act_profile_test.loops-3.skip_reset-1",
 ]
+
+[[tests]]
+name = "aou_act_profile_test"
+module = { uvm = "aou_act_profile_test" }
+seed = 1
+reseed = 3
+tags = ["link"]
+run_modes = ["link"]
+
+[[tests]]
+name = "aou_act_profile_test.loops-3.skip_reset-1"
+module = { uvm = "aou_act_profile_test" }
+seed = 1
+reseed = 2
+tags = ["link"]
+run_modes = ["link"]
+args = ["+loops=3", "+skip_reset=1"]

@@ -12,4 +12,7 @@
 // flags any other burst on its S port. A 1-byte transfer is never unaligned.
 `define AOU_AXI_FC_X_TXN(B) \
   `B``_XIGN("*,size[0],*,unaligned")
+// zero_cycle: the response in the first cycle after its request's last
+// handshake (B after the later of AW and W, the first R beat after AR), the
+// minimum legal latency; later: one or more idle cycles between.
 `define AOU_AXI_FC_ZERO(B) `B``_BIN(later, 0, 0) `B``_BIN(zero_cycle, 1, 1)
