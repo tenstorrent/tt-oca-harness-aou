@@ -16,7 +16,7 @@ class aou_packer_policy extends uvm_object;
   // With max_msgs_per_flit, a WriteData placed right after a WriteReq does not
   // count: the pair shares the flit (max_msgs_per_flit 1 then gives one
   // request, or one WriteReq with its first WriteData, per flit).
-  bit               wreq_wdata_pair;
+  bit               wreq_wdata_pair = 1'b0;
   // Percent chance of leaving 1..max_hole empty granules before a message.
   int unsigned      hole_pct;
   int unsigned      max_hole = 4;
