@@ -1714,6 +1714,40 @@ There is no transition out of ACTIVE on an AOU deactivation, and no
 state requests Active except REQ_ACTIVE, ACTIVE and the Retrain exit.
 Nothing in LINKERROR, LINKDOWN or RESET reacts to an activation request.
 
+*Outputs in each state.* The FDI outputs of the bringup FSM in each state
+are:
+
+[width="100%",cols="<20%,<20%,<15%,<25%,<20%",options="header",]
+|=======================================================================
+|State |[.monospaced]#++lp_state_req++# |[.monospaced]#++lp_wake_req++# |[.monospaced]#++lp_rx_active_sts++# may rise |[.monospaced]#++lp_linkerror++#
+|RESET |NOP |0 |No |0
+|WAIT_PRESENCE |NOP |0 |Yes |0
+|WAKE_ASSERT |NOP |1 |Yes |0
+|WAKE_WAIT_ACK |NOP |1 |Yes |0
+|REQ_ACTIVE |Active |1 |Yes |0
+|ACTIVE |Active |1 |Yes |0
+|RETRAIN |NOP in its first cycle, then Active |1 |Yes |0
+|L1 |L1 |0 |Yes |0
+|L1_CLK_WAKE |L1 |0 |Yes |0
+|LINKERROR |NOP |0 |No |1 on the LPpass:[']s own request, from entry until the PL reports LinkError; otherwise 0
+|LINKDOWN |NOP |0 |Yes |0
+|=======================================================================
+
+*Output timing.* The FSM takes a transition on the first
+[.monospaced]#++I_CLK++# edge at which its trigger is present, and the outputs of the
+new state are driven from that same edge: each output follows the input
+that caused the transition by one [.monospaced]#++I_CLK++# cycle, with no further delay.
+WAKE_ASSERT and L1_CLK_WAKE last one cycle, so [.monospaced]#++lp_wake_req++# rises one
+cycle after the activation request (or, from L1, two cycles after
+[.monospaced]#++pl_clk_req++#) and [.monospaced]#++pl_wake_ack++# is looked at from the following
+cycle. [.monospaced]#++lp_clk_ack++# copies [.monospaced]#++pl_clk_req++# one cycle later in every state,
+including RESET, LINKERROR and LINKDOWN. [.monospaced]#++lp_rx_active_sts++# rises one cycle
+after [.monospaced]#++pl_rx_active_req++# when the FSM is in, or entering, a state where
+the table allows it, and falls one cycle after [.monospaced]#++pl_rx_active_req++# falls,
+in every state (UCIe r1.1 8.2.7: the status follows the request); a
+request still high when the FSM enters RESET or LINKERROR keeps the
+status until the PL withdraws it.
+
 *LinkError recovery.* A LinkError may take the Adapter out of ACTIVE in
 the middle of a flit in either direction. AOU_CORE's FDI data paths keep
 the position of that flit, and only [.monospaced]#++AOU_CON0.AOU_SW_RESET++# clears
