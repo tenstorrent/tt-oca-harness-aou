@@ -15,7 +15,9 @@
 // DISABLED only once that Ack reaches it, v0.8 8.2, so its credits are
 // tolerated and dropped until its next Activation message), request credits
 // we advertise after our own DeactivateAck and that cross the final one
-// (late_adv), and v0.8's ERROR state with its recovery.
+// (late_adv), the DUT's narrower MAS 7.3.1 credit windows (T1-C45: request
+// credits stop with its DeactivateAck's flit, response credits with its
+// DeactivateReq's), and v0.8's ERROR state with its recovery.
 class aou_l3_link_test extends aou_l3_unit_base_test;
   `uvm_component_utils(aou_l3_link_test)
 
@@ -33,6 +35,7 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     deact_crossing();
     deact_credit_rules();
     late_credits();
+    deact_window_rules();
     act_share_rules();
     error_v08();
     phase.drop_objection(this);
@@ -305,6 +308,60 @@ class aou_l3_link_test extends aou_l3_unit_base_test;
     expect_true(a.crd.tx_cred[0][AOU_CC_RDATA] == fresh_rdata,
                 $sformatf("fresh RDATA balance after re-activation: %0d, expected %0d",
                           a.crd.tx_cred[0][AOU_CC_RDATA], fresh_rdata));
+  endfunction
+
+  // A holds B to the DUT's MAS 7.3.1 windows (T1-C45), which the unit models
+  // otherwise do not apply to each other. MsgCredit RP0: WREQ=1 is 16'h0001,
+  // RDATA=1 is 16'h0200.
+  function void deact_window_rules();
+    aou_l3_model a, b;
+    pair(a, b);
+    a.cfg.chk_deact_crd_window = 1'b1;
+    a.lnk.request_activate();
+    void'(exchange(a, b));
+    chk.clear_counts();
+    chk.expect_rule("T1-C45");
+    // A deactivates first: B's request credits end with its DeactivateAck's
+    // flit; its response credits go on until its own DeactivateReq.
+    a.lnk.request_deactivate();
+    a.maybe_release_deact();
+    a_to_b(a, b);
+    b_to_a(a, b, 'h0001);
+    expect_true(b.lnk.dack_sent && a.lnk.dack_rcvd, "B's DeactivateAck is out");
+    expect_true(chk.count("T1-C45") == 0,
+                "a request credit in the DeactivateAck's flit is permitted");
+    b_to_a(a, b, 'h0200);
+    expect_true(chk.count("T1-C45") == 0,
+                "a response credit after the DeactivateAck, before B's DeactivateReq, is fine");
+    b_to_a(a, b, 'h0001);
+    expect_true(chk.count("T1-C45") == 1,
+                "a request credit after the DeactivateAck is T1-C45");
+    void'(exchange(a, b));
+    both(a, b, AOU_LS_DISABLED, "A's deactivation completes");
+    // Re-activation: B's fresh CrdtGrant is no finding.
+    a.lnk.request_activate();
+    void'(exchange(a, b));
+    both(a, b, AOU_LS_ENABLED, "re-activation after the request-window case");
+    expect_true(chk.count("T1-C45") == 1, "the re-activation's credits are no finding");
+    // B deactivates first: its response credits end with its DeactivateReq's
+    // flit; its request credits go on until its DeactivateAck.
+    b.lnk.request_deactivate();
+    b.maybe_release_deact();
+    b_to_a(a, b, 'h0200);
+    expect_true(b.lnk.dreq_sent && a.lnk.dreq_rcvd, "B's DeactivateReq is out");
+    expect_true(chk.count("T1-C45") == 1,
+                "a header response credit in the DeactivateReq's flit is permitted");
+    b_to_a(a, b, 'h0001);
+    expect_true(chk.count("T1-C45") == 1,
+                "a request credit after B's DeactivateReq, before its DeactivateAck, is permitted");
+    b_to_a(a, b, 'h0200);
+    expect_true(chk.count("T1-C45") == 2, "a response credit after the DeactivateReq is T1-C45");
+    void'(exchange(a, b));
+    both(a, b, AOU_LS_DISABLED, "B's deactivation completes");
+    chk.unexpect_rule("T1-C45");
+    expect_true(chk.total() == chk.count("T1-C45"),
+                $sformatf("no other finding (%s)", chk.summary()));
+    chk.clear_counts();
   endfunction
 
   // B advertises request credits until it is DISABLED (late_adv), and the
