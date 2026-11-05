@@ -2192,10 +2192,13 @@ appropriate isolation and retention strategies.
 
 The [.monospaced]#++RTL/LIB/++# directory contains three behavioral reference models that
 are used by the design for reset infrastructure and clock-domain
-crossing, and [.monospaced]#++RTL/AOU_TPSRAM.sv++# is the behavioral two-port SRAM the RX
-granule stores are built from. These models are functionally correct for
-simulation but *must be replaced* with process-appropriate
-implementations before synthesis or tapeout.
+crossing. These models are functionally correct for simulation but
+*must be replaced* with process-appropriate implementations before
+synthesis or tapeout. [.monospaced]#++RTL/AOU_TPSRAM.sv++# is the behavioral two-port
+SRAM the RX granule stores are built from; it is listed here because an
+integrator *may* replace it with a compiled SRAM, not because it must be:
+synthesized as written it becomes flip-flops, which is a valid
+implementation (xref:aou-ig-tpsram-replacement[Section 8.7.2]).
 
 [width="100%",cols="13%,8%,16%,9%,27%,27%",options="header",]
 |=======================================================================
@@ -2220,10 +2223,10 @@ buffer on scan reset)
 |[.monospaced]#++AOU_TPSRAM++# |[.monospaced]#++RTL/AOU_TPSRAM.sv++# |[.monospaced]#++RAM_DATA_WIDTH++#,
 [.monospaced]#++RAM_ADDR_WIDTH++# |Read port [.monospaced]#++CLKA++#, [.monospaced]#++CENA++# (active low), [.monospaced]#++AA++# ->
 [.monospaced]#++QA++# (one cycle later); write port [.monospaced]#++CLKB++#, [.monospaced]#++CENB++# (active low),
-[.monospaced]#++AB++#, [.monospaced]#++DB++# |Two-port (1R1W) synchronous SRAM, read data registered.
-The design does not depend on read-during-write ordering: a word read
-in the cycle it is rewritten holds the granules being read in both its
-old and its new contents (a rewrite only appends granules after them) |[.monospaced]#++AOU_RX_GRANULE_STORE++#, one
+[.monospaced]#++AB++#, [.monospaced]#++DB++# |Two-port (1R1W) synchronous SRAM, read data registered,
+whole-word writes, no reset. Flip-flops or a compiled macro; the
+behaviour the design relies on is in
+xref:aou-ig-tpsram-replacement[Section 8.7.2] |[.monospaced]#++AOU_RX_GRANULE_STORE++#, one
 instance per bank: per RP, two stores (W and R) of [.monospaced]#++NBANK++# banks of
 [.monospaced]#++ROWS++# words x 320 bits ([.monospaced]#++WG++# = 8 granules of 40 bits). With the
 default depths: 5 banks x 16 words at the 32/64/128 B FDI widths
@@ -2255,6 +2258,9 @@ switching.
 * [.monospaced]#++AOU_SOC_BUF++# is on the DFT scan-reset path. Replace with a buffer
 cell that will be preserved through synthesis optimisation (typically
 via a [.monospaced]#++dont_touch++# or equivalent attribute).
+* [.monospaced]#++AOU_TPSRAM++# needs no replacement. If a compiled SRAM is used
+instead, it must have the read and write behaviour of
+xref:aou-ig-tpsram-replacement[Section 8.7.2].
 * The behavioral models can serve as a golden reference for verifying
 functional equivalence of the replacements.
 
@@ -2321,3 +2327,83 @@ ensure it survives all optimization passes, including:
 * Logic optimization and constant propagation
 * Incremental optimization during place-and-route
 * Post-route optimization
+
+[[aou-ig-tpsram-replacement]]
+==== 8.7.2 AOU_TPSRAM: Flip-Flops or a Compiled SRAM
+
+[.monospaced]#++AOU_TPSRAM++# is a behavioral two-port RAM, one read port and one write
+port, written so that it can be synthesized as it is or swapped for a
+compiled SRAM. Either is a valid implementation; the choice is the
+integrator's, on area and power. Synthesized as written it becomes
+[.monospaced]#++2^RAM_ADDR_WIDTH x RAM_DATA_WIDTH++# flip-flops with a read mux and a
+registered output. A compiled SRAM must give [.monospaced]#++AOU_RX_GRANULE_STORE++#, the
+only user, the behaviour below; it is what the behavioral model does and
+all the design relies on. Anything the model does beyond this list (for
+example holding [.monospaced]#++QA++# while [.monospaced]#++CENA++# is high) is not required.
+
+*Ports and clock.*
+
+* Read port: [.monospaced]#++CLKA++#, [.monospaced]#++CENA++# (active low), [.monospaced]#++AA++# in, [.monospaced]#++QA++# out.
+Write port: [.monospaced]#++CLKB++#, [.monospaced]#++CENB++# (active low), [.monospaced]#++AB++#, [.monospaced]#++DB++# in.
+There is no reset, no byte or bit write enable, and no output enable.
+* Both clocks are [.monospaced]#++clk_core++# ([.monospaced]#++I_CLK++# of the store). A single-clock 1R1W
+macro, or a dual-clock one with both clock pins on [.monospaced]#++clk_core++#, fits.
+* Each bank may be read and written in the same cycle; the read and the
+write may be to the same or to different addresses. At most one read and
+one write per bank per cycle. A read or a write may be issued in every
+cycle.
+
+*Write.* On a rising edge with [.monospaced]#++CENB = 0++#, the whole word at [.monospaced]#++AB++# takes
+[.monospaced]#++DB++#. The store always writes complete words: when the granules received
+in a cycle end part-way through a word, the rest of the word is written as
+zeros, and the whole word is rewritten, with the granules it already holds
+repeated from flops, once later granules extend it.
+
+*Read.* On a rising edge with [.monospaced]#++CENA = 0++#, the word at [.monospaced]#++AA++# is read and
+[.monospaced]#++QA++# presents it from that edge until the next (one cycle of latency,
+registered output). The store uses [.monospaced]#++QA++# only in that one cycle: it goes
+through the message alignment and field decode combinationally and is
+registered into the store's output buffer at the next edge, after which it
+is not looked at again. Therefore:
+
+* The macro's clock-to-Q plus the alignment and decode logic is a
+single-cycle path in [.monospaced]#++clk_core++#.
+* What [.monospaced]#++QA++# shows while [.monospaced]#++CENA++# is high, or in any cycle without a read
+the cycle before, does not matter (the model holds the last value; a
+macro may hold, go to zero or float to an undefined level).
+* [.monospaced]#++QA++# needs no reset value, and the memory contents need no
+initialization: the store reads a word only to extract granules it has
+already written, and discards the rest of the word.
+
+*Read during write.* The store may read a word in the cycle it rewrites
+it: the last word of a complete message is read while later granules are
+appended to it. The bits being read are the same in the old and the new
+word, because a rewrite only changes the granule positions after the ones
+already stored. So either read-during-write ordering is acceptable, old
+data (the model's behaviour) or write-through, provided the macro returns
+a defined word built from the old and new contents. A macro whose read
+data is undefined on a same-cycle read and write of the same address, or
+whose simulation model returns unknowns in that case, does not meet this
+requirement without extra logic around it.
+
+*Size.* Each store has [.monospaced]#++NBANK++# banks, each a separate [.monospaced]#++AOU_TPSRAM++#
+instance of [.monospaced]#++ROWS++# words of [.monospaced]#++WG x 40++# bits (320 bits with the default
+[.monospaced]#++WG = 8++#). [.monospaced]#++NBANK++# is 5 at the 32, 64 and 128 B FDI widths and 7 at
+256 B. The word count follows the store's depth in granules
+([.monospaced]#++RPn_RX_W_FIFO_DEPTH++# / [.monospaced]#++RPn_RX_R_FIFO_DEPTH++#, xref:aou-ig-parameter-list[Section 2]):
+[.monospaced]#++WORDS = (DEPTH_G + 2 (WG - 1)) / WG++# rounded down, and
+[.monospaced]#++ROWS = WORDS / NBANK++# rounded up. With the defaults that is 16 rows per
+bank for a depth of 600 granules and 18 rows for 960. [.monospaced]#++RAM_ADDR_WIDTH++#
+is the width of a row address ([.monospaced]#++ceil(log2(ROWS))++#, at least 1), so the
+model allocates [.monospaced]#++2^RAM_ADDR_WIDTH++# words of which only the first [.monospaced]#++ROWS++#
+are addressed; a compiled macro needs [.monospaced]#++ROWS++# words or more. Per RP that is
+two stores (WriteData and ReadData), so with the defaults a four-RP
+instance holds 40 banks of 320 x 16 bits, or 56 banks of 320 x 18 bits at
+the 256 B width.
+
+*Verification.* The behavioral model is the reference: a replacement
+that holds the properties above in a formal check or an equivalence run
+against it needs no bench change. The open-source bench treats
+[.monospaced]#++AOU_TPSRAM++# as a memory macro for coverage whichever way it is implemented:
+it is excluded from code coverage, and the store's control logic around it
+stays in.
