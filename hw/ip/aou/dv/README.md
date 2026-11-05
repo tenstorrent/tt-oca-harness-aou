@@ -72,7 +72,7 @@ machine of your own, never a shared login host.
 ```sh
 python3 scripts/regress.py --help                       # every option, every step
 python3 scripts/regress.py --sim vcs --rid full1        # every CONFIG, every bench, every testlist
-python3 scripts/regress.py --sim verilator --rid full1v # the same on Verilator, without the RTL assertions
+python3 scripts/regress.py --sim verilator --rid full1v # the same on Verilator
 python3 scripts/regress.py --sim vcs --rid pr1 --configs "1x512-sp64 2x512-tp32_64" --items "smoke ci assertions"
 python3 scripts/regress.py --sim vcs --rid nop1 --lists all,-perf  # every testlist but perf
 python3 scripts/regress.py --sim vcs --rid full1 --dry-run   # the plan and the run counts only
@@ -84,8 +84,7 @@ What it does, in steps (`STEPS=build,run,summary`, plus `cov` with `COV=1`):
 1. **build**: `make build` of the T1 bench (`TB=t1`) and the register bench (`TB=reg`)
    for every configuration (`make configs`), the `RTL_ASSERT=1` build of every
    configuration with a `<CONFIG>-assert` target, and the two model unit benches
-   (`TB=l3_unit`, `TB=axi_selftest`): 27 builds on VCS. The RTL assertions are VCS-only
-   ([RTL assertions](#rtl-assertions)), so on Verilator they are skipped with a note: 22 builds.
+   (`TB=l3_unit`, `TB=axi_selftest`): 27 builds.
 2. **run**: one `scripts/run_list.py` per build, with `--per-list`: T1 runs every
    testlist `all.toml` includes except `assertions.toml`, which runs on the `-assert`
    builds; the register bench runs `registers.toml` and the unit benches their own
@@ -781,8 +780,8 @@ directory, and `run_list.py --target <CONFIG>-assert` runs on it. A firing asser
 `$finish` before the UVM report, which `check_run.py` judges FAIL.
 `testlists/assertions.toml` is the representative regression (plan 11.18);
 its entries pass `+rtl_asserts=1`, which is fatal on a build without the
-assertions, so they cannot pass on an ordinary build. The assertions use SVA
-ranges (`##[0:500]`), so the build is VCS-only for now.
+assertions, so they cannot pass on an ordinary build. Both simulators build them
+(Verilator from 5.052, which handles their SVA ranges such as `##[0:500]`).
 
 ## Building against a candidate RTL fix
 

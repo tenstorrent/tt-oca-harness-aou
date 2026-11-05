@@ -31,8 +31,7 @@ on PATH every build and run_list.py is started at once and each job is submitted
 through LSF; with LSF=0 they run one after another on this host. Whatever else is
 given to make regress (LSF_QUEUE, AXI4PC=0, LSF_EXTRA_OPTS, ...) reaches those makes.
 
-RTL assertions (the -assert builds) are VCS-only: on Verilator they are skipped with a
-note. The unit benches have no DUT, so they build without coverage under COV=1.
+The unit benches have no DUT, so they build without coverage under COV=1.
 
 Logs, the exact commands, the state, summary.md and plan_status.md (the test-plan
 status of this RID's runs, scripts/plan_status.py --rid, with the bins behind each
@@ -197,10 +196,6 @@ def plan(args):
     bad = [b for b in benches if b not in BENCHES]
     if bad:
         die(f"unknown BENCHES {' '.join(bad)}; use some of {' '.join(BENCHES)}")
-    if "assert" in benches and args.sim != "vcs":
-        notes.append(f"assert: skipped; the RTL assertions use SVA ranges, so the -assert builds "
-                     f"are VCS-only (SIM={args.sim})")
-        benches = [b for b in benches if b != "assert"]
     if args.cov == "1":
         for b in ("l3_unit", "axi_selftest"):
             if b in benches:
