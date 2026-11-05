@@ -600,6 +600,13 @@ class aou_t1_crd_flow_chk extends uvm_component;
            mb_vif[p].mon_cb.pl_state_sts == aou_fdi_pkg::FDI_STS_ACTIVE;
   endfunction
 
+  // The DUT could send a message of class c for x on this edge: the link is
+  // open, the Adapter takes a beat and the remote die has advertised credit
+  // for the message. Waits on the DUT's answers count only these cycles.
+  function bit can_send(int unsigned x, aou_cred_class_e c);
+    return link_open() && fdi_ready() && cred(x, c);
+  endfunction
+
   protected function void sample(int unsigned c, int unsigned ev);
     s_cls = c;
     s_ev = ev;
