@@ -58,7 +58,7 @@ def window_order(name):
 
 
 def fmt(v):
-    return "" if v is None else f"{v:.1f}"
+    return "" if v is None else f"{v:.4g}"
 
 
 def table(title, base, new, labels, markdown):
@@ -70,7 +70,7 @@ def table(title, base, new, labels, markdown):
     for k in keys:
         b = base.get(k)
         n = new.get(k)
-        d = "" if b is None or n is None else f"{n - b:+.1f}"
+        d = "" if b is None or n is None else f"{n - b:+.4g}"
         lines.append([k[0], k[1], fmt(b), fmt(n), d])
     print(f"\n{title}")
     if markdown:

@@ -13,9 +13,12 @@ class aou_packer_policy extends uvm_object;
 
   // Messages started per flit; 0 is no limit (1 gives minimum density).
   int unsigned      max_msgs_per_flit;
-  // With max_msgs_per_flit, a WriteData placed right after a WriteReq does not
-  // count: the pair shares the flit (max_msgs_per_flit 1 then gives one
-  // request, or one WriteReq with its first WriteData, per flit).
+  // With max_msgs_per_flit, the same RP's WriteData placed right after a
+  // WriteReq does not count: the pair shares the flit (max_msgs_per_flit 1
+  // then gives one request, or one WriteReq with its first WriteData, per
+  // flit). With bulk_last the pick prefers queued requests over data, so a
+  // second RP's WriteReq can take the data's place; the perf windows that use
+  // this (+perf_l3_one_msg=1) run one transaction at a time.
   bit               wreq_wdata_pair = 1'b0;
   // Percent chance of leaving 1..max_hole empty granules before a message.
   int unsigned      hole_pct;
@@ -58,11 +61,12 @@ class aou_packer_policy extends uvm_object;
   // batch queues up and leaves in densely packed flits; the caller kicks the
   // model when it clears the hold.
   bit               hold_credited;
-  // Percent chance that an AXI message to the DUT gets a random FLEX. v0.8
-  // makes FLEX the AXI USER[15:0] (5.2 / 11.1); the DUT has no USER outputs,
-  // so what it receives goes nowhere and any value is legal. The model
-  // randomises FLEX[11:0] (v0.7's PROF) and keeps FLEX[15:12] 0, the only
-  // PROFEXTLEN a v0.7 receiver takes; the name predates v0.8.
+  // Percent chance that an AXI message to the DUT without a fixed FLEX gets
+  // a random one. v0.8 makes FLEX the AXI USER[15:0] (5.2 / 11.1): the DUT
+  // presents what it receives on its ports' USER outputs (aou_t1_attr_chk
+  // DP-R12), so a message whose FLEX the remote AXI agent chose (flex_fixed)
+  // keeps all 16 bits; only the others get FLEX[11:0] randomised here, with
+  // FLEX[15:12] 0 (v0.7's PROF / PROFEXTLEN; the name predates v0.8).
   int unsigned      prof_pct;
   // A message that would not end in this flit is swapped for the largest
   // eligible queue head that does (reorders across queues only), so flits

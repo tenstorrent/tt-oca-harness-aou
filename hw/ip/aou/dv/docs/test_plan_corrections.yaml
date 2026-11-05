@@ -306,7 +306,7 @@
 - id: '4.30'
   added: 'AoU 5.2'
   priority: P2
-  title: 'AxUSER/FLEX carriage: FLEX in every message the DUT sends is the AXI USER[15:0] its port got (first beat of a merged response); the DUT has no USER outputs, so the FLEX it receives goes nowhere'
+  title: 'AxUSER/FLEX carriage: FLEX in every message the DUT sends is the AXI USER[15:0] its port got (first beat of a merged response); the FLEX of every message the DUT receives leaves on the USER outputs of its AXI ports (M-port AWUSER/ARUSER/WUSER, S-port BUSER/RUSER), except that an early write response carries BUSER 0'
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 - id: '4.31'
   added: 'AXI4 A3.3.1'

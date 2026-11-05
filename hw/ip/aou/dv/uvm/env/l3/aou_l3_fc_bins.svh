@@ -49,9 +49,11 @@
 // Activation message starts at G0 (4.4), so g4 away from G0 is AOU-R6's case.
 `define AOU_L3_FC_X_START_SIZE(B) \
   `B``_XILL("g[1*]|g[2*]|g[3*]|g[4*]|g[5]|g[6]|g[7]|g[8]|g[9],g4", "AOU-R6")
-// A 1-granule message can't span flits.
+// A 1-granule message can't span flits; the 4-granule ActivateReq starts at
+// G0, so it can't either (AOU-R6 reports one that does).
 `define AOU_L3_FC_X_SIZE_SPAN(B) \
-  `B``_XIGN("g1,multi_flit")
+  `B``_XIGN("g1,multi_flit") \
+  `B``_XILL("g4,multi_flit", "AOU-R6")
 // Messages that span flits, by kind (msg_kind() numbers) and direction
 // (cg_span). A WriteResp is one granule and an Activation starts at G0 and is
 // at most 4 granules, so neither can span; a CrdtGrant can, but it is no
@@ -143,11 +145,11 @@
 `define AOU_L3_FC_FLEX_KIND(B) \
   `B``_BIN(wreq, 0, 0) `B``_BIN(rreq, 1, 1) `B``_BIN(wdata, 2, 4) `B``_BIN(wdataf, 5, 7) \
   `B``_BIN(rdata, 8, 10) `B``_BIN(wresp, 11, 11)
-// The model never sends all ones: it keeps FLEX[15:12] at 0 toward the DUT
-// (v0.7's PROFEXTLEN, the only length the DUT's receiver takes;
-// aou_packer_policy::prof_pct).
-`define AOU_L3_FC_X_FLEX(B) \
-  `B``_XIGN("all_ones,*,tx")
+// Every cell is reachable on both directions: the remote AXI agents' USER
+// (aou_axi_cfg::user_pat, incl. all ones; aou_attr_test attr_user-1) is the
+// FLEX of the model's messages (flex_fixed), and the packer's random FLEX
+// (aou_packer_policy::prof_pct) only covers messages without one.
+`define AOU_L3_FC_X_FLEX(B)
 // ActivateReq profile fields per RP (cg_act_profile; AoU v0.8 Ch. 11): on rx
 // the DUT's, always the Basic Profile (PROFILE_CFG_RPn read-only 0/0/0), on
 // tx the model's cfg.profile_*. An RP the sender does not have carries 0 (its

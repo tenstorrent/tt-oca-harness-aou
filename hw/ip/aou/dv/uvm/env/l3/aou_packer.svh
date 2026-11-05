@@ -256,7 +256,7 @@ class aou_packer extends uvm_object;
     bit share_grant;    // ... except the initial CrdtGrant (after our ActivateAck)
     bit share_rsp;      // ... except WriteResp/ReadData (after our DeactivateReq)
     bit first_new = 1'b1;
-    bit last_wreq = 1'b0;
+    int last_wreq_rp = -1;   // RP of a WriteReq just placed, else -1
     bit span_grant;     // this flit's CrdtGrant goes at G47 (pol.grant_span_pct)
     aou_cred_method_e meth = cfg.pol.cred_method;
     f.seq = flit_cnt++;
@@ -336,8 +336,8 @@ class aou_packer extends uvm_object;
       int unsigned len;
       int unsigned sg = gp;
       bit at_max = cfg.pol.max_msgs_per_flit != 0 && nmsgs >= cfg.pol.max_msgs_per_flit;
-      // At the limit, only a WriteData right after its WriteReq may still go.
-      if (at_max && !(cfg.pol.wreq_wdata_pair && last_wreq)) break;
+      // At the limit, only the WriteData of a WriteReq just placed may still go.
+      if (at_max && !(cfg.pol.wreq_wdata_pair && last_wreq_rp >= 0)) break;
       if (cfg.pol.hole_pct != 0 && $urandom_range(0, 99) < cfg.pol.hole_pct)
         sg += $urandom_range(1, cfg.pol.max_hole);
       if (first_new && cfg.pol.start_granule >= 0 && sg <= cfg.pol.start_granule)
@@ -346,7 +346,8 @@ class aou_packer extends uvm_object;
       idx = pick(misc_half[sg / AOU_HALF_G]);
       if (idx < 0) break;
       m = (idx == NQ) ? misc_q[0] : q[idx][0];
-      if (at_max && m.cred_class() != AOU_CC_WDATA) break;
+      // Its RP's next WriteData (the model sends an RP's write data in order).
+      if (at_max && (m.cred_class() != AOU_CC_WDATA || int'(m.rp) != last_wreq_rp)) break;
       len = m.num_granules();
       if (cfg.pol.best_fit && sg + len > AOU_GRANULES) begin
         int alt = pick_fit(misc_half[sg / AOU_HALF_G], AOU_GRANULES - sg);
@@ -373,7 +374,7 @@ class aou_packer extends uvm_object;
       gp = sg + len;
       nmsgs++;
       first_new = 1'b0;
-      last_wreq = (m.msg_type == AOU_MT_WREQ);
+      last_wreq_rp = (m.msg_type == AOU_MT_WREQ) ? int'(m.rp) : -1;
     end
     rsp_only = 1'b0;
     // The flit's CrdtGrant at G47, continuing in G0 of the next flit.
