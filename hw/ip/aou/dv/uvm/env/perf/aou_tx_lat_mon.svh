@@ -305,7 +305,13 @@ class aou_tx_lat_mon extends uvm_component;
     foreach (req_q[r, k]) left += req_q[r][k].size();
     foreach (wdata_q[r]) left += wdata_q[r].size();
     foreach (wresp_q[r]) left += wresp_q[r].size();
-    foreach (rdata_q[r, i]) left += rdata_q[r][i].size();
+    // Not foreach (rdata_q[r, i]): Verilator 5.052 emits first()/next() on the
+    // outer unpacked array of an unpacked-of-associative and fails to compile.
+    foreach (rdata_q[r]) begin
+      bit [9:0] id;
+      if (rdata_q[r].first(id) != 0)
+        do left += rdata_q[r][id].size(); while (rdata_q[r].next(id) != 0);
+    end
     foreach (m_pend[r]) left += m_pend[r].size();
     `uvm_info(get_type_name(), $sformatf(
               {"%0d DUT messages timed at the FDI, %0d paired with an AXI handshake, ",
