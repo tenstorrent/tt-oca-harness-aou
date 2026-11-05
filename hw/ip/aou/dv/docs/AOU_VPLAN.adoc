@@ -135,13 +135,12 @@ holes that point at a real gap (<<aou-fcov-gaps>> has the detail):
   DeactivateReq, for who deactivated first, or for activation order.
 . *ERROR entered from DISABLED* (an inconsistent request or acknowledge) has no
   bin.
-. *Failed exclusive reads.* The memory model has no region without exclusive
-  support, so no exclusive read is answered OKAY.
-. *S-port write outstanding limit* is never reached; the early write response
-  may return B first. Back-pressure while at the outstanding limit is never
-  seen either.
-. *FDI stall latency.* Six stall-handshake timing holes, which may be
-  unreachable on some FDI widths; decide per bin whether it is a target.
+. *M-port B stall at the write limit* is never seen: the DUT buffers write
+  responses, so its BREADY drops only below the limit. Possibly unreachable;
+  decide whether it is a target.
+. *FDI stall latency.* Six stall-handshake timing holes that random `pl_trdy`
+  policies and stalls didn't move; two can't occur as defined. Exclusion
+  candidates.
 . *Dense WriteResp flits.* Flits with 16 or more WriteResps from the DUT never
   occur; that is the DUT packer's choice.
 . *Link events with traffic in flight.* No bin combines a link event (Retrain,
@@ -158,8 +157,7 @@ own splitter and aggregator, resets during traffic, low-power mode);
 cross-layer groups (link event × activation state × outstanding; reset ×
 state; zero credit × FDI back-pressure; deactivation phase × message class); a
 full DEST_RP permutation sweep; random-traffic knobs for maximum burst length,
-maximum ID and a low address window per RP; back-pressure over 1000 cycles;
-and a toggle-coverage triage.
+maximum ID and a low address window per RP; and a toggle-coverage triage.
 
 [[aou-vplan-scope]]
 === Scope and References

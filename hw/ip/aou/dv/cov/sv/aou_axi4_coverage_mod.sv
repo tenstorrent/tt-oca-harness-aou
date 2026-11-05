@@ -15,7 +15,8 @@
 //   boundary - crossing flagged illegal); AxSIZE; AxLEN; AxBURST (INCR
 //   only); AxCACHE; AxPROT; AxQOS; AxLOCK; AxID buckets; WSTRB patterns
 //   incl. first-beat lead mask; WLAST/RLAST; BRESP/RRESP; outstanding
-//   counts up to MAX_OUTSTANDING; R/B backpressure stall run-lengths.
+//   counts up to MAX_OUTSTANDING; ready-low stall run-lengths on every
+//   channel, and whether a B or R stall ended at the outstanding limit.
 //   WDATA values are not binned.
 //
 //*************************************************************************
@@ -354,49 +355,47 @@ module aou_axi4_coverage_mod #(
   end
 
   //==========================================================================
-  // Backpressure: response-channel ready-low run-length tracking
+  // Backpressure: ready-low run-length tracking on every channel
   //   Count consecutive cycles where VALID is held but READY is low; when the
-  //   stall ends, latch the run length and pulse a sample event.
+  //   stall ends (VALID cannot drop before its handshake, so with the
+  //   handshake), latch the run length and pulse a sample event. For B and R,
+  //   also latch whether the port had its outstanding limit in flight when
+  //   the stall ended: the count before that handshake retires anything.
   //==========================================================================
   localparam int STALL_W = 16;
+  localparam int N_CH = 5;
+  localparam int CH_AW = 0, CH_W = 1, CH_AR = 2, CH_R = 3, CH_B = 4;
 
-  logic [STALL_W-1:0] r_stall_cnt, b_stall_cnt;
-  logic [STALL_W-1:0] r_stall_len_r, b_stall_len_r;
-  logic               r_stall_done, b_stall_done;
+  logic [N_CH-1:0]    ch_valid, ch_ready;
+  logic [STALL_W-1:0] stall_cnt [N_CH];
+  logic [STALL_W-1:0] stall_len_r [N_CH];
+  logic [N_CH-1:0]    stall_done;
+  logic               r_stall_at_max_r, b_stall_at_max_r;
 
-  always_ff @(posedge clk or negedge rst_n) begin
-    if (!rst_n) begin
-      r_stall_cnt  <= '0;
-      r_stall_done <= 1'b0;
-    end else begin
-      r_stall_done <= 1'b0;
-      if (r_valid && !r_ready) begin
-        r_stall_cnt <= (r_stall_cnt == '1) ? r_stall_cnt : r_stall_cnt + 1'b1;
-      end else begin
-        if (r_stall_cnt != 0) begin
-          r_stall_len_r <= r_stall_cnt;
-          r_stall_done  <= 1'b1;
-        end
-        r_stall_cnt <= '0;
-      end
-    end
-  end
+  assign ch_valid = {b_valid, r_valid, ar_valid, w_valid, aw_valid};
+  assign ch_ready = {b_ready, r_ready, ar_ready, w_ready, aw_ready};
 
   always_ff @(posedge clk or negedge rst_n) begin
     if (!rst_n) begin
-      b_stall_cnt  <= '0;
-      b_stall_done <= 1'b0;
+      for (int c = 0; c < N_CH; c++) stall_cnt[c] <= '0;
+      stall_done <= '0;
     end else begin
-      b_stall_done <= 1'b0;
-      if (b_valid && !b_ready) begin
-        b_stall_cnt <= (b_stall_cnt == '1) ? b_stall_cnt : b_stall_cnt + 1'b1;
-      end else begin
-        if (b_stall_cnt != 0) begin
-          b_stall_len_r <= b_stall_cnt;
-          b_stall_done  <= 1'b1;
+      stall_done <= '0;
+      for (int c = 0; c < N_CH; c++) begin
+        if (ch_valid[c] && !ch_ready[c]) begin
+          stall_cnt[c] <= (stall_cnt[c] == '1) ? stall_cnt[c] : stall_cnt[c] + 1'b1;
+        end else begin
+          if (stall_cnt[c] != 0) begin
+            stall_len_r[c] <= stall_cnt[c];
+            stall_done[c]  <= 1'b1;
+          end
+          stall_cnt[c] <= '0;
         end
-        b_stall_cnt <= '0;
       end
+      if (!(r_valid && !r_ready) && stall_cnt[CH_R] != 0)
+        r_stall_at_max_r <= (rd_os_cnt == MAX_OUTSTANDING);
+      if (!(b_valid && !b_ready) && stall_cnt[CH_B] != 0)
+        b_stall_at_max_r <= (wr_os_cnt == MAX_OUTSTANDING);
     end
   end
 
@@ -695,7 +694,7 @@ module aou_axi4_coverage_mod #(
     option.per_instance = 1;
     option.name = {INST_NAME, "_cg_backpressure"};
 
-    cp_r_stall_len: coverpoint r_stall_len_r iff (r_stall_done) {
+    cp_aw_stall_len: coverpoint stall_len_r[CH_AW] iff (stall_done[CH_AW]) {
       bins cyc_1       = {1};
       bins cyc_2_10    = {[2:10]};
       bins cyc_11_100  = {[11:100]};
@@ -703,7 +702,7 @@ module aou_axi4_coverage_mod #(
       bins cyc_gt_1k   = {[1001:$]};
     }
 
-    cp_b_stall_len: coverpoint b_stall_len_r iff (b_stall_done) {
+    cp_w_stall_len: coverpoint stall_len_r[CH_W] iff (stall_done[CH_W]) {
       bins cyc_1       = {1};
       bins cyc_2_10    = {[2:10]};
       bins cyc_11_100  = {[11:100]};
@@ -711,12 +710,39 @@ module aou_axi4_coverage_mod #(
       bins cyc_gt_1k   = {[1001:$]};
     }
 
-    // FIFO-full proxy: response stall observed while outstanding is at max
-    cp_r_stall_at_max_os: coverpoint (r_stall_done && (rd_os_cnt == MAX_OUTSTANDING)) {
-      bins hit = {1'b1};
+    cp_ar_stall_len: coverpoint stall_len_r[CH_AR] iff (stall_done[CH_AR]) {
+      bins cyc_1       = {1};
+      bins cyc_2_10    = {[2:10]};
+      bins cyc_11_100  = {[11:100]};
+      bins cyc_101_1k  = {[101:1000]};
+      bins cyc_gt_1k   = {[1001:$]};
     }
-    cp_b_stall_at_max_os: coverpoint (b_stall_done && (wr_os_cnt == MAX_OUTSTANDING)) {
-      bins hit = {1'b1};
+
+    cp_r_stall_len: coverpoint stall_len_r[CH_R] iff (stall_done[CH_R]) {
+      bins cyc_1       = {1};
+      bins cyc_2_10    = {[2:10]};
+      bins cyc_11_100  = {[11:100]};
+      bins cyc_101_1k  = {[101:1000]};
+      bins cyc_gt_1k   = {[1001:$]};
+    }
+
+    cp_b_stall_len: coverpoint stall_len_r[CH_B] iff (stall_done[CH_B]) {
+      bins cyc_1       = {1};
+      bins cyc_2_10    = {[2:10]};
+      bins cyc_11_100  = {[11:100]};
+      bins cyc_101_1k  = {[101:1000]};
+      bins cyc_gt_1k   = {[1001:$]};
+    }
+
+    // A response stall that ended with the port's outstanding limit in flight
+    // (the subordinate's response queue full), or below it.
+    cp_r_stall_at_max_os: coverpoint r_stall_at_max_r iff (stall_done[CH_R]) {
+      bins below_max = {1'b0};
+      bins at_max    = {1'b1};
+    }
+    cp_b_stall_at_max_os: coverpoint b_stall_at_max_r iff (stall_done[CH_B]) {
+      bins below_max = {1'b0};
+      bins at_max    = {1'b1};
     }
   endgroup
 

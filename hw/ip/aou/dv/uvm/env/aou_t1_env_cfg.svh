@@ -136,6 +136,10 @@ class aou_t1_env_cfg extends uvm_object;
     remote_cfg = aou_axi_cfg::type_id::create("remote_cfg");
     remote_cfg.vif_key = "s_axi0";
     remote_cfg.mem = aou_mem::type_id::create("remote_mem");
+    // A tenth of each memory's pages has no exclusive monitor, so exclusive
+    // reads also see the OKAY of a subordinate without exclusive support.
+    local_mem.no_excl_pct = 10;
+    remote_cfg.mem.no_excl_pct = 10;
     set_rp_count(n_rp);
   endfunction
 
@@ -254,7 +258,11 @@ class aou_t1_env_cfg extends uvm_object;
     if ($value$plusargs("l1_cancel_mix=%d", v)) l1_cancel_mix = v != 0;
   endfunction
 
-  // Random choices a test usually wants per seed.
+  // Random choices a test usually wants per seed. On a tenth of the S ports
+  // each, the local manager holds BREADY or RREADY low while the port fills
+  // to its outstanding limit (aou_axi_timing b_fill_hold, r_fill_hold), and
+  // may then keep as many requests in flight as the port accepts; applying a
+  // timing profile turns the holds off again.
   function void randomize_knobs();
     local_timing = aou_axi_timing_e'($urandom_range(4));
     for (int unsigned r = 0; r < n_rp; r++) begin
@@ -262,20 +270,56 @@ class aou_t1_env_cfg extends uvm_object;
       m_sub_cfg[r].timing.apply(local_timing);
       s_mgr_cfg[r].w_before_aw_en = 1'($urandom_range(1));
       m_sub_cfg[r].r_interleave_en = 1'($urandom_range(1));
+      s_mgr_cfg[r].timing.b_fill_hold = ($urandom_range(9) == 0);
+      s_mgr_cfg[r].timing.r_fill_hold = ($urandom_range(9) == 0);
+      if (s_mgr_cfg[r].timing.b_fill_hold) s_mgr_cfg[r].max_wr_outstanding = AOU_T1_S_MO_CNT;
+      if (s_mgr_cfg[r].timing.r_fill_hold) s_mgr_cfg[r].max_rd_outstanding = AOU_T1_S_MO_CNT;
     end
     l3_cfg.resp_fork = 1'($urandom_range(1));
     remote_lat_max = $urandom_range(30);
+    fdi_knobs();
+  endfunction
+
+  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r1.1 8.3.2), per
+  // seed on every PHY. HOLES without stalls stays the common case; a fifth of
+  // the seeds take RANDOM or BURSTY pl_trdy (so pl_trdy can also be low at a
+  // flit boundary), and a fifth add stand-alone stalls at a boundary or
+  // mid-flit, with pl_trdy held high or left to its policy during the
+  // handshake. +fdi_trdy and the +fdi_stall_* plusargs override this; a test
+  // that measures performance or depends on the timing sets its own.
+  function void fdi_knobs();
+    aou_fdi_trdy_e pol = AOU_TRDY_HOLES;
+    bit            stalls = ($urandom_range(4) == 0);
+    int unsigned   pct = $urandom_range(5, 1);
+    int unsigned   mid = $urandom_range(90);
+    bit            free = 1'($urandom_range(1));
+    int unsigned   hmin = $urandom_range(1);
+    if ($urandom_range(4) == 0) pol = ($urandom_range(1) == 0) ? AOU_TRDY_RANDOM : AOU_TRDY_BURSTY;
+    foreach (fdi_cfg[p]) begin
+      fdi_cfg[p].trdy_policy = pol;
+      if (!stalls) continue;
+      fdi_cfg[p].stall_pct = pct;
+      fdi_cfg[p].stall_mid_pct = mid;
+      fdi_cfg[p].stall_trdy_free = free;
+      fdi_cfg[p].stall_hold_min = hmin;
+    end
   endfunction
 
   function string convert2string();
+    bit [3:0] bh = '0;
+    bit [3:0] rh = '0;
+    foreach (s_mgr_cfg[r]) begin
+      bh[r] = s_mgr_cfg[r].timing.b_fill_hold;
+      rh[r] = s_mgr_cfg[r].timing.r_fill_hold;
+    end
     return $sformatf({"n_rp=%0d remote_rp_count=%0d rp_bytes=%p remote_bytes=%0d ",
                       "rp_remote_bytes=%p phy=%0d/%0d fdi_beat_bytes=%0d ",
                       "spec=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
-                      "l1 cancel/bubble=%0d/%0d"},
+                      "l1 cancel/bubble=%0d/%0d fill_hold b/r=%4b/%4b"},
                      n_rp, remote_rp_count, rp_bytes, remote_bytes, rp_remote_bytes,
                      lsm_cfg.active_phy,
                      lsm_cfg.n_phy, fdi_cfg[lsm_cfg.active_phy].beat_bytes, spec_rev.name(),
                      local_timing.name(), remote_lat_max, l3_cfg.resp_fork, l1_cancel_pct,
-                     l1_bubble_pct);
+                     l1_bubble_pct, bh, rh);
   endfunction
 endclass

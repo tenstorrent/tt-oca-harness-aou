@@ -307,6 +307,28 @@ tags = ["datapath"]
 run_modes = ["datapath"]
 args = ["+dp_mfull=600", "+dp_wr_pct=100"]
 
+# 8.1: the S-port managers keep each port's outstanding limit (S_WR_MO_CNT,
+# S_RD_MO_CNT) in flight and hold BREADY or RREADY low until it is, sometimes
+# for over 1000 cycles, so every S port reaches its limit with its responses
+# backed up (cg_os at the limit, cg_bp stalls at the limit).
+[[tests]]
+name = "aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-100"
+module = { uvm = "aou_dp_outstanding_test" }
+seed = 1
+reseed = 2
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+dp_sfull=1", "+dp_wr_pct=100"]
+
+[[tests]]
+name = "aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-0"
+module = { uvm = "aou_dp_outstanding_test" }
+seed = 1
+reseed = 2
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+dp_sfull=1", "+dp_wr_pct=0"]
+
 # AXI attributes across the link, both ways, on every configuration: AxQOS
 # 0-15, AxPROT 0-7 and every legal AxCACHE on writes and reads, random FLEX
 # from the remote die, and the DUT's FLEX equal to the AXI USER its ports got
@@ -405,7 +427,7 @@ args = ["+dp_dir=both", "+small_size_pct=5"]
 
 [[groups]]
 name = "datapath"
-expected_count = 40
+expected_count = 42
 tests = [
   "aou_small_size_test",
   "aou_small_size_test.remote_bytes-32_128_64_128",
@@ -441,6 +463,8 @@ tests = [
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.1x512-sp64",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.4x512-sp64",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.4x512-sp64",
+  "aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-100",
+  "aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-0",
   "aou_attr_test",
   "aou_attr_test.attr_excl-1",
   "aou_attr_test.attr_excl-1.attr_early-1",

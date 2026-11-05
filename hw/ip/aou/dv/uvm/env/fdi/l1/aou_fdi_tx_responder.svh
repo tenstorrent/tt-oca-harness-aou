@@ -117,7 +117,9 @@ class aou_fdi_tx_responder extends uvm_component;
       bit mid;
       @(vif.drv_cb);
       mid = $urandom_range(99) < cfg.stall_mid_pct;
-      if (cfg.gate.open && (mid ? tx_beat != 0 : tx_beat == 0) && !stall_busy &&
+      // None while the TX is held (tx_hold): the handshake raises pl_trdy and
+      // would let flits through the hold.
+      if (cfg.gate.open && !cfg.tx_hold && (mid ? tx_beat != 0 : tx_beat == 0) && !stall_busy &&
           $urandom_range(99) < cfg.stall_pct) begin
         stall_begin();
         repeat ($urandom_range(cfg.stall_hold_max, cfg.stall_hold_min)) @(vif.drv_cb);

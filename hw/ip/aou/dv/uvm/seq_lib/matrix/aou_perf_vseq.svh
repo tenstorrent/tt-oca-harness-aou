@@ -49,7 +49,8 @@ class aou_perf_vseq extends aou_dp_vseq;
     if ($value$plusargs("perf_scn=%s", scn)) mode = "scn";
     if (mode == "rxlat" && !uvm_config_db#(aou_rx_lat_mon)::get(null, "*", "rx_lat_mon", rx_lat))
       `uvm_fatal(get_type_name(), "no rx_lat_mon in config_db")
-    if (mode == "rxlat") void'(uvm_config_db#(aou_tx_lat_mon)::get(null, "*", "tx_lat_mon", tx_lat));
+    if (mode == "rxlat")
+      void'(uvm_config_db#(aou_tx_lat_mon)::get(null, "*", "tx_lat_mon", tx_lat));
   endtask
 
   function void full_rate();

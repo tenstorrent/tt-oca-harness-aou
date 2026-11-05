@@ -44,6 +44,13 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
   // issuing, MAS software-operation 7.3.5). A write whose AW or W has started
   // still finishes, and responses are still taken.
   bit                    hold_new = 1'b0;
+  // Response hold (timing.b_fill_hold, r_fill_hold), per channel: 0 B, 1 R.
+  protected bit          fh_on[2];
+  protected int unsigned fh_cyc[2];
+  protected int unsigned fh_min[2];
+  protected int unsigned fh_idle[2];
+  protected int unsigned fh_seen[2];
+  protected int unsigned fh_gap[2];
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -396,13 +403,14 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
     bit rdy;
     int unsigned cnt = 0;
     forever begin
-      rdy = (cnt == 0);
+      rdy = (cnt == 0) && !fill_hold(1'b0);
       vif.mgr_cb.bready <= rdy;
       @(vif.mgr_cb);
       if (stale_held != 0 && $time > stale_until) release_expired();
       if (rdy && vif.mgr_cb.bvalid === 1'b1) begin
         complete_b(vif.mgr_cb.bid, vif.mgr_cb.bresp, vif.mgr_cb.buser);
         cnt = cfg.timing.b_ready.next();
+        if (fh_gap[0] > 0) fh_gap[0]--;
       end else if (cnt > 0) begin
         cnt--;
       end
@@ -413,18 +421,51 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
     bit rdy;
     int unsigned cnt = 0;
     forever begin
-      rdy = (cnt == 0);
+      rdy = (cnt == 0) && !fill_hold(1'b1);
       vif.mgr_cb.rready <= rdy;
       @(vif.mgr_cb);
       if (rdy && vif.mgr_cb.rvalid === 1'b1) begin
         complete_r(vif.mgr_cb.rid, vif.mgr_cb.rdata, vif.mgr_cb.rresp, vif.mgr_cb.rlast,
                    vif.mgr_cb.ruser);
         cnt = cfg.timing.r_ready.next();
+        if (fh_gap[1] > 0) fh_gap[1]--;
       end else if (cnt > 0) begin
         cnt--;
       end
     end
   endtask
+
+  // One cycle of the response hold of the B (rd = 0) or R channel: 1 while its
+  // ready must stay low. The hold ends once the requests handed over reach the
+  // outstanding limit, or stop growing for timing.fill_hold_idle cycles, and it has
+  // lasted its minimum; the next one starts after fh_gap more responses.
+  protected function bit fill_hold(bit rd);
+    int unsigned n = 0;
+    int unsigned lim = rd ? cfg.max_rd_outstanding : cfg.max_wr_outstanding;
+    if (!(rd ? cfg.timing.r_fill_hold : cfg.timing.b_fill_hold) || fh_gap[rd] > 0) return 1'b0;
+    if (rd) foreach (rd_os[k]) n += rd_os[k].addr_done;
+    else    foreach (wr_os[k]) n += wr_os[k].addr_done && wr_os[k].w_done;
+    if (!fh_on[rd]) begin
+      fh_on[rd]   = 1'b1;
+      fh_cyc[rd]  = 0;
+      fh_idle[rd] = 0;
+      fh_seen[rd] = n;
+      fh_min[rd]  = ($urandom_range(7) == 0) ? cfg.timing.fill_hold_long : 0;
+    end
+    fh_cyc[rd]++;
+    if (n != fh_seen[rd]) begin
+      fh_seen[rd] = n;
+      fh_idle[rd] = 0;
+    end else begin
+      fh_idle[rd]++;
+    end
+    if ((n >= lim || fh_idle[rd] >= cfg.timing.fill_hold_idle) && fh_cyc[rd] >= fh_min[rd]) begin
+      fh_on[rd]  = 1'b0;
+      fh_gap[rd] = $urandom_range(2 * lim, 1);
+      return 1'b0;
+    end
+    return 1'b1;
+  endfunction
 
   // Responses go to the oldest outstanding request with the same ID; protocol
   // violations are the monitor's to report.

@@ -799,6 +799,15 @@ at the M port (FEAT-R22) and its cg_mo full bin records that the limit was
 reached; the DUT must
 back-pressure without an error or a lost transfer.
 
+----
++dp_sfull=1: local-originated only, the S-port managers may keep the port's
+----
+
+outstanding limit (S_RD_MO_CNT, S_WR_MO_CNT) in flight and hold BREADY and
+RREADY low until it is, sometimes for over 1000 cycles (aou_axi_timing
+b_fill_hold, r_fill_hold), so each S port reaches its limit with its
+responses backed up; the DUT must neither lose nor reorder a response.
+
 *Procedure.* The base class's virtual sequence `aou_dp_vseq`, configured by this class and its arguments.
 
 *Rules named.* `FEAT-R22`
@@ -820,6 +829,8 @@ back-pressure without an error or a lost transfer.
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.1x512-sp64` | `+dp_mfull=600 +dp_wr_pct=100` | 1-2 | `1x512-sp64` | 9.20
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.4x512-sp64` | `+dp_mfull=600 +dp_wr_pct=0` | 1-2 | `4x512-sp64` | 9.20
 | `aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.4x512-sp64` | `+dp_mfull=600 +dp_wr_pct=100` | 1-2 | `4x512-sp64` | 9.20
+| `aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-100` | `+dp_sfull=1 +dp_wr_pct=100` | 1-2 |  | 8.1
+| `aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-0` | `+dp_sfull=1 +dp_wr_pct=0` | 1-2 |  | 8.1
 | `aou_dp_outstanding_test.dp_batch-16.dp_ids-same.rtl_asserts-1` | `+dp_batch=16 +dp_ids=same +rtl_asserts=1` | 1 | `1x512-sp64-assert` | 11.18
 |===
 
@@ -879,9 +890,12 @@ carry AxLOCK and EXOKAY:
 exclusive read A, exclusive write A (same ID)           -> EXOKAY, EXOKAY
 exclusive read B, plain write into B, exclusive write B -> EXOKAY, OKAY
 exclusive write C with no exclusive read                -> OKAY
+A round that lands on a page without an exclusive monitor (aou_mem
+no_excl_pct) gets OKAY throughout, and its exclusive writes land like
+normal ones (AXI4 A7.2.4).
 aou_t1_attr_chk checks that the requester gets the subordinate's answer
 (DP-R07) and xfer_cov counts both outcomes; the scoreboard checks that only
-the EXOKAY write changed memory.
+the EXOKAY writes, and the writes where there is no monitor, changed memory.
 With `user` set (aou_attr_test +attr_user=1), every RP first runs, from each
 side, the AXI USER rounds: with the agents' USER pattern set to all ones,
 then a walking bit, then random (per beat, cfg.user_mode), then USER held
@@ -982,12 +996,14 @@ Class `aou_split_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_split
 *Purpose.* Splitter (plan 15.1-15.10, 15.12, 15.16, 15.17, 20.9; old F2). +split_aw/+split_ar
 take a value (AxLEN), "sweep" (a random legal 2^n-1), "illegal" (a random
 value that is not 2^n-1, stored as 0xF) or "per_rp" (a different random
-legal value on each RP, 15.16). Remote-originated 64-byte-beat bursts of
+legal value on each RP, 15.16, half of them 16 beats or less and half 32 or
+more, so each RP sees both short and long limits). Remote-originated bursts of
 
 ----
-+dp_len lengths; aou_split_chk checks the M-port bursts against each RP's
++dp_len lengths, 32 bytes per beat up to the bus width (+dp_full_size=1 for
 ----
 
+the bus width only); aou_split_chk checks the M-port bursts against each RP's
 limit, counting the beats after the downsizer on RPs narrower than 512 bits
 (15.17), and the scoreboard the reassembled data, RLAST and merged BRESP at
 the remote side.

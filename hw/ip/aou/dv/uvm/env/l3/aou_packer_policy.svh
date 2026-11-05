@@ -155,8 +155,8 @@ class aou_packer_policy extends uvm_object;
                       "cred_only=%0d empty=%0d%% cred=%0d misc_half=%0d hold=%0d ",
                       "prof=%0d%% zero_grants=%0d grant_span=%0d%% best_fit=%0d ",
                       "wdata_first=%0d%%/%0d hold_wreq=%b bulk_last=%0d"},
-                     max_msgs_per_flit, wreq_wdata_pair, hole_pct, max_hole, start_granule, split_at,
-                     allow_span, random_order, credit_only_flits, empty_flit_pct,
+                     max_msgs_per_flit, wreq_wdata_pair, hole_pct, max_hole, start_granule,
+                     split_at, allow_span, random_order, credit_only_flits, empty_flit_pct,
                      cred_method, misc_per_half_max, hold_credited, prof_pct,
                      zero_grants, grant_span_pct, best_fit, wdata_first_pct, wdata_first_beats,
                      hold_wreq_rps, bulk_last);
