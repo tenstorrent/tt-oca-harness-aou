@@ -34,11 +34,6 @@ only a snapshot.
 
 Where the real holes are (details in <<aou-fcov-gaps>>):
 
-* *No M port has a B stall end with its write limit in flight.* The DUT
-  buffers write responses, so its BREADY drops only once the port is below
-  the limit.
-* *Some FDI stall-handshake latencies are never seen.* These are the DUT's
-  choice, and two of the bins can't occur as defined.
 * *The DUT never requests L1 itself.*
 * *The DUT's packer never puts 16 or more WriteResps in one flit.*
 * *The v0.8 behaviour the RTL doesn't implement yet:* the ERROR activation
@@ -98,6 +93,18 @@ Code: `uvm/env/fdi/l1/aou_fdi_cov.svh`.
 | `cg_fdi_abandon` | A partial flit dropped because the Adapter left Active mid-flit | TX, RX | `l1.cg_fdi_abandon`
 |===
 
+Excluded from `cg_fdi_stall`: an `lp_stallack` held one cycle, which can't
+happen (it may not fall while `pl_stallreq` is high, and `pl_stallreq` falls
+only after it has seen the acknowledge, so the acknowledge lasts at least 2
+cycles); `pl_trdy` low at a flit-boundary request, which the monitor never
+records (it records `pl_trdy` low at the request only for a request inside a
+flit, the UCIe r1.1 8.3.2 corner the bin is there for); and the latencies the
+DUT never chooses, since it acknowledges a request at a flit boundary in 2
+cycles and one inside a flit in 3 or more (the acknowledge can't rise inside a
+flit): boundary × 3, 4-6 and 7+ cycles, and mid-flit × 2 cycles. The regression
+of 2026-11-04 (5610 passing runs) saw 106869 boundary requests, all answered
+in 2 cycles, and 148294 mid-flit ones, all in 3 or more.
+
 ==== 2. FDI Link State and Bring-up (UCIe r1.1 8.2 and 8.3)
 
 Every change of `pl_state_sts` or of the DUT's `lp_state_req`, and the DUT's
@@ -136,7 +143,8 @@ Code: `uvm/env/l3/aou_l3_cov.svh`, `uvm/env/aou_t1_status.svh`.
 | `cg_stray_dack` (DUT) | An out-of-protocol DeactivateAck in ENABLED reached an accepted ending | one bin: ignored, flagged on arrival, or an error at the next deactivation. Any of them is acceptable and one DUT shows one or two, so the target is that one was reached; the run log names which | `env.cg_stray_dack`
 |===
 
-Excluded: a reserved op marked legal; an illegal op sent by the DUT, which
+Excluded: a reserved op (AoU v0.8 Table 27, ops 4-15), which no compliant
+die sends, so seeing one takes out-of-protocol stimulus; an illegal op sent by the DUT, which
 fails the run, so it can't occur in a passing run (illegal ops come only from
 the bench's injection); a DUT ActivateAck without its initial CrdtGrant and a
 DUT ActivateReq carrying one (this DUT always sends the grant in its Ack's
@@ -258,6 +266,13 @@ Code: `cov/sv/aou_axi4_coverage_mod.sv`, bins in `aou_axi4_fc_bins.svh`.
 | Commands | a read and a write issued | `cg_cmd`
 |===
 
+Excluded: a B stall that ends with the port at its write limit, on the M
+ports (`axi_rx_rp<n>`) only. This DUT accepts write responses into its own
+buffering and drops BREADY only once the port is already below its write
+limit, so the bin can't be reached there. The regression of 2026-11-04 reached
+the write limit and B stalls of every length on every M port, never both at
+once. It stays a target on the S ports.
+
 [[aou-fcov-not-covered]]
 ==== 10. Not Covered by Functional Bins
 
@@ -294,27 +309,6 @@ has a bin added yet; each is recorded in the verification plan's road-map
 . *ERROR from DISABLED.* v0.8 enters ERROR on any inconsistent request or
   acknowledge, for example an ActivateAck in DISABLED. The `v0.8` bins start
   only from ACTIVATE, ENABLED and DEACTIVATE.
-. *A reserved Activation op.* `cg_act_op` reserved op × tx × illegal is a
-  hole: no passing run injected one.
-. *M-port B stall at the limit (DUT).* `cg_bp` `cp_b_stall_at_max_os`
-  "at the limit" is a hole on every M port; every B stall the DUT puts on an
-  M port ends below the write limit. Long M-port B stalls come only from
-  tests that hold the DUT's TX: the DUT keeps accepting B into its own
-  buffering while its pending-ID table, full until the WriteResps leave,
-  keeps new AWs out, so the port is below its limit by the time BREADY
-  drops. The bin may be unreachable for this DUT; decide whether it is a
-  target. (An AWREADY stall over 1000 cycles on one M port is a seed-dependent
-  hole of the same group.)
-. *FDI stall latency (DUT).* `cg_fdi_stall` has six holes: a request at a
-  flit boundary answered in 3 or more cycles, a mid-flit request answered in
-  2, `pl_trdy` low at a boundary, and an acknowledge held one cycle. With the
-  `pl_trdy` policy and stand-alone stalls now random per seed (several times
-  the stall samples) none of them moved: the DUT answers a request at a
-  boundary in 2 cycles and one inside a flit in 3 or more. Two can't occur as
-  defined: the monitor records `pl_trdy` low at the request only for a
-  mid-flit request (the UCIe r1.1 8.3.2 rule 7 corner), and `lp_stallack`
-  may not fall while `pl_stallreq` is high, which falls only after the
-  acknowledge is seen, so it is held at least 2 cycles. Exclusion candidates.
 . *DUT WriteResp density (DUT).* `cg_wresp_flit` rx 16-47 and 48 WriteResps
   per flit are holes. The DUT's packer may never build such flits; that is the
   DUT's choice, not a stimulus gap.
@@ -423,8 +417,14 @@ coverage model or its tooling.
 * The integrator-replaced library cells (`AOU_SOC_SYNCHSR`, `AOU_SOC_GFMUX_LVT`,
   `AOU_SOC_BUF`; integration guide 8.7) are excluded with their reasons in
   `cov/config/vcs/cov_exclude.hier`; reset-only FSM transitions through
-  `cov/config/vcs/cov_fsm_reset.filter`. Line and branch exclusions are
-  deferred to the end of closure.
+  `cov/config/vcs/cov_fsm_reset.filter`. Dead line, branch and FSM items are
+  excluded one by one, each with its reason, in `cov/config/vcs/cov_exclude.el`.
+* The bring-up controller's L1 to Reset transition is excluded there: the UCIe
+  Adapter leaves L1 only through Retrain (UCIe r1.1 8.3.3; only L2 exits
+  through Reset), so `pl_state_sts` never goes from L1 straight to Reset. Its
+  two transitions into the link-down state, from L1 and from waiting for the
+  remote die, stay holes until the UCIe and MAS rules on `pl_clk_req` ordering
+  are reviewed.
 * The `v0.8` bins (the ERROR state, `cg_flit_occ` half-flit Misc limit) need an
   AoU v0.8 DUT or partner; the four-granule ActivateReq bins lost the tag when
   the DUT started sending it (profile exchange, `cg_act_profile`).

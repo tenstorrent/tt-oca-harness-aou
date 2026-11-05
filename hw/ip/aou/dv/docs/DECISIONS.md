@@ -682,7 +682,9 @@ twice.
   in). IP-specific logic, including the asynchronous APB bridge, stays in.
 - **Dead code is excluded item by item at report time.** Line and branch items
   that no stimulus can reach, because a higher-priority arm always takes the
-  case, go in `cov/config/vcs/cov_exclude.el`, which `make cov_report` passes to
+  case, and FSM transitions the FDI never makes (the bring-up controller's L1 to
+  Reset: the UCIe Adapter leaves L1 through Retrain), go in
+  `cov/config/vcs/cov_exclude.el`, which `make cov_report` passes to
   `urg -elfile` (`COV_EL=` reports without it). Each item carries its reason;
   URG's checksums drop an item whose RTL has changed, so it is reviewed again.
   Code reachable only by illegal stimulus stays a hole: illegal stimulus is out

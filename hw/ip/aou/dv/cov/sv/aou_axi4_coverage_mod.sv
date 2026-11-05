@@ -29,7 +29,10 @@ module aou_axi4_coverage_mod #(
   parameter int    ADDR_WIDTH      = 64,
   parameter int    DATA_WIDTH      = 512,
   parameter int    ID_WIDTH        = 10,
-  parameter int    MAX_OUTSTANDING = 32
+  parameter int    MAX_OUTSTANDING = 32,
+  // 0 makes "a B stall ended at the write limit" no target on this port
+  // (aou_axi4_cov_bind.sv says why for the DUT's M ports).
+  parameter bit    B_AT_MAX_TARGET = 1'b1
 ) (
   input logic                    clk,
   input logic                    rst_n,
@@ -740,7 +743,8 @@ module aou_axi4_coverage_mod #(
       bins below_max = {1'b0};
       bins at_max    = {1'b1};
     }
-    cp_b_stall_at_max_os: coverpoint b_stall_at_max_r iff (stall_done[CH_B]) {
+    cp_b_stall_at_max_os: coverpoint b_stall_at_max_r iff (stall_done[CH_B] &&
+                                                         (B_AT_MAX_TARGET || !b_stall_at_max_r)) {
       bins below_max = {1'b0};
       bins at_max    = {1'b1};
     }

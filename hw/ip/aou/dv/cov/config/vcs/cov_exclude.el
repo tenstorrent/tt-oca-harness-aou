@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //==================================================
-// VCS line and branch exclusions applied by `make cov_report` (urg -elfile), for code
+// VCS line, branch and FSM exclusions applied by `make cov_report` (urg -elfile), for code
 // that no stimulus can reach. Every item states why; DECISIONS.md D10 lists what may be
 // excluded this way. Items are keyed by URG's module and block checksums: when the RTL
 // around an item changes, URG reports the item as not applied and it must be reviewed.
@@ -46,3 +46,15 @@ ANNOTATION: "Dead since #108: a MsgCredit time-out also aborts, and the abort ar
 Branch 30 "346273100" "(~I_RESETN)" (4) "(~I_RESETN) 0,0,0,0,1"
 ANNOTATION: "Dead since #108: the MsgCredit wait counter clears whenever its flag falls"
 Branch 31 "2125709549" "(~I_RESETN)" (3) "(~I_RESETN) 0,0,0,1"
+//
+// AOU_FDI_BRINGUP_CTRL: the bring-up FSM's L1 to Reset transition. The UCIe Adapter
+// leaves L1 only through Retrain (UCIe r1.1 8.3.3, Figure 8-17; UCIe r3.0 states it as "L1
+// exit transitions the state machine through Retrain to Active", and only L2 exits through
+// Reset), so pl_state_sts never goes from L1 straight to Reset. A link loss in L1 goes to
+// LinkError, LinkReset or Disabled, which the FSM's other arms take.
+CHECKSUM: "3229915601 3559343899"
+ANNOTATION: "ModuleName: AOU_FDI_BRINGUP_CTRL"
+MODULE: AOU_FDI_BRINGUP_CTRL
+Fsm r_cur_st "3559343899"
+ANNOTATION: "UCIe has no direct L1 to Reset: the Adapter leaves L1 through Retrain"
+Transition ST_L1->ST_RESET "256->1"

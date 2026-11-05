@@ -19,13 +19,13 @@
   `B``_BIN(enabled_disabled_lr, 64 + 2 * 8 + 0, 64 + 2 * 8 + 0) \
   `B``_BIN(deactivate_disabled_lr, 64 + 3 * 8 + 0, 64 + 3 * 8 + 0) \
   `B``_TAG("*_error|error_disabled", "v0.8")
-`define AOU_L3_FC_ACT_OP(B) `B``_VALS(op, 0, 3) `B``_BIN(reserved, 4, 15)
+// A reserved op (AoU v0.8 Table 27: ops 4-15) is no target: no compliant die
+// sends one, so seeing one takes out-of-protocol stimulus.
+`define AOU_L3_FC_ACT_OP(B) `B``_VALS(op, 0, 3) `B``_IGN(reserved, 4, 15)
 `define AOU_L3_FC_LEGAL(B) `B``_BIN(illegal, 0, 0) `B``_BIN(legal, 1, 1)
-// A reserved op is never legal. The DUT sending an illegal op is AOU-R40's
-// check, so it can't happen in a passing run; ours come from the inject path.
-`define AOU_L3_FC_X_ACT_OP(B) \
-  `B``_XIGN("reserved,*,legal") \
-  `B``_XIGN("*,rx,illegal")
+// The DUT sending an illegal op is AOU-R40's check, so it can't happen in a
+// passing run; ours come from the inject path.
+`define AOU_L3_FC_X_ACT_OP(B) `B``_XIGN("*,rx,illegal")
 // Message kinds as msg_kind() numbers them.
 `define AOU_L3_FC_MSG_KIND(B) \
   `B``_BIN(wreq, 0, 0) `B``_BIN(rreq, 1, 1) \

@@ -170,7 +170,9 @@
     foreach (STALL_CPS[c]) foreach (STALL_BINS[i])
       fc_reg($sformatf("cg_bp|%s|%s", STALL_CPS[c], STALL_BINS[i]));
     foreach (ATMAX_BINS[i]) fc_reg($sformatf("cg_bp|cp_r_stall_at_max_os|%s", ATMAX_BINS[i]));
-    foreach (ATMAX_BINS[i]) fc_reg($sformatf("cg_bp|cp_b_stall_at_max_os|%s", ATMAX_BINS[i]));
+    foreach (ATMAX_BINS[i])
+      if (B_AT_MAX_TARGET || ATMAX_BINS[i] != "at_max")
+        fc_reg($sformatf("cg_bp|cp_b_stall_at_max_os|%s", ATMAX_BINS[i]));
   end
 
   // Per-cycle counting (same timing/guards as the covergroups).
@@ -232,7 +234,7 @@
       if (stall_done[c]) fc_bump($sformatf("cg_bp|%s|%s", STALL_CPS[c], fc_stall_name(stall_len_r[c])));
     if (stall_done[CH_R])
       fc_bump($sformatf("cg_bp|cp_r_stall_at_max_os|%s", ATMAX_BINS[r_stall_at_max_r]));
-    if (stall_done[CH_B])
+    if (stall_done[CH_B] && (B_AT_MAX_TARGET || !b_stall_at_max_r))
       fc_bump($sformatf("cg_bp|cp_b_stall_at_max_os|%s", ATMAX_BINS[b_stall_at_max_r]));
   end
 

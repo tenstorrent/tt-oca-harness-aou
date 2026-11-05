@@ -121,8 +121,10 @@ class aou_fdi_cov extends uvm_object;
       p = fc_fdi_stall.cp("cp_hold"); `AOU_FDI_FC_HOLD(AOU_FC_REG)
       p = fc_fdi_stall.cp("cp_where"); `AOU_FDI_FC_WHERE(AOU_FC_REG)
       p = fc_fdi_stall.cp("cp_trdy_at_req"); `AOU_FDI_FC_TRDY_AT_REQ(AOU_FC_REG)
-      void'(fc_fdi_stall.add_cross("x_where_lat", "cp_where cp_lat"));
-      void'(fc_fdi_stall.add_cross("x_where_trdy", "cp_where cp_trdy_at_req"));
+      p = fc_fdi_stall.add_cross("x_where_lat", "cp_where cp_lat");
+      `AOU_FDI_FC_X_WHERE_LAT(AOU_FC_REG)
+      p = fc_fdi_stall.add_cross("x_where_trdy", "cp_where cp_trdy_at_req");
+      `AOU_FDI_FC_X_WHERE_TRDY(AOU_FC_REG)
     end
     fc_fdi_abandon = db.group("l1.cg_fdi_abandon", fresh);
     if (fresh) begin
