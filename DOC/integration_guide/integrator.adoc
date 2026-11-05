@@ -103,13 +103,13 @@ v0.7.
 
 To achieve low latency, AOU_CORE directly handles signals related to the
 UCIe FDI interface data flow control and processes data in FDI-width
-chunks (32, 64, or 128 bytes, as selected by the [.monospaced]#++FDI_CONFIG++# parameter)
-in a cut-through manner, without converting them to 256-byte flit data.
-It receives AXI messages from its own AXI slave interface, packs them
-into FDI-width chunks, and transmits these chunks to the remote AoU
-device via UCIe. The remote AoU receives these FDI-width chunks from the
-UCIe FDI interface, unpacks them into AXI messages, and delivers the
-data through its AXI master interface. It supports flow control for all
+beats (32, 64, 128 or 256 bytes, as selected by the [.monospaced]#++FDI_CONFIG++# parameter)
+in a cut-through manner, without assembling a whole 256-byte flit first
+(the RX side works on half flits of 128 bytes). It receives AXI messages
+from its own AXI slave interface, packs them into flits transmitted as
+FDI-width beats, and sends them to the remote AoU device via UCIe. The
+remote AoU receives these beats from the UCIe FDI interface, unpacks the
+messages, and delivers the data through its AXI master interface. It supports flow control for all
 exceptional cases defined in the UCIe standard. First, it handles the
 chunk valid/cancel signal, including the alternative implementation
 method described in the UCIe specification. Second, it handles the stall
@@ -139,30 +139,37 @@ write data, read data and write response busses
 core. It has a 32bit APB interface for programming. It configures all
 the blocks in the core.
 ** AOU_TX_CORE This block packs the arbitrated AXI channels, credits,
-and activation messages into FDI-width chunks (32, 64, or 128 bytes per
-[.monospaced]#++FDI_CONFIG++#). It follows AOU specifications to pack the messages into
-256 byte flit data. It then passes it onto UCIe controller over the FDI
-interface for transmission.
+and activation messages into 256 byte flits following the AoU
+specification, and emits them in FDI-width beats (32, 64, 128 or 256
+bytes per [.monospaced]#++FDI_CONFIG++#) to AOU_TX_FDI_IF for transmission.
+AXI USER inputs are carried as the FLEX field of the messages.
 ** AOU_CRD_CTRL This block manages credits available for TX. It gets
 remote credits available from AOU_RX_CORE, and used credits from
 AOU_TX_CORE and creates final credits that can be used for TX.
-** AOU_RX_CORE This block processes FDI-width chunks (32, 64, or 128
-bytes per [.monospaced]#++FDI_CONFIG++#) received by UCIe controller and passed to the
-core over the FDI interface. It decodes different message types which
-encapsulate different AXI channel transactions. These messages are
-buffered and then passed onto AOU_CORE_RP for presenting the transaction
-to its corresponding AXI interface.
-** AOU_TX_FDI_IF This block receives FDI-width data chunks from
-AOU_TX_CORE and buffers them. It does handshake with UCIe controller FDI
-RX interface and passes the data chunks downstream to be sent to remote
-chiplet.
+** AOU_RX_CORE This block receives the FDI-width beats (32, 64, 128 or
+256 bytes per [.monospaced]#++FDI_CONFIG++#) passed by the UCIe controller over the FDI
+interface, assembles them into half flits (AOU_RX_FDI_IF, which also
+applies the UCIe flit cancel), and decodes one half flit (24 granules,
+or a whole flit of 48 at 256 B) per cycle. Requests, write responses and
+activation messages are decoded here; WriteData and ReadData granules
+are only tagged with their RP, class and message start and handed to the
+granule stores of AOU_FIFO_RP. Received credits go to AOU_CRD_CTRL.
+** AOU_TX_FDI_IF This block takes the FDI-width beats from AOU_TX_CORE,
+handshakes with the UCIe controller's FDI interface (pl_trdy, lp_valid,
+lp_irdy) and acknowledges a stall request only on a flit boundary, so
+the beats of one flit are sent together to the remote chiplet.
 ** AOU_ACT_CTRL This block manages activation and deactivation control
 of the AOU bridge. It initiates activate and deactivate messages to
 remote AOU bridge when configured via APB.
-* AOU_FIFO_RP This block buffers decoded messages from AOU_RX_CORE. It
-separates the messages based on resource plane (RP) indicator and writes
-them into dedicated FIFOs. These FIFOs feed the corresponding
-AOU_CORE_RP which manage a single AXI interface. The FIFOs are on the
+* AOU_FIFO_RP One instance per RP holds that RP's received messages
+until AOU_CORE_RP presents them on its AXI interface: register FIFOs for
+the decoded AW, AR and B messages, and one AOU_RX_GRANULE_STORE each for
+WriteData and ReadData. A granule store keeps the raw 40-bit granules
+AOU_RX_CORE tagged for it in AOU_TPSRAM banks and decodes a message into
+its AXI fields when it is popped; its depth
+([.monospaced]#++RPn_RX_W_FIFO_DEPTH++# / [.monospaced]#++RPn_RX_R_FIFO_DEPTH++#) is in granules and is
+the credit advertised for the class (xref:aou-ig-parameter-list[Section 2],
+xref:aou-ig-library-cell-replacement[Section 8.7]). The FIFOs and stores are on the
 core reset together with AOU_CORE (I_RESETN and AOU_CON0.AOU_SW_RESET,
 xref:aou-ig-reset-domains[Section 3.1.1]).
 * ASYNC_APB_BRIDGE This block synchronizes APB transactions to the local
@@ -182,11 +189,12 @@ xref:aou-ig-ucie-external-control-and-status[Section 3.12].
 ** Supports variable data widths and burst length requests. Configurable
 FIFO Depth
 * UCIe 256B latency-optimized flit(Format 6) support only
-* Message packing and unpacking are handled in variable-sized units of
-32, 64, or 128 bytes, corresponding to the FDI data width selected by
-[.monospaced]#++FDI_CONFIG++#.
+* Messages are packed into 256 B flits sent as FDI-width beats of 32,
+64, 128 or 256 bytes, corresponding to the FDI data width selected by
+[.monospaced]#++FDI_CONFIG++#; the receiver unpacks one half flit (or a whole flit at
+256 B) per cycle.
 * Selectable Early response by setting SFR8
-* Selectable 32B / 64B / 128B single-PHY and 32B+64B / 64B+128B two-PHY
+* Selectable 32B / 64B / 128B / 256B single-PHY and 32B+64B / 64B+128B two-PHY
 FDI configurations via the [.monospaced]#++FDI_CONFIG++# parameter (see
 xref:aou-ig-parameter-list[Section 2]). Two-PHY variants additionally
 require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY ports

@@ -12,24 +12,27 @@ endif::[]
 [[aou-81-performance]]
 === 8.1. Performance
 
-Performance evaluation is conducted in both 512-bit local die and 512-bit remote die environments. The initial latency is measured from the AXI input of the local AOU_CORE to the AXI output of the remote AOU_CORE.
+Latency is measured on one AOU_CORE at zero load, in AOU_CORE clock cycles, as a TX part and an RX part per AXI channel. The TX latency runs from the AXI handshake ([.monospaced]#++VALID++# and [.monospaced]#++READY++#) on the local port to [.monospaced]#++lp_valid++# of the FDI beat that carries the first granule of the message the handshake produced. The RX latency runs from [.monospaced]#++lp_valid++# of the first beat of the flit that carries the message to [.monospaced]#++VALID++# on the AXI port, with the receiving side's [.monospaced]#++READY++# held high. On a back-to-back connection the beat leaves the sending AOU_CORE and reaches the receiving AOU_CORE in the same cycle, so the end-to-end latency is the sum of the two parts; a UCIe link adds its adapter and PHY latency (Figure 29).
 
 [[table-8]]
 
-[cols=",",options="header",]
+[cols="3,3,^2,^2,^2",options="header",]
 |==========================================
-|AXI Channel |AoU Latency on B2B connection
-|Read Request (AR) |9
-|Read Data \(R) |11
-|Write Request (AW) |12
-|Write Data (W) |12
-|Write Response (B) |10
-|Misc |9
+|AXI Channel |AoU message |TX: AXI handshake to FDI |RX: FDI to AXI VALID |Back-to-back total
+|Read Request (AR) |ReadReq |3 |5 |8
+|Read Data \(R) |ReadData, 128 bytes |5 |6 |11
+|Write Request (AW) |WriteReq |3 |9 |12
+|Write Data (W) |WriteDataFull, 128 bytes |3 |9 |12
+|Write Response (B) |WriteResp |4 |5 |9
 |==========================================
 
-_Table 8. AOU_CORE Initial Latency (Cycles)_
+_Table 8. AOU_CORE Zero-Load Latency (Cycles)_
 
-The reason of two additional latency for AW and W CH is from WLAST signal generator, and data width converter.
+Conditions of the measurement: one transaction in flight at a time, each a single 128-byte beat with every strobe set; the local manager asserts [.monospaced]#++AWVALID++# and [.monospaced]#++WVALID++# in the same cycle; the remote die places a WriteReq at G0 and its WriteData at G3 of the same flit, and every other message alone at G0 of its flit. A 128-byte data message occupies both beats of the 128-byte FDI, so [.monospaced]#++WVALID++# and [.monospaced]#++RVALID++# follow the flit's second beat by 8 and 5 cycles respectively. With [.monospaced]#++WVALID++# one cycle after [.monospaced]#++AWVALID++# the TX AW latency is 4 and the others are unchanged: the WriteReq leaves 3 cycles after the later of the two handshakes.
+
+The RX write channels are longer than the read channels because [.monospaced]#++AOU_AXI_WLAST_GEN++# regenerates [.monospaced]#++WLAST++# by aligning the WriteReq with its WriteData: [.monospaced]#++AWVALID++# is asserted only once the first W beat is available, so AW follows W. On the TX side the write response takes one cycle more than a request because of the register slice on the write-response path of [.monospaced]#++AOU_AXI4MUX_3X1_TOP++#, and ReadData one more again for the read-data register slice of the transaction splitter.
+
+The measurement used [.monospaced]#++AOU_TOP++# with [.monospaced]#++RP_COUNT = 1++#, [.monospaced]#++FDI_CONFIG = FDI_CFG_SP_128B++#, [.monospaced]#++RP0_AXI_DATA_WD = 1024++#, [.monospaced]#++TX_NXT_PACKING_EN = 0++#, [.monospaced]#++RP0_S_RD_MO_CNT++# / [.monospaced]#++RP0_S_WR_MO_CNT++# / [.monospaced]#++RP0_M_RD_MO_CNT++# / [.monospaced]#++RP0_M_WR_MO_CNT++# = 32, [.monospaced]#++RP0_RX_AW_FIFO_DEPTH++# / [.monospaced]#++RP0_RX_AR_FIFO_DEPTH++# / [.monospaced]#++RP0_RX_B_FIFO_DEPTH++# = 44, [.monospaced]#++RP0_RX_W_FIFO_DEPTH++# / [.monospaced]#++RP0_RX_R_FIFO_DEPTH++# = 600 granules and [.monospaced]#++RX_AW_FIFO_RS_EN++# = [.monospaced]#++RX_AR_FIFO_RS_EN++# = [.monospaced]#++RX_B_FIFO_RS_EN++# = 1 (the defaults), with the configuration registers at their reset values: early write response and asymmetric RP mapping disabled.
 
 The TX flit packer drives the FDI data path combinationally from the granule ring by default ([.monospaced]#++TX_NXT_PACKING_EN = 0++#). With [.monospaced]#++TX_NXT_PACKING_EN = 1++# [.monospaced]#++AOU_TX_CORE++# computes each chunk from the look-ahead packing state and ring contents and registers it before the output mux.
 
@@ -181,6 +184,9 @@ ifndef::release[]
 | |2026/11/04 |Tenstorrent | |Asymmetric RP mapping (RTL PR #124): new [.monospaced]#++AOU_ASYMMETRIC_RP_PROC++# between the subordinate ports and [.monospaced]#++AOU_TX_CORE++#, new [.monospaced]#++ASYMMETRIC_RP_PROC_CON++# register at 0x0084 (reset 0x1C8, mapping disabled); several local ports may be merged onto one TX lane and remote RP, with per-port ID remapping, two-stage QoS arbitration and per-beat WriteData length ([.monospaced]#++WDLEN++#) in the W path and credit accounting (3.1, 3.2.1, 3.9, 3.10 rewritten with new 3.10.4 and 3.10.5, 7.1, 7.3.2, 7.3.6, 2.1, 2.2; integration guide 1.2.2, 2, 3.9, 6.2). The one-to-one, unique-[.monospaced]#++DEST_RP++#, smaller-RP-count rules of the former 3.10.1 hold only with the mapping disabled. [.monospaced]#++AOU_SW_RESET++# clears the mapping with the other configuration registers; a deactivation does not.
 | |2026/11/04 |Tenstorrent | |The outstanding-count parameters [.monospaced]#++S_RD_MO_CNT++#, [.monospaced]#++S_WR_MO_CNT++#, [.monospaced]#++M_RD_MO_CNT++#, [.monospaced]#++M_WR_MO_CNT++# are replaced by sixteen per-RP parameters [.monospaced]#++RPn_S_RD_MO_CNT++#, [.monospaced]#++RPn_S_WR_MO_CNT++#, [.monospaced]#++RPn_M_RD_MO_CNT++#, [.monospaced]#++RPn_M_WR_MO_CNT++# (n = 0..3) on [.monospaced]#++AOU_TOP++# (default 32) and [.monospaced]#++AOU_CORE_TOP++# (S defaults 64); the S counts also size the ID remap tables of merged routes (3.6.2, 3.7.4, 3.7.5, 7.2.2; integration guide 2).
 | |2026/11/04 |Tenstorrent | |The error information fields [.monospaced]#++SPLIT_BID/RID_MISMATCH_INFO++#, [.monospaced]#++AXI_SLV_BID/RID_MISMATCH_INFO++#, [.monospaced]#++WRITE_RESP_ERR_ID/TYPE_INFO++# and [.monospaced]#++INVALID_ACTMSG_INFO++# now hold the latest event (a further event while the error bit is set overwrites them) and are cleared by the W1C of their error bit; before, they held the first event and cleared whenever the error bit was clear (7.2.2, 7.2.3, 7.2.5). The TX core leaves low-power idle for a pending CrdtGrant message, as 7.1 already stated.
+| |2026/11/04 |Tenstorrent | |The profile registers [.monospaced]#++PROFILE_CFG_RP0..3++# and [.monospaced]#++PROFILE_RMT_RP0..3++# form a block at 0x0100 to 0x011C; they were first placed at 0x0084 to 0x00A0, the offset [.monospaced]#++ASYMMETRIC_RP_PROC_CON++# (RTL PR #124) now occupies. Offsets 0x0088 to 0x00FC are unmapped (read 0, writes ignored) and left free for later control and status registers (7.1; integration guide 3.2, 6).
+| |2026/11/05 |Tenstorrent | |RX text brought in line with the granule-store data path: 3.3 (RX_FDI_IF presents whole half flits; ReadData replication at the store; credits returned per granule), 3.4 (register FIFOs for AW/AR/B, granule stores for W/R; Figure 10 marked as the earlier register FIFO), 3.11.1 to 3.11.3 rewritten for the half-flit cancel unit and single output register. TX: 3.2 describes [.monospaced]#++AOU_TX_FDI_IF++# including the 256 B case; 3.10.4 states that AXI USER / FLEX travels through the asymmetric RP mapping. Integration guide 1.2.1 and 1.2.2 block descriptions updated for 256 B beats, [.monospaced]#++AOU_RX_FDI_IF++#, [.monospaced]#++AOU_RX_GRANULE_STORE++# and [.monospaced]#++AOU_TPSRAM++#.
+| |2026/11/05 |Tenstorrent | |Table 8 remeasured on the current RTL as a zero-load TX part (AXI handshake to the FDI beat carrying the message) and RX part (first FDI beat of the flit to AXI [.monospaced]#++VALID++#) per channel, one 1024-bit RP on a 128 B FDI, with the parameter settings and the measurement conditions stated (8.1); it replaces the end-to-end 512-bit figures.
 |======================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
 
 _Table 11. Record of Changes_

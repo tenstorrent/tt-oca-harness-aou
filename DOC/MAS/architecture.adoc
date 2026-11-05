@@ -45,6 +45,8 @@ xref:figure-3[Figure 3] shows the simplified block diagram of single RP AOU_TX_C
 
 The flit packer reads the ring in steps sized to the FDI data width: a quarter flit (12 granules) per step at 32 B and 64 B, a half flit (24 granules) at 128 B, and the whole flit (48 granules) at 256 B ([.monospaced]#++FDI_CFG_SP_256B++#, see xref:{aou-integration-xref}#aou-ig-fdi_config-values[integration guide, FDI_CONFIG values]). The one-step 256 B packer keeps the same ring and arbitration as the narrower builds, so at most the messages that enter the ring in one cycle fill a flit; a flit therefore leaves every cycle but is not filled at the link rate. Filling 256 B flits at full rate is a follow-on (GitHub issue #131).
 
+[.monospaced]#++AOU_TX_FDI_IF++# hands the packer's output to the FDI one beat per cycle, 8, 4 or 2 beats per flit at 32, 64 and 128 B, and tracks its position in the flit so that a stall request from the D2D adapter is acknowledged only on a flit boundary. At 256 B a flit is a single beat, every beat is a flit boundary and the position counter stays at zero.
+
 The Activation messages come from AOU_ACTIVATION_CTRL and are packed at granule 0 of a flit of their own, with nothing after them but the CrdtGrant that may accompany an ActivateReq or ActivateAck. The ActivateReq is the four-granule message of AoU v0.8 chapter 11: its first granule carries the opcode and the ProfileID, ProfileRev and ProfileOpt of RP0, the next three those of RP1 to RP3, taken from [.monospaced]#++PROFILE_CFG_RP0..3++# when the message is launched (read-only 0/0/0, the Basic Profile, in this design), with zeros for the RPs the build does not have. ActivateAck, DeactivateReq and DeactivateAck stay one granule; the DeactivateReq of a forced deactivation keeps the reserved bit the RTL marks it with (xref:{aou-software-xref}#aou-71-sfr-setting[Section 7.1]).
 
 [[aou-321-tx_core-qos-scheme]]
@@ -105,13 +107,13 @@ Within a merge group of the asymmetric RP mapping, each source port has an equiv
 [[figure-8]]
 image::image8.png[Figure 8. Block Diagram of AOU_RX_CORE]
 
-xref:figure-8[Figure 8] shows the simplified block diagram of AOU_RX_CORE. AOU_RX_CORE is a submodule that interfaces directly with the D2D adapter, receiving I_FDI_PL_VALID, I_FDI_PL_DATA, and I_FDI_PL_FLIT_CANCEL signals to determine the validity of incoming chunks, and unpacking messages in accordance with the AOU specification. Within RX_CORE, there is a submodule called RX_FDI_IF, which is designed to handle flit cancel as defined in the UCIe specification. This module forwards only valid chunks to the Chunk Decoder.
+xref:figure-8[Figure 8] shows the simplified block diagram of AOU_RX_CORE. AOU_RX_CORE is a submodule that interfaces directly with the D2D adapter, receiving I_FDI_PL_VALID, I_FDI_PL_DATA, and I_FDI_PL_FLIT_CANCEL signals to determine the validity of incoming beats, and unpacking messages in accordance with the AOU specification. Within RX_CORE, there is a submodule called RX_FDI_IF, which collects the FDI beats of a half flit (a whole flit at the 256 B width) and presents the half flit to the decoder only once it is complete and has not been cancelled (xref:aou-311-ucie-flit-cancel-mechanism[Section 3.11]). The figure predates the granule stores of xref:aou-34-message-fifo[Section 3.4]: the "Data FIFO" it shows for W and R is now a granule store per RP and class, fed with tagged granules rather than decoded messages.
 
 To ensure that the local die can support AXI transfers regardless of the AXI data width of the remote die, AOU_RX_CORE integrates both Downsizer and Upsizer modules internally.
 
-AOU_RX_CORE includes a splitter that can divide burst lengths so that AXI messages with any burst length from the remote die can be supported on the local bus. The AW, W, and AR messages received from the remote die are sent to the AXI Manager interface, while the B and R messages received from the remote die are directed to the AXI Subordinate interface. The R data may be smaller than the local die AXI data width depending on the ARSIZE of the corresponding AR requests, but R 4M1S FIFO duplicate values so that it is delivered to the AXI Subordinate interface with the same width as the local die AXI data width. Furthermore, the B responses corresponding to the AW and W AXI transfers issued through the Manager interface are routed into the AXI_3X1_MUX before being sent to the AOU_TX_CORE.
+AOU_RX_CORE includes a splitter that can divide burst lengths so that AXI messages with any burst length from the remote die can be supported on the local bus. The AW, W, and AR messages received from the remote die are sent to the AXI Manager interface, while the B and R messages received from the remote die are directed to the AXI Subordinate interface. The R data may be smaller than the local die AXI data width depending on the ARSIZE of the corresponding AR requests; the ReadData granule store decodes the message at the length its DLENGTH gives and replicates a narrower beat across the [.monospaced]#++AXI_PEER_DIE_MAX_DATA_WD++# bus, so that it is delivered to the AXI Subordinate interface with the same width as the local die AXI data width. Furthermore, the B responses corresponding to the AW and W AXI transfers issued through the Manager interface are routed into the AXI_3X1_MUX before being sent to the AOU_TX_CORE.
 
-As illustrated in the figure above, the granularity of data transmitted from the FIFO, whether directed to the bus or to the AXI_3X1_MUX, is conveyed to the AOU_CRD_CTRL.
+Credits are returned to AOU_CRD_CTRL as the FIFOs and stores release their storage: one credit per request or response popped from the AW, AR and B FIFOs, and one credit per granule freed when a WriteData or ReadData message is popped from its granule store (xref:aou-39-credit-controller[Section 3.9]).
 
 [caption=""]
 .Figure 9. Architecture of Chunk Decoder
@@ -129,10 +131,15 @@ The Activation messages are decoded in the same cycle. An ActivateReq is four gr
 [[aou-34-message-fifo]]
 === 3.4. Message FIFO
 
+Each RP has two kinds of RX message storage, both in [.monospaced]#++AOU_FIFO_RP++#:
+
+* *Register FIFOs* for the AW, AR and B channels (xref:figure-11[Figure 11]): the request or response is decoded by RX_CORE in the cycle it arrives and the FIFO holds the decoded AXI fields plus the 16-bit FLEX.
+* *Granule stores* ([.monospaced]#++AOU_RX_GRANULE_STORE++#) for the W and R channels: the store holds the message's raw granules in SRAM and decodes the message when it is popped. xref:figure-10[Figure 10] shows the earlier register data FIFO these replaced; the store is described below.
+
 [caption=""]
-.Figure 10. Data FIFO
+.Figure 10. Data FIFO (register implementation, replaced by the granule store)
 [[figure-10]]
-image::image10.png[Figure 10. Data FIFO]
+image::image10.png[Figure 10. Data FIFO (register implementation, replaced by the granule store)]
 
 [caption=""]
 .Figure 11. Req / Resp FIFO
@@ -649,6 +656,8 @@ Software is responsible for ensuring uniqueness and symmetry of the [.monospaced
 
 *Data width.* Ports of different AXI data widths may share a lane. Each W beat carries the width of its source port ([.monospaced]#++WDLEN++#, 256/512/1024 bits); [.monospaced]#++AOU_TX_CORE++# sends the beat as a WriteData message of that length and [.monospaced]#++AOU_TX_CRD_CTRL++# charges the lane's WriteData credit for that length, not for the width of the lane's own port. The ReadData the remote die returns has the length the request's ARSIZE asked for (xref:aou-35-data-width-converter[Section 3.5]), and the RX data path presents it at [.monospaced]#++AXI_PEER_DIE_MAX_DATA_WD++# (1024 bits), a narrower beat replicated across the bus (xref:aou-33-rx_core[Section 3.3]); the response is returned to the source port and truncated to that port's width, which holds the beat. The W and R storage of a lane is sized for the widest port of the build ([.monospaced]#++RP_AXI_DATA_WD_MAX++#) and the widest AoU data message, so a wide port may share a lane whose own port is narrow.
 
+*USER signals.* The 16-bit AXI USER inputs travel through the mapping with their channel: [.monospaced]#++AWUSER++#, [.monospaced]#++ARUSER++# and [.monospaced]#++WUSER++# of the winning port go to the lane with the request or W beat and become the FLEX field of the message (xref:aou-354-user-signals-and-the-flex-field[Section 3.5.4]), and the [.monospaced]#++BUSER++# / [.monospaced]#++RUSER++# a response carries (the received FLEX) are returned to the source port with the response.
+
 *Credits.* The ports merged onto a lane share the lane's TX credit counters, and the remote RP's RX FIFOs. The MsgCredit RP field of received headers, and the RP field of CrdtGrant messages, name a local lane, as before.
 
 *Limits.* The merged routes have the ID limits of xref:aou-3105-axi-id-handling-on-merged-routes[Section 3.10.5]. The write early response controller and the subordinate ID checker of each port work on the port's own traffic and IDs, in front of the mapping, and are not affected by it.
@@ -687,41 +696,40 @@ image::image19.png[Figure 20. UCIe Flit Cancel - Full Flit Cancel case]
 [[aou-3111-cancel-cases]]
 ==== 3.11.1. Cancel Cases
 
-The [.monospaced]#++AOU_RX_FDI_IF++# module uses the FDI [.monospaced]#++pl_valid++# and [.monospaced]#++pl_flit_cancel++# signals to determine how to handle each incoming chunk. Three cases are distinguished:
+The unit [.monospaced]#++AOU_RX_FDI_IF++# collects and cancels is the *half flit* (128 bytes, 24 granules), or the whole flit at the 256 B FDI width. A half flit is 4 FDI beats at 32 B, 2 at 64 B and 1 at 128 B; at 256 B the whole flit is one beat. The module counts the beats of the half flit in progress and uses the FDI [.monospaced]#++pl_valid++# and [.monospaced]#++pl_flit_cancel++# signals as follows:
 
-[width="100%",cols="34%,33%,33%",options="header",]
+[width="100%",cols="17%,17%,66%",options="header",]
 |=============================================================================================================================================================================================================================================
 |[.monospaced]#++pl_valid++# |[.monospaced]#++pl_flit_cancel++# |Action
-|1 |0 |*Normal*: Phase counter increments. Chunk is stored in the staging buffer.
-|1 |1 |*Retransmit / Partial Valid*: Phase counter decrements by 1. The staging buffer is re-aligned with [.monospaced]#++{zero_data, pl_data}++# and a valid pattern of [.monospaced]#++{1'b0, 1'b1}++#, replacing the previously stored partial chunk with the corrected data.
-|0 |1 |*Full Flit Cancel*: Phase counter decrements by 2. Staging buffer entries are cleared. This is the strongest rollback, discarding the entire in-progress half-flit.
+|1 |0 |*Normal*: the beat is accumulated at its position in the half flit. The last beat completes the half flit, which is presented to RX_CORE in the following cycle.
+|1 |1 |*Retransmit / Partial Valid*: the half flit completed in the previous cycle is dropped (its presentation is suppressed) and the coincident beat is taken as beat 0 of the replayed half flit.
+|0 |1 |*Full Flit Cancel*: the half flit completed in the previous cycle is dropped and the beat counter returns to 0; the next valid beat starts a new half flit.
 |=============================================================================================================================================================================================================================================
+
+In every case the cancel applies to the half flit whose last beat was received in the cycle before [.monospaced]#++pl_flit_cancel++#, which is the only half flit the module still holds. A half flit still being accumulated when a cancel arrives is restarted from beat 0 by the same rule.
 
 At the 256 B FDI width ([.monospaced]#++FDI_CFG_SP_256B++#, 2048-bit data) a flit is a single beat and the unit of cancellation is the whole flit: [.monospaced]#++pl_flit_cancel++# asserted in the cycle after a flit's beat drops that flit, which [.monospaced]#++AOU_RX_FDI_IF++# holds for exactly that cycle, and a beat coincident with the cancel is the replayed flit. This is the contract UCIe defines for a 2048-bit FDI (xref:{aou-integration-xref}#aou-ig-fdi_config-values[integration guide, FDI_CONFIG values]).
 
 [[aou-3112-rx_fdi_if-buffering]]
 ==== 3.11.2. RX_FDI_IF Buffering
 
-The [.monospaced]#++AOU_RX_FDI_IF++# module maintains a staging buffer ([.monospaced]#++r_data++#) that is [.monospaced]#++HF_PHASE_CNT++# entries deep, where [.monospaced]#++HF_PHASE_CNT = PHASE_CNT / 2++#. For the default 512-bit FDI data width, [.monospaced]#++PHASE_CNT = 4++# and [.monospaced]#++HF_PHASE_CNT = 2++#, so the staging buffer holds 2 chunk entries \-- one half-flit of data.
+[.monospaced]#++AOU_RX_FDI_IF++# holds one half flit. Beats 0 to n-2 of a half flit of n beats are accumulated in a register; when the last beat arrives the complete half flit is registered as [.monospaced]#++r_data++# with its valid bit, and that register is the module's only output stage. At 128 B (and at 256 B, where the output is a whole flit) a half flit is one beat and the accumulator is absent: the beat is simply registered.
 
-A parallel valid array ([.monospaced]#++r_data_valid++#) tracks which staging buffer entries contain valid chunk data. The output to RX_CORE is gated:
+The output to RX_CORE is gated by the cancel of the same cycle:
 
 ....
-rx_chunk_data_valid = r_data_valid[1] && !pl_flit_cancel
+O_AOU_RX_HF_VALID = r_valid && !pl_flit_cancel
+O_AOU_RX_HF_DATA  = r_data
 ....
 
-This ensures that chunk presentation is suppressed whenever [.monospaced]#++pl_flit_cancel++# is asserted, even if valid data exists in the staging buffer. Downstream, [.monospaced]#++AOU_RX_CORE++# advances its phase counter ([.monospaced]#++r_aou_rx_phase++#) only when [.monospaced]#++rx_chunk_data_valid++# is high, so cancel-suppressed cycles stall the RX phase progression without data loss.
+So a half flit is presented exactly once, in the cycle after its last beat, unless [.monospaced]#++pl_flit_cancel++# is asserted in that cycle, in which case it is never presented. RX_CORE receives only complete, uncancelled half flits and has no phase or beat state of its own: it decodes each half flit it is given in that cycle (xref:aou-33-rx_core[Section 3.3]), so a cancel costs the decoder nothing but the cancelled half flit itself.
 
 [[aou-3113-timing]]
 ==== 3.11.3. Timing
 
-Cancel handling is purely combinational on the same clock edge as the FDI input signals. No additional pipeline stages are introduced beyond the 2-entry staging buffer and the phase FSM. The latency from FDI input to valid chunk presentation at RX_CORE is therefore determined solely by the half-flit fill time under normal operation.
+Cancel handling adds no pipeline stage beyond the single output register: the cancel gates the register's valid combinationally in the cycle it is asserted. The latency from the FDI beat carrying a granule to the half flit's presentation at RX_CORE is one cycle after the half flit's last beat, that is one cycle at 128 B and 256 B, and up to one or three further cycles of fill at 64 B and 32 B for a granule in the half flit's first beat.
 
-_______________________________________________________________________________________________________________________________________________________________________________________________________
-*Note:* The [.monospaced]#++flit_packing_state++# counter (a TX-side concept in [.monospaced]#++AOU_TX_CORE++#) is unrelated to RX cancel handling. RX cancel operates entirely within [.monospaced]#++AOU_RX_FDI_IF++# using the phase counter [.monospaced]#++r_phase++#.
-_______________________________________________________________________________________________________________________________________________________________________________________________________
-
-The figures below illustrate an example of how only valid chunk data is delivered to RX_CORE. Within the design, [.monospaced]#++pl_data++#, [.monospaced]#++pl_valid++#, and [.monospaced]#++pl_flit_cancel++# are defined as part of the FDI interface. In contrast, [.monospaced]#++rx_chunk_data++# and [.monospaced]#++rx_chunk_data_valid++# represent the signals responsible for delivering valid chunks to RX_CORE.
+The figures below illustrate an example of how only valid data is delivered to RX_CORE. Within the design, [.monospaced]#++pl_data++#, [.monospaced]#++pl_valid++#, and [.monospaced]#++pl_flit_cancel++# are defined as part of the FDI interface. The figures were drawn for the earlier chunk-granular interface ([.monospaced]#++rx_chunk_data++#, [.monospaced]#++rx_chunk_data_valid++#); the current module presents whole half flits ([.monospaced]#++O_AOU_RX_HF_DATA++#, [.monospaced]#++O_AOU_RX_HF_VALID++#), but the selection of valid data they show is the same.
 
 [caption=""]
 .Figure 21. Example of selecting valid chunks for RX_CORE
