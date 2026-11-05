@@ -91,7 +91,7 @@ defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
 
 [targets.4x512-sp64]
-description = "Multi-RP behaviour (2.12) at one width"
+description = "Multi-RP behaviour (plan items 12.x) at one width"
 build_dir = "hw/ip/aou/dv/build/uvm_reg/4x512-sp64"
 work_dir = "hw/ip/aou/dv/build/uvm_reg/4x512-sp64"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=512",
@@ -105,7 +105,7 @@ defines = ["AOU_RP_COUNT=3", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1
            "AOU_RP2_DATA_W=512", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=1"]
 
 [targets.4xmix4211-sp128]
-description = "Mixed widths, every local width (2.14), 128-byte FDI"
+description = "Mixed widths, every local width (plan items 14.x), 128-byte FDI"
 build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128"
 work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
@@ -117,6 +117,13 @@ build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix2144-sp64"
 work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix2144-sp64"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=512", "AOU_RP0_DATA_W=512", "AOU_RP1_DATA_W=256",
            "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1"]
+
+[targets.2xmix41-sp128]
+description = "Two RPs, 1024 and 256 bits, on one 128-byte FDI (single PHY)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix41-sp128"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix41-sp128"
+defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=256",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=2"]
 
 [targets.1x256-sp32]
 description = "Narrowest RP and FDI (the RTL default FDI_CONFIG)"
@@ -152,6 +159,34 @@ work_dir = "hw/ip/aou/dv/build/uvm_reg/2xmix-sp64-rxf"
 defines = ["AOU_RP_COUNT=2", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=256",
            "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=1", "AOU_RX_FIFO_ALT"]
 
+[targets.1x1024-sp128]
+description = "One 1024-bit RP on a 128-byte FDI (RX latency reference, fdi-rx-plan 13)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x1024-sp128"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x1024-sp128"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=2"]
+
+[targets.1x1024-sp256]
+description = "One 1024-bit RP on a 256-byte FDI (one flit per cycle)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x1024-sp256"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x1024-sp256"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=5"]
+
+[targets.4xmix-sp256]
+description = "Mixed widths, every local width, 256-byte FDI"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix-sp256"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix-sp256"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=5"]
+
+[targets.4xmix-sp256-rxf]
+description = "4xmix-sp256 with non-default RX FIFO depths (AOU_RX_FIFO_ALT)"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix-sp256-rxf"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix-sp256-rxf"
+defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
+           "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=512", "AOU_FDI_CONFIG=5", "AOU_RX_FIFO_ALT"]
+
 [targets.1x256-sp32-assert]
 description = "1x256-sp32 with the RTL's ASSERTION_ON checks"
 build_dir = "hw/ip/aou/dv/build/uvm_reg/1x256-sp32-assert"
@@ -186,3 +221,10 @@ build_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128-assert"
 work_dir = "hw/ip/aou/dv/build/uvm_reg/4xmix4211-sp128-assert"
 defines = ["AOU_RP_COUNT=4", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=512",
            "AOU_RP2_DATA_W=256", "AOU_RP3_DATA_W=256", "AOU_FDI_CONFIG=2", "ASSERTION_ON"]
+
+[targets.1x1024-sp256-assert]
+description = "1x1024-sp256 with the RTL's ASSERTION_ON checks"
+build_dir = "hw/ip/aou/dv/build/uvm_reg/1x1024-sp256-assert"
+work_dir = "hw/ip/aou/dv/build/uvm_reg/1x1024-sp256-assert"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=5", "ASSERTION_ON"]

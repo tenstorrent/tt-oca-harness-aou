@@ -136,6 +136,10 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
   protected taken_t          taken[AOU_RP_MAX][$];     // popped while a debug read was outstanding
   protected bit              head_known[AOU_RP_MAX];   // q[r][0] is the hardware's head
   protected int unsigned     pend[AOU_RP_MAX];         // pops whose entries are still in q[r]
+  // Debug-window accesses answered per RP (0 pops, 1 reads), counted since the
+  // start of the test and never cleared: the window answers them inside the
+  // DUT, so they leave the RX FIFO without reaching the M port.
+  int unsigned dbg_done[AOU_RP_MAX][2];
   int unsigned n_overlap;      // debug reads judged with a pop in flight
   int unsigned n_behind;       // reads issued after a pop an earlier read overlapped, judged clean
 
@@ -345,6 +349,7 @@ class aou_t1_dbg_fifo_chk extends uvm_component;
     w = window_of(r, en);
     if (en && t.addr == w && t.dir != AOU_AXI_RD && pop_open[r] != 0) pop_open[r]--;
     if (t.aborted) return;
+    if (en && t.addr == w) dbg_done[r][t.dir == AOU_AXI_RD]++;
     if (!en || t.addr != w) begin
       if (t.dir == AOU_AXI_WR) begin
         wr_hist[r].push_back(t);

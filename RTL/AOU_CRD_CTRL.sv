@@ -78,9 +78,7 @@ import packet_def_pkg::*;
     parameter  RP2_AXI_DATA_WD           = 1024,
     parameter  RP3_AXI_DATA_WD           = 256,
 
-    parameter  DEC_MULTI                 = 2,
-
-    localparam  MAX_MISC_CNT             = 2,
+    parameter   MISC_LANES                = 3,     // CrdtGrant lanes from AOU_RX_CORE
 
     localparam  CNT_RP0_TX_AW_MAX_CREDIT = $clog2(RP0_TX_AW_MAX_CREDIT +1), 
     localparam  CNT_RP0_TX_AR_MAX_CREDIT = $clog2(RP0_TX_AR_MAX_CREDIT +1), 
@@ -171,33 +169,34 @@ import packet_def_pkg::*;
     input       [RP_COUNT-1:0]                  I_AOU_TX_WREQVALID,
     input       [RP_COUNT-1:0]                  I_AOU_TX_RREQVALID,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WDATAVALID,
+    input       [RP_COUNT-1:0][1:0]             I_AOU_TX_WDATA_DLENGTH,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WFDATA,
     input       [RP_COUNT-1:0]                  I_AOU_TX_RDATAVALID,
     input       [RP_COUNT-1:0][1:0]             I_AOU_TX_RDATA_DLENGTH,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WRESPVALID,
 
     //Credit Message Interface Received from the Remote Die
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0]            I_AOU_CRDTGRANT_VALID,
+    input       [MISC_LANES-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED3,
+    input       [MISC_LANES-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED2,
+    input       [MISC_LANES-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED1,
+    input       [MISC_LANES-1:0][1:0]       I_AOU_CRDTGRANT_WRESPCRED0,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED3,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED2,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED1,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RDATACRED0,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED3,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED2,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED1,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WDATACRED0,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED3,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED2,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED1,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_RREQCRED0,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED3,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED2,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED1,
+    input       [MISC_LANES-1:0][2:0]       I_AOU_CRDTGRANT_WREQCRED0,
+    input       [MISC_LANES-1:0]            I_AOU_CRDTGRANT_VALID,
     
     input       [1:0]                           I_AOU_MSGCRDT_WRESPCRED,
     input       [2:0]                           I_AOU_MSGCRDT_RDATACRED,
@@ -330,7 +329,7 @@ AOU_TX_CRD_CTRL #(
     .AXI_DATA_WD_RP2                (RP2_AXI_DATA_WD                ),
     .AXI_DATA_WD_RP3                (RP3_AXI_DATA_WD                ),
     
-    .DEC_MULTI                      (DEC_MULTI                      )
+    .MISC_LANES                     (MISC_LANES                     )
 
 ) u_aou_tx_crd_ctrl(
     .I_CLK                          (I_CLK                          ),
@@ -344,6 +343,7 @@ AOU_TX_CRD_CTRL #(
                                                                
     .I_AOU_TX_WREQVALID             (I_AOU_TX_WREQVALID             ),
     .I_AOU_TX_RREQVALID             (I_AOU_TX_RREQVALID             ),
+    .I_AOU_TX_WDATA_DLENGTH         (I_AOU_TX_WDATA_DLENGTH         ),
     .I_AOU_TX_WDATAVALID            (I_AOU_TX_WDATAVALID            ),
     .I_AOU_TX_WFDATA                (I_AOU_TX_WFDATA                ),
     .I_AOU_TX_RDATAVALID            (I_AOU_TX_RDATAVALID            ),

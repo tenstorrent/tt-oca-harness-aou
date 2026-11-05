@@ -82,8 +82,8 @@ areas:
   axi-port:
     description: Per-RP AXI S/M ports, ID checks, WLAST generation, RX FIFOs and RAMs
     files: [RTL/AOU_CORE_RP.sv, RTL/AOU_AXIMUX_1XN_SS.v, RTL/AOU_SLV_AXI_INFO.sv,
-            RTL/AOU_AXI_WLAST_GEN.v, RTL/AOU_FIFO_RP.sv, RTL/AOU_DATA_R_FIFO_NS1M_TPSRAM.sv,
-            RTL/AOU_DATA_W_FIFO_NS1M_TPSRAM.sv, RTL/AOU_TPSRAM.sv, RTL/AOU_SYNC_FIFO_NS1M.sv,
+            RTL/AOU_AXI_WLAST_GEN.v, RTL/AOU_FIFO_RP.sv, RTL/AOU_RX_GRANULE_STORE.sv,
+            RTL/AOU_TPSRAM.sv, RTL/AOU_SYNC_FIFO_NS1M.sv,
             RTL/AOU_SYNC_FIFO_NS1M_SREADY.sv, RTL/AOU_SYNC_FIFO_REG.v, RTL/AOU_FWD_RS.sv,
             RTL/AOU_REV_RS.sv, RTL/AOU_ISO_RS.sv]
   axi-convert:

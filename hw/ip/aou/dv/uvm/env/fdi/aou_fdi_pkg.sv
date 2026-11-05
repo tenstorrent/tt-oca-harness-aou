@@ -16,8 +16,8 @@ package aou_fdi_pkg;
 
   localparam int FLIT_BYTES     = 256;
   localparam int HALF_BYTES     = 128;
-  localparam int MAX_BEAT_BYTES = 128;
-  localparam int BUS_W          = 1024;
+  localparam int MAX_BEAT_BYTES = 256;
+  localparam int BUS_W          = MAX_BEAT_BYTES * 8;
 
   // UCIe pl_state_sts Active; the same value in the UCIe and RTL encodings.
   localparam logic [3:0] FDI_STS_ACTIVE = 4'h1;
@@ -46,10 +46,12 @@ package aou_fdi_pkg;
   // ---------------------------------------------------------------------------
   // Format 6 codec. Flit byte k travels on FDI byte (k mod N) of transfer
   // floor(k/N), N = beat bytes (UCIe r1.1 §8.3.1). Bytes 0-1 (Flit Header)
-  // and 126-127, 254-255 (CRC0/CRC1) belong to the Adapter.
+  // and 126-127, 254-255 (CRC0/CRC1) belong to the Adapter. At 256 B the
+  // whole flit is one beat and the cancel unit is the flit (fdi-rx-plan 1.3):
+  // beats_per_half is 1 so the half bookkeeping degenerates to one "half".
   // ---------------------------------------------------------------------------
   function automatic bit valid_beat_bytes(int unsigned n);
-    return n inside {32, 64, 128};
+    return n inside {32, 64, 128, 256};
   endfunction
 
   function automatic int unsigned beats_per_flit(int unsigned beat_bytes);
@@ -57,7 +59,12 @@ package aou_fdi_pkg;
   endfunction
 
   function automatic int unsigned beats_per_half(int unsigned beat_bytes);
-    return HALF_BYTES / beat_bytes;
+    return (beat_bytes >= FLIT_BYTES) ? 1 : HALF_BYTES / beat_bytes;
+  endfunction
+
+  // Halves per flit as the cancel unit sees them: 2 up to 128 B, 1 at 256 B.
+  function automatic int unsigned halves_per_flit(int unsigned beat_bytes);
+    return beats_per_flit(beat_bytes) / beats_per_half(beat_bytes);
   endfunction
 
   function automatic bit is_adapter_byte(int unsigned i);

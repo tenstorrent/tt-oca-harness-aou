@@ -8,6 +8,7 @@ directory. Run: python3 scripts/test_plan_status.py
 """
 
 import contextlib
+import csv
 import io
 import itertools
 import os
@@ -123,8 +124,8 @@ blocked:
 UID = itertools.count()
 
 
-def make_run(out, build, test, args, verdict=None, log=None, run_sh=True, age=3600):
-    d = os.path.join(out, build, f"{test}.rid.00.seed.1.time.x.uid.{next(UID)}")
+def make_run(out, build, test, args, verdict=None, log=None, run_sh=True, age=3600, rid="00"):
+    d = os.path.join(out, build, f"{test}.rid.{rid}.seed.1.time.x.uid.{next(UID)}")
     os.makedirs(d)
     if run_sh:
         with open(os.path.join(d, "run.sh"), "w") as fh:
@@ -272,11 +273,11 @@ class PlanStatus(unittest.TestCase):
 
     def statuses(self, *extra):
         out, _ = self.run_ps("--format", "csv", *extra)
-        return {row.split(",")[0]: row.split(",")[3] for row in out.splitlines()[1:]}
+        return {row[0]: row[3] for row in list(csv.reader(io.StringIO(out)))[1:]}
 
     def test_statuses(self):
         st = self.statuses()
-        self.assertEqual(st, {"1.1": "covered", "1.2": "covered", "1.3": "failing", "1.4": "blocked",
+        self.assertEqual(st, {"1.1": "covered", "1.2": "covered, with failures", "1.3": "failing", "1.4": "blocked",
                               "1.10": "not covered", "1.5": "merged", "1.6": "dropped"})
 
     def test_infra_plusargs_ignored(self):
@@ -303,14 +304,40 @@ class PlanStatus(unittest.TestCase):
 
     def test_markdown_summary(self):
         out, err = self.run_ps()
-        self.assertIn("| covered | 2 | 1 | 1 | 0 |", out)
-        self.assertIn("| 2.1 Link | 5 | 2 | 0 | 1 | 1 | 1 | 1 | 1 |", out)
+        self.assertIn("| covered | 1 | 1 | 0 | 0 |", out)
+        self.assertIn("| covered, with failures | 1 | 0 | 1 | 0 |", out)
+        self.assertIn("| 2.1 Link | 5 | 1 | 0 | 1 | 0 | 1 | 1 | 1 | 1 | 1 |", out)
+        self.assertIn("1 FAIL on 4x512-sp64; 1 PASS", out)
         self.assertIn("- 9.9 (rl.toml)", out)
         self.assertIn("| vcs-t1-1x512-sp64 | t_pass | +a=1 | 1 |", out)
         self.assertIn("2 unjudged", out)
         self.assertIn("1 incomplete", out)
-        self.assertIn("2 covered, 0 xfail-only, 1 failing, 1 blocked, 1 not covered", err)
+        self.assertIn("1 covered, 0 covered, with known failures, 1 covered, with failures, 0 xfail-only, "
+                      "1 failing, 1 blocked, 1 not covered", err)
         self.assertIn("t_pass +a=1 +b=2 [t1/1x512-sp64, seeds 1/2]", out)
+
+    def test_known_failures_and_rid(self):
+        with open(self.rl, "a") as fh:
+            fh.write('[[tests]]\nname = "t_k"\n')
+        with open(self.pids, "a") as fh:
+            fh.write("plan_ids:\n  t_k: '1.10'\n")
+        make_run(self.out, "vcs-t1-1x512-sp64", "t_k", "", "PASS: log\n", rid="r2")
+        make_run(self.out, "vcs-t1-4x512-sp64", "t_k", "", "XFAIL: 1 error(s), all known (#131): l\n", rid="r2")
+        out, _ = self.run_ps()
+        row = next(line for line in out.splitlines() if line.startswith("| 1.10 "))
+        self.assertIn("covered, with known failures", row)
+        self.assertIn("1 XFAIL on 4x512-sp64 (#131)", row)
+        self.assertEqual(self.statuses("--rid", "r2")["1.1"], "not covered")
+
+    def test_rid_is_whole_and_builds_filter(self):
+        with open(self.rl, "a") as fh:
+            fh.write('[[tests]]\nname = "t_k"\n')
+        with open(self.pids, "a") as fh:
+            fh.write("plan_ids:\n  t_k: '1.10'\n")
+        make_run(self.out, "vcs-t1-1x512-sp64", "t_k", "", "PASS: log\n", rid="r2.b")
+        self.assertEqual(self.statuses("--rid", "r2")["1.10"], "not covered")
+        self.assertEqual(self.statuses("--rid", "r2.b")["1.10"], "covered")
+        self.assertEqual(self.statuses("--rid", "r2.b", "--build", "vcs-t1-4x512-sp64")["1.10"], "not covered")
 
     def test_judge(self):
         log = "UVM_INFO x\n--- UVM Report Summary ---\n"
@@ -327,6 +354,7 @@ class BuildKey(unittest.TestCase):
                             ("verilator-t1-2xmix-tp64_128", ("t1", "2xmix-tp64_128")),
                             ("vcs-reg-4xmix4211-sp128-cov-fix-p", ("reg", "4xmix4211-sp128")),
                             ("vcs-t1-2x512-tp32_64-noaxi", ("t1", "2x512-tp32_64-noaxi")),
+                            ("vcs-t1-4x512-sp64-assert-axi4pc", ("t1", "4x512-sp64-assert")),
                             ("vcs-l3_unit", ("l3_unit", "")), ("vcs", ("", ""))):
             self.assertEqual(plan_status.build_key(build), want, build)
 

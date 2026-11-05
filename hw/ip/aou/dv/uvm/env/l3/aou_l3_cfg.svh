@@ -38,6 +38,12 @@ class aou_l3_cfg extends uvm_object;
   // PropertyReq of our DeactivateReq. The bench keeps it 0: v0.8 reserves the
   // bit and defines no reaction to it.
   bit                deact_prop;
+  // v0.8 Ch. 11: the ProfileID/Rev/Opt our ActivateReq announces per RP (RPs
+  // beyond rp_count send 0, the fields being reserved for an absent RP).
+  // Default 0/0/0, the Basic Profile. Informational: nothing acts on them.
+  bit [4:0]          profile_id[AOU_RP_MAX];
+  bit [4:0]          profile_rev[AOU_RP_MAX];
+  bit [15:0]         profile_opt[AOU_RP_MAX];
   // AOU_CON0.DEACTIVATE_FORCE (implementation-defined, MAS software-operation
   // 7.1): when software last started writing it while the DUT could deactivate
   // (aou_t1_force_deact_chk sets it; -1: never), and how long after that the

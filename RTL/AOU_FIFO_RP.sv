@@ -17,9 +17,15 @@
 // *****************************************************************************
 //
 //  Module     : AOU_FIFO_RP
-//  Version    : 1.00
-//  Date       : 26-02-26
+//  Version    : 2.00
+//  Date       : 26-10-29
 //  Author     : Soyoung Min, Jaeyun Lee, Hojun Lee, Kwanho Kim
+//
+//  Per-RP RX message storage: register FIFOs for WriteReq, ReadReq and
+//  WriteResp (one message per entry, fed from the AOU_RX_CORE lanes) and
+//  granule stores for WriteData/WriteDataFull and ReadData (one credit per
+//  granule, fed with the tagged granule vector). W_FIFO_DEPTH and
+//  R_FIFO_DEPTH are in granules.
 //
 // *****************************************************************************
 
@@ -31,50 +37,44 @@ module AOU_FIFO_RP
     localparam  AXI_MAX_STRB_WD             = AXI_PEER_DIE_MAX_DATA_WD/8,
     parameter   AXI_ID_WD                   = 10,
 
-    parameter   AW_AR_FIFO_WIDTH            = 10 + 64 + 8 + 3 + 1 + 4 + 3 + 4,
-    parameter   B_FIFO_WIDTH                = AXI_ID_WD + 2,
+    parameter   AW_AR_FIFO_WIDTH            = 10 + 64 + 8 + 3 + 1 + 4 + 3 + 4 + 16, // + FLEX
+    parameter   B_FIFO_WIDTH                = AXI_ID_WD + 2 + 16,                   // + FLEX
     parameter   R_FIFO_EXT_DATA_WIDTH       = AXI_ID_WD + 2 + 1,
-                
+
     parameter   AW_FIFO_DEPTH               = 44,
     parameter   AR_FIFO_DEPTH               = 44,
-    parameter   W_FIFO_DEPTH                = 88,
-    parameter   R_FIFO_DEPTH                = 88,
+    parameter   W_FIFO_DEPTH                = 600,      // granules
+    parameter   R_FIFO_DEPTH                = 600,      // granules
     parameter   B_FIFO_DEPTH                = 44,
-    
-    parameter   DEC_MULTI                   = 2,
 
-    localparam  MAX_REQ_COUNT               = 4,
-    localparam  MAX_WR_RESP_COUNT           = 12,
-    localparam  DATA_DEC_CNT                = 4,
+    parameter   G_CNT                       = 24,       // granules per decode cycle
+    localparam  G_WD                        = 40,
+    localparam  REQ_LANES                   = G_CNT/3 + 1,
+    localparam  B_LANES                     = G_CNT,
 
     parameter   AW_FWD_RS_EN                = 1,
-    parameter   W_FWD_RS_EN                 = 1,
     parameter   B_FWD_RS_EN                 = 1,
-    parameter   AR_FWD_RS_EN                = 1,
-    parameter   R_FWD_RS_EN                 = 1
+    parameter   AR_FWD_RS_EN                = 1
 )
 (
     input                                                       I_CLK,
     input                                                       I_RESETN,
 
-    input       [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                             I_WR_REQ_FIFO_SVALID,
-    input       [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]       I_WR_REQ_FIFO_SDATA,
+    input       [REQ_LANES-1:0]                                 I_WR_REQ_FIFO_SVALID,
+    input       [REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]           I_WR_REQ_FIFO_SDATA,
 
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                               I_WR_DATA_FIFO_SVALID,
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0] I_WR_DATA_FIFO_SDATA,
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                               I_WR_DATA_FIFO_WDATAF,
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_MAX_STRB_WD -1:0]         I_WR_DATA_FIFO_STRB,
+    input       [REQ_LANES-1:0]                                 I_RD_REQ_FIFO_SVALID,
+    input       [REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]           I_RD_REQ_FIFO_SDATA,
 
-    input       [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                             I_RD_REQ_FIFO_SVALID,
-    input       [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]       I_RD_REQ_FIFO_SDATA,
+    input       [B_LANES-1:0]                                   I_WR_RESP_FIFO_SVALID,
+    input       [B_LANES-1:0][B_FIFO_WIDTH-1:0]                 I_WR_RESP_FIFO_SDATA,
 
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                               I_RD_DATA_FIFO_SVALID,
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0] I_RD_DATA_FIFO_SDATA,
-    input       [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][R_FIFO_EXT_DATA_WIDTH -1:0]   I_RD_DATA_FIFO_EXT_SDATA,
-
-
-    input       [DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0]                         I_WR_RESP_FIFO_SVALID,
-    input       [DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0][B_FIFO_WIDTH-1:0]       I_WR_RESP_FIFO_SDATA,
+    input                                                       I_GRANULE_VALID,
+    input       [G_CNT-1:0][G_WD-1:0]                           I_GRANULE,
+    input       [G_CNT-1:0]                                     I_WR_DATA_COVER,
+    input       [G_CNT-1:0]                                     I_WR_DATA_START,
+    input       [G_CNT-1:0]                                     I_RD_DATA_COVER,
+    input       [G_CNT-1:0]                                     I_RD_DATA_START,
 
     input                                                       I_WR_REQ_FIFO_MREADY,
     output      [AW_AR_FIFO_WIDTH -1:0]                         O_WR_REQ_FIFO_MDATA,
@@ -85,109 +85,75 @@ module AOU_FIFO_RP
     output      [AXI_MAX_STRB_WD-1:0]                           O_WR_DATA_FIFO_MSTRB,
     output      [1:0]                                           O_WR_DATA_FIFO_MDLEN,
     output                                                      O_WR_DATA_FIFO_WDATAF,
+    output      [15:0]                                          O_WR_DATA_FIFO_MFLEX,
     output                                                      O_WR_DATA_FIFO_MVALID,
 
-   
     input                                                       I_RD_REQ_FIFO_MREADY,
     output      [AW_AR_FIFO_WIDTH -1:0]                         O_RD_REQ_FIFO_MDATA,
     output                                                      O_RD_REQ_FIFO_MVALID,
-    
+
     input                                                       I_RD_DATA_FIFO_MREADY,
     output      [AXI_PEER_DIE_MAX_DATA_WD-1:0]                  O_RD_DATA_FIFO_MDATA,
     output      [R_FIFO_EXT_DATA_WIDTH -1:0]                    O_RD_DATA_FIFO_EXT_MDATA,
     output      [1:0]                                           O_RD_DATA_FIFO_MDLEN,
+    output      [15:0]                                          O_RD_DATA_FIFO_MFLEX,
     output                                                      O_RD_DATA_FIFO_MVALID,
 
-   
     input                                                       I_WR_RESP_FIFO_MREADY,
     output      [B_FIFO_WIDTH-1:0]                              O_WR_RESP_FIFO_MDATA,
     output                                                      O_WR_RESP_FIFO_MVALID
 );
-    localparam  REQ_CNT         = (DEC_MULTI == 1) ? 6 : (DEC_MULTI == 2) ? 7 : 11;
-    localparam  DATA_FIFO_WD    = 256;
-    localparam  STRB_FIFO_WD    = DATA_FIFO_WD/8;
-    localparam  EXT_FIFO_WD     = AXI_ID_WD + 2 + 1;//RID+RRESP+RLAST
-    localparam  W_SRAM_DEPTH    = (W_FIFO_DEPTH+REQ_CNT-1)/REQ_CNT;
-    localparam  W_DATA_AW       = $clog2(W_SRAM_DEPTH);
-    localparam  R_SRAM_DEPTH    = (R_FIFO_DEPTH+REQ_CNT-1)/REQ_CNT;
-    localparam  R_DATA_AW       = $clog2(R_SRAM_DEPTH);
-
-    logic  [REQ_CNT-1:0]                                   w_wfifo_sram_rd_enb  ;
-    logic  [REQ_CNT-1:0][W_DATA_AW -1:0]                   w_wfifo_sram_rd_addr ;
-    logic  [REQ_CNT-1:0][DATA_FIFO_WD+STRB_FIFO_WD-1:0]    w_wfifo_sram_rd_data ;
-
-    logic  [REQ_CNT-1:0]                                   w_wfifo_sram_wr_enb  ;
-    logic  [REQ_CNT-1:0][W_DATA_AW-1:0]                    w_wfifo_sram_wr_addr ;
-    logic  [REQ_CNT-1:0][DATA_FIFO_WD+STRB_FIFO_WD-1:0]    w_wfifo_sram_wr_data ;   
-
-    logic  [REQ_CNT-1:0]                                   w_rfifo_sram_rd_enb  ;
-    logic  [REQ_CNT-1:0][R_DATA_AW -1:0]                   w_rfifo_sram_rd_addr ;
-    logic  [REQ_CNT-1:0][DATA_FIFO_WD+EXT_FIFO_WD-1:0]     w_rfifo_sram_rd_data ;
-
-    logic  [REQ_CNT-1:0]                                   w_rfifo_sram_wr_enb  ;
-    logic  [REQ_CNT-1:0][R_DATA_AW-1:0]                    w_rfifo_sram_wr_addr ;
-    logic  [REQ_CNT-1:0][DATA_FIFO_WD+EXT_FIFO_WD-1:0]     w_rfifo_sram_wr_data ;
-
     logic w_aw_fwd_rs_ready;
-    logic w_w_fwd_rs_ready;
     logic w_ar_fwd_rs_ready;
-    logic w_r_fwd_rs_ready;
     logic w_b_fwd_rs_ready;
 
-    logic [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                               w_wr_req_fifo_svalid;
-    logic [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]         w_wr_req_fifo_sdata;
+    logic [REQ_LANES-1:0]                           w_wr_req_fifo_svalid;
+    logic [REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]     w_wr_req_fifo_sdata;
 
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 w_wr_data_fifo_svalid;
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]   w_wr_data_fifo_sdata;
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 w_wr_data_fifo_wdataf;
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_MAX_STRB_WD -1:0]           w_wr_data_fifo_strb;
+    logic [REQ_LANES-1:0]                           w_rd_req_fifo_svalid;
+    logic [REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]     w_rd_req_fifo_sdata;
 
-    logic [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                               w_rd_req_fifo_svalid;
-    logic [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]         w_rd_req_fifo_sdata;
+    logic [B_LANES-1:0]                             w_wr_resp_fifo_svalid;
+    logic [B_LANES-1:0][B_FIFO_WIDTH-1:0]           w_wr_resp_fifo_sdata;
 
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 w_rd_data_fifo_svalid;
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]   w_rd_data_fifo_sdata;
-    logic [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][R_FIFO_EXT_DATA_WIDTH -1:0]     w_rd_data_fifo_ext_sdata;
-
-    logic [DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0]                           w_wr_resp_fifo_svalid;
-    logic [DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0][B_FIFO_WIDTH-1:0]         w_wr_resp_fifo_sdata; 
-
+//-----------------------------------------------------------------------------
+// WriteReq
+//-----------------------------------------------------------------------------
     generate
-    if(AW_FWD_RS_EN) begin
-    
-    logic   [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                             w_wr_req_fwd_rs_mvalid;
-    logic   [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]       w_wr_req_fwd_rs_mdata;              
+    if(AW_FWD_RS_EN) begin : gen_aw_rs
+
+    logic   [REQ_LANES-1:0]                         w_wr_req_fwd_rs_mvalid;
+    logic   [REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]   w_wr_req_fwd_rs_mdata;
     logic   w_aw_fwd_rs_valid;
 
         AOU_FWD_RS #(
-            .DATA_WIDTH         (DEC_MULTI*MAX_REQ_COUNT*(AW_AR_FIFO_WIDTH+1))
+            .DATA_WIDTH         (REQ_LANES*(AW_AR_FIFO_WIDTH+1))
         ) u_aou_rx_aw_fwd_rs
         (
-            .I_CLK              ( I_CLK                     ),                                          
-            .I_RESETN           ( I_RESETN                  ),                
-        
-            .I_SVALID           ( |I_WR_REQ_FIFO_SVALID     ),            
+            .I_CLK              ( I_CLK                     ),
+            .I_RESETN           ( I_RESETN                  ),
+
+            .I_SVALID           ( |I_WR_REQ_FIFO_SVALID     ),
             .I_SDATA            ( {I_WR_REQ_FIFO_SVALID, I_WR_REQ_FIFO_SDATA}),
             .O_SREADY           (),
-        
-            .I_MREADY           ( w_aw_fwd_rs_ready         ), 
-            .O_MDATA            ( {w_wr_req_fwd_rs_mvalid, w_wr_req_fwd_rs_mdata}),        
-            .O_MVALID           ( w_aw_fwd_rs_valid         )                                 
+
+            .I_MREADY           ( w_aw_fwd_rs_ready         ),
+            .O_MDATA            ( {w_wr_req_fwd_rs_mvalid, w_wr_req_fwd_rs_mdata}),
+            .O_MVALID           ( w_aw_fwd_rs_valid         )
         );
-        assign w_wr_req_fifo_svalid = w_wr_req_fwd_rs_mvalid & {(DEC_MULTI*MAX_REQ_COUNT){w_aw_fwd_rs_valid}};
+        assign w_wr_req_fifo_svalid = w_wr_req_fwd_rs_mvalid & {REQ_LANES{w_aw_fwd_rs_valid}};
         assign w_wr_req_fifo_sdata  = w_wr_req_fwd_rs_mdata;
 
-    end else begin
+    end else begin : gen_aw_direct
         assign w_wr_req_fifo_svalid = I_WR_REQ_FIFO_SVALID;
         assign w_wr_req_fifo_sdata  = I_WR_REQ_FIFO_SDATA;
-
     end
     endgenerate
 
     AOU_SYNC_FIFO_NS1M #(
         .FIFO_WIDTH                 ( AW_AR_FIFO_WIDTH                  ),
         .FIFO_DEPTH                 ( AW_FIFO_DEPTH                     ),
-        .ICH_CNT                    ( MAX_REQ_COUNT*DEC_MULTI           ),
+        .ICH_CNT                    ( REQ_LANES                         ),
         .ALWAYS_READY               ( 1                                 )
     ) u_aou_rx_aw_fifo_rp0
     (
@@ -199,148 +165,79 @@ module AOU_FIFO_RP
         .O_SREADY                   ( w_aw_fwd_rs_ready                 ),
         // read transaction
         .I_MREADY                   ( I_WR_REQ_FIFO_MREADY              ),
-        .O_MDATA                    ( O_WR_REQ_FIFO_MDATA               ), 
+        .O_MDATA                    ( O_WR_REQ_FIFO_MDATA               ),
         .O_MVALID                   ( O_WR_REQ_FIFO_MVALID              ),
-    
+
         .O_S_EMPTY_CNT              (                                   ),
         .O_M_DATA_CNT               (                                   )
-
     );
 
-    generate
-    if (W_FWD_RS_EN) begin
-
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 w_wr_data_fwd_rs_mvalid;
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]   w_wr_data_fwd_rs_mdata;
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_MAX_STRB_WD -1:0]           w_wr_data_fwd_rs_mstrb;
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 w_wr_data_fwd_rs_mwdataf;
-    
-    logic   w_w_fwd_rs_valid;
-
-        AOU_FWD_RS #(
-            .DATA_WIDTH         (DEC_MULTI*DATA_DEC_CNT*(AXI_PEER_DIE_MAX_DATA_WD+AXI_MAX_STRB_WD+1+1))
-        ) u_aou_rx_w_fwd_rs
-        (
-            .I_CLK              ( I_CLK                     ),                                          
-            .I_RESETN           ( I_RESETN                  ),                
-        
-            .I_SVALID           ( |I_WR_DATA_FIFO_SVALID     ),            
-            .I_SDATA            ( {I_WR_DATA_FIFO_SVALID, I_WR_DATA_FIFO_SDATA, I_WR_DATA_FIFO_STRB, I_WR_DATA_FIFO_WDATAF}),
-            .O_SREADY           ( ),
-        
-            .I_MREADY           ( w_w_fwd_rs_ready         ), 
-            .O_MDATA            ( {w_wr_data_fwd_rs_mvalid, w_wr_data_fwd_rs_mdata, w_wr_data_fwd_rs_mstrb, w_wr_data_fwd_rs_mwdataf}),        
-            .O_MVALID           ( w_w_fwd_rs_valid         )                                 
-    );
-        assign w_wr_data_fifo_svalid           = w_wr_data_fwd_rs_mvalid & {(DEC_MULTI*DATA_DEC_CNT){w_w_fwd_rs_valid}};                   
-        assign w_wr_data_fifo_sdata            = w_wr_data_fwd_rs_mdata;   
-        assign w_wr_data_fifo_strb             = w_wr_data_fwd_rs_mstrb;   
-        assign w_wr_data_fifo_wdataf           = w_wr_data_fwd_rs_mwdataf;
-
-    end else begin
-        assign w_wr_data_fifo_svalid           = I_WR_DATA_FIFO_SVALID          ;                   
-        assign w_wr_data_fifo_sdata            = I_WR_DATA_FIFO_SDATA           ;   
-        assign w_wr_data_fifo_strb             = I_WR_DATA_FIFO_STRB            ;   
-        assign w_wr_data_fifo_wdataf           = I_WR_DATA_FIFO_WDATAF          ;
-    end
-    endgenerate
-    
-    AOU_DATA_W_FIFO_NS1M_TPSRAM #(
-        .AXI_PEER_DIE_MAX_DATA_WD   ( AXI_PEER_DIE_MAX_DATA_WD          ),
-        .FIFO_DEPTH                 ( W_FIFO_DEPTH                      ),
-        .ICH_CNT                    ( DATA_DEC_CNT*DEC_MULTI            ),
-        .ALWAYS_READY               ( 1                                 ),
-        .DEC_MULTI                  ( DEC_MULTI                         )
-    ) u_aou_rx_w_fifo_rp0
+//-----------------------------------------------------------------------------
+// WriteData / WriteDataFull granule store
+//-----------------------------------------------------------------------------
+    AOU_RX_GRANULE_STORE #(
+        .G_CNT                      ( G_CNT                             ),
+        .DEPTH_G                    ( W_FIFO_DEPTH                      ),
+        .IS_READ                    ( 0                                 ),
+        .AXI_ID_WD                  ( AXI_ID_WD                         )
+    ) u_aou_rx_w_store
     (
         .I_CLK                      ( I_CLK                             ),
         .I_RESETN                   ( I_RESETN                          ),
-    
-        // write transaction
-        .I_SVALID                   ( w_wr_data_fifo_svalid             ),
-        .I_SDATA                    ( w_wr_data_fifo_sdata              ),
-        .I_SDATA_STRB               ( w_wr_data_fifo_strb               ),
-        .I_SDATA_WDATAF             ( w_wr_data_fifo_wdataf             ),
-        .O_SREADY                   ( w_w_fwd_rs_ready                  ),
-        
-        // read transaction
-        .I_MREADY                   ( I_WR_DATA_FIFO_MREADY             ),
-        .O_MDATA                    ( O_WR_DATA_FIFO_MDATA              ),
-        .O_MDATA_STRB               ( O_WR_DATA_FIFO_MSTRB              ),
-        .O_MDLEN                    ( O_WR_DATA_FIFO_MDLEN              ),
-        .O_MDATA_WDATAF             ( O_WR_DATA_FIFO_WDATAF             ),
-        .O_MVALID                   ( O_WR_DATA_FIFO_MVALID             ),
 
-	//SRAM Interface
-        .O_FIFO_SRAM_RD_ENB         ( w_wfifo_sram_rd_enb               ),
-        .O_FIFO_SRAM_RD_ADDR        ( w_wfifo_sram_rd_addr              ),
-        .I_FIFO_SRAM_RD_DATA        ( w_wfifo_sram_rd_data              ),
-                                                           
-        .O_FIFO_SRAM_WR_ENB         ( w_wfifo_sram_wr_enb               ),
-        .O_FIFO_SRAM_WR_ADDR        ( w_wfifo_sram_wr_addr              ),
-        .O_FIFO_SRAM_WR_DATA        ( w_wfifo_sram_wr_data              )
+        .I_SVALID                   ( I_GRANULE_VALID                   ),
+        .I_SGRANULE                 ( I_GRANULE                         ),
+        .I_SCOVER                   ( I_WR_DATA_COVER                   ),
+        .I_SSTART                   ( I_WR_DATA_START                   ),
+
+        .I_MREADY                   ( I_WR_DATA_FIFO_MREADY             ),
+        .O_MVALID                   ( O_WR_DATA_FIFO_MVALID             ),
+        .O_MDATA                    ( O_WR_DATA_FIFO_MDATA              ),
+        .O_MDLEN                    ( O_WR_DATA_FIFO_MDLEN              ),
+        .O_MFLEX                    ( O_WR_DATA_FIFO_MFLEX              ),
+        .O_MSTRB                    ( O_WR_DATA_FIFO_MSTRB              ),
+        .O_MWDATAF                  ( O_WR_DATA_FIFO_WDATAF             ),
+        .O_MEXT                     (                                   )
     );
-    
+
+//-----------------------------------------------------------------------------
+// ReadReq
+//-----------------------------------------------------------------------------
     generate
-        genvar m;
-        for ( m = 0 ; m < REQ_CNT ; m = m + 1) begin : gen_WFIFO_FAKE_SRAM
-            AOU_TPSRAM     #(
-                .RAM_DATA_WIDTH ( DATA_FIFO_WD+STRB_FIFO_WD ),
-                .RAM_ADDR_WIDTH ( W_DATA_AW                 )
-            ) u_tpsram_wdata_fifo
-            (
-                // Read Port 
-                .CLKA   (I_CLK                   ), 
-                .CENA   (w_wfifo_sram_rd_enb [m] ),  
-                .AA     (w_wfifo_sram_rd_addr[m] ), 
-                .QA     (w_wfifo_sram_rd_data[m] ),          
-            
-                // Write Port
-                .CLKB   (I_CLK                   ), 
-                .CENB   (w_wfifo_sram_wr_enb [m] ),  
-                .AB     (w_wfifo_sram_wr_addr[m] ), 
-                .DB     (w_wfifo_sram_wr_data[m] )       
-            
-            );            
-        end
-    endgenerate
-    
-    generate
-    if(AR_FWD_RS_EN) begin
-    
-    logic   [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                           w_rd_req_fwd_rs_mvalid;
-    logic   [DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]     w_rd_req_fwd_rs_mdata;              
+    if(AR_FWD_RS_EN) begin : gen_ar_rs
+
+    logic   [REQ_LANES-1:0]                         w_rd_req_fwd_rs_mvalid;
+    logic   [REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]   w_rd_req_fwd_rs_mdata;
     logic   w_ar_fwd_rs_valid;
 
         AOU_FWD_RS #(
-            .DATA_WIDTH         (DEC_MULTI*MAX_REQ_COUNT*(AW_AR_FIFO_WIDTH+1))
+            .DATA_WIDTH         (REQ_LANES*(AW_AR_FIFO_WIDTH+1))
         ) u_aou_rx_ar_fwd_rs
         (
-            .I_CLK              ( I_CLK                     ),                                          
-            .I_RESETN           ( I_RESETN                  ),                
-        
-            .I_SVALID           ( |I_RD_REQ_FIFO_SVALID     ),            
+            .I_CLK              ( I_CLK                     ),
+            .I_RESETN           ( I_RESETN                  ),
+
+            .I_SVALID           ( |I_RD_REQ_FIFO_SVALID     ),
             .I_SDATA            ( {I_RD_REQ_FIFO_SVALID, I_RD_REQ_FIFO_SDATA}),
             .O_SREADY           (),
-        
-            .I_MREADY           ( w_ar_fwd_rs_ready         ), 
-            .O_MDATA            ( {w_rd_req_fwd_rs_mvalid, w_rd_req_fwd_rs_mdata}),        
-            .O_MVALID           ( w_ar_fwd_rs_valid         )                                 
+
+            .I_MREADY           ( w_ar_fwd_rs_ready         ),
+            .O_MDATA            ( {w_rd_req_fwd_rs_mvalid, w_rd_req_fwd_rs_mdata}),
+            .O_MVALID           ( w_ar_fwd_rs_valid         )
         );
-        assign w_rd_req_fifo_svalid = w_rd_req_fwd_rs_mvalid & {(DEC_MULTI*MAX_REQ_COUNT){w_ar_fwd_rs_valid}};
+        assign w_rd_req_fifo_svalid = w_rd_req_fwd_rs_mvalid & {REQ_LANES{w_ar_fwd_rs_valid}};
         assign w_rd_req_fifo_sdata  = w_rd_req_fwd_rs_mdata;
 
-    end else begin
+    end else begin : gen_ar_direct
         assign w_rd_req_fifo_svalid = I_RD_REQ_FIFO_SVALID;
         assign w_rd_req_fifo_sdata  = I_RD_REQ_FIFO_SDATA;
-
     end
     endgenerate
 
     AOU_SYNC_FIFO_NS1M #(
-        .FIFO_WIDTH                 ( AW_AR_FIFO_WIDTH                  ),                   
+        .FIFO_WIDTH                 ( AW_AR_FIFO_WIDTH                  ),
         .FIFO_DEPTH                 ( AR_FIFO_DEPTH                     ),
-        .ICH_CNT                    ( MAX_REQ_COUNT*DEC_MULTI           ),
+        .ICH_CNT                    ( REQ_LANES                         ),
         .ALWAYS_READY               ( 1                                 )
     ) u_aou_rx_ar_fifo_rp0
     (
@@ -357,128 +254,65 @@ module AOU_FIFO_RP
 
         .O_S_EMPTY_CNT              (                                   ),
         .O_M_DATA_CNT               (                                   )
-
     );
 
-    generate
-    if (R_FWD_RS_EN) begin
-
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 w_rd_data_fwd_rs_mvalid;
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]   w_rd_data_fwd_rs_mdata;
-    logic   [DEC_MULTI-1:0][DATA_DEC_CNT-1:0][R_FIFO_EXT_DATA_WIDTH -1:0]     w_rd_data_fwd_rs_ext_mdata;
-    logic   w_r_fwd_rs_valid;
-
-        AOU_FWD_RS #(
-            .DATA_WIDTH         (DEC_MULTI*DATA_DEC_CNT*(AXI_PEER_DIE_MAX_DATA_WD+R_FIFO_EXT_DATA_WIDTH+1))
-        ) u_aou_rx_r_fwd_rs
-        (
-            .I_CLK              ( I_CLK                     ),                                          
-            .I_RESETN           ( I_RESETN                  ),                
-        
-            .I_SVALID           ( |I_RD_DATA_FIFO_SVALID     ),            
-            .I_SDATA            ( {I_RD_DATA_FIFO_SVALID, I_RD_DATA_FIFO_SDATA, I_RD_DATA_FIFO_EXT_SDATA}),
-            .O_SREADY           ( ),
-        
-            .I_MREADY           ( w_r_fwd_rs_ready         ), 
-            .O_MDATA            ( {w_rd_data_fwd_rs_mvalid, w_rd_data_fwd_rs_mdata, w_rd_data_fwd_rs_ext_mdata}),        
-            .O_MVALID           ( w_r_fwd_rs_valid         )                                 
-    );
-        assign w_rd_data_fifo_svalid           = w_rd_data_fwd_rs_mvalid & {(DEC_MULTI*DATA_DEC_CNT){w_r_fwd_rs_valid}};                   
-        assign w_rd_data_fifo_sdata            = w_rd_data_fwd_rs_mdata;   
-        assign w_rd_data_fifo_ext_sdata        = w_rd_data_fwd_rs_ext_mdata;   
-
-    end else begin
-        assign w_rd_data_fifo_svalid           = I_RD_DATA_FIFO_SVALID          ;                   
-        assign w_rd_data_fifo_sdata            = I_RD_DATA_FIFO_SDATA           ;   
-        assign w_rd_data_fifo_ext_sdata        = I_RD_DATA_FIFO_EXT_SDATA       ;   
-    end
-    endgenerate
-
-    AOU_DATA_R_FIFO_NS1M_TPSRAM #(
-        .AXI_PEER_DIE_MAX_DATA_WD   ( AXI_PEER_DIE_MAX_DATA_WD          ),
-        .EXT_FIFO_WD                ( EXT_FIFO_WD                       ), 
-        .FIFO_DEPTH                 ( R_FIFO_DEPTH                      ),
-        .ICH_CNT                    ( DATA_DEC_CNT*DEC_MULTI            ),
-        .ALWAYS_READY               ( 1                                 ),
-        .DEC_MULTI                  ( DEC_MULTI                         )
-    ) u_aou_rx_r_fifo_rp0
+//-----------------------------------------------------------------------------
+// ReadData granule store
+//-----------------------------------------------------------------------------
+    AOU_RX_GRANULE_STORE #(
+        .G_CNT                      ( G_CNT                             ),
+        .DEPTH_G                    ( R_FIFO_DEPTH                      ),
+        .IS_READ                    ( 1                                 ),
+        .AXI_ID_WD                  ( AXI_ID_WD                         )
+    ) u_aou_rx_r_store
     (
         .I_CLK                      ( I_CLK                             ),
         .I_RESETN                   ( I_RESETN                          ),
-	
-        // write transaction
-        .I_SVALID                   ( w_rd_data_fifo_svalid             ),
-        .I_SDATA                    ( w_rd_data_fifo_sdata              ),
-        .I_EXT_SDATA                ( w_rd_data_fifo_ext_sdata          ),
-        .O_SREADY                   ( w_r_fwd_rs_ready                  ),
 
-        // read transaction 
+        .I_SVALID                   ( I_GRANULE_VALID                   ),
+        .I_SGRANULE                 ( I_GRANULE                         ),
+        .I_SCOVER                   ( I_RD_DATA_COVER                   ),
+        .I_SSTART                   ( I_RD_DATA_START                   ),
+
         .I_MREADY                   ( I_RD_DATA_FIFO_MREADY             ),
-        .O_MDATA                    ( O_RD_DATA_FIFO_MDATA              ), 
-        .O_EXT_MDATA                ( O_RD_DATA_FIFO_EXT_MDATA          ),
-        .O_MDLEN                    ( O_RD_DATA_FIFO_MDLEN              ),
         .O_MVALID                   ( O_RD_DATA_FIFO_MVALID             ),
-
-	//SRAM Interface
-        .O_FIFO_SRAM_RD_ENB         ( w_rfifo_sram_rd_enb               ),
-        .O_FIFO_SRAM_RD_ADDR        ( w_rfifo_sram_rd_addr              ),
-        .I_FIFO_SRAM_RD_DATA        ( w_rfifo_sram_rd_data              ),
-                                                                          
-        .O_FIFO_SRAM_WR_ENB         ( w_rfifo_sram_wr_enb               ),
-        .O_FIFO_SRAM_WR_ADDR        ( w_rfifo_sram_wr_addr              ),
-        .O_FIFO_SRAM_WR_DATA        ( w_rfifo_sram_wr_data              ) 
+        .O_MDATA                    ( O_RD_DATA_FIFO_MDATA              ),
+        .O_MDLEN                    ( O_RD_DATA_FIFO_MDLEN              ),
+        .O_MFLEX                    ( O_RD_DATA_FIFO_MFLEX              ),
+        .O_MSTRB                    (                                   ),
+        .O_MWDATAF                  (                                   ),
+        .O_MEXT                     ( O_RD_DATA_FIFO_EXT_MDATA          )
     );
 
-     generate
-        genvar n;
-        for ( n = 0 ; n < REQ_CNT ; n = n + 1) begin : gen_RFIFO_FAKE_SRAM
-            AOU_TPSRAM     #(
-                .RAM_DATA_WIDTH ( DATA_FIFO_WD+EXT_FIFO_WD  ),
-                .RAM_ADDR_WIDTH ( R_DATA_AW                 )
-            ) u_tpsram_rdata_fifo
-            (
-                // Read Port 
-                .CLKA   (I_CLK                   ), 
-                .CENA   (w_rfifo_sram_rd_enb [n] ),  
-                .AA     (w_rfifo_sram_rd_addr[n] ), 
-                .QA     (w_rfifo_sram_rd_data[n] ),          
-            
-                // Write Port
-                .CLKB   (I_CLK                   ), 
-                .CENB   (w_rfifo_sram_wr_enb [n] ),  
-                .AB     (w_rfifo_sram_wr_addr[n] ), 
-                .DB     (w_rfifo_sram_wr_data[n] )       
-            
-            );            
-        end
-    endgenerate
-
+//-----------------------------------------------------------------------------
+// WriteResp
+//-----------------------------------------------------------------------------
     generate
-    if(B_FWD_RS_EN) begin
+    if(B_FWD_RS_EN) begin : gen_b_rs
 
-        logic [DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0] w_wr_resp_fwd_rs_mvalid;
-        logic w_b_fwd_rs_valid;
-        logic [DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0][B_FIFO_WIDTH-1:0] w_wr_resp_fwd_rs_mdata;
+        logic [B_LANES-1:0]                     w_wr_resp_fwd_rs_mvalid;
+        logic                                   w_b_fwd_rs_valid;
+        logic [B_LANES-1:0][B_FIFO_WIDTH-1:0]   w_wr_resp_fwd_rs_mdata;
 
     AOU_FWD_RS #(
-            .DATA_WIDTH         ( DEC_MULTI*MAX_WR_RESP_COUNT*(B_FIFO_WIDTH+1) )
+            .DATA_WIDTH         ( B_LANES*(B_FIFO_WIDTH+1) )
     ) u_aou_rx_b_fwd_rs
     (
-        .I_CLK              ( I_CLK                     ),                                          
-        .I_RESETN           ( I_RESETN                  ),                
-    
-        .I_SVALID           ( |I_WR_RESP_FIFO_SVALID    ),            
+        .I_CLK              ( I_CLK                     ),
+        .I_RESETN           ( I_RESETN                  ),
+
+        .I_SVALID           ( |I_WR_RESP_FIFO_SVALID    ),
         .I_SDATA            ( {I_WR_RESP_FIFO_SVALID, I_WR_RESP_FIFO_SDATA}),
         .O_SREADY           (                           ),
-    
-        .I_MREADY           ( w_b_fwd_rs_ready          ), 
-        .O_MDATA            ( {w_wr_resp_fwd_rs_mvalid, w_wr_resp_fwd_rs_mdata}),        
-        .O_MVALID           ( w_b_fwd_rs_valid          )                                
+
+        .I_MREADY           ( w_b_fwd_rs_ready          ),
+        .O_MDATA            ( {w_wr_resp_fwd_rs_mvalid, w_wr_resp_fwd_rs_mdata}),
+        .O_MVALID           ( w_b_fwd_rs_valid          )
     );
-        assign w_wr_resp_fifo_svalid = w_wr_resp_fwd_rs_mvalid & {(DEC_MULTI*MAX_WR_RESP_COUNT){w_b_fwd_rs_valid}};
+        assign w_wr_resp_fifo_svalid = w_wr_resp_fwd_rs_mvalid & {B_LANES{w_b_fwd_rs_valid}};
         assign w_wr_resp_fifo_sdata  = w_wr_resp_fwd_rs_mdata;
 
-    end else begin
+    end else begin : gen_b_direct
         assign w_wr_resp_fifo_svalid  = I_WR_RESP_FIFO_SVALID;
         assign w_wr_resp_fifo_sdata   = I_WR_RESP_FIFO_SDATA;
     end
@@ -487,7 +321,7 @@ module AOU_FIFO_RP
     AOU_SYNC_FIFO_NS1M #(
         .FIFO_WIDTH                 ( B_FIFO_WIDTH                  ),
         .FIFO_DEPTH                 ( B_FIFO_DEPTH                  ),
-        .ICH_CNT                    ( MAX_WR_RESP_COUNT*DEC_MULTI   ),
+        .ICH_CNT                    ( B_LANES                       ),
         .ALWAYS_READY               ( 1                             )
     ) u_aou_rx_b_fifo_rp0
     (
@@ -499,11 +333,11 @@ module AOU_FIFO_RP
         .O_SREADY                   ( w_b_fwd_rs_ready              ),
         // read transaction
         .I_MREADY                   ( I_WR_RESP_FIFO_MREADY         ),
-        .O_MDATA                    ( O_WR_RESP_FIFO_MDATA          ), 
+        .O_MDATA                    ( O_WR_RESP_FIFO_MDATA          ),
         .O_MVALID                   ( O_WR_RESP_FIFO_MVALID         ),
-    
+
         .O_S_EMPTY_CNT              (                               ),
         .O_M_DATA_CNT               (                               )
     );
 
-endmodule  
+endmodule

@@ -241,17 +241,20 @@ class aou_l3_agent extends uvm_component;
   // Dequeueing from the modelled RX buffer is the handover to L4a (MAS 3.9).
   task serve_write(aou_l3_wr_txn t);
     bit [1:0] bresp;
+    bit [15:0] bflex;
     aou_msg_wresp b;
     int unsigned epoch = resp_epoch;
     model.consume(t.req);
     foreach (t.beats[i]) model.consume(t.beats[i]);
-    cfg.l4a.handle_write(t.req, t.beats, bresp);
+    cfg.l4a.handle_write(t.req, t.beats, bresp, bflex);
     wait_turn(0, int'(t.req.rp), t.req.id, t.ticket, epoch);
     if (epoch != resp_epoch) return;
     b = aou_msg_wresp::type_id::create("b");
     b.rp = cfg.dest_rp[t.req.rp];
     b.id = t.req.id;
     b.resp = bresp;
+    b.flex = bflex;  // the remote subordinate's BUSER (FLEX = USER[15:0])
+    b.flex_fixed = 1'b1;
     model.send(b);
     writes_done++;
     end_turn(0, int'(t.req.rp), t.req.id);
@@ -260,9 +263,10 @@ class aou_l3_agent extends uvm_component;
   task serve_read(aou_msg_rreq rq, int unsigned t);
     bit [1023:0] data[$];
     bit [1:0] resp[$];
+    bit [15:0] flex[$];
     int unsigned epoch = resp_epoch;
     model.consume(rq);
-    cfg.l4a.handle_read(rq, data, resp);
+    cfg.l4a.handle_read(rq, data, resp, flex);
     wait_turn(1, int'(rq.rp), rq.id, t, epoch);
     if (epoch != resp_epoch) return;
     foreach (data[i]) begin
@@ -272,6 +276,8 @@ class aou_l3_agent extends uvm_component;
       d.dlength = aou_dl_for_size(rq.size);
       d.data = data[i];
       d.resp = (i < resp.size()) ? resp[i] : 2'b00;
+      d.flex = (i < flex.size()) ? flex[i] : 16'h0;  // the remote subordinate's RUSER
+      d.flex_fixed = 1'b1;
       d.last = (i == data.size() - 1);
       model.send(d);
       if (cfg.rdata_ilv && !d.last) begin

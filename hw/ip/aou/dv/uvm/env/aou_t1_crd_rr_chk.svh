@@ -8,9 +8,17 @@
 // RP the DUT owes credit to can have it back (it has held the DUT's TX until
 // the DUT dequeued everything it received), the first non-zero header
 // MsgCredits name each owed RP exactly once, and all arrive within
-// window_cycles; the checker closes the window itself. The DUT owes an RP
+// window_cycles; the checker closes the window itself. The test holds the
+// DUT's TX only once the DUT owes nothing (owes_nothing()): a header already
+// in a flit stalled on the FDI, or an RP the DUT picked for its next header
+// before the hold, would otherwise go out first after the release although it
+// was chosen before the other RPs were owed anything. The DUT owes an RP
 // what the remote model has consumed of the DUT's credit and not had back:
-// per class, the most it held since activation minus what it holds now.
+// per class, the RX FIFO's full credit (MAS 3.9, which T1-C40 checks the DUT
+// advertises once quiet) minus what the model holds now. The most the model
+// held since activation stands in where the full credit is not known; it alone
+// can miss credit the DUT still owes, since the remote die may spend credit
+// before the DUT has advertised all of it.
 // How many RPs a window owed is coverage (env.cg_crd_rr).
 class aou_t1_crd_rr_chk extends uvm_component;
   `uvm_component_utils(aou_t1_crd_rr_chk)
@@ -54,9 +62,17 @@ class aou_t1_crd_rr_chk extends uvm_component;
 
   function int unsigned owed_by_dut(int unsigned r);
     int unsigned n = 0;
-    for (int unsigned c = 0; c < AOU_CC_NUM; c++)
-      if (crd.tx_full[r][c] > crd.tx_cred[r][c]) n += crd.tx_full[r][c] - crd.tx_cred[r][c];
+    for (int unsigned c = 0; c < AOU_CC_NUM; c++) begin
+      int unsigned full = crd.tx_full[r][c];
+      if (crd.cfg != null && crd.cfg.dut_max_cred[r][c] > full) full = crd.cfg.dut_max_cred[r][c];
+      if (full > crd.tx_cred[r][c]) n += full - crd.tx_cred[r][c];
+    end
     return n;
+  endfunction
+
+  function bit owes_nothing();
+    for (int unsigned r = 0; r < n_rp; r++) if (owed_by_dut(r) != 0) return 1'b0;
+    return 1'b1;
   endfunction
 
   // Test intent: every owed credit can be returned now. Returns the number of

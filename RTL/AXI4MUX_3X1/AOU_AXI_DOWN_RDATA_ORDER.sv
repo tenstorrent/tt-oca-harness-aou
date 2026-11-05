@@ -45,6 +45,7 @@ module AOU_AXI_DOWN_RDATA_ORDER #(
     input  logic  [AXI_ID_WD-1:0]               I_AXI_RId,
     input  logic                                I_AXI_RLast,
     input  logic     [1:0]                      I_AXI_RResp,
+    input  logic     [15:0]                     I_AXI_RUser,
     input  logic     [O_DATA_WD-1:0]            I_AXI_RData,
     input  logic                                I_AXI_RValid,
     input  logic                                I_AXI_RReady,
@@ -53,6 +54,7 @@ module AOU_AXI_DOWN_RDATA_ORDER #(
     output logic                                O_ReorderBuf_MValid,
     output logic     [I_DATA_WD-1:0]            O_ReorderBuf_MData,
     output logic     [1:0]                      O_ReorderBuf_MResp,
+    output logic     [15:0]                     O_ReorderBuf_MUser,
     output logic                                O_RReadyNonBlocking,
     output logic     [AXI_ID_WD-1:0]            O_ReorderBuf_MId,
 
@@ -67,6 +69,12 @@ typedef struct  packed {
     logic [UP_WD-1:0]               burst_cnt;
     logic [((UP_N-1)*O_DATA_WD)-1:0]rdata;
     logic [1:0]                     rresp;
+    // RUSER of the transaction's first R beat. Several narrow beats become one
+    // wide beat here, and AXI defines no rule for USER under width conversion;
+    // every merged beat of the transaction carries this value, which becomes the
+    // FLEX field of its ReadData (AoU v0.8 Basic Profile: FLEX = USER[15:0]).
+    logic [15:0]                    ruser;
+    logic                           ruser_vld;
 
     logic                           pending;
     logic [RD_MO_IDX_WD-1:0]        rid_numbering;
@@ -127,6 +135,8 @@ always_ff @(posedge I_CLK or negedge I_RESETN) begin
             artable[i].burst_cnt     <= '0;
             artable[i].rdata         <= '0;
             artable[i].rresp         <= '0;
+            artable[i].ruser         <= '0;
+            artable[i].ruser_vld     <= '0;
 
             artable[i].pending       <= '0;
             artable[i].rid_numbering <= '0;
@@ -137,6 +147,8 @@ always_ff @(posedge I_CLK or negedge I_RESETN) begin
             artable[w_artable_wptr_cur].id            <= I_AXI_ArId;
             artable[w_artable_wptr_cur].burst_cnt     <= '0;
             artable[w_artable_wptr_cur].rresp         <= '0;
+            artable[w_artable_wptr_cur].ruser         <= '0;
+            artable[w_artable_wptr_cur].ruser_vld     <= '0;
             artable[w_artable_wptr_cur].rdata         <= '0;
             artable[w_artable_wptr_cur].pending       <= 1'b1;
             if (I_AXI_RValid & I_AXI_RReady & I_AXI_RLast & (I_AXI_ArId == I_AXI_RId)) begin
@@ -152,6 +164,10 @@ always_ff @(posedge I_CLK or negedge I_RESETN) begin
             end
             artable[w_artable_rptr_cur].burst_cnt        <= artable[w_artable_rptr_cur].burst_cnt + 1;
             artable[w_artable_rptr_cur].rdata            <= nxt_rdata;
+            if (~artable[w_artable_rptr_cur].ruser_vld) begin
+                artable[w_artable_rptr_cur].ruser        <= I_AXI_RUser;
+                artable[w_artable_rptr_cur].ruser_vld    <= 1'b1;
+            end
             if(&artable[w_artable_rptr_cur].burst_cnt) begin
                 artable[w_artable_rptr_cur].rresp        <= '0;
             end else begin
@@ -194,6 +210,9 @@ end
 assign O_ReorderBuf_MValid = &artable[w_artable_rptr_cur].burst_cnt;
 assign O_ReorderBuf_MData  = {I_AXI_RData, artable[w_artable_rptr_cur].rdata};
 assign O_ReorderBuf_MResp  = artable[w_artable_rptr_cur].rresp | I_AXI_RResp;
+// A merged beat leaves on narrow beat UP_N-1 of its group at the earliest and
+// UP_N >= 2, so the first beat's RUSER is always in the table before it is read.
+assign O_ReorderBuf_MUser  = artable[w_artable_rptr_cur].ruser;
 assign O_RReadyNonBlocking = ~(&artable[w_artable_rptr_cur].burst_cnt);
 assign O_ReorderBuf_MId    = artable[w_artable_rptr_cur].id;
 //------------------------------------------------------------------

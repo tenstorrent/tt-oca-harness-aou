@@ -4,7 +4,7 @@
 // T1 SV-UVM test include manifest, `include`d in module scope by tb/tb_top.sv
 // under `ifdef UVM (the harness compile-order contract: tests are not a
 // package). Thin classes on aou_base_test (ocah_test) that set aou_t1_env_cfg
-// and name a virtual sequence from aou_seq_lib_pkg (docs/ARCHITECTURE.md,
+// and name a virtual sequence from aou_seq_lib_pkg (docs/AOU_TB_ARCH.adoc,
 // "Tests"). Scenario names and plan items: testlists/.
 `include "uvm_macros.svh"
 `include "aou_macros.svh"

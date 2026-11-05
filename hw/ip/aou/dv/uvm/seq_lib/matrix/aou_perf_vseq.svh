@@ -18,14 +18,24 @@
 //          S1's one-sided windows of that side instead.
 //   drain  the remote die advertises no ReadReq credit; local reads queue in
 //          the DUT; then one grant per RP releases them (10.7)
+//   rxlat  RX per-message latency windows for aou_rx_lat_mon (fdi-rx-plan 13),
+//          on RP0 unless said: idle_* one transaction at a time, each
+//          direction and each data size the RP allows (every RX message
+//          class: WriteReq/WriteData r2l, ReadReq r2l, WriteResp l2r, ReadData
+//          l2r); stream_* 16-beat bursts back to back, one direction and
+//          size; loaded_* the same with the AXI side accepting about half the
+//          cycles (M-port AW/W/AR ready, S-port B/R ready random 0-2 cycles);
+//          mixed every RP, both directions, half writes.
 // +perf_slots=<n> sets the transactions each manager keeps outstanding
 // (default 32; see aou_perf_test).
 class aou_perf_vseq extends aou_dp_vseq;
   `uvm_object_utils(aou_perf_vseq)
 
-  aou_perf_mon mon;
-  string       mode = "bw";
-  string       scn;
+  aou_perf_mon   mon;
+  aou_rx_lat_mon rx_lat;
+  aou_tx_lat_mon tx_lat;
+  string         mode = "bw";
+  string         scn;
 
   function new(string name = "aou_perf_vseq");
     super.new(name);
@@ -37,6 +47,10 @@ class aou_perf_vseq extends aou_dp_vseq;
       `uvm_fatal(get_type_name(), "no perf_mon in config_db")
     void'($value$plusargs("perf_mode=%s", mode));
     if ($value$plusargs("perf_scn=%s", scn)) mode = "scn";
+    if (mode == "rxlat" && !uvm_config_db#(aou_rx_lat_mon)::get(null, "*", "rx_lat_mon", rx_lat))
+      `uvm_fatal(get_type_name(), "no rx_lat_mon in config_db")
+    if (mode == "rxlat")
+      void'(uvm_config_db#(aou_tx_lat_mon)::get(null, "*", "tx_lat_mon", tx_lat));
   endtask
 
   function void full_rate();
@@ -63,8 +77,79 @@ class aou_perf_vseq extends aou_dp_vseq;
     drain();
     wait_cycles(200);
     mon.open(name, one, scenario, dn, p.wr_pct);
+    if (rx_lat != null) rx_lat.open(name);
+    if (tx_lat != null) tx_lat.open(name);
     traffic(dir, n, p);
+    if (rx_lat != null) begin
+      // Let the last credits come back before the window closes.
+      drain();
+      wait_cycles(100);
+      rx_lat.close();
+      if (tx_lat != null) tx_lat.close();
+    end
     mon.close();
+  endtask
+
+  // The AXI side accepts about half the cycles: the DUT's RX stores fill.
+  function void half_rate();
+    for (int unsigned r = 0; r < cfg.n_rp; r++) begin
+      cfg.m_sub_cfg[r].timing.aw_ready.set_range(0, 2);
+      cfg.m_sub_cfg[r].timing.w_ready.set_range(0, 2);
+      cfg.m_sub_cfg[r].timing.ar_ready.set_range(0, 2);
+      cfg.s_mgr_cfg[r].timing.b_ready.set_range(0, 2);
+      cfg.s_mgr_cfg[r].timing.r_ready.set_range(0, 2);
+    end
+  endfunction
+
+  // RX latency windows (fdi-rx-plan 13): each RX message class once idle,
+  // streamed and loaded, at every data size RP0 allows; then every RP mixed.
+  task rxlat_windows(int unsigned slots);
+    int unsigned sizes[$];
+    int unsigned n_idle = num_txns;
+    int unsigned n_strm = 4 * num_txns;
+    for (int unsigned s = 5; (32 << (s - 5)) <= cfg.rp_bytes[0]; s++) sizes.push_back(s);
+    k.full_size = 1'b0;
+    // idle: one transaction at a time, single beat
+    k.lens = '{0};
+    foreach (sizes[i]) begin
+      k.sizes = '{sizes[i]};
+      window($sformatf("idle_wr_r2l_%0d", 256 << (sizes[i] - 5)), AOU_T1_R2L, n_idle,
+             prof(100, 1, 4'h1), 1'b1, "rxlat");
+      window($sformatf("idle_rd_l2r_%0d", 256 << (sizes[i] - 5)), AOU_T1_L2R, n_idle,
+             prof(0, 1, 4'h1), 1'b1, "rxlat");
+    end
+    k.sizes = '{sizes[sizes.size() - 1]};
+    window("idle_rd_r2l", AOU_T1_R2L, n_idle, prof(0, 1, 4'h1), 1'b1, "rxlat");
+    window("idle_wr_l2r", AOU_T1_L2R, n_idle, prof(100, 1, 4'h1), 1'b1, "rxlat");
+    // stream: 16-beat bursts back to back, one direction, one size
+    k.lens = '{15};
+    foreach (sizes[i]) begin
+      k.sizes = '{sizes[i]};
+      window($sformatf("stream_wr_r2l_%0d", 256 << (sizes[i] - 5)), AOU_T1_R2L, n_strm,
+             prof(100, slots, 4'h1), 1'b0, "rxlat");
+      window($sformatf("stream_rd_l2r_%0d", 256 << (sizes[i] - 5)), AOU_T1_L2R, n_strm,
+             prof(0, slots, 4'h1), 1'b0, "rxlat");
+    end
+    k.sizes = '{sizes[sizes.size() - 1]};
+    window("stream_rd_r2l", AOU_T1_R2L, n_strm, prof(0, slots, 4'h1), 1'b0, "rxlat");
+    window("stream_wr_l2r", AOU_T1_L2R, n_strm, prof(100, slots, 4'h1), 1'b0, "rxlat");
+    // loaded: the same streams with the AXI side accepting about half the cycles
+    half_rate();
+    foreach (sizes[i]) begin
+      k.sizes = '{sizes[i]};
+      window($sformatf("loaded_wr_r2l_%0d", 256 << (sizes[i] - 5)), AOU_T1_R2L, n_strm,
+             prof(100, slots, 4'h1), 1'b0, "rxlat");
+      window($sformatf("loaded_rd_l2r_%0d", 256 << (sizes[i] - 5)), AOU_T1_L2R, n_strm,
+             prof(0, slots, 4'h1), 1'b0, "rxlat");
+    end
+    k.sizes = '{sizes[sizes.size() - 1]};
+    window("loaded_rd_r2l", AOU_T1_R2L, n_strm, prof(0, slots, 4'h1), 1'b0, "rxlat");
+    window("loaded_wr_l2r", AOU_T1_L2R, n_strm, prof(100, slots, 4'h1), 1'b0, "rxlat");
+    full_rate();
+    // mixed: every RP, both directions, half writes, the bus width
+    k.full_size = 1'b1;
+    k.sizes.delete();
+    window("mixed", AOU_T1_BOTH_DIRS, n_strm, prof(50, slots, 4'hF), 1'b0, "rxlat");
   endtask
 
   // Periods of window w's pattern: +perf_n, or enough that every link that
@@ -174,6 +259,7 @@ class aou_perf_vseq extends aou_dp_vseq;
         window("lat_rd_r2l", AOU_T1_R2L, num_txns, prof(0, 1, 4'h1), 1'b1, "lat");
       end
       "scn": run_scenario(scn, slots);
+      "rxlat": rxlat_windows(slots);
       "bw": begin
         void'($value$plusargs("perf_dir=%s", pd));
         // S1's both-sides windows are the ones without a direction suffix.

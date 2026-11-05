@@ -4,7 +4,7 @@
 // One 256B Format 6 flit. For driving it carries a cancel plan per 128B half
 // and idle gaps; the monitor fills in what it observed.
 //
-// Cancel plan (UCIe r1.1 §8.2.5, Synopsys FDI notes §3.3):
+// Cancel plan (UCIe r1.1 §8.2.5):
 //   cancel_h0 only        H0 (cancelled), H0, H1
 //   cancel_h0 and h1      H0 (cancelled), H1 (cancelled), H0, H1
 //   cancel_h1 only        H0, H1 (cancelled), then either
@@ -53,6 +53,7 @@ class aou_flit_item extends uvm_sequence_item;
   int unsigned          gap_before;     // idle cycles since the previous flit
   time                  t_start;
   time                  t_end;
+  time                  t_beat[FLIT_BYTES/32];  // each beat's transfer (index: beat)
 
   function new(string name = "aou_flit_item");
     super.new(name);
@@ -66,6 +67,7 @@ class aou_flit_item extends uvm_sequence_item;
 
   function void put_beat(int unsigned beat_bytes, int unsigned idx, aou_fdi_beat_t b);
     for (int unsigned i = 0; i < beat_bytes; i++) data[idx*beat_bytes + i] = b[8*i +: 8];
+    if (idx < FLIT_BYTES/32) t_beat[idx] = $time;
   endfunction
 
   function void clear();

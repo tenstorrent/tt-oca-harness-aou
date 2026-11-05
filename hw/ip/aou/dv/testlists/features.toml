@@ -3,7 +3,7 @@
 
 schema_version = 1
 
-# Features (stream F).
+# Features.
 #
 # Feature tests: aggregator, early BRESP, splitting, QoS modes, DEST_RP, TX LP
 # mode and the rest. TB=t1. Width bypass (14.8) runs as an aou_dp_size_test entry.

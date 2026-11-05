@@ -3,13 +3,13 @@
 
 schema_version = 1
 
-# Configuration matrix (stream J).
+# Configuration matrix.
 #
-# Configuration matrix (stream J): multi-RP (plan 2.12), data width conversion
-# (2.14) and performance data (2.10) on the CONFIGs of docs/ARCHITECTURE.md. TB=t1.
+# Configuration matrix: multi-RP (plan items 12.x), data width conversion
+# (14.x) and performance data (10.x) on every CONFIG of aou_sim_cfg.toml. TB=t1.
 # The latency and drain performance runs pass when they produced their data;
 # scripts/perf_report.py tabulates perf.txt. The gated bandwidth scenarios
-# (plan 10.1-10.3, 10.8, 10.10-10.13) are in perf.yaml.
+# (plan 10.1-10.3, 10.8, 10.10-10.13) are in perf.toml.
 #
 # Scenario -> test-plan items: plan_ids.yaml. Scenario names are unique across
 # every list all.toml includes; a name carries the plusargs, target or area only
@@ -475,6 +475,15 @@ run_modes = ["matrix"]
 args = ["+perf_mode=drain", "+aou_config=1x512-sp64"]
 
 [[tests]]
+name = "aou_perf_test.perf_mode-rxlat.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+aou_config=1x512-sp64"]
+
+[[tests]]
 name = "aou_perf_test.perf_mode-lat.4x512-sp64"
 module = { uvm = "aou_perf_test" }
 target = "4x512-sp64"
@@ -491,6 +500,15 @@ seed = 1
 tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+perf_mode=drain", "+aou_config=4x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.4x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "4x512-sp64"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+aou_config=4x512-sp64"]
 
 [[tests]]
 name = "aou_perf_test.perf_mode-lat.4xmix4211-sp128"
@@ -518,6 +536,15 @@ seed = 1
 tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+perf_mode=drain", "+aou_config=4xmix4211-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.4xmix4211-sp128"
+module = { uvm = "aou_perf_test" }
+target = "4xmix4211-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+aou_config=4xmix4211-sp128"]
 
 [[tests]]
 name = "aou_perf_test.perf_mode-drain.4xmix2144-sp64"
@@ -793,6 +820,201 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+st_bp=all"]
 
+# 1x1024-sp128: the single-RP 128 B latency reference (docs/fdi-rx-plan.md 13.2);
+# the latency and drain perf windows alongside 4xmix4211-sp128's.
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.1x1024-sp128"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=1x1024-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.1x1024-sp128"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=1x1024-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.1x1024-sp128"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+aou_config=1x1024-sp128"]
+
+# Zero-load latency reference (MAS Table 8): the remote die packs one message per flit
+# at G0 (a WriteReq with its WriteData), the local manager drives AW and W in the same
+# cycle; txlat.idle_* (AXI handshake to the FDI beat carrying the message) and
+# rxlat_first.idle_* (flit first beat to AXI VALID) are the table's columns.
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+perf_l3_one_msg=1", "+perf_w_before_aw=1", "+aou_config=1x1024-sp128"]
+
+# 256 B FDI (FDI_CONFIG 5): one flit per cycle into the RX decoder (48 granules),
+# whole-flit cancel, the one-message-per-cycle TX packer (docs/fdi-rx-plan.md 7).
+# Packing across flits, cancels, random traffic both ways, back-pressure, the
+# perf windows, mixed widths with every remote width, credit round-robin, and the
+# -rxf depths (credit math in granules, partial SRAM words).
+
+[[tests]]
+name = "aou_pack_test.pk-crossflit.1x1024-sp256"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=crossflit"]
+
+[[tests]]
+name = "aou_pack_test.pk-mixed.1x1024-sp256"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=mixed"]
+
+[[tests]]
+name = "aou_pack_test.pk-full.1x1024-sp256"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=full"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.1x1024-sp256"
+module = { uvm = "aou_dp_random_test" }
+target = "1x1024-sp256"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both", "+l1_cancel_pct=40", "+l1_cancel_mix=1"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-all.1x1024-sp256"
+module = { uvm = "aou_stress_test" }
+target = "1x1024-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+st_bp=all"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-lat.1x1024-sp256"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp256"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=lat", "+aou_config=1x1024-sp256"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-drain.1x1024-sp256"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp256"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=drain", "+aou_config=1x1024-sp256"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.1x1024-sp256"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp256"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+aou_config=1x1024-sp256"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.4xmix-sp256"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-crd_rr.4xmix-sp256"
+module = { uvm = "aou_mrp_test" }
+target = "4xmix-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=crd_rr"]
+
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.4xmix-sp256"
+module = { uvm = "aou_perf_test" }
+target = "4xmix-sp256"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+aou_config=4xmix-sp256"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-32_64_128_32.4xmix-sp256"
+module = { uvm = "aou_dw_test" }
+target = "4xmix-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=32,64,128,32"]
+
+[[tests]]
+name = "aou_dw_test.remote_bytes-128_128_64_64.4xmix-sp256"
+module = { uvm = "aou_dw_test" }
+target = "4xmix-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+remote_bytes=128,128,64,64"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.4xmix-sp256-rxf"
+module = { uvm = "aou_dp_random_test" }
+target = "4xmix-sp256-rxf"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-all.4xmix-sp256-rxf"
+module = { uvm = "aou_stress_test" }
+target = "4xmix-sp256-rxf"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+st_bp=all"]
+
 # 12.20: local and remote RP_COUNT differ; traffic on the RPs both dies have
 # (T1-M01: the others carry no AXI message; AOU-R14/AOU-R24 on the smaller count).
 [[tests]]
@@ -835,7 +1057,7 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+remote_rp_count=3"]
 
-# Width pairings (plan 2.14): every DUT RP width against every remote RP width
+# Width pairings (plan items 14.x): every DUT RP width against every remote RP width
 # (256, 512, 1024), the remote's set per run with +remote_bytes. The 4xmix
 # builds carry all three DUT widths; aou_dw_test sends every size up to each
 # requester's width both ways (narrower requests included), and aou_split_test
@@ -1078,7 +1300,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 105
+expected_count = 127
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1131,11 +1353,14 @@ tests = [
   "aou_dw_test.remote_bytes-32_64_128_64",
   "aou_perf_test.perf_mode-lat.1x512-sp64",
   "aou_perf_test.perf_mode-drain.1x512-sp64",
+  "aou_perf_test.perf_mode-rxlat.1x512-sp64",
   "aou_perf_test.perf_mode-lat.4x512-sp64",
   "aou_perf_test.perf_mode-drain.4x512-sp64",
+  "aou_perf_test.perf_mode-rxlat.4x512-sp64",
   "aou_perf_test.perf_mode-lat.4xmix4211-sp128",
   "aou_perf_test.perf_mode-lat.4xmix2144-sp64",
   "aou_perf_test.perf_mode-drain.4xmix4211-sp128",
+  "aou_perf_test.perf_mode-rxlat.4xmix4211-sp128",
   "aou_perf_test.perf_mode-drain.4xmix2144-sp64",
   "aou_perf_test.perf_mode-lat.1x256-sp32",
   "aou_perf_test.perf_mode-drain.1x256-sp32",
@@ -1185,11 +1410,30 @@ tests = [
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix4211-sp128",
   "aou_dw_test.remote_bytes-32_128_64_32.remote_wreq-dut_like",
   "aou_dw_test.remote_bytes-128.remote_wreq-dut_like.4xmix2144-sp64",
+  "aou_perf_test.perf_mode-lat.1x1024-sp128",
+  "aou_perf_test.perf_mode-drain.1x1024-sp128",
+  "aou_perf_test.perf_mode-rxlat.1x1024-sp128",
+  "aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128",
+  "aou_pack_test.pk-crossflit.1x1024-sp256",
+  "aou_pack_test.pk-mixed.1x1024-sp256",
+  "aou_pack_test.pk-full.1x1024-sp256",
+  "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.1x1024-sp256",
+  "aou_stress_test.st_bp-all.1x1024-sp256",
+  "aou_perf_test.perf_mode-lat.1x1024-sp256",
+  "aou_perf_test.perf_mode-drain.1x1024-sp256",
+  "aou_perf_test.perf_mode-rxlat.1x1024-sp256",
+  "aou_mrp_test.mrp_scn-interleave.4xmix-sp256",
+  "aou_mrp_test.mrp_scn-crd_rr.4xmix-sp256",
+  "aou_perf_test.perf_mode-rxlat.4xmix-sp256",
+  "aou_dw_test.remote_bytes-32_64_128_32.4xmix-sp256",
+  "aou_dw_test.remote_bytes-128_128_64_64.4xmix-sp256",
+  "aou_dp_random_test.dp_dir-both.4xmix-sp256-rxf",
+  "aou_stress_test.st_bp-all.4xmix-sp256-rxf",
 ]
 
 # The nine DUT x remote RP width pairings, both directions, narrower requests,
 # the downsizer with the splitter and every legal remote write sizing
-# (triage record of the width matrix; plan 2.14, 15.17).
+# (triage record of the width matrix; plan items 14.x, 15.17).
 [[groups]]
 name = "width_pairs"
 expected_count = 35

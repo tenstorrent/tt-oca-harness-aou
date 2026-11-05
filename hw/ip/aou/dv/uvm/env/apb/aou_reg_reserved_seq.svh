@@ -4,7 +4,8 @@
 // Reserved bits and unmapped offsets.
 //  REG-R06: writing 1s to a register's reserved bits leaves them reading 0 and
 //           changes no other field.
-//  REG-R07: writes to unmapped offsets in the decoded window change no register.
+//  REG-R07: writes to unmapped offsets in the decoded window (inside the map and
+//           above it) change no register.
 class aou_reg_reserved_seq extends aou_reg_base_seq;
   `uvm_object_utils(aou_reg_reserved_seq)
 
@@ -31,6 +32,14 @@ class aou_reg_reserved_seq extends aou_reg_base_seq;
       check_reg(regs[i], "", "after clearing the reserved bits");
     end
 
+    // Every unmapped word inside the map (the gap below the profile block),
+    // the first word past the map, the last word of the window and random
+    // words in between.
+    for (bit [31:0] a = 0; a < map_end; a += 4) begin
+      bit mapped = 0;
+      foreach (regs[i]) if (32'(regs[i].get_address()) == a) mapped = 1;
+      if (!mapped) holes.push_back(a);
+    end
     holes.push_back(map_end);
     holes.push_back(window - 4);
     repeat (n_holes) holes.push_back($urandom_range(window - 4, map_end) & ~32'h3);

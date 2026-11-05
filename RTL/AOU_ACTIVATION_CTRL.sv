@@ -37,6 +37,12 @@ module AOU_ACTIVATION_CTRL
     input   [3:0]   I_ACTMSG_ACTIVATION_OP          ,
     input           I_ACTMSG_PROPERTYREQ            ,
     input           I_ACTMSG_VALID                  ,
+    // ProfileID/Rev/Opt per RP of the received ActivateReq (AoU v0.8), and the
+    // strobe that stores them in the SFR (PROFILE_RMT_RPn): an ActivateReq this
+    // FSM accepts, i.e. the same one it answers with an ActivateAck.
+    input   [3:0][25:0] I_ACTMSG_PROFILE            ,
+    output  [3:0][25:0] O_PROFILE_RMT               ,
+    output          O_PROFILE_RMT_WE                ,
     
     //output Activation message
     output  [3:0]   O_ACTMSG_ACTIVATION_OP          ,
@@ -149,6 +155,8 @@ logic       w_fdi_link_fell;
 logic       w_act_req_pending;
 logic       w_fdi_link_lost;
 logic       w_fsm_abort;
+logic       w_deact_done;
+logic       w_act_req_invalid_st;
 
 assign      w_activate_en   = ((r_cur_st == DISABLED) | (r_cur_st == ACTIVATE  )) & ~(r_tx_activate_req | ((O_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & O_ACTMSG_VALID))
                             & ~(r_lp_linkerror_pending | w_lp_linkerror_start);
@@ -247,6 +255,16 @@ assign w_act_req_pending   = r_tx_activate_req | r_rx_activate_req
                            | ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID);
 assign w_fdi_link_lost     = w_fdi_link_fell & ((r_cur_st != DISABLED) | w_act_req_pending);
 assign w_fsm_abort         = w_lp_linkerror_start | w_fdi_link_fell;
+
+// The deactivation handshake is complete (the DEACTIVATE -> DISABLED condition
+// below) but the state register has not moved yet. The peer is DISABLED as soon
+// as it has sent its DeactivateAck and may put an ActivateReq in the very next
+// flit (AoU v0.8 8.4); at the 256 B FDI width that flit arrives one cycle after
+// the Ack, while r_cur_st still reads DEACTIVATE. Such an ActivateReq is valid,
+// so for the ActivateReq checks this cycle counts as DISABLED.
+assign w_deact_done         = (r_cur_st == DEACTIVATE) & r_tx_deactivate_req & r_rx_deactivate_req
+                            & r_tx_deactivate_ack & r_rx_deactivate_ack;
+assign w_act_req_invalid_st = (r_cur_st == ENABLED) | ((r_cur_st == DEACTIVATE) & ~w_deact_done);
 assign O_INT_FDI_LINK_DOWN = w_fdi_link_lost;
 
 //-------------------------------------------------------------
@@ -337,7 +355,8 @@ end
 //handshake (a request) or complete the next one early (an Ack). The one-cycle
 //abort comes with a LinkReset request or a lost link, so software resets the
 //core before the next session; a message accepted in that cycle is lost.
-//An ActivateReq in ENABLED or DEACTIVATE is the invalid message that requests
+//An ActivateReq in ENABLED or DEACTIVATE (handshake not yet complete,
+//w_act_req_invalid_st) is the invalid message that requests
 //LinkReset (w_activate_related1 sends it no Ack); it must not be remembered
 //either, or the FSM, DISABLED by that error, would re-enter ACTIVATE on it.
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
@@ -346,7 +365,7 @@ always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     end else if (w_fsm_abort) begin
         r_rx_activate_req <= 1'b0;
     end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID
-                 & ~((r_cur_st == ENABLED) | (r_cur_st == DEACTIVATE))) begin
+                 & ~w_act_req_invalid_st) begin
         r_rx_activate_req <= 1'b1;
     end else if (w_activate_reg_clear) begin
         r_rx_activate_req <= 1'b0;
@@ -446,8 +465,14 @@ assign  w_deactivate_related0    = w_deactivate_start_rising_edge_detect | w_dea
 //An ActivateReq in ENABLED or DEACTIVATE is an invalid activation message (ERROR in
 //AoU v0.8 8.3.3, nothing transmitted, 8.4): no ActivateAck, only the LinkReset request
 assign  w_activate_related1      = (I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID
-                                 & ~((r_cur_st == ENABLED) | (r_cur_st == DEACTIVATE));
+                                 & ~w_act_req_invalid_st;
 assign  w_deactivate_related1    = (I_ACTMSG_ACTIVATION_OP == DEACTIVATE_REQ) & I_ACTMSG_VALID;
+
+// The peer's announced profile travels to the SFR with the accepted ActivateReq;
+// an ActivateReq rejected above (ENABLED, mid-DEACTIVATE) leaves the stored
+// values alone.
+assign  O_PROFILE_RMT            = I_ACTMSG_PROFILE;
+assign  O_PROFILE_RMT_WE         = w_activate_related1;
 
 //svalid 0 is for ACTIVATE_REQ & DEACTIVATE_REQ
 //svalid 1 is for ACTIVATE_ACK & DEACTIVATE_ACK
@@ -636,7 +661,7 @@ always_comb begin
             end
         end
         DEACTIVATE : begin
-            if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID) begin
+            if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_REQ) & I_ACTMSG_VALID & ~w_deact_done) begin
                 w_invalid_msgtype = 1'b1;
             end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID) begin
                 w_invalid_msgtype = 1'b1;

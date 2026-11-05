@@ -73,6 +73,15 @@ class aou_t1_early_tbl_chk extends uvm_component;
     return rg != null && rg.get_field_by_name("early_bresp_en").get_mirrored_value() != 0;
   endfunction
 
+  // WRITE_EARLY_RESPONSE_RPr.EARLY_ALWAYS_EN (register mirror): every
+  // non-exclusive write is answered early, bufferable or not.
+  function bit always_en(int unsigned r);
+    uvm_reg rg;
+    if (rm == null) return 1'b0;
+    rg = rm.get_reg_by_name($sformatf("write_early_response_rp%0d", r));
+    return rg != null && rg.get_field_by_name("early_always_en").get_mirrored_value() != 0;
+  endfunction
+
   // Entries RP r's early table holds (a lower bound, see the header); 0 while
   // EARLY_BRESP_EN is clear, when the table is a pass-through (MAS 3.7.5).
   function int unsigned held(int unsigned r);

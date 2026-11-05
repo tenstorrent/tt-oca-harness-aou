@@ -84,6 +84,10 @@ class aou_pack_stats extends uvm_component;
     if ($cast(a, m)) bump(d, "act");
     if ($cast(g, m)) bump(d, "crdt");
     if (m.cred_class() != AOU_CC_NONE && m.flex[11:0] != 0) bump(d, "prof");
+    // Data messages by start granule: the half-flit edges (23, 47) are the
+    // tagger's carry cases.
+    if (m.msg_type inside {AOU_MT_WDATA, AOU_MT_WDATAF, AOU_MT_RDATA})
+      bump(d, $sformatf("data_start_g%0d", m.start_granule));
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -115,6 +119,7 @@ class aou_pack_stats extends uvm_component;
       aou_msg q[$] = msgs[d][f];
       bit has_wreq, has_rreq, has_wresp;
       int unsigned n_wresp = 0;
+      int unsigned n_wreq_h[2] = '{0, 0};
       int unsigned misc_h[2] = '{0, 0};
       int rp0 = -1;
       bit multi = 1'b0;
@@ -122,7 +127,10 @@ class aou_pack_stats extends uvm_component;
       bit carry = 1'b0;
       foreach (q[i]) begin
         int sg = q[i].start_granule;
-        if (q[i].msg_type == AOU_MT_WREQ) has_wreq = 1'b1;
+        if (q[i].msg_type == AOU_MT_WREQ) begin
+          has_wreq = 1'b1;
+          n_wreq_h[sg / AOU_HALF_G]++;
+        end
         if (q[i].msg_type == AOU_MT_RREQ) has_rreq = 1'b1;
         if (q[i].msg_type == AOU_MT_WRESP) begin has_wresp = 1'b1; n_wresp++; end
         if (q[i].msg_type == AOU_MT_MISC) misc_h[sg / AOU_HALF_G]++;
@@ -148,6 +156,7 @@ class aou_pack_stats extends uvm_component;
       end
       if (occ[f] == '1 && !spans_out.exists(f)) bump(d, "full");
       keep_max(d, "wresp_max", n_wresp);
+      keep_max(d, "wreq_half_max", (n_wreq_h[0] > n_wreq_h[1]) ? n_wreq_h[0] : n_wreq_h[1]);
       if (multi) bump(d, "multi_rp");
       if (misc_h[0] >= 2 || misc_h[1] >= 2) bump(d, "misc2_half");
     end

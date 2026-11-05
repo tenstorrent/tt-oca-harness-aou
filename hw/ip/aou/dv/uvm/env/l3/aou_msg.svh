@@ -12,6 +12,9 @@ class aou_msg extends uvm_sequence_item;
   bit [3:0]      msg_type;
   bit [1:0]      rp;          // wire RP field: the destination plane
   bit [15:0]     flex;        // v0.7 {PROFEXTLEN, PROF}; v0.8 FLEX
+  // The sender chose flex (the remote manager's AXI USER, the remote
+  // subordinate's BUSER/RUSER): the packer's random FLEX leaves it alone.
+  bit            flex_fixed;
   aou_spec_rev_e spec_rev = AOU_SPEC_V07;
 
   // Where the message travelled, filled by the packer or unpacker.
@@ -126,6 +129,7 @@ class aou_msg extends uvm_sequence_item;
     msg_type = r.msg_type;
     rp = r.rp;
     flex = r.flex;
+    flex_fixed = r.flex_fixed;
     spec_rev = r.spec_rev;
     dir = r.dir;
     start_flit = r.start_flit;

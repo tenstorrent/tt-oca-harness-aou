@@ -21,8 +21,8 @@ untested), and, in a tt-oca-harness checkout that places this directory at the
 same `hw/ip/aou/dv` path (the RTL vendored under
 `vendor/tenstorrent/aou/upstream/`), through the harness runner `run_dv.py` from
 the same `aou_sim_cfg.toml`, testlists and sources. This document describes the
-bench that exists; `docs/ARCHITECTURE.md` carries the stream contracts and API
-names the layers were built against, and `docs/DECISIONS.md` the decisions.
+bench that exists, with the APIs between its layers in <<aou-tb-layer-apis>>;
+`docs/DECISIONS.md` records the decisions.
 
 Four tops share the environment packages:
 
@@ -42,7 +42,7 @@ Each has a sim config (`aou_sim_cfg.toml`, `aou_reg_sim_cfg.toml`,
 
 === VIP Selection Policy
 
-No commercial VIP and no vendored third-party VIP is used; `DECISIONS.md` D2
+No commercial VIP and no vendored third-party VIP is used; `DECISIONS.md` D1
 and `docs/VIP_EVALUATION.md` record why. Every bus model is the bench's own,
 written against the public specifications (AMBA AXI4 and APB, UCIe FDI, the
 AoU specification) and against the rules in `uvm/env/checkers/rules.csv`.
@@ -84,8 +84,8 @@ Every model is DUT-local to this bench and lives under `uvm/env/`:
 |===
 
 Layers depend only downward: L4a uses L3's message API, L3 uses L1's flit API,
-L1 and L2 know nothing above them. `docs/ARCHITECTURE.md` "Inter-layer APIs"
-gives the contracts.
+L1 and L2 know nothing above them. <<aou-tb-api-inter-layer>> gives the
+contracts.
 
 === Testbench Hierarchy
 
@@ -130,7 +130,7 @@ every simulator. `aou_rst_if.apb_quiet` is read from the asynchronous APB
 bridge's state so the reset agent can honour the integration guide's reset rule.
 With `ASSERTION_ON` (the `<target>-assert` targets) the RTL's own assertions are
 compiled, all but the WLAST generator's unbounded-AWREADY check, which the top
-turns off (BUGS/054).
+turns off (tenstorrent/tt-oca-harness-aou#132).
 
 Under `ifdef UVM` (always defined by the Makefile and by the harness) the top
 registers every interface in `uvm_config_db` under scope `"*"` (`s_axi<r>`,
@@ -208,7 +208,13 @@ class header lists its own). Randomisation is per seed: activation initiator
 and order, AXI addresses, lengths, sizes, strobes, attributes and timing within
 the profile, the active PHY on two-PHY targets, the packer layout policy of the
 remote die (`aou_packer_policy`: DUT-like, sparse, minimum and maximum density,
-random), credit return policy and delays.
+random), credit return policy and delays. A tenth of each
+memory's pages has no exclusive monitor (`aou_mem.no_excl_pct`). At a modest rate per seed
+(`aou_t1_env_cfg::randomize_knobs`) an S-port manager holds BREADY or RREADY
+low while its port fills to the outstanding limit (`aou_axi_timing`
+`b_fill_hold`, `r_fill_hold`), the Adapter's `pl_trdy` policy is RANDOM or
+BURSTY instead of HOLES, and stand-alone FDI stalls are added; a test that
+measures performance, or depends on the timing, sets its own.
 
 Stimulus keeps in-flight transactions to disjoint addresses unless a test asks
 otherwise, so the golden model is unambiguous. Negative scenarios inject through
@@ -283,15 +289,15 @@ union-merges the passing runs. Code coverage of `RTL/` comes from the
 simulator (`COV=1`, `make cov_report`), with the integrator-replaced cells
 excluded by `cov/config/vcs/cov_exclude.hier`. Bound AXI4 coverage monitors
 (`cov/sv/aou_axi4_coverage_mod.sv`) cover every S and M port. Closure is
-measured on the union of every target, with no waivers; `AOU_FCOV.adoc` has
-the goals, the definitions and the closure policy, `docs/COVERAGE_CLOSURE.md`
-the closure plan and its decisions.
+measured on the union of every target; `AOU_FCOV.adoc` has the goals, the
+definitions and the closure policy, `docs/DECISIONS.md` D10 the decisions, and
+the verification plan's road-map the open coverage work.
 
 === SystemVerilog UVM Realization
 
 This bench has one realization, SV-UVM. Where the tt-oca-harness DV pattern
 defines the DUT-neutral contract with a PyUVM/cocotb twin, this bench states
-the contract in `docs/ARCHITECTURE.md` and keeps the cocotb twin as an open
+the contract in <<aou-tb-layer-apis>> and keeps the cocotb twin as an open
 item (`OPEN_ITEMS.md`). The realization follows the harness compile-order
 contract: packages in dependency order from the sim config's `sources`, the
 tests included from `tb_top.sv` under `ifdef UVM`, `aou_base_test` on
@@ -305,7 +311,7 @@ Differences from the pattern, and why:
 | Difference | Reason
 | UVM library | Standalone compiles the pinned uvm-core (`.deps/uvm-core`, `scripts/get_uvm_core.sh`) on every simulator so VCS and Verilator run one library (D2); under the harness runner VCS's shipped `uvm-ieee-2020-2.0` is used (`[build.vcs].uvm_lib` in the sim configs), the shipped library nearest the pinned source; the harness leg is a deferred follow-up (OPEN_ITEMS.md). Constructs only one library accepts are replaced in the bench or selected by the library's version macro.
 | Scenario naming | A scenario is a class plus plusargs, named `<class>[.<plusarg slug>][.<target>]` in the testlist, instead of one class per scenario; the plusarg variants predate the pattern (`OPEN_ITEMS.md`).
-| Expected failures | `expected_fail.yaml` plus `check_run.py` is the grader of record; the testlists carry `expect_fail` for the deterministic entries only, because the harness schema has no equivalent of `requires:`, `seed_dependent` or `when_re`.
+| Expected failures | `expected_fail.yaml` plus `check_run.py` is the grader of record. No testlist entry uses the harness schema's `expect_fail`, which has no equivalent of `requires:`, `seed_dependent` or `when_re`.
 | Plan traceability | `testlists/plan_ids.yaml` maps scenario to plan items (the harness testlist schema has no key for it); `scripts/plan_status.py` joins the two.
 | Vendored root | Paths in the sim config are harness-relative (`vendor/tenstorrent/aou/upstream/...`, `hw/common/dv/vip/...`); `scripts/sim_cfg.py` maps them to this repository and `.deps/ocah_lib/` for the standalone Makefile.
 | Executors | Standalone `run_list.py` keeps an LSF pool with live steering and per-job metrics; the harness runner's regression mode draws random seeds, so a seed-exact sweep goes through `scripts/sweep.py` one leaf at a time.
@@ -326,11 +332,399 @@ Differences from the pattern, and why:
   joins in `all.toml` and raise each group's `expected_count`, and add its plan
   items under its name in `testlists/plan_ids.yaml`.
   `python3 scripts/check_testlists.py` (in `make lint`) validates all of it.
-. A scenario that must fail on a known DUT bug gets an `expected_fail.yaml`
-  entry tied to the bug's GitHub issue (or its staged draft, AGENTS.md
-  "Reporting bugs"); if the failure is deterministic, also
-  `expect_fail` / `expect_fail_match` in the testlist entry.
+. A failure on a known DUT bug is tied to it by the bug's existing
+  `expected_fail.yaml` entries (its GitHub issue, AGENTS.md "Reporting bugs");
+  a new failure is triaged and reported, not given a new entry to keep a
+  regression green.
 . Run it (`make build`, `make run TEST=<class> PLUSARGS="..."` or
   `scripts/run_list.py --items <name>`), then `make docs` so
-  `AOU_VPLAN.adoc`'s generated summary, procedure and matrix pick it up, and
-  check the FCOV traceability table names the covergroups it drives.
+  `AOU_VPLAN.adoc`'s generated summary, procedures and per-area item tables
+  pick it up, and check that `AOU_FCOV.adoc` describes the covergroups it
+  drives.
+
+==== Naming Rules
+
+* A test class is `aou_<subject>_test` and lives in `uvm/tests/<area>/`; its
+  virtual sequence is `aou_<subject>_vseq` (or `_seq`) in `uvm/seq_lib/`.
+  `aou_sanity_test` / `aou_sanity_test_seq` is the bring-up gate's pair.
+* A scenario is a `[[tests]]` entry of `testlists/<area>.toml`. Its name is
+  the class name when the class has one entry; otherwise the class name
+  followed by a slug of the plusargs that distinguish it
+  (`aou_dp_random_test.dp_dir-both.dp_profile-stall`), then the target when
+  the same arguments run pinned to several targets
+  (`aou_t1_slice_test.rtl_asserts-1.4x512-sp64-assert`), then the area when a
+  name would still repeat. Names are unique across every list `all.toml`
+  includes (`scripts/check_testlists.py`).
+* `module = { uvm = "<class>" }` binds the scenario to its class; `args` are
+  its plusargs; `seed` and `reseed` give seeds `seed`..`seed+reseed-1`;
+  `target` pins it to one `[targets.<name>]`; `run_modes = ["<area>"]` names
+  its timeout class; a scenario that cannot run yet carries the `blocked` tag,
+  joins no group and has its reason under `blocked:` in
+  `testlists/plan_ids.yaml`.
+* A negative scenario's class header names the rules it expects to fire, and
+  the sequence declares them with `expect_event()`.
+* Rule IDs: `AOU-R<n>` AoU protocol, `FDI-R<n>`/`FDI-M<n>` FDI, `AXI-R<n>`/
+  `AXI-S<n>` AXI, `APB-R<n>`, `REG-R<n>` registers, `FEAT-R<n>` features,
+  `DP-R<n>` data path, `T1-<class><n>` bench-level checks (`T1-L` link,
+  `T1-C` credits, `T1-E` errors, `T1-M` matrix, `T1-P` performance, `T1-V`
+  verdict, ...). The inventory is `uvm/env/checkers/rules.csv`.
+* Plan item IDs are `<N>.<M>` from `docs/test_plan_items.yaml`, written as
+  text (`4.10` is not `4.1`). They keep the numbering of the plan they came
+  from; `docs/plan_areas.yaml` puts each in a feature area of the plan.
+
+[[aou-tb-layer-apis]]
+=== Appendix: Layer APIs
+
+The names and connections the layers are built against: the interfaces the
+top registers, the APIs between the layers, the one AXI transaction type, the
+scoreboard's rule and the API tests use. Code comments cite these sections by
+name.
+
+[[aou-tb-api-interfaces]]
+==== Interfaces and config_db names
+
+`tb_top` registers every interface in `uvm_config_db` under scope `"*"`:
+
+[cols="1,1,1",options="header"]
+|===
+| Key | Type | Used by
+| `s_axi<r>` | `aou_axi_bus_if #(.DATA_W(1024))` | L4b manager agent (DUT's AXI S port)
+| `m_axi<r>` | `aou_axi_bus_if #(.DATA_W(1024))` | L4b subordinate agent (DUT's AXI M port)
+| `fdi_mb<p>` | `aou_fdi_mb_if #(.DATA_W(1024))` | L1 agent, PHY *p*
+| `fdi_lsm` | `aou_fdi_lsm_if` | L2 agent
+| `apb` | `aou_apb_if` | APB agent
+| `status` | `aou_status_if` | interrupts, FSM state, SW pins
+| `irq` | `aou_irq_if` | the same interrupts and activation status, clocked (T1 status watcher)
+| `rst` | `aou_rst_if` | T1 reset agent: mid-test I_RESETN/I_PRESETN (ANDed with the top's power-on reset)
+| `wdt` | `aou_wdt_if` | write-watchdog checker: per-RP AW/B handshakes at the early-response controller, the SFR's watchdog fields and its APB port (white-box taps)
+| `fdi_chk` | `aou_fdi_checker_if` | AOU_FDI_CHECKER status ports (`aou_fdi_chk_adapter`)
+|===
+
+One parameterization per interface type (widest width, with the real width in
+the agent config) means one Verilator vif type. Drivers use only their own
+clocking block; monitors use only `mon_cb`.
+
+===== T1 env: where the implementation departs from the test layer API
+
+The names below differ from <<aou-tb-api-test-layer>> because the API names
+are SystemVerilog keywords or because a PR 80 interface has no clock. Everything
+else keeps the API's names.
+
+[cols="1,1,1",options="header"]
+|===
+| API name | Implemented as | Why
+| `env.expect` | `env.expects` | `expect` is a keyword
+| `program(feature_cfg)` | `program_cfg(aou_t1_feature_cfg)` | `program` is a keyword
+| `deactivate(who, force)` | `deactivate(who, forced)` | `force` is a keyword
+| reset agent on `aou_reset_if` | `aou_t1_reset_agent` on `aou_rst_if` (key `rst`) | PR 80's `aou_reset_if` (since retired) had no clock, so no clocking block
+| `regs.model` | `aou_t1_reg_env` (extends `aou_reg_env`) adds `model` | `aou_reg_env` calls it `regmodel`
+|===
+
+Per-RP remote widths: `cfg.rp_remote_bytes[r]` (0: `cfg.remote_bytes`), read
+through `cfg.remote_bytes_of(r)`. Traffic profiles carry `rp_mask` (default all
+RPs): `traffic()` runs only on the RPs it selects.
+
+Additions: `env.rmgr` (remote managers: one `aou_axi_sequencer` per RP whose
+transactions go out through L3, `vseqr.r_mgr_sqr[r]`), `env.sw_isr` (the local
+software of MAS 7.3.5: answers INT_ACTIVATE_START/INT_DEACTIVATE_START through the
+registers; `cfg.sw_isr_en`), `env.l4a` (the `aou_l4a_if_c` adapter over `remote`),
+`env.attr_chk` (`aou_t1_attr_chk`: attributes, exclusive responses and FLEX across the
+link; `cfg.attr_chk_en`), `env.xfer_cov` (`aou_t1_xfer_cov`: their functional coverage),
+`env.rx_fifo_chk` (`aou_t1_rx_fifo_chk`, passive: credit and activation against what
+the DUT's RX FIFOs still hold, and the DEACTIVATE_TIME_OUT_VALUE quiet window;
+`cfg.rx_fifo_chk_en`, `cfg.rx_fifo_slack`), `cfg.remote_rp_count` (the remote die's RP
+count, `+remote_rp_count`), `env.outstanding(why)`, and in the base vseq `inject_mem_error()`, `wait_link()`,
+`wait_l3()`, `write_field()`. Traffic profiles are `aou_t1_traffic_cfg` objects
+(`aou_t1_traffic_cfg::named("rand"|"unaligned"|"b_zero"|"long"|"short"|"narrow"|"stall"|"low")`).
+`scoreboard.remote_imp` gets the remote managers' completed transactions (originated by L4a), not the remote model's responses.
+
+Reset contract as implemented: `env.reset_flush(which, bus_reset)`. I_PRESETN alone
+only cancels the software ISR (the core and link keep running). I_RESETN and
+AOU_SW_RESET (`sw_reset()`; both bus_reset = 1): the local AXI agents are on the
+DUT's AXI-port reset (`tb_top.axi_port_rst_n`, the core reset read from the DUT), as
+the SoC's AXI peers must be (MAS 7.3.6, integration guide 3.1.1: either reset loses
+every AXI transaction in flight or queued in AOU_CORE, and the attached managers and
+subordinates are reset with it or recover on their own). AXI managers drop queued
+and in-flight items and restart idle once the reset is over, subordinates drop
+requests, monitors forget in-flight transactions. `abort_traffic()` (bus_reset = 0,
+no reset) only stops waiting: a burst already on the bus is still completed. The
+managers' outstanding transactions end with `aou_axi_txn.aborted = 1` (sequences
+continue) and `sb.abort()` counts them and marks the bytes an aborted write strobes
+unknown: each may hold its old value or the write's until a checked write defines
+it again. `sw_reset()` also brackets the request with `env.sw_reset_window()`, from
+the APB write that requests AOU_SW_RESET to the core reset: the S-port monitors
+mark every transaction on the bus in the window `reset_outstanding`; a write that
+completes in it is lost or landed whatever its response (the reset loses writes
+queued in the core, early-acknowledged ones included, 7.2.5), so the scoreboard
+treats it like an aborted write, and a read that ends with SLVERR counts as aborted
+too (MAS 7.3.6 loses the read and defines no response, so the SLVERR is taken from the RTL; any other response is checked as usual, and SLVERR on any
+later transaction is still an error). The DUT sends no response for a
+transaction the reset lost (its RX FIFOs reset with the core), but the managers
+tolerate one: for `stale_window` (10 us) a response on an ID with an aborted
+request is taken as the stale one and new requests on that ID wait; later, a stale
+count only absorbs a response nothing else matches. The subordinate agents'
+monitors use no window (the responder is the bench's own driver, reset with the
+port). The remote die (L3
+`reset_flush()`: queues, credits, responder; L1 pump and
+PL driver: flits built before the reset) always drops everything. `traffic()` and
+`wait_traffic()` are bounded by `cfg.drain_timeout` (T1-V08, then `stop_traffic()`).
+
+Reset rule (integration guide 3.1.1): I_RESETN or I_PRESETN is asserted only with the
+APB master idle (PSEL low, nothing waiting on PREADY) and the asynchronous APB bridge's
+request/done handshake drained in both clock domains (`aou_rst_if.apb_quiet`, read from
+the bridge's state), both clocks running; at power-on both resets are held while both
+clocks run, and the APB and AXI drivers wait for their reset to release. The reset
+agent's `do_reset()` calls `quiesce_apb()` first: `aou_apb_cfg.hold` stops the APB driver
+starting new transfers, and the agent waits for PSEL low and the bridge idle for four
+PCLK cycles. Master-visible completion of a write is not enough. A checker in the agent
+reports any reset asserted otherwise. A test that resets mid-access on purpose passes
+`quiesce = 0`, says so in its header and does not claim the rule.
+
+[[aou-tb-api-inter-layer]]
+==== Inter-layer APIs
+
+* *L1 ↔ L3:* `aou_flit_item` holds 256 bytes, the PHY, cancel and stall plans
+for driving, and timestamps. The L1 driver takes flits from a sequencer. The L1
+monitor publishes `ap_tx` (flits the DUT sent, after cancel rollback) and `ap_rx`
+(flits delivered to the DUT).
+* *L2:* `aou_lsm_cfg` holds the latency ranges; states are encoded as in UCIe
+r1.1 Table 8-2. The agent publishes state changes, and L1 only drives while L2
+reports Active.
+* *L3 ↔ L4a:* L3 publishes decoded messages from the DUT (`aou_msg` subclasses)
+and accepts messages to send through `aou_l3_agent.send(aou_msg)`. Credits,
+packing and activation are L3's job. L4a's remote AXI model turns the DUT's
+WriteReq/WriteData/ReadReq into memory operations on the remote `aou_mem` and
+returns WriteResp/ReadData through L3, with configurable latency.
+* *L4a ↔ scoreboard:* only `aou_axi_txn`.
+
+[[aou-tb-api-l3-l4a]]
+===== L3 ↔ L4a: remote AXI model API
+
+`aou_remote_axi_model` (`aou_axi_pkg`, a `uvm_component`) is the remote die's AXI
+subordinate. L3 must not import L4, so the glue that turns decoded
+WriteReq/WriteData/ReadReq messages into calls belongs to a class above L3 (the
+remote-die agent glue in env).
+
+* *Config:* `cfg` is an `aou_axi_cfg`, set directly or from `uvm_config_db` key
+`"cfg"`. It uses `mem` (the remote `aou_mem`, created if null), `timing.b_lat`
+and `timing.r_lat` (latency in cycles), `exclusive_en`, and `vif`/`vif_key`. Any
+`aou_axi_bus_if` on the same clock will do, because only `mon_cb` is used, to
+count cycles; a vif is needed only for nonzero latency.
+* *Call:* `task execute(aou_axi_txn req, output aou_axi_txn rsp)`.
+** `req` holds the request fields (`dir`, `id`, `addr`, `len`, `size`, `burst`,
+`lock`, `cache`, `prot`, `qos`) and `data_bytes`, the width the data is laid
+out in. A write also carries `data[]` and `strb[]`, one entry per beat in
+bus-aligned lanes.
+** `rsp` is a copy with `local_side = 0` and `t_done` set. A write gets `bresp`;
+a read gets `data[]` and `rresp[]` for every beat. Both follow `aou_mem`'s
+error-region and exclusive rules.
+** Fork one call per request. Responses come back out of order across IDs and
+in call order within an ID, with reads and writes ordered independently. A
+write lands on the memory, and is judged by the exclusive monitor, when the
+call is made (arrival order, as at a subordinate that has accepted AW and
+W); only its B waits. A read's data is taken when the call returns.
+* *Publishing:* the model writes every response to its `ap`.
+
+`aou_scoreboard` (`aou_env_pkg`) has three analysis imps:
+
+* `local_mgr_imp`: local manager monitors at the DUT's S ports.
+* `remote_imp`: transactions *L4a originated* towards the DUT, published once
+they complete, with responses and `local_side = 0`. Not the model's
+`execute()` responses.
+* `local_sub_imp`: local subordinate monitors at the M ports. Only counted.
+
+Set `sb.remote_mem` to the model's `cfg.mem`, and `sb.local_mem` to the one
+`aou_mem` that all local subordinate agents share.
+
+[[aou-tb-api-l1-l3]]
+===== L1 ↔ L3 boundary and the L3 API
+
+L3 (`l3/aou_l3_pkg`) does not import `aou_fdi_pkg`. Its only flit type is
+`aou_l3_flit_item`: `bit [7:0] bytes[256]` in wire byte order (byte *i* is the
+*i*-th byte of the 256-byte Format 6 flit, beat *k* of a 64-byte FDI carries bytes
+64k..64k+63), plus `phy` and `t_start`. L3 fills every byte; bytes 0-1 (flit
+header, default PID 11b from `cfg.fh_byte0`) and 126-127/254-255 (CRC) are the
+adapter's and L1 may overwrite them.
+
+What L1 must provide, and how the integrator connects it (env glue, a byte copy
+each way: `l3_item.bytes = l1_item.data` and back; L1's `aou_flit_item.data[256]`
+uses the same byte order):
+
+* *DUT → L3:* every flit the DUT sent, after cancel rollback, exactly once and
+in order: L1 `ap_tx` → converter → `aou_l3_agent.rx_flit_imp`
+(`uvm_analysis_imp #(aou_l3_flit_item)`, a function, zero time).
+* *L3 → DUT:* L1's driver side pulls: a sequence on the L1 sequencer loops
+`l3.tx_flit_export.get(it)` (`uvm_blocking_get_imp`, blocks until L3 has a flit),
+copies `it.bytes` into an `aou_flit_item` and drives it. L3 builds a flit only
+when asked, so the credits it returns are current; it never needs idle flits.
+L1 drives only while L2 reports Active.
+
+L3 API (`aou_l3_agent`, `aou_l3_cfg` set directly or via `uvm_config_db` key `"cfg"`):
+
+[cols="1,1",options="header"]
+|===
+| Item | Meaning
+| `send(aou_msg)` | Queue a message (`aou_msg_wreq/rreq/wdata/rdata/wresp/act/crdtgrant/raw`). `msg.rp` is the wire RP (the DUT's plane). Credits, packing and activation are L3's.
+| `activate()`, `deactivate()`, `wait_state(s)` | Link control tasks; states `AOU_LS_DISABLED/ACTIVATE/ENABLED/DEACTIVATE/ERROR`. By default L3 answers the DUT's ActivateReq/DeactivateReq itself.
+| `ap_rx_msg`, `ap_tx_msg` | Decoded DUT messages (every type) / messages L3 put into a flit.
+| `ap_tx_flit` | Flits handed to L1.
+| `sqr` (`aou_l3_sequencer`) | Message sequencer; `p_sequencer.model` reaches the model for non-message injections.
+| `cfg.l4a` (`aou_l4a_if_c`) | Responder callback: `task handle_write(aou_msg_wreq, aou_msg_wdata[$], output bresp)`, `task handle_read(aou_msg_rreq, output bit[1023:0] data[$], output bit[1:0] resp[$])`. L3 groups AWLEN+1 WriteData per WriteReq (per RP, in order), sets RP/RID/RLAST/DLENGTH (from ARSIZE) on ReadData, and sends WriteResp/ReadData through the packer. Dequeue to L4a frees the RX credits. `cfg.resp_fork` runs requests concurrently (ordered within an ID). With no `l4a`, DUT requests are consumed without a response. An env adapter implements this over `aou_remote_axi_model.execute()`.
+| `cfg.spec_rev`, `rp_count`, `fdid`, `dest_rp[]` | v0.7 or v0.8 (the DUT environment's default; the 4-granule ActivateReq with the profile fields, `cfg.profile_*` per RP); RP count; FDId; DEST_RP map for responses.
+| `cfg.rx_depth[]`, `ret_policy[]`, `ret_delay`, `tx_cred_max` | Modelled RX buffer per class (= credits advertised), return policy (immediate, on consume, delayed, withheld), TX saturation.
+| `cfg.pol` (`aou_packer_policy`) | Layout: `set_dut_like/sparse/min_density/max_density/random`, `start_granule`, `split_at`, `hole_pct`, `max_msgs_per_flit`, `allow_span`, `random_order`, `cred_method`, `misc_per_half_max` (v0.8 4.4: at most 2; an Activation always travels alone), `hold_credited`, `prof_pct` (random FLEX in AXI messages to the DUT; v0.8 FLEX = USER[15:0], the name predates it), `zero_grants` (extra zero-credit CrdtGrants).
+| `cfg.chk` (`aou_l3_rule_chk`) | Rule reporting: findings are `uvm_error` "AOU-R*n*: ..." unless `expect_rule()` declared them; `count(rule, src)`.
+|===
+
+Error injection: `aou_msg.ignore_credits / ignore_state / flip_mask / len_adj / raw_g`,
+and the sequences in `l3/seq/` (`aou_l3_bad_type_seq`, `aou_l3_rsvd_seq`,
+`aou_l3_no_credit_seq`, `aou_l3_act_inject_seq`, `aou_l3_flit_inject_seq`,
+`aou_l3_overgrant_seq`).
+
+AOU_FDI_CHECKER (`checker/`, copied from bdf498c) is instantiated by the top on
+the DUT's FDI through `aou_fdi_chk_phy`, one instance per PHY at that PHY's
+width (LP = DUT TX qualified by valid&irdy&trdy, PL = flits to the DUT,
+`FDI_IF_BYTES` = FDI width, `RP_COUNT`, `I_CFG_RP_DEST_RP` = DEST_RP). On a
+two-PHY build the instance on the PHY `I_PHY_TYPE` does not select is held in
+link reset. The selected instance's reporting ports go to the
+`aou_fdi_checker_if` registered as `"fdi_chk"`, which `aou_fdi_chk_adapter`
+turns into AOU-R* reports.
+
+[[aou-tb-api-txn]]
+==== The transaction contract
+
+`aou_axi_txn` (in `axi/`, VIP-neutral) is the only AXI type the scoreboard,
+sequences and tests see.
+
+[source,systemverilog]
+----
+typedef enum bit {AOU_AXI_WR, AOU_AXI_RD} aou_axi_dir_e;
+class aou_axi_txn extends uvm_sequence_item;
+  aou_axi_dir_e dir;
+  int unsigned  rp;
+  bit           local_side;          // 1: DUT's AXI ports; 0: remote die (L4a)
+  bit [9:0]     id;
+  bit [63:0]    addr;
+  bit [7:0]     len;                 // beats - 1
+  bit [2:0]     size;                // log2(bytes per beat)
+  bit [1:0]     burst;
+  bit           lock;
+  bit [3:0]     cache, qos;
+  bit [2:0]     prot;
+  int unsigned  data_bytes;          // bus width in bytes
+  bit [1023:0]  data[];              // one entry per beat, bus-aligned lanes
+  bit [127:0]   strb[];              // per W beat
+  bit [1:0]     rresp[];             // per R beat
+  bit [1:0]     bresp;
+  time          t_addr, t_done;
+  // helpers: beat_addr(i), active lanes for beat i, bytes() as address -> byte
+endclass
+----
+
+Monitors and L4a publish a transaction on `analysis_port #(aou_axi_txn)` when it
+completes: a write after B, a read after its last data beat.
+
+[[aou-tb-api-scoreboard]]
+==== Scoreboard rule
+
+Checks bytes, as AXI4 defines them, so it is unaffected by splitting,
+aggregation and width conversion inside the DUT:
+
+* *Memories.* The local subordinate agents and the remote L4a model each answer
+from an `aou_mem` (sparse, random initial contents, seeded). The scoreboard keeps
+a golden copy of each.
+* *Local to remote.* A write entering the DUT's S port must change the remote
+memory at exactly the bytes AXI4 addressing and WSTRB select; when its B returns
+OKAY, those bytes must match golden. Read data returned at the S port must equal
+golden remote memory, beat by beat and lane by lane.
+* *Remote to local.* The same, for traffic L4a originates through L3 towards
+the DUT's M port and local memory.
+* *Responses and order.* Every request gets exactly one response with its own ID,
+in order within an ID. Error responses injected by a memory propagate unchanged.
+The one exception is the reset rule in the reset contract above.
+* *Attributes.* prot, qos, cache, lock and id are checked end to end when no
+feature splits or merges the transaction.
+* *Isolation.* Stimulus keeps in-flight transactions to disjoint addresses unless
+a test asks otherwise, so the golden model is unambiguous.
+* *Drain.* Nothing outstanding at end of test.
+
+[[aou-tb-api-test-layer]]
+==== Test layer API
+
+Tests never reach into agents. A test picks a configuration and a virtual
+sequence; virtual sequences use only the handles and helper tasks below. Every test
+depends on this API, so a change to it is a change to every test.
+
+===== Environment (`aou_t1_env`, in `env/`)
+
+[cols="1,1",options="header"]
+|===
+| Handle | Type
+| `cfg` | `aou_t1_env_cfg`: RP count and per-RP data bytes, `spec_rev`, L1/L2/L3/AXI agent configs, timing profiles, check enables
+| `s_mgr[r]`, `m_sub[r]` | `aou_axi_mgr_agent` on the DUT's S port, `aou_axi_sub_agent` on its M port, per RP
+| `fdi[p]`, `lsm` | L1 agent per PHY, L2 link-state agent
+| `l3`, `remote` | `aou_l3_agent` (remote die protocol layer), `aou_remote_axi_model` (remote AXI side, behind the L4a adapter)
+| `apb`, `regs` | APB agent, `aou_reg_env` (`regs.model` is the register block)
+| `rst` | reset agent driving `I_RESETN`/`I_PRESETN` through `aou_rst_if` (config_db key `rst`)
+| `sb`, `status`, `fdi_chk`, `expect` | scoreboard, interrupt/status watcher, FDI checker adapter, expectation registry
+| `dbg_chk` | `aou_t1_dbg_fifo_chk`: predicts each RP's response error debug FIFO and checks every debug-window read and pop
+| `crd_rr`, `early_tbl` | `aou_t1_crd_rr_chk`: round-robin MsgCredit order in a window a test opens (T1-C03); `aou_t1_early_tbl_chk`: early-table backpressure on RPs with EARLY_BRESP_EN (FEAT-R15/R16)
+| `wdt_chk` | `aou_t1_wdt_chk`: the write-transaction watchdog of every RP, from a model of its count (FEAT-R23 to R28)
+| `crd_chk` | `aou_t1_crd_flow_chk`: an RP with credit and queued work is not held back by another RP without credit (T1-C01), the DUT uses the credit it holds (T1-C02), and no RP with credit that is next in a class's order waits too long for its message (T1-C43)
+| `vseqr` | `aou_t1_vseqr`: sequencer handles for all of the above, plus `env`
+|===
+
+===== Base virtual sequence (`aou_base_test_seq`)
+
+Every test's virtual sequence extends this and composes these tasks:
+
+[cols="1,1",options="header"]
+|===
+| Task | Meaning
+| `link_up()` | L2 bringup to Active
+| `activate(who, order)` | AoU activation: DUT-, remote- or both-initiated (APB `activate_start`, SW pin, or L3), with ordering and timing randomization
+| `deactivate(who, force)` | orderly or forced deactivation from either side; waits for DISABLED
+| `program(feature_cfg)` | DUT configuration through the register sequences (split, aggregator, early response, QoS, DEST_RP, LP mode, interrupt masks, error info, time-outs)
+| `traffic(dir, n, profile)` / `traffic_nb(...)` + `wait_traffic()` | local→remote, remote→local or both; a profile names AXI sequence knobs and timing policies
+| `pause_traffic()` / `resume_traffic()` | quiesce or resume all traffic sources
+| `drain(timeout)` | wait until nothing is outstanding anywhere
+| `link_event(kind)` | PL-initiated Retrain, LinkError, L1 entry/exit, Reset, inband_pres drop, clk_req wake
+| `lp_mode(en, threshold)` | TX low-power mode; static configuration, only while the DUT is DISABLED (T1-LP03)
+| `hold_tx()` / `release_tx()` | back-pressure on the DUT's TX: L1 holds pl_trdy low from the next flit boundary (`aou_fdi_cfg.tx_hold`), so requests back up behind the DUT's ring buffer and arbiters
+| `hold_remote_tx()` / `release_remote_tx()` | the remote die's counterpart: L3 holds back credited messages (`pol.hold_credited`), then packs the backlog densely
+| `inject(kind, args)` | L3 error injection (bad type, reserved bits, credit violations, out-of-state Activate/Deactivate, MsgStart, placement, over-grant, ...) and AXI error responses from memories
+| `sw_reset()` | `AOU_SW_RESET` (every SFR, the activation state and the RX FIFOs reset, MAS 7.3.6), then reprogram and re-activate
+| `hard_reset(which)` | assert `I_RESETN` and/or `I_PRESETN` mid-test, flush the environment, bring up again
+| `expect_event(id, min, max)` | declare an error, interrupt or rule hit the scenario is supposed to cause
+|===
+
+[[aou-tb-api-reset]]
+===== Reset contract
+
+Every agent, model, monitor and checker implements `reset_flush()`: drop
+in-flight state, clear queues and credits, and re-arm. The env calls it on
+every reset the `rst` agent drives. On reset the scoreboard moves outstanding
+transactions to an "aborted" count instead of reporting them, and checks
+again from the next activation.
+
+[[aou-tb-api-expectations]]
+===== Expectations
+
+The expectation registry (`expect`) is how negative tests stay strict.
+`expect_event(id, min, max)` registers a rule ID (`AOU-R16`, `FDI-R12`,
+`AXI-R05`, ...), an interrupt (`INT_REQ_LINKRESET`, ...) or a scoreboard
+check. A report catcher demotes matching errors to info and counts them. At
+end of test, each expectation's count must be within `[min, max]`, and any
+error that was not expected fails the test as usual. Checkers never need to
+know which test is running.
+
+===== Tests
+
+A test (`uvm/tests/`) is thin. It sets `aou_t1_env_cfg` (or factory overrides),
+names its virtual sequence, and has its plan items listed in `testlists/plan_ids.yaml`. The
+base test (`aou_base_test`, on the OCAH library's `ocah_test`) builds the env,
+runs the virtual sequence through `start_seq()`, and performs the end-of-test
+checks: scoreboard drained, expectations met, no unexpected interrupts, FDI
+checker clean. `aou_sanity_test` is the bring-up gate: one pass of
+`aou_sanity_test_seq` through `run_single_scenario()`; it is also the default
+`make run` test.

@@ -213,7 +213,12 @@ class aou_packer extends uvm_object;
     aou_granule_t g[$];
     aou_cred_class_e c = m.cred_class();
     m.dir = AOU_L3_TX;
-    if (c != AOU_CC_NONE && cfg.pol.prof_pct != 0 && $urandom_range(99) < cfg.pol.prof_pct)
+    // Random FLEX to the DUT (aou_packer_policy::prof_pct): the low 12 bits,
+    // FLEX[15:12] 0 for a v0.7 receiver. Not on a message whose sender chose
+    // the FLEX (flex_fixed: the remote AXI agents' USER, checked at the DUT's
+    // AXI ports by aou_t1_attr_chk).
+    if (c != AOU_CC_NONE && !m.flex_fixed && cfg.pol.prof_pct != 0 &&
+        $urandom_range(99) < cfg.pol.prof_pct)
       m.flex[11:0] = 12'($urandom());
     m.to_granules(g);
     f.msg_start[gp] = 1'b1;
@@ -251,6 +256,7 @@ class aou_packer extends uvm_object;
     bit share_grant;    // ... except the initial CrdtGrant (after our ActivateAck)
     bit share_rsp;      // ... except WriteResp/ReadData (after our DeactivateReq)
     bit first_new = 1'b1;
+    int last_wreq_rp = -1;   // RP of a WriteReq just placed, else -1
     bit span_grant;     // this flit's CrdtGrant goes at G47 (pol.grant_span_pct)
     aou_cred_method_e meth = cfg.pol.cred_method;
     f.seq = flit_cnt++;
@@ -329,7 +335,9 @@ class aou_packer extends uvm_object;
       aou_msg m;
       int unsigned len;
       int unsigned sg = gp;
-      if (cfg.pol.max_msgs_per_flit != 0 && nmsgs >= cfg.pol.max_msgs_per_flit) break;
+      bit at_max = cfg.pol.max_msgs_per_flit != 0 && nmsgs >= cfg.pol.max_msgs_per_flit;
+      // At the limit, only the WriteData of a WriteReq just placed may still go.
+      if (at_max && !(cfg.pol.wreq_wdata_pair && last_wreq_rp >= 0)) break;
       if (cfg.pol.hole_pct != 0 && $urandom_range(0, 99) < cfg.pol.hole_pct)
         sg += $urandom_range(1, cfg.pol.max_hole);
       if (first_new && cfg.pol.start_granule >= 0 && sg <= cfg.pol.start_granule)
@@ -338,6 +346,8 @@ class aou_packer extends uvm_object;
       idx = pick(misc_half[sg / AOU_HALF_G]);
       if (idx < 0) break;
       m = (idx == NQ) ? misc_q[0] : q[idx][0];
+      // Its RP's next WriteData (the model sends an RP's write data in order).
+      if (at_max && (m.cred_class() != AOU_CC_WDATA || int'(m.rp) != last_wreq_rp)) break;
       len = m.num_granules();
       if (cfg.pol.best_fit && sg + len > AOU_GRANULES) begin
         int alt = pick_fit(misc_half[sg / AOU_HALF_G], AOU_GRANULES - sg);
@@ -364,6 +374,7 @@ class aou_packer extends uvm_object;
       gp = sg + len;
       nmsgs++;
       first_new = 1'b0;
+      last_wreq_rp = (m.msg_type == AOU_MT_WREQ) ? int'(m.rp) : -1;
     end
     rsp_only = 1'b0;
     // The flit's CrdtGrant at G47, continuing in G0 of the next flit.

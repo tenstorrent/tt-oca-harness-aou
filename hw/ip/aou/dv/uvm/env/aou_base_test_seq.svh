@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Base of every T1 virtual sequence (docs/ARCHITECTURE.md, "Base virtual
+// Base of every T1 virtual sequence (docs/AOU_TB_ARCH.adoc, "Base virtual
 // sequence"), on the shared library's ocah_sequence: scenario_seed,
 // random_count and loop_index are set by aou_base_test when it starts a
 // scenario pass (run_single_scenario / run_looped_scenario); a body that
@@ -367,6 +367,16 @@ class aou_base_test_seq extends ocah_sequence;
       s.start(null);
     end
   endtask
+
+  // The profile the remote die announces for its RP rp (its own configuration;
+  // the DUT stores it in PROFILE_RMT_RPn on each accepted ActivateReq). Takes
+  // effect at the remote's next ActivateReq. The DUT's own side has no knob:
+  // it announces the Basic Profile (PROFILE_CFG_RPn read-only 0/0/0, AOU-R12).
+  function void remote_profile(int unsigned rp, bit [4:0] id, bit [4:0] rev, bit [15:0] opt);
+    cfg.l3_cfg.profile_id[rp] = id;
+    cfg.l3_cfg.profile_rev[rp] = rev;
+    cfg.l3_cfg.profile_opt[rp] = opt;
+  endfunction
 
   // TX low-power mode. Static configuration: call it only while the DUT is
   // DISABLED (before activation, or after a deactivation has completed).

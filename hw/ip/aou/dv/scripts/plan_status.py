@@ -12,13 +12,17 @@ and its build (TB and CONFIG from the build directory name) match the
 scenario; a scenario without `target` matches every T1 config, as
 scripts/run_list.py runs it on any. Each item is then:
 
-  covered      a PASS run of an entry that lists it
-  xfail-only   no PASS, only XFAIL runs (known DUT bugs, named)
-  failing      no PASS, at least one FAIL run
-  blocked      no runs; every scenario listing it is tagged `blocked`
-  not covered  no entry lists it, or its entries have no judged runs
+  covered                        PASS runs of the entries that list it, and no other verdict
+  covered, with known failures   PASS runs, and XFAIL runs (known DUT bugs) on the
+                                 configurations named
+  covered, with failures         PASS runs, and FAIL runs on the configurations named
+  xfail-only                     no PASS, only XFAIL runs (known DUT bugs, named)
+  failing                        no PASS, at least one FAIL run
+  blocked                        no runs; every scenario listing it is tagged `blocked`
+  not covered                    no entry lists it, or its entries have no judged runs
 
-Only PASS counts, as for coverage. A run's verdict is the PASS/XFAIL/FAIL line
+The report counts items per feature area of the plan (docs/plan_areas.yaml).
+--rid takes only one regression's runs. Only PASS counts, as for coverage. A run's verdict is the PASS/XFAIL/FAIL line
 of its verdict.txt (scripts/check_run.py). Runs without one are unjudged and
 ignored unless --judge, which judges their sim.log with check_run.py's rules
 (read-only); a run whose sim.log is still being written is skipped. Merged items
@@ -38,11 +42,13 @@ from collections import Counter, defaultdict
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import check_run  # noqa: E402
 import listyaml  # noqa: E402
+import plan_areas  # noqa: E402
 import sim_cfg  # noqa: E402
 import testlist  # noqa: E402
 
 UVM_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATUSES = ["covered", "xfail-only", "failing", "blocked", "not covered"]
+STATUSES = ["covered", "covered, with known failures", "covered, with failures", "xfail-only",
+            "failing", "blocked", "not covered"]
 TBS = {"reg", "axi_selftest", "t1", "l3_unit"}
 
 
@@ -78,6 +84,8 @@ def build_key(build):
     flags = rest.split("-") if rest else []
     if "noaxi" in flags:
         config += "-noaxi"
+    if "assert" in flags:
+        config += "-assert"
     return tb, config
 
 
@@ -111,7 +119,7 @@ def load_entries(paths, aliases, known, plan_ids=None):
                 "seeds": set(e["seeds"]), "seeds_run": set(),
                 "plusargs": norm_plusargs(e["plusargs"]), "plan_ids": ids,
                 "blocked": e["blocked"], "list": e["list"] + ".toml",
-                "verdicts": Counter(), "bugs": set(),
+                "verdicts": Counter(), "bugs": set(), "xfail_cfgs": set(), "fail_cfgs": set(),
             })
     return entries, unknown
 
@@ -151,10 +159,14 @@ def scan_runs(out_dir, entries, args):
         index[(e["test"], e["tb"], e["config"], e["plusargs"])].append(e)
     runs = Counter()
     unmatched = Counter()
-    for run in sorted(glob.glob(os.path.join(out_dir, "*", "*.rid.*"))):
+    # Whole RID only: "a" must not select "a.b" (the same match as passing_runs.scan()).
+    pattern = f"*.rid.{glob.escape(args.rid)}.seed.*" if args.rid else "*.rid.*"
+    for run in sorted(glob.glob(os.path.join(out_dir, "*", pattern))):
         if not os.path.isdir(run):
             continue
         build = os.path.basename(os.path.dirname(run))
+        if args.build and build not in args.build:
+            continue
         test = os.path.basename(run).split(".rid.")[0]
         run_sh = os.path.join(run, "run.sh")
         plusargs = run_plusargs(run_sh) if os.path.exists(run_sh) else None
@@ -177,6 +189,10 @@ def scan_runs(out_dir, entries, args):
                 e["seeds_run"].add(int(m.group(1)))
             e["verdicts"][verdict] += 1
             e["bugs"] |= bugs
+            if verdict == "XFAIL":
+                e["xfail_cfgs"].add(config or tb)
+            elif verdict == "FAIL":
+                e["fail_cfgs"].add(config or tb)
     return runs, unmatched
 
 
@@ -197,9 +213,17 @@ def item_status(entries):
             bugs |= e["bugs"]
     passing = [e for e in entries if e["verdicts"]["PASS"]]
     if passing:
-        extra = f"; also {v['FAIL']} FAIL" if v["FAIL"] else ""
-        return "covered", f"{v['PASS']} PASS: " + "; ".join(entry_label(e) for e in passing[:3]) + \
-            (f" (+{len(passing) - 3} more)" if len(passing) > 3 else "") + extra
+        ev = f"{v['PASS']} PASS: " + "; ".join(entry_label(e) for e in passing[:3]) + \
+            (f" (+{len(passing) - 3} more)" if len(passing) > 3 else "")
+        fail_cfgs = sorted(set().union(*(e["fail_cfgs"] for e in entries)))
+        xf_cfgs = sorted(set().union(*(e["xfail_cfgs"] for e in entries)))
+        xf_bugs = sorted(set().union(*(e["bugs"] for e in entries if e["verdicts"]["XFAIL"])))
+        if v["FAIL"]:
+            return "covered, with failures", f"{v['FAIL']} FAIL on {', '.join(fail_cfgs)}; " + ev
+        if v["XFAIL"]:
+            return "covered, with known failures", \
+                f"{v['XFAIL']} XFAIL on {', '.join(xf_cfgs)} ({', '.join(xf_bugs) or 'bug not named'}); " + ev
+        return "covered", ev
     if v["FAIL"]:
         return "failing", f"{v['FAIL']} FAIL, {v['XFAIL']} XFAIL: " + \
             "; ".join(entry_label(e) for e in entries if e["verdicts"]["FAIL"])
@@ -224,6 +248,15 @@ def evaluate(args):
     for e in entries:
         for pid in dict.fromkeys(e["plan_ids"]):
             by_item[pid].append(e)
+    try:
+        area_of = plan_areas.assign(items)
+        titles = {a["key"]: a["title"] for a in plan_areas.areas()}
+        order = [a["key"] for a in plan_areas.areas()]
+    except plan_areas.PlanAreaError:
+        # Items outside the plan's areas (a fixture, an old plan): group by section.
+        area_of = {it["id"]: it["section"] for it in items}
+        titles = {it["section"]: f"{it['section']} {it.get('section_title', '')}" for it in items}
+        order = list(dict.fromkeys(it["section"] for it in items))
     rows = []
     for it in items:
         if it.get("merged_into"):
@@ -232,7 +265,8 @@ def evaluate(args):
             status, ev = "dropped", it["dropped"]
         else:
             status, ev = item_status(by_item.get(it["id"], []))
-        rows.append({**it, "status": status, "evidence": ev})
+        rows.append({**it, "status": status, "evidence": ev,
+                     "area": titles[area_of[it["id"]]], "area_rank": order.index(area_of[it["id"]])})
     return rows, runs, unmatched, unknown, paths
 
 
@@ -257,7 +291,10 @@ def render_md(rows, runs, unmatched, unknown, paths, args):
       f"{sum(unmatched.values())} unmatched, {runs['unjudged']} unjudged (no verdict.txt"
       f"{'' if args.judge else '; --judge to judge them'}), {runs['incomplete']} incomplete. "
       f"Run lists: {', '.join(os.path.basename(p) for p in paths)}.\n\n")
-    w("## Summary\n\n| Status | Items | P0 | P1 | P2 |\n|---|---|---|---|---|\n")
+    w("## Summary\n\nAn item is covered when a passing run of a scenario that lists it exists; "
+      "\"with known failures\" adds that some of its runs are XFAIL on the configurations its evidence "
+      "names, each tied to a filed DUT issue in expected_fail.yaml.\n\n")
+    w("| Status | Items | P0 | P1 | P2 |\n|---|---|---|---|---|\n")
     for s in STATUSES:
         pc = Counter(r["priority"] for r in active if r["status"] == s)
         w(f"| {s} | {c[s]} | {pc['P0']} | {pc['P1']} | {pc['P2']} |\n")
@@ -265,19 +302,20 @@ def render_md(rows, runs, unmatched, unknown, paths, args):
     w(f"| **total** | **{len(active)}** | {pc['P0']} | {pc['P1']} | {pc['P2']} |\n\n")
     w(f"{c['merged']} duplicate items report through their surviving ID and {c['dropped']} are dropped; "
       f"neither is counted above.\n\n")
-    w("## Per section\n\n| Section | Items | Covered | XFAIL only | Failing | Blocked | Not covered | Merged | Dropped |\n"
-      "|---|---|---|---|---|---|---|---|---|\n")
+    w("## Per area\n\n| Area | Items | Covered | With known failures | With failures | XFAIL only | "
+      "Failing | Blocked | Not covered | Merged | Dropped |\n|---|---|---|---|---|---|---|---|---|---|---|\n")
     secs = {}
-    for r in rows:
-        secs.setdefault((r["section"], r["section_title"]), Counter())[r["status"]] += 1
-    for (sec, title), sc in sorted(secs.items(), key=lambda kv: int(kv[0][0].split(".")[1])):
+    for r in sorted(rows, key=lambda r: r["area_rank"]):
+        secs.setdefault(r["area"], Counter())[r["status"]] += 1
+    for title, sc in secs.items():
         n = sum(sc[s] for s in STATUSES)
-        w(f"| {sec} {title} | {n} | " + " | ".join(str(sc[s]) for s in STATUSES) +
+        w(f"| {title} | {n} | " + " | ".join(str(sc[s]) for s in STATUSES) +
           f" | {sc['merged']} | {sc['dropped']} |\n")
-    w("\n## Items\n\n| ID | Pri | Title | Status | Evidence |\n|---|---|---|---|---|\n")
-    for r in rows:
+    w("\n## Items\n\n| ID | Area | Pri | Title | Status | Evidence |\n|---|---|---|---|---|---|\n")
+    for r in sorted(rows, key=lambda r: r["area_rank"]):
         title = r["title"] if len(r["title"]) <= 90 else r["title"][:87] + "..."
-        w(f"| {r['id']} | {r['priority']} | {md_escape(title)} | {r['status']} | {md_escape(r['evidence'])} |\n")
+        w(f"| {r['id']} | {r['area']} | {r['priority']} | {md_escape(title)} | {r['status']} | "
+          f"{md_escape(r['evidence'])} |\n")
     if unknown:
         w("\n## Run-list plan IDs not in the plan\n\n")
         for pid, lists in sorted(unknown.items()):
@@ -292,9 +330,9 @@ def render_md(rows, runs, unmatched, unknown, paths, args):
 def render_csv(rows):
     out = io.StringIO()
     cw = csv.writer(out)
-    cw.writerow(["id", "section", "priority", "status", "title", "evidence"])
+    cw.writerow(["id", "area", "priority", "status", "title", "evidence"])
     for r in rows:
-        cw.writerow([r["id"], r["section"], r["priority"], r["status"], r["title"], r["evidence"]])
+        cw.writerow([r["id"], r["area"], r["priority"], r["status"], r["title"], r["evidence"]])
     return out.getvalue()
 
 
@@ -307,6 +345,9 @@ def main(argv=None):
                     help="scenario -> plan items sidecar (default testlists/plan_ids.yaml)")
     ap.add_argument("--out-dir", default=os.path.join(UVM_ROOT, "out"), help="directory holding <build>/ run dirs")
     ap.add_argument("--expected", default=os.path.join(UVM_ROOT, "expected_fail.yaml"))
+    ap.add_argument("--rid", help="only the runs of this regression ID (default: every run)")
+    ap.add_argument("--build", action="append",
+                    help="only the runs under out/<BUILD>/ (repeatable; default: every build)")
     ap.add_argument("--judge", action="store_true", help="judge runs that have no verdict.txt from their sim.log")
     ap.add_argument("--settle", type=float, default=10,
                     help="with --judge: a sim.log without a report summary changed within this many minutes "
