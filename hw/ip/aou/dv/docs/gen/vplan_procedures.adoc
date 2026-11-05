@@ -2362,10 +2362,19 @@ arrive while the first pop's response may still wait).
 +take_wflood=N issues N single-beat OKAY writes on the
 ----
 
-RP just ahead of each pair; with few WriteResp credits
+RP just ahead of each group; with few WriteResp credits
 (+wresp_crd, +crd_delay) their responses back up behind
 the credit, so the first pop's response waits at the
 window while the second pop's address and data arrive.
+
+----
++take_group=N (2 to 4, default 2) takes up to N at once
+----
+
+the same way, each read and pop a cycle after the one
+before. Behind a held response the window accepts the
+second pop whole and then holds the third pop's address
+until the second pop has completed.
 
 ----
 +pop_lead=G +wresp_crd=N  each take is an OKAY write on the RP, then the
@@ -2397,7 +2406,7 @@ in flight, returns the same entry.
 | `aou_axi_err_resp_test.part-fifo.dbg_len-63.dbg_cache-2.agg_en-1.remote_bytes-32.4x512-sp64` | `+part=fifo +dbg_len=63 +dbg_cache=2 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.take_pair-1.dbg_len-15` | `+part=fifo +take_pair=1 +dbg_len=15` | 1-2 |  | 9.13,9.14
-| `aou_axi_err_resp_test.part-fifo.take_pair-1.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48.4x512-sp64` | `+part=fifo +take_pair=1 +take_wflood=6 +dbg_len=3 +wresp_crd=1 +crd_delay=48` | 1-2 | `4x512-sp64` | 9.13,9.14
+| `aou_axi_err_resp_test.part-fifo.take_pair-1.take_group-3.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48` | `+part=fifo +take_pair=1 +take_group=3 +take_wflood=6 +dbg_len=3 +wresp_crd=1 +crd_delay=48` | 1-2 |  | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64` | `+part=fifo +err_len=1 +err_off=32 +agg_en=1 +remote_bytes=32` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64` | `+part=fifo +err_len=3 +err_off=32 +agg_en=1 +remote_bytes=32 +max_awburstlen=3 +max_arburstlen=1` | 1-2 | `4x512-sp64` | 9.13,9.14
 | `aou_axi_err_resp_test.part-fifo.err_len-1.agg_en-1.remote_bytes-32.rdata_crd-8.crd_delay-64.flood-1.flood_len-3.pair_gap-64.4x512-sp64` | `+part=fifo +err_len=1 +agg_en=1 +remote_bytes=32 +rdata_crd=8 +crd_delay=64 +flood=1 +flood_len=3 +pair_gap=64` | 1-2 | `4x512-sp64` | 9.13,9.14
