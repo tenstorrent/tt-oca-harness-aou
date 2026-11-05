@@ -46,12 +46,14 @@ module AOU_AXI4MUX_3X1_1024 #(
     input       [ LEN_WD-1: 0]          I_S_ARLEN_0,
     input                               I_S_ARLOCK_0,
     input       [ 3: 0]                 I_S_ARQOS_0,
+    input       [15: 0]                 I_S_ARUSER_0,
     input                               I_S_ARVALID_0,
     output wire                         O_S_ARREADY_0,
 
     output wire [ ID_WD-1: 0]           O_S_RID_0,
     output wire [ 255: 0]               O_S_RDATA_0,
     output wire [ 1: 0]                 O_S_RRESP_0,
+    output wire [15: 0]                 O_S_RUSER_0,
     output wire                         O_S_RLAST_0,
     output wire                         O_S_RVALID_0,
     input                               I_S_RREADY_0,
@@ -65,17 +67,20 @@ module AOU_AXI4MUX_3X1_1024 #(
     input       [ 3: 0]                 I_S_AWCACHE_0,
     input       [ 2: 0]                 I_S_AWPROT_0,
     input       [ 3: 0]                 I_S_AWQOS_0,
+    input       [15: 0]                 I_S_AWUSER_0,
     input                               I_S_AWVALID_0,
     output wire                         O_S_AWREADY_0,
 
     input       [ 255 : 0]              I_S_WDATA_0,
     input       [ 31  : 0]              I_S_WSTRB_0,
     input                               I_S_WLAST_0,
+    input       [15: 0]                 I_S_WUSER_0,
     input                               I_S_WVALID_0,
     output                              O_S_WREADY_0,
 
     output wire [ ID_WD-1: 0]           O_S_BID_0,
     output wire [ 1: 0]                 O_S_BRESP_0,
+    output wire [15: 0]                 O_S_BUSER_0,
     output wire                         O_S_BVALID_0,
     input                               I_S_BREADY_0,
 
@@ -89,12 +94,14 @@ module AOU_AXI4MUX_3X1_1024 #(
     input       [ LEN_WD-1: 0]          I_S_ARLEN_1,
     input                               I_S_ARLOCK_1,
     input       [ 3: 0]                 I_S_ARQOS_1,
+    input       [15: 0]                 I_S_ARUSER_1,
     input                               I_S_ARVALID_1,
     output wire                         O_S_ARREADY_1,
 
     output wire [ ID_WD-1: 0]           O_S_RID_1,
     output wire [ 511 : 0]              O_S_RDATA_1,
     output wire [ 1: 0]                 O_S_RRESP_1,
+    output wire [15: 0]                 O_S_RUSER_1,
     output wire                         O_S_RLAST_1,
     output wire                         O_S_RVALID_1,
     input                               I_S_RREADY_1,       
@@ -108,17 +115,20 @@ module AOU_AXI4MUX_3X1_1024 #(
     input       [ 3: 0]                 I_S_AWCACHE_1,
     input       [ 2: 0]                 I_S_AWPROT_1,
     input       [ 3: 0]                 I_S_AWQOS_1,
+    input       [15: 0]                 I_S_AWUSER_1,
     input                               I_S_AWVALID_1,
     output wire                         O_S_AWREADY_1,
 
     input       [ 511: 0]               I_S_WDATA_1,
     input       [ 63: 0]                I_S_WSTRB_1,  //WSTRB width = wdata width / 8
     input                               I_S_WLAST_1,
+    input       [15: 0]                 I_S_WUSER_1,
     input                               I_S_WVALID_1,
     output wire                         O_S_WREADY_1,
 
     output wire [ ID_WD-1: 0]           O_S_BID_1,
     output wire [ 1: 0]                 O_S_BRESP_1,
+    output wire [15: 0]                 O_S_BUSER_1,
     output wire                         O_S_BVALID_1,       
     input                               I_S_BREADY_1,
 
@@ -132,12 +142,14 @@ module AOU_AXI4MUX_3X1_1024 #(
     input       [ LEN_WD-1: 0]          I_S_ARLEN_2,
     input                               I_S_ARLOCK_2,
     input       [ 3: 0]                 I_S_ARQOS_2,
+    input       [15: 0]                 I_S_ARUSER_2,
     input                               I_S_ARVALID_2,
     output wire                         O_S_ARREADY_2,
 
     output wire [ ID_WD-1: 0]           O_S_RID_2,
     output wire [ 1023: 0]              O_S_RDATA_2,
     output wire [ 1: 0]                 O_S_RRESP_2,
+    output wire [15: 0]                 O_S_RUSER_2,
     output wire                         O_S_RLAST_2,
     output wire                         O_S_RVALID_2,
     input                               I_S_RREADY_2,       
@@ -151,17 +163,20 @@ module AOU_AXI4MUX_3X1_1024 #(
     input       [ 3: 0]                 I_S_AWCACHE_2,
     input       [ 2: 0]                 I_S_AWPROT_2,
     input       [ 3: 0]                 I_S_AWQOS_2,
+    input       [15: 0]                 I_S_AWUSER_2,
     input                               I_S_AWVALID_2,
     output wire                         O_S_AWREADY_2,
 
     input       [ 1023: 0]              I_S_WDATA_2,
     input       [ 127: 0]               I_S_WSTRB_2,
     input                               I_S_WLAST_2,
+    input       [15: 0]                 I_S_WUSER_2,
     input                               I_S_WVALID_2,
     output wire                         O_S_WREADY_2,
 
     output wire [ ID_WD-1: 0]           O_S_BID_2,
     output wire [ 1: 0]                 O_S_BRESP_2,
+    output wire [15: 0]                 O_S_BUSER_2,
     output wire                         O_S_BVALID_2,       
     input                               I_S_BREADY_2,
 
@@ -175,12 +190,14 @@ module AOU_AXI4MUX_3X1_1024 #(
     output wire [ LEN_WD-1: 0]          O_M_ARLEN,
     output wire                         O_M_ARLOCK,
     output wire [ 3: 0]                 O_M_ARQOS,
+    output wire [15: 0]                 O_M_ARUSER,
     output wire                         O_M_ARVALID,
     input                               I_M_ARREADY,
 
     input       [ ID_WD+1: 0]           I_M_RID,
     input       [ DATA_WD-1: 0]         I_M_RDATA,
     input       [ 1: 0]                 I_M_RRESP,
+    input       [15: 0]                 I_M_RUSER,
     input                               I_M_RLAST,
     input       [ ADDR_WD-1: 0]         I_M_ADDR_CNT,
     input                               I_M_RVALID,
@@ -195,23 +212,26 @@ module AOU_AXI4MUX_3X1_1024 #(
     output wire [ 3: 0]                 O_M_AWCACHE,
     output wire [ 2: 0]                 O_M_AWPROT,
     output wire [ 3: 0]                 O_M_AWQOS,
+    output wire [15: 0]                 O_M_AWUSER,
     output wire                         O_M_AWVALID,
     input                               I_M_AWREADY,      
 
     output wire [ DATA_WD-1: 0]         O_M_WDATA,
     output wire [ STRB_WD-1: 0]         O_M_WSTRB,
     output wire                         O_M_WLAST,
+    output wire [15: 0]                 O_M_WUSER,
     output wire                         O_M_WVALID,
     input                               I_M_WREADY,
 
     input       [ ID_WD+1: 0]           I_M_BID,
     input       [ 1: 0]                 I_M_BRESP,
+    input       [15: 0]                 I_M_BUSER,
     input                               I_M_BVALID,
     output wire                         O_M_BREADY
 );
 
-localparam W_WD = DATA_WD + STRB_WD + 1; // WLAST
-localparam AXI_AWCH_PAYLOAD_WD = ID_WD+2 + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4+ 3 + 4;
+localparam W_WD = DATA_WD + STRB_WD + 1 + 16; // WLAST + WUSER
+localparam AXI_AWCH_PAYLOAD_WD = ID_WD+2 + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4+ 3 + 4 + 16; // + AWUSER
 
 wire [ ID_WD-1: 0]           up_s_awid_0;
 wire [ ADDR_WD-1: 0]         up_s_awaddr_0;
@@ -222,17 +242,20 @@ wire                         up_s_awlock_0;
 wire [ 3: 0]                 up_s_awcache_0;
 wire [ 2: 0]                 up_s_awprot_0;
 wire [ 4-1: 0]               up_s_awqos_0;
+wire [15: 0]                 up_s_awuser_0;
 wire                         up_s_awvalid_0;
 wire                         up_s_awready_0;
 
 wire [ DATA_WD-1: 0]         up_s_wdata_0;
 wire [ STRB_WD-1: 0]         up_s_wstrb_0;
 wire                         up_s_wlast_0;
+wire [15: 0]                 up_s_wuser_0;
 wire                         up_s_wvalid_0;
 wire                         up_s_wready_0;
 
 wire [ ID_WD-1: 0]           up_s_bid_0;
 wire [ 1: 0]                 up_s_bresp_0;
+wire [15: 0]                 up_s_buser_0;
 wire                         up_s_bvalid_0;       
 wire                         up_s_bready_0;
 
@@ -245,12 +268,14 @@ wire [ 2: 0]                 up_s_arprot_0;
 wire [ LEN_WD-1: 0]          up_s_arlen_0;
 wire                         up_s_arlock_0;
 wire [ 4-1: 0]               up_s_arqos_0;
+wire [15: 0]                 up_s_aruser_0;
 wire                         up_s_arvalid_0;
 wire                         up_s_arready_0;
 
 wire [ ID_WD-1: 0]           up_s_rid_0;
 wire [ DATA_WD-1: 0]         up_s_rdata_0;
 wire [ 1: 0]                 up_s_rresp_0;
+wire [15: 0]                 up_s_ruser_0;
 wire                         up_s_rlast_0;
 wire [ ADDR_WD-1: 0]         up_s_addr_cnt_0;
 wire                         up_s_rvalid_0;
@@ -265,17 +290,20 @@ wire                         up_s_awlock_1;
 wire [ 3: 0]                 up_s_awcache_1;
 wire [ 2: 0]                 up_s_awprot_1;
 wire [ 4-1: 0]               up_s_awqos_1;
+wire [15: 0]                 up_s_awuser_1;
 wire                         up_s_awvalid_1;
 wire                         up_s_awready_1;
 
 wire [ DATA_WD-1: 0]         up_s_wdata_1;
 wire [ STRB_WD-1: 0]         up_s_wstrb_1;
 wire                         up_s_wlast_1;
+wire [15: 0]                 up_s_wuser_1;
 wire                         up_s_wvalid_1;
 wire                         up_s_wready_1;
 
 wire [ ID_WD-1: 0]           up_s_bid_1;
 wire [ 1: 0]                 up_s_bresp_1;
+wire [15: 0]                 up_s_buser_1;
 wire                         up_s_bvalid_1;       
 wire                         up_s_bready_1;
 
@@ -288,12 +316,14 @@ wire [ 2: 0]                 up_s_arprot_1;
 wire [ LEN_WD-1: 0]          up_s_arlen_1;
 wire                         up_s_arlock_1;
 wire [ 4-1: 0]               up_s_arqos_1;
+wire [15: 0]                 up_s_aruser_1;
 wire                         up_s_arvalid_1;
 wire                         up_s_arready_1;
 
 wire [ ID_WD-1: 0]           up_s_rid_1;
 wire [ DATA_WD-1: 0]         up_s_rdata_1;
 wire [ 1: 0]                 up_s_rresp_1;
+wire [15: 0]                 up_s_ruser_1;
 wire                         up_s_rlast_1;
 wire [ ADDR_WD-1: 0]         up_s_addr_cnt_1;
 wire                         up_s_rvalid_1;
@@ -319,12 +349,14 @@ AOU_AXI_UP #(
     .I_S_ARLEN     ( I_S_ARLEN_0     ),
     .I_S_ARLOCK    ( I_S_ARLOCK_0    ),
     .I_S_ARQOS     ( I_S_ARQOS_0     ),
+    .I_S_ARUSER    ( I_S_ARUSER_0    ),
     .I_S_ARVALID   ( I_S_ARVALID_0   ),
     .O_S_ARREADY   ( O_S_ARREADY_0   ),
 
     .O_S_RID       ( O_S_RID_0       ),
     .O_S_RDATA     ( O_S_RDATA_0     ),
     .O_S_RRESP     ( O_S_RRESP_0     ),
+    .O_S_RUSER     ( O_S_RUSER_0     ),
     .O_S_RLAST     ( O_S_RLAST_0     ),
     .O_S_RVALID    ( O_S_RVALID_0    ),
     .I_S_RREADY    ( I_S_RREADY_0    ),
@@ -338,17 +370,20 @@ AOU_AXI_UP #(
     .I_S_AWCACHE   ( I_S_AWCACHE_0   ),
     .I_S_AWPROT    ( I_S_AWPROT_0    ),
     .I_S_AWQOS     ( I_S_AWQOS_0     ),
+    .I_S_AWUSER    ( I_S_AWUSER_0    ),
     .I_S_AWVALID   ( I_S_AWVALID_0   ),
     .O_S_AWREADY   ( O_S_AWREADY_0   ),
 
     .I_S_WDATA     ( I_S_WDATA_0     ),
     .I_S_WSTRB     ( I_S_WSTRB_0     ),  
     .I_S_WLAST     ( I_S_WLAST_0     ),
+    .I_S_WUSER     ( I_S_WUSER_0     ),
     .I_S_WVALID    ( I_S_WVALID_0    ),
     .O_S_WREADY    ( O_S_WREADY_0    ),
 
     .O_S_BID       ( O_S_BID_0       ),
     .O_S_BRESP     ( O_S_BRESP_0     ),
+    .O_S_BUSER     ( O_S_BUSER_0     ),
     .O_S_BVALID    ( O_S_BVALID_0    ),
     .I_S_BREADY    ( I_S_BREADY_0    ),
 
@@ -361,12 +396,14 @@ AOU_AXI_UP #(
     .O_M_ARLEN     ( up_s_arlen_0    ),
     .O_M_ARLOCK    ( up_s_arlock_0   ),
     .O_M_ARQOS     ( up_s_arqos_0    ),
+    .O_M_ARUSER    ( up_s_aruser_0   ),
     .O_M_ARVALID   ( up_s_arvalid_0  ),
     .I_M_ARREADY   ( up_s_arready_0  ),
 
     .I_M_RID       ( up_s_rid_0      ),
     .I_M_RDATA     ( up_s_rdata_0    ),
     .I_M_RRESP     ( up_s_rresp_0    ),
+    .I_M_RUSER     ( up_s_ruser_0    ),
     .I_M_RLAST     ( up_s_rlast_0    ),
     .I_M_ADDR_CNT  ( up_s_addr_cnt_0 ),
     .I_M_RVALID    ( up_s_rvalid_0   ),
@@ -381,17 +418,20 @@ AOU_AXI_UP #(
     .O_M_AWCACHE   ( up_s_awcache_0  ),
     .O_M_AWPROT    ( up_s_awprot_0   ),
     .O_M_AWQOS     ( up_s_awqos_0    ),
+    .O_M_AWUSER    ( up_s_awuser_0   ),
     .O_M_AWVALID   ( up_s_awvalid_0  ),
     .I_M_AWREADY   ( up_s_awready_0  ),
 
     .O_M_WDATA     ( up_s_wdata_0    ),
     .O_M_WSTRB     ( up_s_wstrb_0    ),
     .O_M_WLAST     ( up_s_wlast_0    ),
+    .O_M_WUSER     ( up_s_wuser_0    ),
     .O_M_WVALID    ( up_s_wvalid_0   ),
     .I_M_WREADY    ( up_s_wready_0   ),
 
     .I_M_BID       ( up_s_bid_0      ),
     .I_M_BRESP     ( up_s_bresp_0    ),
+    .I_M_BUSER     ( up_s_buser_0    ),
     .I_M_BVALID    ( up_s_bvalid_0   ),
     .O_M_BREADY    ( up_s_bready_0   )
 
@@ -417,12 +457,14 @@ AOU_AXI_UP #(
     .I_S_ARLEN     ( I_S_ARLEN_1     ),
     .I_S_ARLOCK    ( I_S_ARLOCK_1    ),
     .I_S_ARQOS     ( I_S_ARQOS_1     ),
+    .I_S_ARUSER    ( I_S_ARUSER_1    ),
     .I_S_ARVALID   ( I_S_ARVALID_1   ),
     .O_S_ARREADY   ( O_S_ARREADY_1   ),
 
     .O_S_RID       ( O_S_RID_1       ),
     .O_S_RDATA     ( O_S_RDATA_1     ),
     .O_S_RRESP     ( O_S_RRESP_1     ),
+    .O_S_RUSER     ( O_S_RUSER_1     ),
     .O_S_RLAST     ( O_S_RLAST_1     ),
     .O_S_RVALID    ( O_S_RVALID_1    ),
     .I_S_RREADY    ( I_S_RREADY_1    ),
@@ -436,17 +478,20 @@ AOU_AXI_UP #(
     .I_S_AWCACHE   ( I_S_AWCACHE_1   ),
     .I_S_AWPROT    ( I_S_AWPROT_1    ),
     .I_S_AWQOS     ( I_S_AWQOS_1     ),
+    .I_S_AWUSER    ( I_S_AWUSER_1    ),
     .I_S_AWVALID   ( I_S_AWVALID_1   ),
     .O_S_AWREADY   ( O_S_AWREADY_1   ),
 
     .I_S_WDATA     ( I_S_WDATA_1     ),
     .I_S_WSTRB     ( I_S_WSTRB_1     ),  
     .I_S_WLAST     ( I_S_WLAST_1     ),
+    .I_S_WUSER     ( I_S_WUSER_1     ),
     .I_S_WVALID    ( I_S_WVALID_1    ),
     .O_S_WREADY    ( O_S_WREADY_1    ),
 
     .O_S_BID       ( O_S_BID_1       ),
     .O_S_BRESP     ( O_S_BRESP_1     ),
+    .O_S_BUSER     ( O_S_BUSER_1     ),
     .O_S_BVALID    ( O_S_BVALID_1    ),
     .I_S_BREADY    ( I_S_BREADY_1    ),
 
@@ -459,12 +504,14 @@ AOU_AXI_UP #(
     .O_M_ARLEN     ( up_s_arlen_1    ),
     .O_M_ARLOCK    ( up_s_arlock_1   ),
     .O_M_ARQOS     ( up_s_arqos_1    ),
+    .O_M_ARUSER    ( up_s_aruser_1   ),
     .O_M_ARVALID   ( up_s_arvalid_1  ),
     .I_M_ARREADY   ( up_s_arready_1  ),
 
     .I_M_RID       ( up_s_rid_1      ),
     .I_M_RDATA     ( up_s_rdata_1    ),
     .I_M_RRESP     ( up_s_rresp_1    ),
+    .I_M_RUSER     ( up_s_ruser_1    ),
     .I_M_RLAST     ( up_s_rlast_1    ),
     .I_M_ADDR_CNT  ( up_s_addr_cnt_1 ),
     .I_M_RVALID    ( up_s_rvalid_1   ),
@@ -479,17 +526,20 @@ AOU_AXI_UP #(
     .O_M_AWCACHE   ( up_s_awcache_1  ),
     .O_M_AWPROT    ( up_s_awprot_1   ),
     .O_M_AWQOS     ( up_s_awqos_1    ),
+    .O_M_AWUSER    ( up_s_awuser_1   ),
     .O_M_AWVALID   ( up_s_awvalid_1  ),
     .I_M_AWREADY   ( up_s_awready_1  ),
 
     .O_M_WDATA     ( up_s_wdata_1    ),
     .O_M_WSTRB     ( up_s_wstrb_1    ),
     .O_M_WLAST     ( up_s_wlast_1    ),
+    .O_M_WUSER     ( up_s_wuser_1    ),
     .O_M_WVALID    ( up_s_wvalid_1   ),
     .I_M_WREADY    ( up_s_wready_1   ),
 
     .I_M_BID       ( up_s_bid_1      ),
     .I_M_BRESP     ( up_s_bresp_1    ),
+    .I_M_BUSER     ( up_s_buser_1    ),
     .I_M_BVALID    ( up_s_bvalid_1   ),
     .O_M_BREADY    ( up_s_bready_1   )
 );
@@ -507,6 +557,7 @@ wire                         O_M_AWLOCK_tmp;
 wire [ 3: 0]                 O_M_AWCACHE_tmp;
 wire [ 2: 0]                 O_M_AWPROT_tmp;
 wire [ 3: 0]                 O_M_AWQOS_tmp;
+wire [15: 0]                 O_M_AWUSER_tmp;
 wire                         O_M_AWVALID_tmp;
 
 
@@ -516,6 +567,7 @@ wire                         O_SS_WREADY_0  ;
 wire [ DATA_WD-1: 0]         I_SS_WDATA_0   ;
 wire [ STRB_WD-1: 0]         I_SS_WSTRB_0   ;
 wire                         I_SS_WLAST_0   ;
+wire [15: 0]                 I_SS_WUSER_0   ;
 
 wire [W_WD - 1:0]     w_s_w_payload_0;
 wire [W_WD - 1:0]     w_m_w_payload_0;
@@ -527,6 +579,7 @@ wire                         O_SS_WREADY_1  ;
 wire [ DATA_WD-1: 0]         I_SS_WDATA_1   ;
 wire [ STRB_WD-1: 0]         I_SS_WSTRB_1   ;
 wire                         I_SS_WLAST_1   ;
+wire [15: 0]                 I_SS_WUSER_1   ;
 
 wire [W_WD - 1:0]     w_s_w_payload_1;
 wire [W_WD - 1:0]     w_m_w_payload_1;
@@ -538,6 +591,7 @@ wire                         O_SS_WREADY_2  ;
 wire [ DATA_WD-1: 0]         I_SS_WDATA_2   ;
 wire [ STRB_WD-1: 0]         I_SS_WSTRB_2   ;
 wire                         I_SS_WLAST_2   ;
+wire [15: 0]                 I_SS_WUSER_2   ;
 
 wire [W_WD - 1:0]     w_s_w_payload_2;
 wire [W_WD - 1:0]     w_m_w_payload_2;
@@ -578,6 +632,7 @@ assign  O_M_ARPROT  = (ar_grant[0])? up_s_arprot_0       : (ar_grant[1])? up_s_a
 assign  O_M_ARLEN   = (ar_grant[0])? up_s_arlen_0        : (ar_grant[1])? up_s_arlen_1        :(ar_grant[2])? I_S_ARLEN_2         : 'd0;
 assign  O_M_ARLOCK  = (ar_grant[0])? up_s_arlock_0       : (ar_grant[1])? up_s_arlock_1       :(ar_grant[2])? I_S_ARLOCK_2        : 'd0;
 assign  O_M_ARQOS   = (ar_grant[0])? up_s_arqos_0        : (ar_grant[1])? up_s_arqos_1        :(ar_grant[2])? I_S_ARQOS_2         : 'd0;
+assign  O_M_ARUSER  = (ar_grant[0])? up_s_aruser_0        : (ar_grant[1])? up_s_aruser_1        :(ar_grant[2])? I_S_ARUSER_2         : 'd0;
 
 assign  up_s_arready_0   = (ar_grant[0])? I_M_ARREADY   : 1'b0;
 assign  up_s_arready_1   = (ar_grant[1])? I_M_ARREADY   : 1'b0;
@@ -593,8 +648,11 @@ assign  up_s_rdata_0    = I_M_RDATA;
 assign  up_s_rdata_1    = I_M_RDATA;
 assign  O_S_RDATA_2     = I_M_RDATA;
 assign  up_s_rresp_0    = I_M_RRESP;
+assign  up_s_ruser_0    = I_M_RUSER;
 assign  up_s_rresp_1    = I_M_RRESP;
+assign  up_s_ruser_1    = I_M_RUSER;
 assign  O_S_RRESP_2     = I_M_RRESP;
+assign  O_S_RUSER_2     = I_M_RUSER;
 assign  up_s_rlast_0    = I_M_RLAST;
 assign  up_s_rlast_1    = I_M_RLAST;
 assign  O_S_RLAST_2     = I_M_RLAST;
@@ -652,6 +710,7 @@ assign  O_M_AWLOCK_tmp      = (aw_grant[0]) ? up_s_awlock_0       : (aw_grant[1]
 assign  O_M_AWCACHE_tmp     = (aw_grant[0]) ? up_s_awcache_0      : (aw_grant[1]) ? up_s_awcache_1      : (aw_grant[2]) ? I_S_AWCACHE_2       : 'd0;
 assign  O_M_AWPROT_tmp      = (aw_grant[0]) ? up_s_awprot_0       : (aw_grant[1]) ? up_s_awprot_1       : (aw_grant[2]) ? I_S_AWPROT_2        : 'd0;
 assign  O_M_AWQOS_tmp       = (aw_grant[0]) ? up_s_awqos_0        : (aw_grant[1]) ? up_s_awqos_1        : (aw_grant[2]) ? I_S_AWQOS_2         : 'd0;
+assign  O_M_AWUSER_tmp      = (aw_grant[0]) ? up_s_awuser_0        : (aw_grant[1]) ? up_s_awuser_1        : (aw_grant[2]) ? I_S_AWUSER_2         : 'd0;
 assign  O_M_AWVALID_tmp     = (aw_grant[0]) ? (up_s_awvalid_0 & w_awfifo_sready) : 
                               (aw_grant[1]) ? (up_s_awvalid_1 & w_awfifo_sready) : 
                                               (I_S_AWVALID_2  & w_awfifo_sready) ;
@@ -665,7 +724,8 @@ assign w_awch_fwd_rs_sdata = {
     O_M_AWLOCK_tmp,
     O_M_AWCACHE_tmp,
     O_M_AWPROT_tmp,
-    O_M_AWQOS_tmp };
+    O_M_AWQOS_tmp,
+    O_M_AWUSER_tmp };
 
 AOU_FWD_RS #(
     .DATA_WIDTH ( AXI_AWCH_PAYLOAD_WD  )
@@ -694,7 +754,8 @@ assign {O_M_AWID,
         O_M_AWLOCK,
         O_M_AWCACHE,
         O_M_AWPROT,
-        O_M_AWQOS } = w_awch_fwd_rs_mdata;
+        O_M_AWQOS,
+        O_M_AWUSER } = w_awch_fwd_rs_mdata;
 
 AOU_SYNC_FIFO_REG  #
 (
@@ -721,8 +782,8 @@ AOU_SYNC_FIFO_REG  #
 //                          W
 //==============================================================
 
-assign w_s_w_payload_0 = {up_s_wdata_0, up_s_wstrb_0, up_s_wlast_0};
-assign {I_SS_WDATA_0, I_SS_WSTRB_0, I_SS_WLAST_0} = w_m_w_payload_0;
+assign w_s_w_payload_0 = {up_s_wdata_0, up_s_wstrb_0, up_s_wlast_0, up_s_wuser_0};
+assign {I_SS_WDATA_0, I_SS_WSTRB_0, I_SS_WLAST_0, I_SS_WUSER_0} = w_m_w_payload_0;
 
 
 // W channel
@@ -750,8 +811,8 @@ u_wch_aximux_4x1_sync_fifo_0
 
 //==============================================================
 
-assign w_s_w_payload_1 = {up_s_wdata_1, up_s_wstrb_1, up_s_wlast_1};
-assign {I_SS_WDATA_1, I_SS_WSTRB_1, I_SS_WLAST_1} = w_m_w_payload_1;
+assign w_s_w_payload_1 = {up_s_wdata_1, up_s_wstrb_1, up_s_wlast_1, up_s_wuser_1};
+assign {I_SS_WDATA_1, I_SS_WSTRB_1, I_SS_WLAST_1, I_SS_WUSER_1} = w_m_w_payload_1;
 
 
 // W channel
@@ -779,8 +840,8 @@ u_wch_aximux_4x1_sync_fifo_1
 
 //==============================================================
 
-assign w_s_w_payload_2 = {I_S_WDATA_2, I_S_WSTRB_2, I_S_WLAST_2};
-assign {I_SS_WDATA_2, I_SS_WSTRB_2, I_SS_WLAST_2} = w_m_w_payload_2;
+assign w_s_w_payload_2 = {I_S_WDATA_2, I_S_WSTRB_2, I_S_WLAST_2, I_S_WUSER_2};
+assign {I_SS_WDATA_2, I_SS_WSTRB_2, I_SS_WLAST_2, I_SS_WUSER_2} = w_m_w_payload_2;
 
 // W channel
 AOU_SYNC_FIFO_REG 
@@ -816,6 +877,7 @@ assign  O_SS_WREADY_2    = ((w_granted_wch2)? I_M_WREADY   : 1'b0) | w_no_wvalid
 assign  O_M_WDATA        = (w_granted_wch0)? I_SS_WDATA_0  : (w_granted_wch1)? I_SS_WDATA_1  : (w_granted_wch2)? I_SS_WDATA_2  : 'd0;
 assign  O_M_WSTRB        = (w_granted_wch0)? I_SS_WSTRB_0  : (w_granted_wch1)? I_SS_WSTRB_1  : (w_granted_wch2)? I_SS_WSTRB_2  : 'd0;
 assign  O_M_WLAST        = (w_granted_wch0)? I_SS_WLAST_0  : (w_granted_wch1)? I_SS_WLAST_1  : (w_granted_wch2)? I_SS_WLAST_2  : 'd0;
+assign  O_M_WUSER        = (w_granted_wch0)? I_SS_WUSER_0  : (w_granted_wch1)? I_SS_WUSER_1  : (w_granted_wch2)? I_SS_WUSER_2  : 'd0;
 assign  O_M_WVALID       = ((w_granted_wch0)? (I_SS_WVALID_0) : 
                             (w_granted_wch1)? (I_SS_WVALID_1) : 
                             (w_granted_wch2)? (I_SS_WVALID_2) : 'b0) & w_awfifo_mvalid;
@@ -827,8 +889,11 @@ assign  up_s_bid_0      = I_M_BID[ID_WD+1:2];
 assign  up_s_bid_1      = I_M_BID[ID_WD+1:2];
 assign  O_S_BID_2       = I_M_BID[ID_WD+1:2];
 assign  up_s_bresp_0    = I_M_BRESP;
+assign  up_s_buser_0    = I_M_BUSER;
 assign  up_s_bresp_1    = I_M_BRESP;
+assign  up_s_buser_1    = I_M_BUSER;
 assign  O_S_BRESP_2     = I_M_BRESP;
+assign  O_S_BUSER_2     = I_M_BUSER;
 assign  up_s_bvalid_0   = (I_M_BID[1:0] == 2'b00) & I_M_BVALID;
 assign  up_s_bvalid_1   = (I_M_BID[1:0] == 2'b01) & I_M_BVALID;
 assign  O_S_BVALID_2    = (I_M_BID[1:0] == 2'b10) & I_M_BVALID;

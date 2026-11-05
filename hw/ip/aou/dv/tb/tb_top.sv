@@ -7,7 +7,8 @@
 // configuration comes from defines (aou_sim_cfg.toml targets; Makefile CONFIG): AOU_RP_COUNT, AOU_RP<n>_DATA_W (per RP; default
 // AOU_RP_DATA_W), AOU_FDI_CONFIG, AOU_TX_NXT_PACKING (TX_NXT_PACKING_EN, default 0), TWO_PHY for the
 // two-PHY FDI configurations, and
-// AOU_RX_FIFO_ALT for non-default RX FIFO depths with the register slices off
+// AOU_RX_FIFO_ALT for non-default RX FIFO depths (granules for W and R) with the
+// request/response register slices off
 // (aou_t1_env_pkg::AOU_T1_RX_DEPTH). Every interface is registered in
 // uvm_config_db under scope "*" (docs/AOU_TB_ARCH.adoc) by the SV-UVM harness
 // block at the end (`ifdef UVM), which also compiles the test classes
@@ -58,9 +59,10 @@ module tb_top;
   endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
   localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
-  localparam int BUS_W      = 1024;
+  localparam int BUS_W      = aou_fdi_pkg::BUS_W;   // widest FDI beat (256 B)
   localparam int AXI_W      = 1024;
-  localparam int WD0 = (FDI_CFG == 0 || FDI_CFG == 3) ? 256 : (FDI_CFG == 2) ? 1024 : 512;
+  localparam int WD0 = (FDI_CFG == 0 || FDI_CFG == 3) ? 256 : (FDI_CFG == 2) ? 1024 :
+                       (FDI_CFG == 5) ? 2048 : 512;
 `ifdef TWO_PHY
   localparam int WD1 = (FDI_CFG == 4) ? 1024 : 512;
   localparam bit TWO_PHY_BUILD = 1'b1;
@@ -70,7 +72,7 @@ module tb_top;
 
   // The RTL does not cross-check FDI_CONFIG against TWO_PHY.
   initial begin
-    if (TWO_PHY_BUILD != (FDI_CFG >= 3))
+    if (TWO_PHY_BUILD != (FDI_CFG == 3 || FDI_CFG == 4))
       $fatal(1, "FDI_CONFIG=%0d does not match TWO_PHY=%0b", FDI_CFG, TWO_PHY_BUILD);
   end
 
@@ -203,6 +205,12 @@ module tb_top;
                                       s_bready, s_rlast, s_rvalid, s_rready;
   logic [RP_COUNT-1:0][RP_DATA_W-1:0] s_wdata, s_rdata;
   logic [RP_COUNT-1:0][SW-1:0]        s_wstrb;
+  // AXI USER, 16 bits (AoU v0.8 Table 31): the DUT takes AWUSER/ARUSER/WUSER
+  // on the S port and BUSER/RUSER on the M port and sends them as FLEX; the
+  // FLEX of the messages it receives comes out as M-port AWUSER/ARUSER/WUSER
+  // and S-port BUSER/RUSER.
+  logic [RP_COUNT-1:0][15:0]          s_awuser, s_aruser, s_wuser, s_buser, s_ruser;
+  logic [RP_COUNT-1:0][15:0]          m_awuser, m_aruser, m_wuser, m_buser, m_ruser;
 
   logic [RP_COUNT-1:0][9:0]           m_awid, m_arid, m_bid, m_rid;
   logic [RP_COUNT-1:0][63:0]          m_awaddr, m_araddr;
@@ -228,15 +236,18 @@ module tb_top;
     assign s_awcache[r] = s_axi[r].awcache;
     assign s_awprot[r]  = s_axi[r].awprot;
     assign s_awqos[r]   = s_axi[r].awqos;
+    assign s_awuser[r]  = s_axi[r].awuser;
     assign s_awvalid[r] = s_axi[r].awvalid;
     assign s_axi[r].awready = s_awready[r];
     assign s_wdata[r]   = RP_DATA_W'(s_axi[r].wdata[W-1:0]);
     assign s_wstrb[r]   = SW'(s_axi[r].wstrb[W/8-1:0]);
     assign s_wlast[r]   = s_axi[r].wlast;
+    assign s_wuser[r]   = s_axi[r].wuser;
     assign s_wvalid[r]  = s_axi[r].wvalid;
     assign s_axi[r].wready = s_wready[r];
     assign s_axi[r].bid    = s_bid[r];
     assign s_axi[r].bresp  = s_bresp[r];
+    assign s_axi[r].buser  = s_buser[r];
     assign s_axi[r].bvalid = s_bvalid[r];
     assign s_bready[r]  = s_axi[r].bready;
     assign s_arid[r]    = s_axi[r].arid;
@@ -248,12 +259,14 @@ module tb_top;
     assign s_arcache[r] = s_axi[r].arcache;
     assign s_arprot[r]  = s_axi[r].arprot;
     assign s_arqos[r]   = s_axi[r].arqos;
+    assign s_aruser[r]  = s_axi[r].aruser;
     assign s_arvalid[r] = s_axi[r].arvalid;
     assign s_axi[r].arready = s_arready[r];
     assign s_axi[r].rid    = s_rid[r];
     assign s_axi[r].rdata  = AXI_W'(s_rdata[r][W-1:0]);
     assign s_axi[r].rresp  = s_rresp[r];
     assign s_axi[r].rlast  = s_rlast[r];
+    assign s_axi[r].ruser  = s_ruser[r];
     assign s_axi[r].rvalid = s_rvalid[r];
     assign s_rready[r]  = s_axi[r].rready;
 
@@ -267,15 +280,18 @@ module tb_top;
     assign m_axi[r].awcache = m_awcache[r];
     assign m_axi[r].awprot  = m_awprot[r];
     assign m_axi[r].awqos   = m_awqos[r];
+    assign m_axi[r].awuser  = m_awuser[r];
     assign m_axi[r].awvalid = m_awvalid[r];
     assign m_awready[r] = m_axi[r].awready;
     assign m_axi[r].wdata   = AXI_W'(m_wdata[r][W-1:0]);
     assign m_axi[r].wstrb   = (AXI_W / 8)'(m_wstrb[r][W/8-1:0]);
     assign m_axi[r].wlast   = m_wlast[r];
+    assign m_axi[r].wuser   = m_wuser[r];
     assign m_axi[r].wvalid  = m_wvalid[r];
     assign m_wready[r]  = m_axi[r].wready;
     assign m_bid[r]     = m_axi[r].bid;
     assign m_bresp[r]   = m_axi[r].bresp;
+    assign m_buser[r]   = m_axi[r].buser;
     assign m_bvalid[r]  = m_axi[r].bvalid;
     assign m_axi[r].bready  = m_bready[r];
     assign m_axi[r].arid    = m_arid[r];
@@ -287,12 +303,14 @@ module tb_top;
     assign m_axi[r].arcache = m_arcache[r];
     assign m_axi[r].arprot  = m_arprot[r];
     assign m_axi[r].arqos   = m_arqos[r];
+    assign m_axi[r].aruser  = m_aruser[r];
     assign m_axi[r].arvalid = m_arvalid[r];
     assign m_arready[r] = m_axi[r].arready;
     assign m_rid[r]     = m_axi[r].rid;
     assign m_rdata[r]   = RP_DATA_W'(m_axi[r].rdata[W-1:0]);
     assign m_rresp[r]   = m_axi[r].rresp;
     assign m_rlast[r]   = m_axi[r].rlast;
+    assign m_ruser[r]   = m_axi[r].ruser;
     assign m_rvalid[r]  = m_axi[r].rvalid;
     assign m_axi[r].rready  = m_rready[r];
 
@@ -302,21 +320,22 @@ module tb_top;
     assign s_axi[r].awid = '0;    assign s_axi[r].awaddr = '0;  assign s_axi[r].awlen = '0;
     assign s_axi[r].awsize = '0;  assign s_axi[r].awburst = '0; assign s_axi[r].awlock = '0;
     assign s_axi[r].awcache = '0; assign s_axi[r].awprot = '0;  assign s_axi[r].awqos = '0;
-    assign s_axi[r].awvalid = 1'b0;
+    assign s_axi[r].awuser = '0;  assign s_axi[r].awvalid = 1'b0;
     assign s_axi[r].wdata = '0;   assign s_axi[r].wstrb = '0;   assign s_axi[r].wlast = 1'b0;
-    assign s_axi[r].wvalid = 1'b0;
+    assign s_axi[r].wuser = '0;   assign s_axi[r].wvalid = 1'b0;
     assign s_axi[r].bready = 1'b1;
     assign s_axi[r].arid = '0;    assign s_axi[r].araddr = '0;  assign s_axi[r].arlen = '0;
     assign s_axi[r].arsize = '0;  assign s_axi[r].arburst = '0; assign s_axi[r].arlock = '0;
     assign s_axi[r].arcache = '0; assign s_axi[r].arprot = '0;  assign s_axi[r].arqos = '0;
-    assign s_axi[r].arvalid = 1'b0;
+    assign s_axi[r].aruser = '0;  assign s_axi[r].arvalid = 1'b0;
     assign s_axi[r].rready = 1'b1;
     assign m_axi[r].awready = 1'b1;
     assign m_axi[r].wready = 1'b1;
-    assign m_axi[r].bid = '0;     assign m_axi[r].bresp = '0;   assign m_axi[r].bvalid = 1'b0;
+    assign m_axi[r].bid = '0;     assign m_axi[r].bresp = '0;   assign m_axi[r].buser = '0;
+    assign m_axi[r].bvalid = 1'b0;
     assign m_axi[r].arready = 1'b1;
     assign m_axi[r].rid = '0;     assign m_axi[r].rdata = '0;   assign m_axi[r].rresp = '0;
-    assign m_axi[r].rlast = 1'b0; assign m_axi[r].rvalid = 1'b0;
+    assign m_axi[r].rlast = 1'b0; assign m_axi[r].ruser = '0;   assign m_axi[r].rvalid = 1'b0;
 `endif
   end
 
@@ -397,6 +416,25 @@ module tb_top;
 `undef AOU_WDT_SFR
 `undef AOU_WDT_CTRL
 
+  // RX granule store taps (aou_rx_gs_if): each RP's WriteData and ReadData
+  // store handing a complete message, as raw granules, to its output buffer.
+`define AOU_GS_RP(R) u_dut.u_aou_core_top.gen_aou_fifo_rp[R].u_aou_fifo_rp
+  aou_rx_gs_if gs (.clk(clk));
+  for (genvar r = 0; r < 4; r++) begin : g_gs
+    if (r < RP_COUNT) begin : g_rp
+      assign gs.valid[0][r] = `AOU_GS_RP(r).u_aou_rx_w_store.w_out_svalid;
+      assign gs.g[0][r]     = `AOU_GS_RP(r).u_aou_rx_w_store.w_msg_g;
+      assign gs.valid[1][r] = `AOU_GS_RP(r).u_aou_rx_r_store.w_out_svalid;
+      assign gs.g[1][r]     = `AOU_GS_RP(r).u_aou_rx_r_store.w_msg_g;
+    end else begin : g_none
+      assign gs.valid[0][r] = 1'b0;
+      assign gs.g[0][r]     = '0;
+      assign gs.valid[1][r] = 1'b0;
+      assign gs.g[1][r]     = '0;
+    end
+  end
+`undef AOU_GS_RP
+
   AOU_TOP #(
       .RP_COUNT       (RP_COUNT),
       .FDI_CONFIG     (FDI_CFG),
@@ -447,8 +485,6 @@ module tb_top;
       .RP3_RX_B_FIFO_DEPTH(aou_t1_env_pkg::AOU_T1_RX_DEPTH[3][4]),
       .RX_AW_FIFO_RS_EN(aou_t1_env_pkg::AOU_T1_RX_RS_EN),
       .RX_AR_FIFO_RS_EN(aou_t1_env_pkg::AOU_T1_RX_RS_EN),
-      .RX_W_FIFO_RS_EN(aou_t1_env_pkg::AOU_T1_RX_RS_EN),
-      .RX_R_FIFO_RS_EN(aou_t1_env_pkg::AOU_T1_RX_RS_EN),
       .RX_B_FIFO_RS_EN(aou_t1_env_pkg::AOU_T1_RX_RS_EN)
 `endif
   ) u_dut (
@@ -470,21 +506,26 @@ module tb_top;
       .O_AOU_RX_AXI_M_ARLEN  (m_arlen),   .O_AOU_RX_AXI_M_ARSIZE (m_arsize),
       .O_AOU_RX_AXI_M_ARBURST(m_arburst), .O_AOU_RX_AXI_M_ARLOCK (m_arlock),
       .O_AOU_RX_AXI_M_ARCACHE(m_arcache), .O_AOU_RX_AXI_M_ARPROT (m_arprot),
-      .O_AOU_RX_AXI_M_ARQOS  (m_arqos),   .O_AOU_RX_AXI_M_ARVALID(m_arvalid),
+      .O_AOU_RX_AXI_M_ARQOS  (m_arqos),   .O_AOU_RX_AXI_M_ARUSER (m_aruser),
+      .O_AOU_RX_AXI_M_ARVALID(m_arvalid),
       .I_AOU_RX_AXI_M_ARREADY(m_arready),
       .I_AOU_TX_AXI_M_RID    (m_rid),     .I_AOU_TX_AXI_M_RDATA  (m_rdata),
       .I_AOU_TX_AXI_M_RRESP  (m_rresp),   .I_AOU_TX_AXI_M_RLAST  (m_rlast),
+      .I_AOU_TX_AXI_M_RUSER  (m_ruser),
       .I_AOU_TX_AXI_M_RVALID (m_rvalid),  .O_AOU_TX_AXI_M_RREADY (m_rready),
       .O_AOU_RX_AXI_M_AWID   (m_awid),    .O_AOU_RX_AXI_M_AWADDR (m_awaddr),
       .O_AOU_RX_AXI_M_AWLEN  (m_awlen),   .O_AOU_RX_AXI_M_AWSIZE (m_awsize),
       .O_AOU_RX_AXI_M_AWBURST(m_awburst), .O_AOU_RX_AXI_M_AWLOCK (m_awlock),
       .O_AOU_RX_AXI_M_AWCACHE(m_awcache), .O_AOU_RX_AXI_M_AWPROT (m_awprot),
-      .O_AOU_RX_AXI_M_AWQOS  (m_awqos),   .O_AOU_RX_AXI_M_AWVALID(m_awvalid),
+      .O_AOU_RX_AXI_M_AWQOS  (m_awqos),   .O_AOU_RX_AXI_M_AWUSER (m_awuser),
+      .O_AOU_RX_AXI_M_AWVALID(m_awvalid),
       .I_AOU_RX_AXI_M_AWREADY(m_awready),
       .O_AOU_RX_AXI_M_WDATA  (m_wdata),   .O_AOU_RX_AXI_M_WSTRB  (m_wstrb),
-      .O_AOU_RX_AXI_M_WLAST  (m_wlast),   .O_AOU_RX_AXI_M_WVALID (m_wvalid),
+      .O_AOU_RX_AXI_M_WLAST  (m_wlast),   .O_AOU_RX_AXI_M_WUSER  (m_wuser),
+      .O_AOU_RX_AXI_M_WVALID (m_wvalid),
       .I_AOU_RX_AXI_M_WREADY (m_wready),
       .I_AOU_TX_AXI_M_BID    (m_bid),     .I_AOU_TX_AXI_M_BRESP  (m_bresp),
+      .I_AOU_TX_AXI_M_BUSER  (m_buser),
       .I_AOU_TX_AXI_M_BVALID (m_bvalid),  .O_AOU_TX_AXI_M_BREADY (m_bready),
 
       .I_AOU_TX_AXI_S_ARID   (s_arid),    .I_AOU_TX_AXI_S_ARADDR (s_araddr),
@@ -492,20 +533,25 @@ module tb_top;
       .I_AOU_TX_AXI_S_ARBURST(s_arburst), .I_AOU_TX_AXI_S_ARLOCK (s_arlock),
       .I_AOU_TX_AXI_S_ARCACHE(s_arcache), .I_AOU_TX_AXI_S_ARPROT (s_arprot),
       .I_AOU_TX_AXI_S_ARQOS  (s_arqos),   .I_AOU_TX_AXI_S_ARVALID(s_arvalid),
+      .I_AOU_TX_AXI_S_ARUSER (s_aruser),
       .O_AOU_TX_AXI_S_ARREADY(s_arready),
       .O_AOU_RX_AXI_S_RID    (s_rid),     .O_AOU_RX_AXI_S_RDATA  (s_rdata),
       .O_AOU_RX_AXI_S_RRESP  (s_rresp),   .O_AOU_RX_AXI_S_RLAST  (s_rlast),
+      .O_AOU_RX_AXI_S_RUSER  (s_ruser),
       .O_AOU_RX_AXI_S_RVALID (s_rvalid),  .I_AOU_RX_AXI_S_RREADY (s_rready),
       .I_AOU_TX_AXI_S_AWID   (s_awid),    .I_AOU_TX_AXI_S_AWADDR (s_awaddr),
       .I_AOU_TX_AXI_S_AWLEN  (s_awlen),   .I_AOU_TX_AXI_S_AWSIZE (s_awsize),
       .I_AOU_TX_AXI_S_AWBURST(s_awburst), .I_AOU_TX_AXI_S_AWLOCK (s_awlock),
       .I_AOU_TX_AXI_S_AWCACHE(s_awcache), .I_AOU_TX_AXI_S_AWPROT (s_awprot),
       .I_AOU_TX_AXI_S_AWQOS  (s_awqos),   .I_AOU_TX_AXI_S_AWVALID(s_awvalid),
+      .I_AOU_TX_AXI_S_AWUSER (s_awuser),
       .O_AOU_TX_AXI_S_AWREADY(s_awready),
       .I_AOU_TX_AXI_S_WDATA  (s_wdata),   .I_AOU_TX_AXI_S_WSTRB  (s_wstrb),
       .I_AOU_TX_AXI_S_WLAST  (s_wlast),   .I_AOU_TX_AXI_S_WVALID (s_wvalid),
+      .I_AOU_TX_AXI_S_WUSER  (s_wuser),
       .O_AOU_TX_AXI_S_WREADY (s_wready),
       .O_AOU_RX_AXI_S_BID    (s_bid),     .O_AOU_RX_AXI_S_BRESP  (s_bresp),
+      .O_AOU_RX_AXI_S_BUSER  (s_buser),
       .O_AOU_RX_AXI_S_BVALID (s_bvalid),  .I_AOU_RX_AXI_S_BREADY (s_bready),
 
 `ifdef TWO_PHY
@@ -569,22 +615,44 @@ module tb_top;
   // reset, and fdi_chk shows the adapter the selected one's reports.
   // ---------------------------------------------------------------------------
 `ifndef TWO_PHY
-  aou_fdi_chk_phy #(.WD(WD0), .RP_COUNT(RP_COUNT)) u_fdi_chk0 (
-      .clk            (clk),
-      .rst_n          (rst_n),
-      .link_reset     (fdi_mb0.pl_state_sts == 4'h0),
-      .lp_valid       (fdi_mb0.lp_valid),
-      .lp_irdy        (fdi_mb0.lp_irdy),
-      .lp_data        (lp0_data),
-      .pl_trdy        (fdi_mb0.pl_trdy),
-      .pl_valid       (fdi_mb0.pl_valid),
-      .pl_data        (fdi_mb0.pl_data[WD0-1:0]),
-      .pl_flit_cancel (fdi_mb0.pl_flit_cancel),
-      .act_st_disabled(status.activate_st_disabled),
-      .act_st_enabled (status.activate_st_enabled),
-      .err_clear      (fdi_chk.err_clear),
-      .chk            (fdi_chk)
-  );
+  if (WD0 <= 1024) begin : g_fdi_chk
+    aou_fdi_chk_phy #(.WD(WD0), .RP_COUNT(RP_COUNT)) u_fdi_chk0 (
+        .clk            (clk),
+        .rst_n          (rst_n),
+        .link_reset     (fdi_mb0.pl_state_sts == 4'h0),
+        .lp_valid       (fdi_mb0.lp_valid),
+        .lp_irdy        (fdi_mb0.lp_irdy),
+        .lp_data        (lp0_data),
+        .pl_trdy        (fdi_mb0.pl_trdy),
+        .pl_valid       (fdi_mb0.pl_valid),
+        .pl_data        (fdi_mb0.pl_data[WD0-1:0]),
+        .pl_flit_cancel (fdi_mb0.pl_flit_cancel),
+        .act_st_disabled(status.activate_st_disabled),
+        .act_st_enabled (status.activate_st_enabled),
+        .err_clear      (fdi_chk.err_clear),
+        .chk            (fdi_chk)
+    );
+  end else begin : g_no_fdi_chk
+    // AOU_FDI_CHECKER supports 32/64/128 B beats only; a 256 B build has no
+    // checker (aou_t1_env_cfg.fdi_chk_en is off) and the interface idles.
+    assign fdi_chk.rst_n               = rst_n;
+    assign fdi_chk.violation           = '0;
+    assign fdi_chk.trigger             = 1'b0;
+    assign fdi_chk.viol_cnt            = '0;
+    assign fdi_chk.capture_valid       = 1'b0;
+    assign fdi_chk.capture_code        = '0;
+    assign fdi_chk.capture_dir         = 1'b0;
+    assign fdi_chk.capture_flit_seq    = '0;
+    assign fdi_chk.capture_granule_idx = '0;
+    assign fdi_chk.capture_granule     = '0;
+    assign fdi_chk.check_enabled       = '0;
+    assign fdi_chk.lp_flit_seq         = '0;
+    assign fdi_chk.pl_flit_seq         = '0;
+    assign fdi_chk.xchk_violation      = '0;
+    assign fdi_chk.dir_violation       = '0;
+    assign fdi_chk.dir_flit_seq        = '0;
+    assign fdi_chk.late_adv            = '0;
+  end
 `else
   aou_fdi_checker_if fdi_chk_p0 (.clk(clk));
   aou_fdi_checker_if fdi_chk_p1 (.clk(clk));
@@ -703,6 +771,7 @@ module tb_top;
     uvm_config_db #(virtual aou_status_if)::set(null, "*", "status", status);
     uvm_config_db #(virtual aou_irq_if)::set(null, "*", "irq", irq);
     uvm_config_db #(virtual aou_wdt_if)::set(null, "*", "wdt", wdt);
+    uvm_config_db #(virtual aou_rx_gs_if)::set(null, "*", "gs", gs);
     uvm_config_db #(virtual aou_rst_if)::set(null, "*", "rst", rst);
     uvm_config_db #(virtual aou_axi4pc_ctl_if)::set(null, "*", "axi4pc_ctl", axi4pc_ctl);
     uvm_config_db #(virtual aou_fdi_checker_if)::set(null, "*", "fdi_chk", fdi_chk);
@@ -717,7 +786,8 @@ module tb_top;
   // ---------------------------------------------------------------------------
   // Arm Axi4PC (BP063, optional; Makefile AXI4PC) on each RP's DUT S and M ports, at
   // the RP's own width (g_rp). tb/aou_axi4pc_msg.svh reports its failures as UVM
-  // errors. AoU has no REGION or USER signals and no low-power interface.
+  // errors. AoU has no REGION signals and no low-power interface; the five USER
+  // signals are 16 bits wide (AoU v0.8 Table 31).
   // The bench stalls READY on purpose, so the recommended MAX_WAIT rules are off.
   // ARESETn comes from tb/aou_axi4pc_gate.sv: the port's reset (axi_port_rst_n),
   // held after a reset only the DUT saw and after a link event (aou_t1_axi4pc_ctl).
@@ -735,7 +805,7 @@ module tb_top;
     ); \
     Axi4PC #( \
       .DATA_WIDTH(rp_w(r)), .WID_WIDTH(10), .RID_WIDTH(10), .ADDR_WIDTH(64), \
-      .AWUSER_WIDTH(1), .WUSER_WIDTH(1), .BUSER_WIDTH(1), .ARUSER_WIDTH(1), .RUSER_WIDTH(1), \
+      .AWUSER_WIDTH(16), .WUSER_WIDTH(16), .BUSER_WIDTH(16), .ARUSER_WIDTH(16), .RUSER_WIDTH(16), \
       .MAXRBURSTS(`AOU_AXI4PC_MAXBURSTS), .MAXWBURSTS(`AOU_AXI4PC_MAXBURSTS), \
       .RecMaxWaitOn(1'b0) \
     ) u_``P``_axi4pc ( \
@@ -743,17 +813,17 @@ module tb_top;
       .AWID(P``_awid[r]), .AWADDR(P``_awaddr[r]), .AWLEN(P``_awlen[r]), \
       .AWSIZE(P``_awsize[r]), .AWBURST(P``_awburst[r]), .AWLOCK(P``_awlock[r]), \
       .AWCACHE(P``_awcache[r]), .AWPROT(P``_awprot[r]), .AWQOS(P``_awqos[r]), \
-      .AWREGION(4'b0), .AWUSER(1'b0), .AWVALID(P``_awvalid[r]), .AWREADY(P``_awready[r]), \
-      .WLAST(P``_wlast[r]), .WDATA(P``_wdata[r][rp_w(r)-1:0]), .WSTRB(P``_wstrb[r][rp_w(r)/8-1:0]), .WUSER(1'b0), \
+      .AWREGION(4'b0), .AWUSER(P``_awuser[r]), .AWVALID(P``_awvalid[r]), .AWREADY(P``_awready[r]), \
+      .WLAST(P``_wlast[r]), .WDATA(P``_wdata[r][rp_w(r)-1:0]), .WSTRB(P``_wstrb[r][rp_w(r)/8-1:0]), .WUSER(P``_wuser[r]), \
       .WVALID(P``_wvalid[r]), .WREADY(P``_wready[r]), \
-      .BID(P``_bid[r]), .BRESP(P``_bresp[r]), .BUSER(1'b0), \
+      .BID(P``_bid[r]), .BRESP(P``_bresp[r]), .BUSER(P``_buser[r]), \
       .BVALID(P``_bvalid[r]), .BREADY(P``_bready[r]), \
       .ARID(P``_arid[r]), .ARADDR(P``_araddr[r]), .ARLEN(P``_arlen[r]), \
       .ARSIZE(P``_arsize[r]), .ARBURST(P``_arburst[r]), .ARLOCK(P``_arlock[r]), \
       .ARCACHE(P``_arcache[r]), .ARPROT(P``_arprot[r]), .ARQOS(P``_arqos[r]), \
-      .ARREGION(4'b0), .ARUSER(1'b0), .ARVALID(P``_arvalid[r]), .ARREADY(P``_arready[r]), \
+      .ARREGION(4'b0), .ARUSER(P``_aruser[r]), .ARVALID(P``_arvalid[r]), .ARREADY(P``_arready[r]), \
       .RID(P``_rid[r]), .RLAST(P``_rlast[r]), .RDATA(P``_rdata[r][rp_w(r)-1:0]), .RRESP(P``_rresp[r]), \
-      .RUSER(1'b0), .RVALID(P``_rvalid[r]), .RREADY(P``_rready[r]), \
+      .RUSER(P``_ruser[r]), .RVALID(P``_rvalid[r]), .RREADY(P``_rready[r]), \
       .CACTIVE(1'b1), .CSYSREQ(1'b1), .CSYSACK(1'b1) \
     );
   for (genvar r = 0; r < RP_COUNT; r++) begin : g_axi4pc

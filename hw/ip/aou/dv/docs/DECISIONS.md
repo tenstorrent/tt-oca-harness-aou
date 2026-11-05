@@ -553,7 +553,7 @@ yet carries the `blocked` tag and its reason in the sidecar; `run_list.py` and
 
 **Decision.** `CONFIG` selects the T1 (and register bench) build parameters: RP
 count, data width per RP, `FDI_CONFIG`, `TX_NXT_PACKING_EN` (and, in `-rxf`, the RX FIFO
-parameters). Ten configurations exist (three more, `1x512-sp64-p512`,
+parameters). Fourteen configurations exist (three more, `1x512-sp64-p512`,
 `4xmix4211-sp128-p512` and `4xmix4211-sp128-p256`, built
 `AXI_PEER_DIE_MAX_DATA_WD` below 1024 until that parameter became a localparam
 fixed at the AoU maximum; see the amendment below):
@@ -570,6 +570,10 @@ fixed at the AoU maximum; see the amendment below):
 | 2x512-tp32_64 | 2 | 512 each | 3 (TP_32B_64B) | Two-PHY FDI with a 256-bit PHY0, two RPs at one width |
 | 1x512-sp64-nxt | 1 | 512 | 1 (SP_64B) | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
 | 2xmix-sp64-rxf | 2 | 1024, 256 | 1 (SP_64B) | Non-default RX FIFO depths, RX FIFO register slices off |
+| 1x1024-sp128 | 1 | 1024 | 2 (SP_128B) | One 1024-bit RP on a 128-byte FDI: the single-RP 128 B RX latency reference (docs/fdi-rx-plan.md 13) |
+| 1x1024-sp256 | 1 | 1024 | 5 (SP_256B) | 256-byte FDI: one flit per cycle, 48 granules decoded per cycle, whole-flit cancel |
+| 4xmix-sp256 | 4 | 1024, 512, 256, 512 | 5 (SP_256B) | Mixed widths, every local width, 256-byte FDI |
+| 4xmix-sp256-rxf | 4 | 1024, 512, 256, 512 | 5 (SP_256B) | 4xmix-sp256 with non-default RX FIFO depths |
 
 Names describe the configuration and refer to nothing else:
 
@@ -583,9 +587,10 @@ Names describe the configuration and refer to nothing else:
   AOU_TX_CORE output-stage parameter, a registered flit chunk computed from the
   packer's look-ahead state. Every other build takes the RTL default, 0.
 - `-rxf`: the integrator's RX FIFO parameters changed: a different depth per RP and
-  class (multiples the MAS 3.9 credit formulas divide by) and every `RX_*_FIFO_RS_EN`
-  0. The other builds keep the RTL defaults, so the advertised credit is checked
-  against the integration guide's defaults there and against these depths here.
+  class (AW/AR/B in messages, W/R in granules; MAS 3.9) and the request/response
+  `RX_*_FIFO_RS_EN` 0. The other builds keep the RTL defaults, so the advertised
+  credit is checked against the integration guide's defaults there and against
+  these depths here.
 
 The set is pairwise, not a cross product: every pair of RP count, local width and
 FDI width that matters appears in some build, and every `FDI_CONFIG` value is

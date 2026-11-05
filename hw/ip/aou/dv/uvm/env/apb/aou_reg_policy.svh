@@ -10,7 +10,8 @@
 //   - self-clearing controls (RDL: "Self-clears when ..."): activate_start,
 //     deactivate_start, deactivate_force;
 //   - when traffic can run (quiet = 0), fields hardware sets on events: the W1C
-//     error/interrupt flags and invalid_actmsg_info.
+//     error/interrupt flags, invalid_actmsg_info and PROFILE_RMT_RPn (written
+//     by each accepted ActivateReq).
 // Self-clearing controls start activation or deactivation, and AOU_SW_RESET
 // (write-only, self-clearing) resets the core, so generic tests write them as 0
 // (side_effect_mask).
@@ -32,7 +33,9 @@ class aou_reg_policy extends uvm_object;
   endfunction
 
   static function bit is_hw_set(uvm_reg_field f);
-    return f.get_access() == "W1C" || f.get_name() == "invalid_actmsg_info";
+    string rg = f.get_parent().get_name();
+    return f.get_access() == "W1C" || f.get_name() == "invalid_actmsg_info" ||
+           (rg.len() >= 11 && rg.substr(0, 10) == "profile_rmt");
   endfunction
 
   static function bit is_reserved(uvm_reg_field f);

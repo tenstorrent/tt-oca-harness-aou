@@ -13,3 +13,4 @@
 `include "link/aou_deact_ctrl_vseq.svh"
 `include "link/aou_remote_react_vseq.svh"
 `include "link/aou_act_flit_vseq.svh"
+`include "link/aou_act_profile_vseq.svh"

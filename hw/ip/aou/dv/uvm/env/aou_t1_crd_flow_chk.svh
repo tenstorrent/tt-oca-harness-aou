@@ -248,11 +248,16 @@ class aou_t1_crd_flow_chk extends uvm_component;
       AOU_CC_WDATA:
         return s_vif[x].mon_cb.wvalid === 1'b1 && s_vif[x].mon_cb.wready !== 1'b1 &&
                w_need[x] - pend_beats[x] > w_got[x] && others_w_ok(x);
+      // A presented response counts only when it answers a request the DUT
+      // issued: an orphan beat (aou_axi_sub_driver::inject_orphan, an ID no
+      // M-port transaction is open for) the DUT may leave untaken for good.
       AOU_CC_RDATA:
-        return (m_vif[x].mon_cb.rvalid === 1'b1 && m_vif[x].mon_cb.rready !== 1'b1) ||
+        return (m_vif[x].mon_cb.rvalid === 1'b1 && m_vif[x].mon_cb.rready !== 1'b1 &&
+                m_rd_out[x][m_vif[x].mon_cb.rid] > 0) ||
                owed(x, 1'b1);
       default:
-        return (m_vif[x].mon_cb.bvalid === 1'b1 && m_vif[x].mon_cb.bready !== 1'b1) ||
+        return (m_vif[x].mon_cb.bvalid === 1'b1 && m_vif[x].mon_cb.bready !== 1'b1 &&
+                m_wr_out[x][m_vif[x].mon_cb.bid] > 0) ||
                owed(x, 1'b0);
     endcase
   endfunction

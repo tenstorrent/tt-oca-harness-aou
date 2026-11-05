@@ -15,7 +15,16 @@ class aou_t1_env_cfg extends uvm_object;
   aou_t1_rwreq_e remote_wreq = AOU_RWREQ_AWSIZE;  // remote WriteReq sizing (remote_mgr_driver)
   int unsigned   remote_max_burst = 256;   // remote splitter's longest burst (2^n beats)
   bit            remote_max_burst_rand = 1'b0;  // re-pick it while the remote is idle
-  aou_spec_rev_e spec_rev = AOU_SPEC_V07;
+  // Activation message format the DUT and the remote die use. v0.8: the
+  // ActivateReq is 4 granules and carries the profile of each RP (Ch. 11,
+  // PROFILE_CFG_RPn / PROFILE_RMT_RPn); the other Activation messages are
+  // unchanged but for PropertyReq, which v0.8 reserves.
+  aou_spec_rev_e spec_rev = AOU_SPEC_V08;
+  // v0.8 8.3.3 ERROR state in the remote model on an out-of-sequence Req/Ack.
+  // Off: the DUT does not implement ERROR (it answers a late ActivateReq, MAS
+  // 7.2.3), so the model keeps the v0.7 reaction and the tests their
+  // expectations.
+  bit            error_state_en = 1'b0;
 
   // Agent configs
   aou_fdi_cfg    fdi_cfg[AOU_T1_N_PHY];
@@ -31,6 +40,12 @@ class aou_t1_env_cfg extends uvm_object;
   // Timing profiles applied at build (local agents; remote model latency)
   aou_axi_timing_e local_timing = AOU_AXI_TIMING_RANDOM;
   int unsigned     remote_lat_max = 20;
+
+  // AXI USER on the DUT's local ports (S-port AWUSER/ARUSER/WUSER from the
+  // managers, M-port BUSER/RUSER from the subordinates), which the DUT sends
+  // as FLEX (AoU v0.8 5.2 / 11.1). finalize() pushes it into every local
+  // agent; +user_mode=zero|const_per_txn|per_beat sets it (aou_base_test).
+  aou_axi_user_mode_e user_mode = AOU_AXI_USER_CONST;
 
   // L1 stimulus of the flits L3 sends to the DUT
   int unsigned   l1_cancel_pct = 10;
@@ -54,8 +69,9 @@ class aou_t1_env_cfg extends uvm_object;
   bit            sb_en = 1'b1;
   // aou_t1_attr_chk: request attributes, exclusive responses and FLEX across the link.
   bit            attr_chk_en = 1'b1;
-  // AOU_FDI_CHECKER on the PHY the test selects (tb_top).
-  bit            fdi_chk_en = 1'b1;
+  // AOU_FDI_CHECKER on the PHY the test selects (tb_top). The checker supports
+  // 32/64/128 B beats only, so a 256 B build (FDI_CONFIG 5) has none.
+  bit            fdi_chk_en = AOU_T1_BEAT0 <= 128;
   bit            status_en = 1'b1;
   // Local software answers INT_ACTIVATE_START / INT_DEACTIVATE_START.
   bit            sw_isr_en = 1'b1;
@@ -164,6 +180,7 @@ class aou_t1_env_cfg extends uvm_object;
     foreach (rp_remote_bytes[r])
       if (rp_remote_bytes[r] > AOU_T1_PEER_MAX_BYTES) rp_remote_bytes[r] = AOU_T1_PEER_MAX_BYTES;
     l3_cfg.spec_rev = spec_rev;
+    l3_cfg.error_state_en = error_state_en;
     l3_cfg.rp_count = (remote_rp_count != 0) ? remote_rp_count : n_rp;
     l3_cfg.peer_rp_count = n_rp;
     // The credit the DUT may advertise (MAS 3.9) on the RPs both dies have.
@@ -174,8 +191,10 @@ class aou_t1_env_cfg extends uvm_object;
     remote_cfg.timing.r_lat.set_range(0, remote_lat_max);
     for (int unsigned r = 0; r < n_rp; r++) begin
       s_mgr_cfg[r].data_bytes = rp_bytes[r];
+      s_mgr_cfg[r].user_mode = user_mode;
       m_sub_cfg[r].data_bytes = rp_bytes[r];
       m_sub_cfg[r].mem = local_mem;
+      m_sub_cfg[r].user_mode = user_mode;
       r_mgr_cfg[r].data_bytes = remote_bytes_of(r);
     end
   endfunction
@@ -294,12 +313,12 @@ class aou_t1_env_cfg extends uvm_object;
       rh[r] = s_mgr_cfg[r].timing.r_fill_hold;
     end
     return $sformatf({"n_rp=%0d remote_rp_count=%0d rp_bytes=%p remote_bytes=%0d ",
-                      "rp_remote_bytes=%p phy=%0d/%0d ",
+                      "rp_remote_bytes=%p phy=%0d/%0d fdi_beat_bytes=%0d ",
                       "spec=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
                       "l1 cancel/bubble=%0d/%0d fill_hold b/r=%4b/%4b"},
                      n_rp, remote_rp_count, rp_bytes, remote_bytes, rp_remote_bytes,
                      lsm_cfg.active_phy,
-                     lsm_cfg.n_phy, spec_rev.name(),
+                     lsm_cfg.n_phy, fdi_cfg[lsm_cfg.active_phy].beat_bytes, spec_rev.name(),
                      local_timing.name(), remote_lat_max, l3_cfg.resp_fork, l1_cancel_pct,
                      l1_bubble_pct, bh, rh);
   endfunction

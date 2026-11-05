@@ -245,6 +245,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
       if (t.data.size() != t.beats() || t.strb.size() != t.beats())
         `uvm_fatal(get_type_name(), $sformatf("write needs %0d data/strb beats: %s",
                                               t.beats(), t.convert2string()))
+      fill_user(t);
       wr_tok.get(1);
       wr_os.push_back(it);
       aw_mb.put(it);
@@ -252,6 +253,8 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
     end else begin
       t.data  = new[t.beats()];
       t.rresp = new[t.beats()];
+      t.ruser = new[t.beats()];
+      fill_user(t);
       rd_tok.get(1);
       rd_os.push_back(it);
       ar_mb.put(it);
@@ -261,6 +264,20 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
   protected task wait_cycles(int unsigned n);
     repeat (n) @(vif.mgr_cb);
   endtask
+
+  // AWUSER/ARUSER and one WUSER per W beat from cfg.user_mode, unless the
+  // sequence fixed them (user_fixed; a write then needs one wuser per beat).
+  protected function void fill_user(aou_axi_txn t);
+    if (t.user_fixed) begin
+      if (t.dir == AOU_AXI_WR && t.wuser.size() != t.beats())
+        `uvm_fatal(get_type_name(), $sformatf("user_fixed write needs %0d wuser entries: %s",
+                                              t.beats(), t.convert2string()))
+      return;
+    end
+    t.user = cfg.one_user();
+    if (t.dir == AOU_AXI_WR) cfg.fill_user(t.wuser, t.beats());
+    else t.wuser.delete();
+  endfunction
 
   protected function void idle_outputs();
     vif.mgr_cb.awvalid <= 1'b0;
@@ -277,9 +294,11 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
     vif.mgr_cb.awcache <= '0;
     vif.mgr_cb.awprot  <= '0;
     vif.mgr_cb.awqos   <= '0;
+    vif.mgr_cb.awuser  <= '0;
     vif.mgr_cb.wdata   <= '0;
     vif.mgr_cb.wstrb   <= '0;
     vif.mgr_cb.wlast   <= '0;
+    vif.mgr_cb.wuser   <= '0;
     vif.mgr_cb.arid    <= '0;
     vif.mgr_cb.araddr  <= '0;
     vif.mgr_cb.arlen   <= '0;
@@ -289,6 +308,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
     vif.mgr_cb.arcache <= '0;
     vif.mgr_cb.arprot  <= '0;
     vif.mgr_cb.arqos   <= '0;
+    vif.mgr_cb.aruser  <= '0;
   endfunction
 
   // Every loop polls its mailbox at a clock edge, so a drive always lands right
@@ -314,6 +334,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
       vif.mgr_cb.awcache <= it.txn.cache;
       vif.mgr_cb.awprot  <= it.txn.prot;
       vif.mgr_cb.awqos   <= it.txn.qos;
+      vif.mgr_cb.awuser  <= it.txn.user;
       vif.mgr_cb.awvalid <= 1'b1;
       do @(vif.mgr_cb); while (vif.mgr_cb.awready !== 1'b1);
       it.txn.t_addr = $time;
@@ -342,6 +363,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
       vif.mgr_cb.arcache <= it.txn.cache;
       vif.mgr_cb.arprot  <= it.txn.prot;
       vif.mgr_cb.arqos   <= it.txn.qos;
+      vif.mgr_cb.aruser  <= it.txn.user;
       vif.mgr_cb.arvalid <= 1'b1;
       do @(vif.mgr_cb); while (vif.mgr_cb.arready !== 1'b1);
       it.txn.t_addr = $time;
@@ -367,6 +389,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
         vif.mgr_cb.wdata  <= it.txn.data[i] & data_mask;
         vif.mgr_cb.wstrb  <= it.txn.strb[i] & strb_mask;
         vif.mgr_cb.wlast  <= (i == it.txn.beats() - 1);
+        vif.mgr_cb.wuser  <= it.txn.wuser[i];
         vif.mgr_cb.wvalid <= 1'b1;
         do @(vif.mgr_cb); while (vif.mgr_cb.wready !== 1'b1);
       end
@@ -385,7 +408,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
       @(vif.mgr_cb);
       if (stale_held != 0 && $time > stale_until) release_expired();
       if (rdy && vif.mgr_cb.bvalid === 1'b1) begin
-        complete_b(vif.mgr_cb.bid, vif.mgr_cb.bresp);
+        complete_b(vif.mgr_cb.bid, vif.mgr_cb.bresp, vif.mgr_cb.buser);
         cnt = cfg.timing.b_ready.next();
         if (fh_gap[0] > 0) fh_gap[0]--;
       end else if (cnt > 0) begin
@@ -402,7 +425,8 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
       vif.mgr_cb.rready <= rdy;
       @(vif.mgr_cb);
       if (rdy && vif.mgr_cb.rvalid === 1'b1) begin
-        complete_r(vif.mgr_cb.rid, vif.mgr_cb.rdata, vif.mgr_cb.rresp, vif.mgr_cb.rlast);
+        complete_r(vif.mgr_cb.rid, vif.mgr_cb.rdata, vif.mgr_cb.rresp, vif.mgr_cb.rlast,
+                   vif.mgr_cb.ruser);
         cnt = cfg.timing.r_ready.next();
         if (fh_gap[1] > 0) fh_gap[1]--;
       end else if (cnt > 0) begin
@@ -445,7 +469,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
 
   // Responses go to the oldest outstanding request with the same ID; protocol
   // violations are the monitor's to report.
-  protected function void complete_b(bit [9:0] id, bit [1:0] resp);
+  protected function void complete_b(bit [9:0] id, bit [1:0] resp, bit [15:0] buser);
     aou_axi_txn t;
     if (is_stale(1'b0, id)) begin
       drop_stale(1'b0, id);
@@ -457,6 +481,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
       if (wr_os[k].txn.id == id && wr_os[k].addr_done && wr_os[k].w_done) begin
         t        = wr_os[k].txn;
         t.bresp  = resp;
+        t.buser  = buser;
         t.t_done = $time;
         wr_os.delete(k);
         wr_tok.put(1);
@@ -471,7 +496,8 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
     `uvm_error(get_type_name(), $sformatf("B ID %0h matches no outstanding write", id))
   endfunction
 
-  protected function void complete_r(bit [9:0] id, bit [1023:0] d, bit [1:0] resp, bit last);
+  protected function void complete_r(bit [9:0] id, bit [1023:0] d, bit [1:0] resp, bit last,
+                                     bit [15:0] ruser);
     aou_axi_txn t;
     if (is_stale(1'b1, id)) begin
       if (last) drop_stale(1'b1, id);
@@ -484,6 +510,7 @@ class aou_axi_mgr_driver extends uvm_driver #(aou_axi_txn);
         t = rd_os[k].txn;
         t.data[rd_os[k].beats_rcvd]  = d & data_mask;
         t.rresp[rd_os[k].beats_rcvd] = resp;
+        t.ruser[rd_os[k].beats_rcvd] = ruser;
         rd_os[k].beats_rcvd++;
         if (last || rd_os[k].beats_rcvd == t.beats()) begin
           t.t_done = $time;

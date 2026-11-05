@@ -56,9 +56,7 @@ import packet_def_pkg::*;
     parameter   AXI_DATA_WD_RP2          = 512,
     parameter   AXI_DATA_WD_RP3          = 512,
 
-    parameter   DEC_MULTI                = 2,
-
-    localparam  MAX_MISC_CNT             = 2,
+    parameter   MISC_LANES                = 3,     // CrdtGrant lanes from AOU_RX_CORE
 
     localparam  CNT_RP0_AW_MAX_CREDIT = $clog2(RP0_AW_MAX_CREDIT +1), 
     localparam  CNT_RP0_AR_MAX_CREDIT = $clog2(RP0_AR_MAX_CREDIT +1), 
@@ -187,27 +185,27 @@ import packet_def_pkg::*;
     input       [RP_COUNT-1:0][1:0]             I_AOU_TX_RDATA_DLENGTH,
     input       [RP_COUNT-1:0]                  I_AOU_TX_WRESPVALID,
     
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED3,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED2,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED1,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED0,
-    input       [DEC_MULTI-1:0][MAX_MISC_CNT-1:0]                                I_AOU_CRDTGRANT_VALID,
+    input       [MISC_LANES-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED3,
+    input       [MISC_LANES-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED2,
+    input       [MISC_LANES-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED1,
+    input       [MISC_LANES-1:0][1:0]                           I_AOU_CRDTGRANT_WRESPCRED0,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED3,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED2,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED1,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RDATACRED0,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED3,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED2,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED1,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WDATACRED0,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED3,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED2,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED1,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_RREQCRED0,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED3,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED2,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED1,
+    input       [MISC_LANES-1:0][2:0]                           I_AOU_CRDTGRANT_WREQCRED0,
+    input       [MISC_LANES-1:0]                                I_AOU_CRDTGRANT_VALID,
 
     input       [1:0]                           I_AOU_MSGCRDT_WRESPCRED,
     input       [2:0]                           I_AOU_MSGCRDT_RDATACRED,
@@ -259,11 +257,11 @@ for (genvar a = 0; a <4 ; a++) begin : generate_rp_b_credit
     logic [CNT_RP_B_MAX_CREDIT[a]-1:0] r_cnt_b_credit_rx;
 end
 
-logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][3:0]             i_crdtgrant_wrespcred;
-logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_rdatacred;
-logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_wdatacred;
-logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_rreqcred;
-logic   [3:0] [DEC_MULTI-1:0][MAX_MISC_CNT-1:0][7:0]             i_crdtgrant_wreqcred;
+logic   [3:0] [MISC_LANES-1:0][3:0]             i_crdtgrant_wrespcred;
+logic   [3:0] [MISC_LANES-1:0][7:0]             i_crdtgrant_rdatacred;
+logic   [3:0] [MISC_LANES-1:0][7:0]             i_crdtgrant_wdatacred;
+logic   [3:0] [MISC_LANES-1:0][7:0]             i_crdtgrant_rreqcred;
+logic   [3:0] [MISC_LANES-1:0][7:0]             i_crdtgrant_wreqcred;
 
 logic   [3:0] [9:0]             w_cnt_rp_aw_credit;
 logic   [3:0] [9:0]             w_cnt_rp_ar_credit;
@@ -334,31 +332,31 @@ assign  w_rp3_credit_match        = (I_AOU_MSGCRDT_RP == 2'b11);
 assign  w_rp_credit_match_one_hot = {w_rp3_credit_match,w_rp2_credit_match,w_rp1_credit_match,w_rp0_credit_match};
 
 always_comb begin
-    for(int dec_multi = 0 ; dec_multi < DEC_MULTI; dec_multi = dec_multi + 1) begin
-        for(int misc_cnt = 0; misc_cnt < MAX_MISC_CNT; misc_cnt = misc_cnt +1) begin
-            i_crdtgrant_wrespcred[0][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED0[dec_multi][misc_cnt]][3:0];
-            i_crdtgrant_rdatacred[0][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED0[dec_multi][misc_cnt]];
-            i_crdtgrant_wdatacred[0][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED0[dec_multi][misc_cnt]];
-            i_crdtgrant_rreqcred [0][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED0 [dec_multi][misc_cnt]];
-            i_crdtgrant_wreqcred [0][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED0 [dec_multi][misc_cnt]];
+    for(int misc_cnt = 0; misc_cnt < MISC_LANES; misc_cnt = misc_cnt +1) begin
+        begin
+            i_crdtgrant_wrespcred[0][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED0[misc_cnt]][3:0];
+            i_crdtgrant_rdatacred[0][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED0[misc_cnt]];
+            i_crdtgrant_wdatacred[0][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED0[misc_cnt]];
+            i_crdtgrant_rreqcred [0][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED0 [misc_cnt]];
+            i_crdtgrant_wreqcred [0][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED0 [misc_cnt]];
             
-            i_crdtgrant_wrespcred[1][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED1[dec_multi][misc_cnt]][3:0];
-            i_crdtgrant_rdatacred[1][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED1[dec_multi][misc_cnt]];
-            i_crdtgrant_wdatacred[1][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED1[dec_multi][misc_cnt]];
-            i_crdtgrant_rreqcred [1][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED1 [dec_multi][misc_cnt]];
-            i_crdtgrant_wreqcred [1][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED1 [dec_multi][misc_cnt]];
+            i_crdtgrant_wrespcred[1][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED1[misc_cnt]][3:0];
+            i_crdtgrant_rdatacred[1][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED1[misc_cnt]];
+            i_crdtgrant_wdatacred[1][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED1[misc_cnt]];
+            i_crdtgrant_rreqcred [1][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED1 [misc_cnt]];
+            i_crdtgrant_wreqcred [1][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED1 [misc_cnt]];
             
-            i_crdtgrant_wrespcred[2][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED2[dec_multi][misc_cnt]][3:0];
-            i_crdtgrant_rdatacred[2][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED2[dec_multi][misc_cnt]];
-            i_crdtgrant_wdatacred[2][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED2[dec_multi][misc_cnt]];
-            i_crdtgrant_rreqcred [2][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED2 [dec_multi][misc_cnt]];
-            i_crdtgrant_wreqcred [2][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED2 [dec_multi][misc_cnt]];
+            i_crdtgrant_wrespcred[2][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED2[misc_cnt]][3:0];
+            i_crdtgrant_rdatacred[2][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED2[misc_cnt]];
+            i_crdtgrant_wdatacred[2][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED2[misc_cnt]];
+            i_crdtgrant_rreqcred [2][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED2 [misc_cnt]];
+            i_crdtgrant_wreqcred [2][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED2 [misc_cnt]];
             
-            i_crdtgrant_wrespcred[3][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED3[dec_multi][misc_cnt]][3:0];
-            i_crdtgrant_rdatacred[3][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED3[dec_multi][misc_cnt]];
-            i_crdtgrant_wdatacred[3][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED3[dec_multi][misc_cnt]];
-            i_crdtgrant_rreqcred [3][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED3 [dec_multi][misc_cnt]];
-            i_crdtgrant_wreqcred [3][dec_multi][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED3 [dec_multi][misc_cnt]];
+            i_crdtgrant_wrespcred[3][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WRESPCRED3[misc_cnt]][3:0];
+            i_crdtgrant_rdatacred[3][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RDATACRED3[misc_cnt]];
+            i_crdtgrant_wdatacred[3][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WDATACRED3[misc_cnt]];
+            i_crdtgrant_rreqcred [3][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_RREQCRED3 [misc_cnt]];
+            i_crdtgrant_wreqcred [3][misc_cnt]   = CREDIT_TABLE[I_AOU_CRDTGRANT_WREQCRED3 [misc_cnt]];
         end
     end
 end
@@ -379,14 +377,14 @@ always_comb begin
                 w_cnt_rp_b_credit[i]    +=   CREDIT_TABLE[I_AOU_MSGCRDT_WRESPCRED   ][3:0];
             end
         end
-        for(int dec_multi = 0 ; dec_multi < DEC_MULTI; dec_multi = dec_multi + 1) begin
-            for(int misc_cnt = 0; misc_cnt < MAX_MISC_CNT; misc_cnt = misc_cnt +1) begin
-                if(I_AOU_CRDTGRANT_VALID[dec_multi][misc_cnt])begin
-                    w_cnt_rp_aw_credit[i]   +=   i_crdtgrant_wreqcred [i][dec_multi][misc_cnt];
-                    w_cnt_rp_ar_credit[i]   +=   i_crdtgrant_rreqcred [i][dec_multi][misc_cnt];
-                    w_cnt_rp_w_credit[i]    +=   i_crdtgrant_wdatacred[i][dec_multi][misc_cnt];
-                    w_cnt_rp_r_credit[i]    +=   i_crdtgrant_rdatacred[i][dec_multi][misc_cnt];
-                    w_cnt_rp_b_credit[i]    +=   i_crdtgrant_wrespcred[i][dec_multi][misc_cnt];
+        for(int misc_cnt = 0; misc_cnt < MISC_LANES; misc_cnt = misc_cnt +1) begin
+            begin
+                if(I_AOU_CRDTGRANT_VALID[misc_cnt])begin
+                    w_cnt_rp_aw_credit[i]   +=   i_crdtgrant_wreqcred [i][misc_cnt];
+                    w_cnt_rp_ar_credit[i]   +=   i_crdtgrant_rreqcred [i][misc_cnt];
+                    w_cnt_rp_w_credit[i]    +=   i_crdtgrant_wdatacred[i][misc_cnt];
+                    w_cnt_rp_r_credit[i]    +=   i_crdtgrant_rdatacred[i][misc_cnt];
+                    w_cnt_rp_b_credit[i]    +=   i_crdtgrant_wrespcred[i][misc_cnt];
                 end
             end
         end     

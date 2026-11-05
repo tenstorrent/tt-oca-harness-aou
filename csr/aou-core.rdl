@@ -449,4 +449,96 @@ addrmap aou_core {
         field { sw = rw; desc = "Local TX lane that RP0's requests are sent on when asymmetric_rp_en is set; the lane's DEST_RP field names the remote RP. Must be below RP_COUNT. Reset 0 (RP0 on lane 0)."; } rp0_tx_rp_sel[2:1] = 0;
         field { sw = rw; desc = "Enable the asymmetric RP mapping. Reset 0: every RP is on the lane of the same index and the rpN_tx_rp_sel fields are ignored. Set to 1 to route each RP's requests on the lane in its rpN_tx_rp_sel field, merging the RPs that select the same one. Write this bit only while the activation FSM is DISABLED and no AXI traffic is outstanding."; } asymmetric_rp_en[0:0] = 0;
     } asymmetric_rp_proc_con @ 0x0084;
+
+    // -------------------------------------------------------------------------
+    // Profile exchange (AoU v0.8 Ch. 11): the ActivateReq carries ProfileID,
+    // ProfileRev and ProfileOpt for each of RP0..RP3. PROFILE_CFG_RPn is what
+    // this die sends: read-only 0/0/0, the Basic Profile, the only profile this
+    // design implements. PROFILE_RMT_RPn is what the peer sent. The fields are
+    // informational: hardware does not act on them, and no negotiation is
+    // performed.
+    // -------------------------------------------------------------------------
+    reg {
+        regwidth = 32;
+        name = "Profile Config RP0";
+        desc = "Profile announced for RP0 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.";
+        field { sw = r; } reserved_31_26[31:26] = 0;
+        field { sw = r; desc = "ProfileOpt sent for RP0: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_opt[25:10] = 0;
+        field { sw = r; desc = "ProfileRev sent for RP0: revision of the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_rev[9:5] = 0;
+        field { sw = r; desc = "ProfileID sent for RP0. Constant 0 = Basic Profile (AoU v0.8 Ch. 11)."; } profile_id[4:0] = 0;
+    } profile_cfg_rp0 @ 0x0100;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Config RP1";
+        desc = "Profile announced for RP1 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.";
+        field { sw = r; } reserved_31_26[31:26] = 0;
+        field { sw = r; desc = "ProfileOpt sent for RP1: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_opt[25:10] = 0;
+        field { sw = r; desc = "ProfileRev sent for RP1: revision of the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_rev[9:5] = 0;
+        field { sw = r; desc = "ProfileID sent for RP1. Constant 0 = Basic Profile (AoU v0.8 Ch. 11)."; } profile_id[4:0] = 0;
+    } profile_cfg_rp1 @ 0x0104;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Config RP2";
+        desc = "Profile announced for RP2 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.";
+        field { sw = r; } reserved_31_26[31:26] = 0;
+        field { sw = r; desc = "ProfileOpt sent for RP2: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_opt[25:10] = 0;
+        field { sw = r; desc = "ProfileRev sent for RP2: revision of the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_rev[9:5] = 0;
+        field { sw = r; desc = "ProfileID sent for RP2. Constant 0 = Basic Profile (AoU v0.8 Ch. 11)."; } profile_id[4:0] = 0;
+    } profile_cfg_rp2 @ 0x0108;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Config RP3";
+        desc = "Profile announced for RP3 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.";
+        field { sw = r; } reserved_31_26[31:26] = 0;
+        field { sw = r; desc = "ProfileOpt sent for RP3: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_opt[25:10] = 0;
+        field { sw = r; desc = "ProfileRev sent for RP3: revision of the profile identified by profile_id. Constant 0 (Basic Profile)."; } profile_rev[9:5] = 0;
+        field { sw = r; desc = "ProfileID sent for RP3. Constant 0 = Basic Profile (AoU v0.8 Ch. 11)."; } profile_id[4:0] = 0;
+    } profile_cfg_rp3 @ 0x010C;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Remote RP0";
+        desc = "Profile the peer announced for RP0 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp0 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).";
+        field { sw = r; hw = w; desc = "1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3."; } rcvd[31:31] = 0;
+        field { sw = r; } reserved_30_26[30:26] = 0;
+        field { sw = r; hw = w; desc = "ProfileOpt received for RP0."; } profile_opt[25:10] = 0;
+        field { sw = r; hw = w; desc = "ProfileRev received for RP0."; } profile_rev[9:5] = 0;
+        field { sw = r; hw = w; desc = "ProfileID received for RP0. 0 = Basic Profile."; } profile_id[4:0] = 0;
+    } profile_rmt_rp0 @ 0x0110;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Remote RP1";
+        desc = "Profile the peer announced for RP1 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp1 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).";
+        field { sw = r; hw = w; desc = "1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3."; } rcvd[31:31] = 0;
+        field { sw = r; } reserved_30_26[30:26] = 0;
+        field { sw = r; hw = w; desc = "ProfileOpt received for RP1."; } profile_opt[25:10] = 0;
+        field { sw = r; hw = w; desc = "ProfileRev received for RP1."; } profile_rev[9:5] = 0;
+        field { sw = r; hw = w; desc = "ProfileID received for RP1. 0 = Basic Profile."; } profile_id[4:0] = 0;
+    } profile_rmt_rp1 @ 0x0114;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Remote RP2";
+        desc = "Profile the peer announced for RP2 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp2 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).";
+        field { sw = r; hw = w; desc = "1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3."; } rcvd[31:31] = 0;
+        field { sw = r; } reserved_30_26[30:26] = 0;
+        field { sw = r; hw = w; desc = "ProfileOpt received for RP2."; } profile_opt[25:10] = 0;
+        field { sw = r; hw = w; desc = "ProfileRev received for RP2."; } profile_rev[9:5] = 0;
+        field { sw = r; hw = w; desc = "ProfileID received for RP2. 0 = Basic Profile."; } profile_id[4:0] = 0;
+    } profile_rmt_rp2 @ 0x0118;
+
+    reg {
+        regwidth = 32;
+        name = "Profile Remote RP3";
+        desc = "Profile the peer announced for RP3 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp3 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).";
+        field { sw = r; hw = w; desc = "1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3."; } rcvd[31:31] = 0;
+        field { sw = r; } reserved_30_26[30:26] = 0;
+        field { sw = r; hw = w; desc = "ProfileOpt received for RP3."; } profile_opt[25:10] = 0;
+        field { sw = r; hw = w; desc = "ProfileRev received for RP3."; } profile_rev[9:5] = 0;
+        field { sw = r; hw = w; desc = "ProfileID received for RP3. 0 = Basic Profile."; } profile_id[4:0] = 0;
+    } profile_rmt_rp3 @ 0x011C;
 };

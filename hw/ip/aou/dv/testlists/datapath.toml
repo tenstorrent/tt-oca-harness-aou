@@ -330,8 +330,9 @@ run_modes = ["datapath"]
 args = ["+dp_sfull=1", "+dp_wr_pct=0"]
 
 # AXI attributes across the link, both ways, on every configuration: AxQOS
-# 0-15, AxPROT 0-7 and every legal AxCACHE on writes and reads, random PROF
-# from the remote die, FLEX 0 from the DUT (aou_attr_chk).
+# 0-15, AxPROT 0-7 and every legal AxCACHE on writes and reads, random FLEX
+# from the remote die, and the DUT's FLEX equal to the AXI USER its ports got
+# (one random value per transaction, aou_t1_attr_chk).
 [[tests]]
 name = "aou_attr_test"
 module = { uvm = "aou_attr_test" }
@@ -360,6 +361,19 @@ reseed = 2
 tags = ["datapath"]
 run_modes = ["datapath"]
 args = ["+attr_excl=1", "+attr_early=1"]
+
+# AXI USER per beat (all ones, a walking bit, random, 0) through the merge points:
+# MAX_AxBURSTLEN 4 splits the 16-beat bursts (several B into one WriteResp) and
+# a 128-byte remote die makes the DUT downsize its reads on narrower RPs
+# (several local R beats into one ReadData, FLEX = the first beat's RUSER).
+[[tests]]
+name = "aou_attr_test.attr_user-1.remote_bytes-128"
+module = { uvm = "aou_attr_test" }
+seed = 1
+reseed = 2
+tags = ["datapath"]
+run_modes = ["datapath"]
+args = ["+attr_user=1", "+remote_bytes=128"]
 
 [[tests]]
 name = "aou_chan_test.chan-wfirst"
@@ -413,7 +427,7 @@ args = ["+dp_dir=both", "+small_size_pct=5"]
 
 [[groups]]
 name = "datapath"
-expected_count = 41
+expected_count = 42
 tests = [
   "aou_small_size_test",
   "aou_small_size_test.remote_bytes-32_128_64_128",
@@ -454,6 +468,7 @@ tests = [
   "aou_attr_test",
   "aou_attr_test.attr_excl-1",
   "aou_attr_test.attr_excl-1.attr_early-1",
+  "aou_attr_test.attr_user-1.remote_bytes-128",
   "aou_chan_test.chan-wfirst",
   "aou_chan_test.chan-ilv",
 ]

@@ -35,6 +35,7 @@ module AOU_AXIMUX_NX1 #(
     input       [AXI_SLV_NUM-1:0][3: 0]                I_S_AWCACHE,
     input       [AXI_SLV_NUM-1:0][2: 0]                I_S_AWPROT,
     input       [AXI_SLV_NUM-1:0][AXI_QOS_WD-1: 0]     I_S_AWQOS,
+    input       [AXI_SLV_NUM-1:0][15: 0]     I_S_AWUSER,
     input       [AXI_SLV_NUM-1:0]                      I_S_AWVALID,
     output wire [AXI_SLV_NUM-1:0]                      O_S_AWREADY,
 
@@ -42,11 +43,13 @@ module AOU_AXIMUX_NX1 #(
     input       [AXI_SLV_NUM-1:0][AXI_STRB_WD-1: 0]    I_S_WSTRB,
     input       [AXI_SLV_NUM-1:0]                      I_S_WLAST,
     input       [AXI_SLV_NUM-1:0][1:0]                 I_S_WDLEN,
+    input       [AXI_SLV_NUM-1:0][15:0]                 I_S_WUSER,
     input       [AXI_SLV_NUM-1:0]                      I_S_WVALID,
     output      [AXI_SLV_NUM-1:0]                      O_S_WREADY,
 
     output wire [AXI_SLV_NUM-1:0][AXI_ID_WD-1: 0]      O_S_BID,
     output wire [AXI_SLV_NUM-1:0][1: 0]                O_S_BRESP,
+    output wire [AXI_SLV_NUM-1:0][15: 0]                O_S_BUSER,
     output wire [AXI_SLV_NUM-1:0]                      O_S_BVALID,
     input       [AXI_SLV_NUM-1:0]                      I_S_BREADY,
 
@@ -59,12 +62,14 @@ module AOU_AXIMUX_NX1 #(
     input       [AXI_SLV_NUM-1:0][AXI_LEN_WD-1: 0]     I_S_ARLEN,
     input       [AXI_SLV_NUM-1:0]                      I_S_ARLOCK,
     input       [AXI_SLV_NUM-1:0][AXI_QOS_WD-1: 0]     I_S_ARQOS,
+    input       [AXI_SLV_NUM-1:0][15: 0]     I_S_ARUSER,
     input       [AXI_SLV_NUM-1:0]                      I_S_ARVALID,
     output wire [AXI_SLV_NUM-1:0]                      O_S_ARREADY,
 
     output wire [AXI_SLV_NUM-1:0][AXI_ID_WD-1: 0]      O_S_RID,
     output wire [AXI_SLV_NUM-1:0][AXI_PEER_DIE_MAX_DATA_WD-1: 0]    O_S_RDATA,
     output wire [AXI_SLV_NUM-1:0][1: 0]                O_S_RRESP,
+    output wire [AXI_SLV_NUM-1:0][15: 0]                O_S_RUSER,
     output wire [AXI_SLV_NUM-1:0]                      O_S_RLAST,
     output wire [AXI_SLV_NUM-1:0]                      O_S_RVALID,
     input       [AXI_SLV_NUM-1:0]                      I_S_RREADY,
@@ -78,6 +83,7 @@ module AOU_AXIMUX_NX1 #(
     output wire [3: 0]                                 O_M_AWCACHE,
     output wire [2: 0]                                 O_M_AWPROT,
     output wire [AXI_QOS_WD-1: 0]                      O_M_AWQOS,
+    output wire [15: 0]                      O_M_AWUSER,
     output wire                                        O_M_AWVALID,
     input                                              I_M_AWREADY,      
 
@@ -85,11 +91,13 @@ module AOU_AXIMUX_NX1 #(
     output wire [AXI_STRB_WD-1: 0]                     O_M_WSTRB,
     output wire                                        O_M_WLAST,
     output wire [1:0]                                  O_M_WDLEN,
+    output wire [15:0]                                  O_M_WUSER,
     output wire                                        O_M_WVALID,
     input                                              I_M_WREADY,
 
     input       [AXI_ID_WD-1+LOG_MN: 0]                I_M_BID,
     input       [1: 0]                                 I_M_BRESP,
+    input       [15: 0]                                 I_M_BUSER,
     input                                              I_M_BVALID,
     output wire                                        O_M_BREADY,
 
@@ -102,12 +110,14 @@ module AOU_AXIMUX_NX1 #(
     output wire [AXI_LEN_WD-1: 0]                      O_M_ARLEN,
     output wire                                        O_M_ARLOCK,
     output wire [AXI_QOS_WD-1: 0]                      O_M_ARQOS,
+    output wire [15: 0]                      O_M_ARUSER,
     output wire                                        O_M_ARVALID,
     input                                              I_M_ARREADY,
 
     input       [AXI_ID_WD-1+LOG_MN: 0]                I_M_RID,
     input       [AXI_PEER_DIE_MAX_DATA_WD-1: 0]        I_M_RDATA,
     input       [1: 0]                                 I_M_RRESP,
+    input       [15: 0]                                 I_M_RUSER,
     input                                              I_M_RLAST,
     input                                              I_M_RVALID,
     output wire                                        O_M_RREADY
@@ -284,6 +294,7 @@ assign O_M_ARPROT   = I_S_ARPROT[w_ar_arb_grt_bin]  ;
 assign O_M_ARLEN    = I_S_ARLEN[w_ar_arb_grt_bin]   ;
 assign O_M_ARLOCK   = I_S_ARLOCK[w_ar_arb_grt_bin]  ;
 assign O_M_ARQOS    = I_S_ARQOS[w_ar_arb_grt_bin]   ;
+assign O_M_ARUSER    = I_S_ARUSER[w_ar_arb_grt_bin]   ;
 
 assign O_M_RREADY   = ~I_M_RVALID | I_S_RREADY[I_M_RID[0+:LOG_MN]];
 
@@ -295,6 +306,7 @@ generate
         assign O_S_RID[p]       = I_M_RID[AXI_ID_WD-1+LOG_MN:LOG_MN];
         assign O_S_RDATA[p]     = I_M_RDATA;
         assign O_S_RRESP[p]     = I_M_RRESP;
+        assign O_S_RUSER[p]     = I_M_RUSER;
         assign O_S_RLAST[p]     = I_M_RLAST;
         assign O_S_RVALID[p]    = (I_M_RID[0+:LOG_MN] == p) & I_M_RVALID;
     end
@@ -333,11 +345,13 @@ assign O_M_AWLOCK      = I_S_AWLOCK[w_aw_arb_grt_bin_mux]  ;
 assign O_M_AWCACHE     = I_S_AWCACHE[w_aw_arb_grt_bin_mux] ;
 assign O_M_AWPROT      = I_S_AWPROT[w_aw_arb_grt_bin_mux]  ;
 assign O_M_AWQOS       = I_S_AWQOS[w_aw_arb_grt_bin_mux]   ;
+assign O_M_AWUSER       = I_S_AWUSER[w_aw_arb_grt_bin_mux]   ;
 
 assign O_M_WDATA       = I_S_WDATA[w_aw_arb_grt_bin_mux] ;
 assign O_M_WSTRB       = I_S_WSTRB[w_aw_arb_grt_bin_mux] ;
 assign O_M_WLAST       = I_S_WLAST[w_aw_arb_grt_bin_mux] ;
 assign O_M_WDLEN       = I_S_WDLEN[w_aw_arb_grt_bin_mux];
+assign O_M_WUSER       = I_S_WUSER[w_aw_arb_grt_bin_mux];
 
 assign O_M_AWVALID     = ~r_s_wbusy_tt & I_S_AWVALID[w_aw_arb_grt_bin_mux];
 
@@ -355,6 +369,7 @@ generate
 
         assign O_S_BID[p]     = I_M_BID[AXI_ID_WD-1+LOG_MN:LOG_MN];
         assign O_S_BRESP[p]   = I_M_BRESP;
+        assign O_S_BUSER[p]   = I_M_BUSER;
         assign O_S_BVALID[p]  = (I_M_BID[0+:LOG_MN] == p) & I_M_BVALID;
     end
 endgenerate

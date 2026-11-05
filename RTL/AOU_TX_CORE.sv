@@ -106,6 +106,7 @@ import packet_def_pkg::*;
     input  logic    [RP_CNT-1:0][3:0]                           I_AOU_TX_AXI_AWCACHE,
     input  logic    [RP_CNT-1:0][2:0]                           I_AOU_TX_AXI_AWPROT,
     input  logic    [RP_CNT-1:0][3:0]                           I_AOU_TX_AXI_AWQOS,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_AWUSER,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_AWVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_AWREADY,
 
@@ -113,6 +114,7 @@ import packet_def_pkg::*;
     input  logic    [RP_CNT-1:0][MAX_AXI_STRB_WD-1:0]           I_AOU_TX_AXI_WSTRB,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_WLAST,
     input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_WDLEN,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_WUSER,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_WVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_WREADY,
 
@@ -125,21 +127,25 @@ import packet_def_pkg::*;
     input  logic    [RP_CNT-1:0][3:0]                           I_AOU_TX_AXI_ARCACHE,
     input  logic    [RP_CNT-1:0][2:0]                           I_AOU_TX_AXI_ARPROT,
     input  logic    [RP_CNT-1:0][3:0]                           I_AOU_TX_AXI_ARQOS,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_ARUSER,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_ARVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_ARREADY,
 
     input  logic    [RP_CNT-1:0][AXI_ID_WD-1:0]                 I_AOU_TX_AXI_BID_256,
     input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_BRESP_256,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_BUSER_256,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_BVALID_256,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_BREADY_256,
 
     input  logic    [RP_CNT-1:0][AXI_ID_WD-1:0]                 I_AOU_TX_AXI_BID_512,
     input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_BRESP_512,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_BUSER_512,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_BVALID_512,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_BREADY_512,
 
     input  logic    [RP_CNT-1:0][AXI_ID_WD-1:0]                 I_AOU_TX_AXI_BID_1024,
     input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_BRESP_1024,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_BUSER_1024,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_BVALID_1024,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_BREADY_1024,
 
@@ -147,6 +153,7 @@ import packet_def_pkg::*;
     input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_RDLEN,
     input  logic    [RP_CNT-1:0][1023:0]                        I_AOU_TX_AXI_RDATA,
     input  logic    [RP_CNT-1:0][1:0]                           I_AOU_TX_AXI_RRESP,
+    input  logic    [RP_CNT-1:0][15:0]                          I_AOU_TX_AXI_RUSER,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_RLAST,
     input  logic    [RP_CNT-1:0]                                I_AOU_TX_AXI_RVALID,
     output logic    [RP_CNT-1:0]                                O_AOU_TX_AXI_RREADY,
@@ -190,6 +197,11 @@ import packet_def_pkg::*;
     input  logic                                                I_AOU_ACTIVATION_PROP_REQ,
     input  logic                                                I_AOU_ACTIVATION_VALID,
     output logic                                                O_AOU_ACTIVATION_READY,
+    // Profile announced per RP ({ProfileID, ProfileRev, ProfileOpt}, SFR
+    // PROFILE_CFG_RPn: constant 0, the Basic Profile, in this design), sent in
+    // granules 0-3 of the ActivateReq (AoU v0.8 Table "Activation Req Message
+    // Format"); RPs beyond RP_CNT send 0.
+    input  logic     [3:0][PROFILE_WD-1:0]                      I_AOU_PROFILE_CFG,
 
     // State for TX_CORE fifo
     output logic                                                O_AOU_TX_PENDING,
@@ -249,12 +261,19 @@ import packet_def_pkg::*;
 //   "Active" width for packing = max(FDI_IF_WD0, FDI_IF_WD1) so both
 //   single-PHY (WD1 defaults to 512) and two-PHY configurations select the
 //   same packing pipeline depth as the original FDI_*B defines:
+//     FDI_PACK_WD == 2048 -> 1-step pack (whole flit per cycle, 48 granules;
+//                            the minimal 256 B packer: the same ring and
+//                            arbitration, so at most the per-cycle pops of the
+//                            narrower builds fill a flit)
 //     FDI_PACK_WD == 1024 -> 2-step pack (half-flit at a time, 24 granules)
 //     FDI_PACK_WD <= 512  -> 4-step pack (quarter-flit at a time, 12 granules)
+// The packing state counts the chunks of the flit sent so far and wraps at
+// FLIT_LAST_PACK_STATE (0 for the one-step packer, where it never moves).
 localparam int FDI_PACK_WD           = (FDI_IF_WD0 > FDI_IF_WD1) ? FDI_IF_WD0 : FDI_IF_WD1;
-localparam int FLIT_PACK_STATE_W     = (FDI_PACK_WD == 1024) ? 1 : 2;
-localparam int FLIT_PACK_GRANULE_CNT = (FDI_PACK_WD == 1024) ? 24 : 12;
-localparam logic [FLIT_PACK_STATE_W-1:0] FLIT_LAST_PACK_STATE = {FLIT_PACK_STATE_W{1'b1}};
+localparam int FLIT_PACK_STATE_W     = (FDI_PACK_WD >= 1024) ? 1 : 2;
+localparam int FLIT_PACK_GRANULE_CNT = (FDI_PACK_WD == 2048) ? 48 : (FDI_PACK_WD == 1024) ? 24 : 12;
+localparam logic [FLIT_PACK_STATE_W-1:0] FLIT_LAST_PACK_STATE =
+    (FDI_PACK_WD == 2048) ? '0 : {FLIT_PACK_STATE_W{1'b1}};
 
 localparam RP0_NO_STRB_W_G_SIZE  = (RP0_AXI_DATA_WD == 256) ? WF256b_G  :
                                     (RP0_AXI_DATA_WD == 512) ? WF512b_G  :
@@ -346,9 +365,11 @@ logic    [56-1:0]               w_misc_crdtgrant_payload;
 logic                           w_misc_crdtgrant_fifo_valid;
 logic                           w_misc_crdtgrant_fifo_ready;
 
-logic    [39:0]                 w_misc_activate_message;
+logic    [40*ACT_REQ_G-1:0]     w_misc_activate_message;
 logic    [3:0]                  w_misc_activation_op;
 logic                           w_misc_activation_prop_req;
+logic                           w_misc_activation_is_req;   // the 4-granule ActivateReq
+logic    [2:0]                  w_misc_act_add;             // granules an Activation message adds
 logic                           w_misc_activation_valid;
 logic                           w_misc_activation_ready;
 
@@ -448,8 +469,9 @@ logic     [40*R1024b_G-1:0]      w_aou_tx_m_axi_r_message;
 logic     [40*AR_G-1:0]          w_aou_tx_m_axi_ar_message;
 
 
-logic [40-1:0]      w_misc_activate_message_byteswap;
-logic [40*2-1:0]    w_misc_crdtgrant_message_byteswap;
+logic [40*ACT_REQ_G-1:0]    w_misc_activate_message_byteswap;
+logic [40*2-1:0]            w_misc_crdtgrant_message_byteswap;
+logic [3:0][PROFILE_WD-1:0] w_profile_cfg;              // I_AOU_PROFILE_CFG, 0 for absent RPs
 
 logic [RP_CNT-1:0][40*W1024b_G-1:0 ]  w_writedata_message_rp;
 logic [RP_CNT-1:0][40*WF1024b_G-1:0]  w_writedata_wo_strb_message_rp;
@@ -594,6 +616,7 @@ AOU_TX_AXI_BUFFER
     .I_AOU_TX_S_AXI_AWCACHE                 ( I_AOU_TX_AXI_AWCACHE              ),
     .I_AOU_TX_S_AXI_AWPROT                  ( I_AOU_TX_AXI_AWPROT               ),
     .I_AOU_TX_S_AXI_AWQOS                   ( I_AOU_TX_AXI_AWQOS                ),
+    .I_AOU_TX_S_AXI_AWUSER                  ( I_AOU_TX_AXI_AWUSER               ),
     .I_AOU_TX_S_AXI_AWVALID                 ( I_AOU_TX_AXI_AWVALID              ),
     .O_AOU_TX_S_AXI_AWREADY                 ( O_AOU_TX_AXI_AWREADY              ),
 
@@ -601,6 +624,7 @@ AOU_TX_AXI_BUFFER
     .I_AOU_TX_S_AXI_WSTRB                   ( I_AOU_TX_AXI_WSTRB                ),
     .I_AOU_TX_S_AXI_WLAST                   ( I_AOU_TX_AXI_WLAST                ),
     .I_AOU_TX_S_AXI_WDLEN                   ( I_AOU_TX_AXI_WDLEN                ),
+    .I_AOU_TX_S_AXI_WUSER                   ( I_AOU_TX_AXI_WUSER                ),
     .I_AOU_TX_S_AXI_WVALID                  ( I_AOU_TX_AXI_WVALID               ),
     .O_AOU_TX_S_AXI_WREADY                  ( O_AOU_TX_AXI_WREADY               ),
 
@@ -613,21 +637,25 @@ AOU_TX_AXI_BUFFER
     .I_AOU_TX_S_AXI_ARCACHE                 ( I_AOU_TX_AXI_ARCACHE              ),
     .I_AOU_TX_S_AXI_ARPROT                  ( I_AOU_TX_AXI_ARPROT               ),
     .I_AOU_TX_S_AXI_ARQOS                   ( I_AOU_TX_AXI_ARQOS                ),
+    .I_AOU_TX_S_AXI_ARUSER                  ( I_AOU_TX_AXI_ARUSER               ),
     .I_AOU_TX_S_AXI_ARVALID                 ( I_AOU_TX_AXI_ARVALID              ),
     .O_AOU_TX_S_AXI_ARREADY                 ( O_AOU_TX_AXI_ARREADY              ),
 
     .I_AOU_TX_S_AXI_BID_256                 ( I_AOU_TX_AXI_BID_256              ),
     .I_AOU_TX_S_AXI_BRESP_256               ( I_AOU_TX_AXI_BRESP_256            ),
+    .I_AOU_TX_S_AXI_BUSER_256               ( I_AOU_TX_AXI_BUSER_256            ),
     .I_AOU_TX_S_AXI_BVALID_256              ( I_AOU_TX_AXI_BVALID_256           ),
     .O_AOU_TX_S_AXI_BREADY_256              ( O_AOU_TX_AXI_BREADY_256           ),
 
     .I_AOU_TX_S_AXI_BID_512                 ( I_AOU_TX_AXI_BID_512              ),
     .I_AOU_TX_S_AXI_BRESP_512               ( I_AOU_TX_AXI_BRESP_512            ),
+    .I_AOU_TX_S_AXI_BUSER_512               ( I_AOU_TX_AXI_BUSER_512            ),
     .I_AOU_TX_S_AXI_BVALID_512              ( I_AOU_TX_AXI_BVALID_512           ),
     .O_AOU_TX_S_AXI_BREADY_512              ( O_AOU_TX_AXI_BREADY_512           ),
 
     .I_AOU_TX_S_AXI_BID_1024                ( I_AOU_TX_AXI_BID_1024             ),
     .I_AOU_TX_S_AXI_BRESP_1024              ( I_AOU_TX_AXI_BRESP_1024           ),
+    .I_AOU_TX_S_AXI_BUSER_1024              ( I_AOU_TX_AXI_BUSER_1024           ),
     .I_AOU_TX_S_AXI_BVALID_1024             ( I_AOU_TX_AXI_BVALID_1024          ),
     .O_AOU_TX_S_AXI_BREADY_1024             ( O_AOU_TX_AXI_BREADY_1024          ),
 
@@ -635,6 +663,7 @@ AOU_TX_AXI_BUFFER
     .I_AOU_TX_S_AXI_RDLEN                   ( I_AOU_TX_AXI_RDLEN                ),
     .I_AOU_TX_S_AXI_RDATA                   ( I_AOU_TX_AXI_RDATA                ),
     .I_AOU_TX_S_AXI_RRESP                   ( I_AOU_TX_AXI_RRESP                ),
+    .I_AOU_TX_S_AXI_RUSER                   ( I_AOU_TX_AXI_RUSER                ),
     .I_AOU_TX_S_AXI_RLAST                   ( I_AOU_TX_AXI_RLAST                ),
     .I_AOU_TX_S_AXI_RVALID                  ( I_AOU_TX_AXI_RVALID               ),
     .O_AOU_TX_S_AXI_RREADY                  ( O_AOU_TX_AXI_RREADY               ),
@@ -779,7 +808,25 @@ assign w_readdata512b_message   = w_aou_tx_m_axi_r_message[40*R512b_G-1:0];
 assign w_readdata1024b_message  = w_aou_tx_m_axi_r_message;
 
 
-assign w_misc_activate_message_byteswap      = {MSG_MISC, 3'b010, w_misc_activation_op, w_misc_activation_prop_req, 28'b0};
+// Activation message in spec bit order (fields MSB-first), byte-reversed below
+// into wire order. ActivateReq (AoU v0.8 Table "Activation Req Message
+// Format"): MSGTYPE, MISCOP, ACTIVATIONOP, RsvdZero3, RP0 {ID, Rev, Opt}, then
+// {RsvdZero14, RPn {ID, Rev, Opt}} for RP1-3, four granules. The other opcodes
+// are one granule, MSGTYPE, MISCOP, ACTIVATIONOP, RsvdZero29; the DUT marks
+// the DeactivateReq of AOU_CON0.DEACTIVATE_FORCE in the top RsvdZero bit
+// (v0.7's PropertyReq position, MAS 7.1).
+always_comb begin
+    for (int n = 0; n < 4; n++)
+        w_profile_cfg[n] = (n < RP_CNT) ? I_AOU_PROFILE_CFG[n] : '0;
+end
+
+assign w_misc_activation_is_req = (w_misc_activation_op == ACTOP_ACTIVATE_REQ);
+assign w_misc_act_add           = w_aou_fifo_misc_act_hs ? (w_misc_activation_is_req ? 3'(ACT_REQ_G) : 3'(ACT_OTHER_G)) : '0;
+
+assign w_misc_activate_message_byteswap      = w_misc_activation_is_req ?
+    {MSG_MISC, 3'b010, w_misc_activation_op, 3'b0, w_profile_cfg[0],
+     14'b0, w_profile_cfg[1], 14'b0, w_profile_cfg[2], 14'b0, w_profile_cfg[3]} :
+    {MSG_MISC, 3'b010, w_misc_activation_op, w_misc_activation_prop_req, 28'b0, {40*(ACT_REQ_G-1){1'b0}}};   // MSB side = granule 0 after the byte reversal
 assign w_misc_crdtgrant_message_byteswap     = {MSG_MISC, 3'b100, w_misc_crdtgrant_payload, 17'b0};
 
 assign w_misc_activate_message = {<<8{w_misc_activate_message_byteswap}};
@@ -812,10 +859,10 @@ always_comb begin
                          + w_b_add + w_ar_add + w_r_add;
     w_misc_crdt_start_idx   =  r_cur_granule_start + w_aw_add + w_w_add
                          + w_b_add + w_ar_add + w_r_add
-                         + w_aou_fifo_misc_act_hs;
+                         + w_misc_act_add;
     nxt_granule_start       =  r_cur_granule_start + w_aw_add + w_w_add
                          + w_b_add + w_ar_add + w_r_add
-                         + w_aou_fifo_misc_act_hs + w_misc_crdt_add;
+                         + w_misc_act_add + w_misc_crdt_add;
 end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
@@ -926,9 +973,11 @@ always_comb begin
     end
 
     if (w_aou_fifo_misc_act_hs) begin
-        for (int unsigned n=0; n < 1; n++) begin
-            nxt_granule_buffer[add_idx(w_misc_activate_start_idx, n)] = w_misc_activate_message[n*40 +: 40];
-            nxt_msgstart_buffer[add_idx(w_misc_activate_start_idx, n)] = (n == 0);
+        for (int unsigned n=0; n < ACT_REQ_G; n++) begin
+            if ((n == 0) || w_misc_activation_is_req) begin
+                nxt_granule_buffer[add_idx(w_misc_activate_start_idx, n)] = w_misc_activate_message[n*40 +: 40];
+                nxt_msgstart_buffer[add_idx(w_misc_activate_start_idx, n)] = (n == 0);
+            end
         end
     end
 
@@ -956,13 +1005,15 @@ end
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (!I_RESETN) begin
-        r_flit_packing_state <= 2'b00;
-    end else if (w_flit_fifo_valid && w_flit_fifo_ready) begin
-        r_flit_packing_state <= r_flit_packing_state + 1;
+        r_flit_packing_state <= '0;
+    end else begin
+        r_flit_packing_state <= nxt_flit_packing_state;
     end
 end
 
-assign nxt_flit_packing_state = (w_flit_fifo_valid && w_flit_fifo_ready) ? (r_flit_packing_state + 1) : r_flit_packing_state;
+assign nxt_flit_packing_state = (w_flit_fifo_valid && w_flit_fifo_ready) ?
+                                ((r_flit_packing_state == FLIT_LAST_PACK_STATE) ? '0 : (r_flit_packing_state + 1'b1)) :
+                                r_flit_packing_state;
 
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (!I_RESETN) begin
@@ -1110,10 +1161,11 @@ assign O_AOU_TX_AXI_TR_PENDING = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_ao
 
 assign w_aou_tx_axi_tr_pending = w_aou_fifo_awvalid || w_aou_fifo_wvalid || w_aou_fifo_bvalid || w_aou_fifo_arvalid || w_aou_fifo_rvalid || w_aou_tx_axi_hs;
 
-// Two parallel packing pipelines. Exactly one elaborates per config:
+// Three packing pipelines. Exactly one elaborates per config:
+//   FDI_PACK_WD <= 512  -> g_pack_4step (quarter-flit per cycle, 12 granules)
+//   FDI_PACK_WD == 2048 -> g_pack_1step (whole flit per cycle, 48 granules)
 //   FDI_PACK_WD == 1024 -> g_pack_2step (half-flit per cycle, 24 granules)
-//   otherwise           -> g_pack_4step (quarter-flit per cycle, 12 granules)
-generate if (FDI_PACK_WD != 1024) begin : g_pack_4step
+generate if (FDI_PACK_WD < 1024) begin : g_pack_4step
     logic [64*8-1:0]    w_flit_fifo_data;
     logic [64*8-1:0]    w_flit_chunk;
     logic [16-1:0]      w_a_half_header;
@@ -1380,6 +1432,94 @@ generate if (FDI_PACK_WD != 1024) begin : g_pack_4step
         end
     `endif
 
+
+end else if (FDI_PACK_WD == 2048) begin : g_pack_1step
+    // Whole 256 B flit per cycle: both half flits from one 48-granule window
+    // of the ring. Half 0 carries the flit header, half 1 the MsgCredit; each
+    // half carries the MsgStart bits of its own 24 granules.
+    logic [64*8*4-1:0]    w_flit_fifo_data;
+    logic [64*8*4-1:0]    w_flit_chunk;
+    logic [16-1:0]        w_msgstart_q [4];       // MsgStart of granules 12q .. 12q+11
+
+    logic [RING_CNT-1:0]         w_pack_granule_start;
+    logic [RING_CNT-1:0]         w_pack_fifo_start;
+    logic [40-1:0]               w_pack_granule  [RING_DEPTH-1:0];
+    logic                        w_pack_msgstart [RING_DEPTH-1:0];
+
+    if (TX_NXT_PACKING_EN != 0) begin : g_src_nxt
+        assign w_pack_granule_start = nxt_granule_start;
+        assign w_pack_fifo_start    = nxt_flit_for_fifo_start;
+        assign w_pack_granule       = nxt_granule_buffer;
+        assign w_pack_msgstart      = nxt_msgstart_buffer;
+    end else begin : g_src_cur
+        assign w_pack_granule_start = r_cur_granule_start;
+        assign w_pack_fifo_start    = r_cur_flit_for_fifo_start;
+        assign w_pack_granule       = r_granule_buffer;
+        assign w_pack_msgstart      = r_msgstart_buffer;
+    end
+
+    if (TX_NXT_PACKING_EN != 0) begin : g_out_reg
+        logic [64*8*4-1:0]    r_flit_fifo_data;
+        always_ff @ (posedge I_CLK or negedge I_RESETN) begin
+            if (!I_RESETN) begin
+                r_flit_fifo_data <= 'd0;
+            end else if (w_misc_activation_valid || w_flit_fifo_valid || O_AOU_TX_AXI_TR_PENDING) begin
+                r_flit_fifo_data <= w_flit_fifo_data;
+            end
+        end
+        assign w_flit_chunk = r_flit_fifo_data;
+    end else begin : g_out_comb
+        assign w_flit_chunk = w_flit_fifo_data;
+    end
+
+    always_comb begin
+        w_flit_fifo_data = '0;
+        for (int unsigned q = 0; q < 4; q++) begin
+            w_msgstart_q[q] = 16'b0;
+            for (int unsigned n = 0; n < 12; n++) begin
+                if (n + 12*q < ((w_pack_granule_start - w_pack_fifo_start) & 8'b1111_1111)) begin
+                    w_msgstart_q[q][4 + n] = w_pack_msgstart[(w_pack_fifo_start + n + 12*q) & (8'b0111_1111)];
+                    w_flit_fifo_data[1024*(q/2) + 512*(q%2) + 16 + 40*n +: 40] =
+                        w_pack_granule[(w_pack_fifo_start + n + 12*q) & (8'b0111_1111)];
+                end
+            end
+        end
+        // half flit 0: flit header, G0-11, MsgStart[11:0], MsgStart[23:12], G12-23, CRC
+        w_flit_fifo_data[0 +: 16]           = 16'b0000_0000_1100_0000;
+        w_flit_fifo_data[62*8 +: 16]        = w_msgstart_q[0];
+        w_flit_fifo_data[64*8 +: 16]        = w_msgstart_q[1];
+        // half flit 1: MsgCredit, G24-35, MsgStart[35:24], MsgStart[47:36], G36-47, CRC
+        w_flit_fifo_data[128*8 +: 16]       = w_aou_msgcredit_valid ?
+            {w_aou_rs_msgcredit_rp, w_aou_rs_msgcredit_wrespcred, w_aou_rs_msgcredit_rdatacred,
+             w_aou_rs_msgcredit_wdatacred, w_aou_rs_msgcredit_rreqcred, w_aou_rs_msgcredit_wreqcred} : 16'b0;
+        w_flit_fifo_data[(128+62)*8 +: 16]  = w_msgstart_q[2];
+        w_flit_fifo_data[(128+64)*8 +: 16]  = w_msgstart_q[3];
+    end
+
+    assign w_aou_msgcredit_ready = w_flit_fifo_valid && w_flit_fifo_ready;
+    assign w_flit_fifo_chunk_partial = 1'b0;
+
+    AOU_REV_RS #(
+        .DATA_WIDTH         (FDI_IF_WD0)
+    ) u_aou_tx_core_phy0_rs
+    (
+        .I_CLK              ( I_CLK                 ),
+        .I_RESETN           ( I_RESETN              ),
+
+        .I_SVALID           ( w_flit_fifo_valid     ),
+        .O_SREADY           ( w_flit_fifo_ready     ),
+        .I_SDATA            ( w_flit_chunk          ),
+
+        .O_MVALID           ( O_FDI_LP_VALID_0      ),
+        .I_MREADY           ( I_FDI_PL_TRDY_0       ),
+        .O_MDATA            ( O_FDI_LP_DATA_0       )
+    );
+
+`ifdef TWO_PHY
+    // No two-PHY 256 B configuration: PHY1 idle.
+    assign O_FDI_LP_VALID_1 = 1'b0;
+    assign O_FDI_LP_DATA_1  = '0;
+`endif
 
 end else begin : g_pack_2step
     logic [64*8*2-1:0]    w_flit_fifo_data;

@@ -124,6 +124,12 @@ class aou_base_test extends ocah_test;
       void'($value$plusargs("active_phy=%d", cfg.lsm_cfg.active_phy));
     end
     configure();
+    // AXI USER the local agents drive, which the DUT sends as FLEX (AoU v0.8
+    // 5.2 / 11.1); the plusarg wins over the test's configure().
+    if ($value$plusargs("user_mode=%s", rb) && !aou_axi_cfg::parse_user_mode(rb, cfg.user_mode))
+      `uvm_fatal(get_type_name(), {"+user_mode: zero, const_per_txn or per_beat, not ", rb})
+    // expected_fail.yaml scopes entries to a mode with when_re on this line.
+    `uvm_info(get_type_name(), {"user_mode=", aou_axi_cfg::user_mode_name(cfg.user_mode)}, UVM_LOW)
     void'($value$plusargs("wdata_first_pct=%d", cfg.l3_cfg.pol.wdata_first_pct));
     void'($value$plusargs("wdata_first_beats=%d", cfg.l3_cfg.pol.wdata_first_beats));
     void'($value$plusargs("act_share_pct=%d", cfg.l3_cfg.pol.act_share_pct));

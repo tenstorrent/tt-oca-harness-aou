@@ -8,6 +8,13 @@
 // transaction from the DUT's WriteResp/ReadData (rsp_write(), fed by
 // aou_t1_remote_mgr). item_done() returns once the messages are queued; the
 // completed transaction goes back through put_response() and out on ap.
+// AXI USER (FLEX = USER[15:0], AoU v0.8 Basic Profile): the transaction's
+// AWUSER/ARUSER and one WUSER per W beat come from cfg.user_mode like a local
+// manager's (unless user_fixed) and go out as the FLEX of the WriteReq/ReadReq
+// and WriteData messages; a WriteData beat that merges several W beats
+// (AOU_RWREQ_UPSIZE) carries the first one's WUSER, and the transaction keeps
+// that link view in link_size/link_len/link_wuser for aou_t1_attr_chk, which
+// checks the DUT's M port presents them.
 class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   `uvm_component_utils(aou_t1_remote_mgr_driver)
 
@@ -79,6 +86,7 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
                                             t.data_bytes, cfg.data_bytes))
     t.rp = cfg.rp;
     t.local_side = 1'b0;
+    fill_user(t);
     while (is_stale(t.dir == AOU_AXI_RD, t.id)) @(clk_vif.mon_cb);
     t.t_addr = $time;
     req_ap.write(t);
@@ -91,6 +99,7 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
       while (n_rd_os >= cfg.max_rd_outstanding) done_ev.wait_trigger();
       t.data = new[t.beats()];
       t.rresp = new[t.beats()];
+      t.ruser = new[t.beats()];
       send_read(t);
       rd_q[t.id].push_back(t);
       rd_beat[t.id].push_back(0);
@@ -98,8 +107,25 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
     end
   endtask
 
+  // AWUSER/ARUSER and one WUSER per W beat from cfg.user_mode, unless the
+  // sequence fixed them (as aou_axi_mgr_driver does).
+  protected function void fill_user(aou_axi_txn t);
+    t.link_wuser.delete();
+    if (t.user_fixed) begin
+      if (t.dir == AOU_AXI_WR && t.wuser.size() != t.beats())
+        `uvm_fatal(get_type_name(), $sformatf("user_fixed write needs %0d wuser entries: %s",
+                                              t.beats(), t.convert2string()))
+      return;
+    end
+    t.user = cfg.one_user();
+    if (t.dir == AOU_AXI_WR) cfg.fill_user(t.wuser, t.beats());
+    else t.wuser.delete();
+  endfunction
+
   protected function void fill_req(aou_msg_req m, aou_axi_txn t);
     m.rp = wire_rp;
+    m.flex = t.user;
+    m.flex_fixed = 1'b1;
     m.id = t.id;
     m.addr = t.addr;
     m.len = t.len;
@@ -127,6 +153,8 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
       aou_msg_wdata wd = aou_msg_wdata::type_id::create("wdata");
       wd.rp = wire_rp;
       wd.dlength = dl_of(mb);
+      wd.flex = (i < t.wuser.size()) ? t.wuser[i] : 16'h0;  // one WriteData per W beat
+      wd.flex_fixed = 1'b1;
       if (mb == cfg.data_bytes) begin
         wd.data = t.data[i];
         wd.strb = t.strb[i] & all;
@@ -146,7 +174,8 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
   endfunction
 
   // t as a WriteReq of our bus size: the same bytes, in beats of the bus from
-  // t's (possibly unaligned) start to its end, strobes on t's bytes only.
+  // t's (possibly unaligned) start to its end, strobes on t's bytes only. A
+  // WriteData beat carries the WUSER of the first W beat it holds.
   protected function void send_write_upsized(aou_axi_txn t);
     aou_msg_wreq wq = aou_msg_wreq::type_id::create("wreq");
     bit [7:0] b[bit [63:0]];
@@ -160,11 +189,20 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
     fill_req(wq, t);
     wq.size = 3'($clog2(bb));
     wq.len = 8'(nbeats - 1);
+    t.link_size = wq.size;
+    t.link_len = wq.len;
+    t.link_wuser = new[nbeats];
     l3.send(wq);
     for (int unsigned i = 0; i < nbeats; i++) begin
       aou_msg_wdata wd = aou_msg_wdata::type_id::create("wdata");
+      // The first W beat in this WriteData beat: the one holding its first
+      // byte that belongs to t (t.addr for beat 0, the beat's base after).
+      int k = t.beat_index_of((i == 0) ? t.addr : base + 64'(i) * 64'(bb));
       wd.rp = wire_rp;
       wd.dlength = dl_of(bb);
+      wd.flex = (k >= 0 && k < t.wuser.size()) ? t.wuser[k] : 16'h0;
+      wd.flex_fixed = 1'b1;
+      t.link_wuser[i] = wd.flex;
       wd.data = '0;
       wd.strb = '0;
       for (int unsigned l = 0; l < bb; l++) begin
@@ -213,6 +251,7 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
       end
       t = wr_q[b.id].pop_front();
       t.bresp = b.resp;
+      t.buser = b.flex;  // FLEX = BUSER[15:0] (AoU v0.8 Basic Profile)
       n_wr_os--;
       n_wr++;
       complete(t);
@@ -247,6 +286,7 @@ class aou_t1_remote_mgr_driver extends uvm_driver #(aou_axi_txn);
         t.data[i][8*l +: 8] = d.data[8*int'(a % 64'(bus)) +: 8];
       end
       t.rresp[i] = d.resp;
+      t.ruser[i] = d.flex;  // FLEX = RUSER[15:0] (AoU v0.8 Basic Profile)
       rd_beat[d.id][0] = i + 1;
       if (d.last != (i + 1 == t.beats()))
         `uvm_error(get_type_name(), $sformatf("T1-RM04: RLAST=%0d on beat %0d of %0d: %s", d.last,

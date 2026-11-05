@@ -100,7 +100,10 @@ class aou_l3_model extends uvm_object;
   // ---- API -------------------------------------------------------------
   function void send(aou_msg m);
     aou_msg_act a;
-    if ($cast(a, m)) a.spec_rev = cfg.spec_rev;
+    if ($cast(a, m)) begin
+      a.spec_rev = cfg.spec_rev;
+      if (a.op == AOU_ACT_REQ && !a.profile_fixed) lnk.fill_profile(a);
+    end
     pk.push(m);
     kick();
   endfunction
@@ -195,11 +198,15 @@ class aou_l3_model extends uvm_object;
       // Each Req we send is a request the DUT must answer (checked at the end).
       if ($cast(a, m) && a.op == AOU_ACT_REQ) ledger_chk("AOU-R28");
       if ($cast(a, m) && a.op == AOU_DEACT_REQ) ledger_chk("AOU-R36");
+      if (a != null)
+        `uvm_info("aou_l3_model", $sformatf("sent %s %s", aou_msg_act::op_name(a.op),
+                                            a.fields2string()), UVM_HIGH)
       tx_msgs++;
       tx_sent_q.push_back(m);
       track_tx(m);
       if (cov != null) begin
         cov.sample_msg(m);
+        if ($cast(a, m)) cov.sample_act_profile(a, cfg.rp_count);
         cov.sample_tx_write(m);
         if (m.cred_class() != AOU_CC_NONE)
           cov.sample_credit(aou_l3_cov::EV_CONSUME, m.cred_class(), AOU_L3_TX);
@@ -522,8 +529,15 @@ class aou_l3_model extends uvm_object;
 
   function void rx_deliver(aou_msg m);
     aou_msg_rdata rd;
+    aou_msg_act a;
     rx_msgs++;
-    if (cov != null) cov.sample_msg(m);
+    if ($cast(a, m))
+      `uvm_info("aou_l3_model", $sformatf("received %s %s", aou_msg_act::op_name(a.op),
+                                          a.fields2string()), UVM_HIGH)
+    if (cov != null) begin
+      cov.sample_msg(m);
+      if (a != null) cov.sample_act_profile(a, cfg.peer_count());
+    end
     begin
       case (m.msg_type)
         AOU_MT_WREQ: begin

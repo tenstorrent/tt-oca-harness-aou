@@ -65,6 +65,7 @@ module AOU_EARLY_BRESP_CTRL_AWCACHE
 
     output  [AXI_ID_WD-1:0]         O_AXI_S_BID,
     output  [1:0]                   O_AXI_S_BRESP,
+    output  [15:0]                  O_AXI_S_BUSER,
     output                          O_AXI_S_BVALID,
     input                           I_AXI_S_BREADY,
 
@@ -89,6 +90,7 @@ module AOU_EARLY_BRESP_CTRL_AWCACHE
 
     input   [AXI_ID_WD-1:0]         I_AXI_M_BID,
     input   [1:0]                   I_AXI_M_BRESP,
+    input   [15:0]                  I_AXI_M_BUSER,
     input                           I_AXI_M_BVALID,
     output                          O_AXI_M_BREADY,
     
@@ -283,6 +285,8 @@ assign  O_AXI_M_WVALID    = r_early_bresp_en ? I_AXI_S_WVALID & (w_aw_cnt_fifo_m
 //  B CH ==================================================
 assign  O_AXI_S_BID       = r_early_bresp_en ? w_earlyrsp_valid ? w_early_rsp_id  : w_earlyrsp_consume ? 'd0   : I_AXI_M_BID   : I_AXI_M_BID;  
 assign  O_AXI_S_BRESP     = r_early_bresp_en ? w_earlyrsp_valid ? 2'b00           : w_earlyrsp_consume ? 2'b00 : I_AXI_M_BRESP : I_AXI_M_BRESP;
+// An early write response is generated here, not by the remote subordinate: it carries BUSER (FLEX) = 0.
+assign  O_AXI_S_BUSER     = r_early_bresp_en ? w_earlyrsp_valid ? 16'h0           : w_earlyrsp_consume ? 16'h0 : I_AXI_M_BUSER : I_AXI_M_BUSER;
 assign  O_AXI_S_BVALID    = r_early_bresp_en ? w_earlyrsp_valid ? 1'b1            : w_earlyrsp_consume ? 1'b0  : I_AXI_M_BVALID: I_AXI_M_BVALID;
 assign  O_AXI_M_BREADY    = r_early_bresp_en ? w_earlyrsp_valid ? 1'b0            : w_earlyrsp_consume ? 1'b1  : I_AXI_S_BREADY: I_AXI_S_BREADY;
 

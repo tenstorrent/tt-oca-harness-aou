@@ -47,12 +47,14 @@ module AOU_AXI_WLAST_GEN #(
     input       [ 3: 0]                 I_S_AWCACHE,
     input       [ 2: 0]                 I_S_AWPROT,
     input       [ QOS_WD-1: 0]          I_S_AWQOS,
+    input       [15:0]                  I_S_AWUSER,
     input                               I_S_AWVALID,
     output wire                         O_S_AWREADY,
 
     input       [ 1: 0]                 I_S_WDLENGTH,
     input       [ DATA_WD-1 : 0]        I_S_WDATA,
     input       [ STRB_WD-1 : 0]        I_S_WSTRB,
+    input       [15:0]                  I_S_WUSER,
     input                               I_S_WVALID,
     output                              O_S_WREADY,
 
@@ -64,6 +66,7 @@ module AOU_AXI_WLAST_GEN #(
     output wire [ 3: 0]                 O_M_AWCACHE,
     output wire [ 2: 0]                 O_M_AWPROT,
     output wire [ 3: 0]                 O_M_AWQOS,
+    output wire [15:0]                  O_M_AWUSER,
     output wire                         O_M_AWVALID_256,
     output wire                         O_M_AWVALID_512,
     output wire                         O_M_AWVALID_1024,
@@ -74,6 +77,7 @@ module AOU_AXI_WLAST_GEN #(
     output wire [ 1: 0]                 O_M_WDLENGTH,
     output wire [ DATA_WD-1: 0]         O_M_WDATA,
     output wire [ STRB_WD-1: 0]         O_M_WSTRB,
+    output wire [15:0]                  O_M_WUSER,
     output wire                         O_M_WLAST,
     output wire                         O_M_WVALID_256,
     output wire                         O_M_WVALID_512,
@@ -84,8 +88,8 @@ module AOU_AXI_WLAST_GEN #(
 
 );
 
-localparam AXI_AWCH_PAYLOAD_WD = ID_WD + ADDR_WD + LEN_WD + 3 + 1 + 4 + 3 + QOS_WD;//+2 BURST is always 01
-localparam AXI_WCH_PAYLOAD_WD  = 2 + DATA_WD + STRB_WD;
+localparam AXI_AWCH_PAYLOAD_WD = ID_WD + ADDR_WD + LEN_WD + 3 + 1 + 4 + 3 + QOS_WD + 16;//+2 BURST is always 01; +16 AWUSER (FLEX)
+localparam AXI_WCH_PAYLOAD_WD  = 2 + DATA_WD + STRB_WD + 16; // +16 WUSER (FLEX)
 
 wire [AXI_AWCH_PAYLOAD_WD - 1 : 0]  w_awch_fwd_rs_sdata;
 wire [AXI_AWCH_PAYLOAD_WD - 1 : 0]  w_awch_fwd_rs_mdata;
@@ -111,7 +115,8 @@ assign w_awch_fwd_rs_sdata = {
     I_S_AWLOCK,
     I_S_AWCACHE,
     I_S_AWPROT,
-    I_S_AWQOS
+    I_S_AWQOS,
+    I_S_AWUSER
 };
 
 assign {O_M_AWID,
@@ -121,7 +126,8 @@ assign {O_M_AWID,
         O_M_AWLOCK,
         O_M_AWCACHE,
         O_M_AWPROT,
-        O_M_AWQOS} = w_awch_fwd_rs_mdata;
+        O_M_AWQOS,
+        O_M_AWUSER} = w_awch_fwd_rs_mdata;
 
 generate
 if (AOU_AXI_WLAST_AWCH_RS_EN == 1) begin
@@ -158,7 +164,8 @@ endgenerate
 assign w_wch_fwd_rs_sdata = {
     I_S_WDLENGTH,
     I_S_WDATA,
-    I_S_WSTRB
+    I_S_WSTRB,
+    I_S_WUSER
 };
 
 generate
@@ -192,7 +199,8 @@ endgenerate
 
 assign {O_M_WDLENGTH,
         O_M_WDATA,
-        O_M_WSTRB} = w_wch_fwd_rs_mdata;
+        O_M_WSTRB,
+        O_M_WUSER} = w_wch_fwd_rs_mdata;
 
 //----------------------------------------------------
 wire   w_m_awvalid_awready;

@@ -43,21 +43,17 @@
 `define AOU_L3_FC_SIZE(B) \
   `B``_BIN(g1, 1, 1) `B``_BIN(g2, 2, 2) `B``_BIN(g3, 3, 3) `B``_BIN(g4, 4, 4) \
   `B``_BIN(g7, 7, 7) `B``_BIN(g8, 8, 8) `B``_BIN(g14, 14, 14) `B``_BIN(g15, 15, 15) \
-  `B``_BIN(g27, 27, 27) `B``_BIN(g30, 30, 30) \
-  `B``_TAG("g4", "v0.8")
+  `B``_BIN(g27, 27, 27) `B``_BIN(g30, 30, 30)
 `define AOU_L3_FC_SPAN(B) `B``_BIN(one_flit, 0, 0) `B``_BIN(multi_flit, 1, 1)
-// The 4-granule ActivateReq is v0.8 (AoU v0.8 Table 27). It is the only
-// 4-granule message, and an Activation message always starts at G0 (AoU v0.8
-// 4.4), so it can neither start later nor span flits: those cells are illegal,
-// and the unpacker's Activation placement check (AOU-R6) reports a hit.
+// g4 is the ActivateReq (AoU v0.8 Table 27), sent and received by the DUT; an
+// Activation message starts at G0 (4.4), so g4 away from G0 is AOU-R6's case.
 `define AOU_L3_FC_X_START_SIZE(B) \
-  `B``_TAG("*,g4", "v0.8") \
-  `B``_XILL("g[1*]|g[2*]|g[3*]|g[4*]|g[5]|g[6]|g[7]|g[8]|g[9],g4", "")
-// A 1-granule message can't span flits.
+  `B``_XILL("g[1*]|g[2*]|g[3*]|g[4*]|g[5]|g[6]|g[7]|g[8]|g[9],g4", "AOU-R6")
+// A 1-granule message can't span flits; the 4-granule ActivateReq starts at
+// G0, so it can't either (AOU-R6 reports one that does).
 `define AOU_L3_FC_X_SIZE_SPAN(B) \
   `B``_XIGN("g1,multi_flit") \
-  `B``_TAG("g4,*", "v0.8") \
-  `B``_XILL("g4,multi_flit", "")
+  `B``_XILL("g4,multi_flit", "AOU-R6")
 // Messages that span flits, by kind (msg_kind() numbers) and direction
 // (cg_span). A WriteResp is one granule and an Activation starts at G0 and is
 // at most 4 granules, so neither can span; a CrdtGrant can, but it is no
@@ -140,3 +136,29 @@
 `define AOU_L3_FC_X_WF(B) \
   `B``_XIGN("none,whole,*") \
   `B``_XIGN("none,*,one|more")
+// FLEX of an AXI message (cg_flex): zero, some other value, or all ones. In
+// the Basic Profile FLEX is USER[15:0] (AoU v0.8 5.2 / 11.1): on rx (the DUT's
+// messages) the DUT forwards the USER its AXI port got, on tx the model's FLEX
+// to the DUT.
+`define AOU_L3_FC_FLEX(B) `B``_BIN(zero, 0, 0) `B``_BIN(nonzero, 1, 1) `B``_BIN(all_ones, 2, 2)
+// The AXI messages that carry FLEX, in msg_kind() order.
+`define AOU_L3_FC_FLEX_KIND(B) \
+  `B``_BIN(wreq, 0, 0) `B``_BIN(rreq, 1, 1) `B``_BIN(wdata, 2, 4) `B``_BIN(wdataf, 5, 7) \
+  `B``_BIN(rdata, 8, 10) `B``_BIN(wresp, 11, 11)
+// Every cell is reachable on both directions: the remote AXI agents' USER
+// (aou_axi_cfg::user_pat, incl. all ones; aou_attr_test attr_user-1) is the
+// FLEX of the model's messages (flex_fixed), and the packer's random FLEX
+// (aou_packer_policy::prof_pct) only covers messages without one.
+`define AOU_L3_FC_X_FLEX(B)
+// ActivateReq profile fields per RP (cg_act_profile; AoU v0.8 Ch. 11): on rx
+// the DUT's, always the Basic Profile (PROFILE_CFG_RPn read-only 0/0/0), on
+// tx the model's cfg.profile_*. An RP the sender does not have carries 0 (its
+// fields are reserved); the non-zero bins are reached on tx only.
+`define AOU_L3_FC_PROFILE_ID(B) `B``_BIN(basic, 0, 0) `B``_BIN(low, 1, 15) `B``_BIN(high, 16, 31)
+`define AOU_L3_FC_PROFILE_NZ(B) `B``_BIN(zero, 0, 0) `B``_BIN(nonzero, 1, 1)
+`define AOU_L3_FC_PRESENT(B) `B``_BIN(absent, 0, 0) `B``_BIN(present, 1, 1)
+`define AOU_L3_FC_X_PROFILE(B) \
+  `B``_XIGN("*,low|high,*,*,absent") \
+  `B``_XIGN("*,*,nonzero,*,absent") \
+  `B``_XIGN("*,*,*,nonzero,absent") \
+  `B``_XIGN("rp[0],*,*,*,absent")

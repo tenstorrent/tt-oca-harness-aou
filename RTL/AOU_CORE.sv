@@ -123,13 +123,20 @@ import packet_def_pkg::*;
     parameter   FDI_IF_WD0                  = 512,
     parameter   FDI_IF_WD1                  = 512,
     parameter   RP_COUNT                    = 1,
-    parameter   DEC_MULTI                   = 2,
-    parameter   PHY_TYPE                    = 1,
 
-    // Active FDI width for RX decode: max of the two PHY widths. In both
-    // TWO_PHY and single-PHY configurations this matches the width the
-    // AOU_RX_CORE expects on its I_FDI_PL_DATA bus.
+    // FDI beat width the RX decode sees. With TWO_PHY the narrower PHY is
+    // paired up to the wider one by AOU_RX_CORE_IN_MUX; a single PHY feeds
+    // AOU_RX_CORE directly, whatever its width.
+`ifdef TWO_PHY
     localparam  FDI_DEC_WD                  = (FDI_IF_WD0 > FDI_IF_WD1) ? FDI_IF_WD0 : FDI_IF_WD1,
+`else
+    localparam  FDI_DEC_WD                  = FDI_IF_WD0,
+`endif
+    // Granules decoded per cycle: one half flit, or a whole flit on a 2048-bit FDI.
+    localparam  G_CNT                       = (FDI_DEC_WD == 2048) ? 48 : 24,
+    localparam  REQ_LANES                   = G_CNT/3 + 1,
+    localparam  B_LANES                     = G_CNT,
+    localparam  MISC_LANES                  = 3,
 
     localparam  RP0_AXI_STRB_WD             = RP0_AXI_DATA_WD / 8,
     localparam  RP1_AXI_STRB_WD             = RP1_AXI_DATA_WD / 8,
@@ -145,13 +152,8 @@ import packet_def_pkg::*;
 
     localparam  AXI_MAX_STRB_WD             = AXI_PEER_DIE_MAX_DATA_WD / 8,
 
-    localparam  MAX_MISC_COUNT              = 2,
-    localparam  MAX_REQ_COUNT               = 4,
-    localparam  MAX_WR_RESP_COUNT           = 12,
-    localparam  DATA_DEC_CNT                = 4,
-
-    parameter   AW_AR_FIFO_WIDTH            = AXI_ID_WD + AXI_ADDR_WD + AXI_LEN_WD + 3 + 1 + 4 + 3 + 4,
-    parameter   B_FIFO_WIDTH                = AXI_ID_WD + 2,
+    parameter   AW_AR_FIFO_WIDTH            = AXI_ID_WD + AXI_ADDR_WD + AXI_LEN_WD + 3 + 1 + 4 + 3 + 4 + 16, // + FLEX
+    parameter   B_FIFO_WIDTH                = AXI_ID_WD + 2 + 16,                                            // + FLEX
     parameter   R_FIFO_EXT_DATA_WIDTH       = AXI_ID_WD + 2 + 1,
 
     localparam int unsigned RP_AXI_DATA_WD[4]  = '{
@@ -230,12 +232,14 @@ import packet_def_pkg::*;
     output  [RP_COUNT-1:0][3:0]                             O_AOU_RX_AXI_M_ARCACHE,
     output  [RP_COUNT-1:0][2:0]                             O_AOU_RX_AXI_M_ARPROT,
     output  [RP_COUNT-1:0][3:0]                             O_AOU_RX_AXI_M_ARQOS,
+    output  [RP_COUNT-1:0][15:0]                            O_AOU_RX_AXI_M_ARUSER,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_M_ARVALID,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_M_ARREADY,
 
     input   [RP_COUNT-1:0][AXI_ID_WD-1:0]                   I_AOU_TX_AXI_M_RID,
     input   [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]          I_AOU_TX_AXI_M_RDATA,
     input   [RP_COUNT-1:0][1:0]                             I_AOU_TX_AXI_M_RRESP,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_TX_AXI_M_RUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_M_RLAST,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_M_RVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_TX_AXI_M_RREADY,
@@ -249,17 +253,20 @@ import packet_def_pkg::*;
     output  [RP_COUNT-1:0][3:0]                             O_AOU_RX_AXI_M_AWCACHE,
     output  [RP_COUNT-1:0][2:0]                             O_AOU_RX_AXI_M_AWPROT,
     output  [RP_COUNT-1:0][3:0]                             O_AOU_RX_AXI_M_AWQOS,
+    output  [RP_COUNT-1:0][15:0]                            O_AOU_RX_AXI_M_AWUSER,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_M_AWVALID,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_M_AWREADY,
 
     output  [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]          O_AOU_RX_AXI_M_WDATA,
     output  [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]          O_AOU_RX_AXI_M_WSTRB,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_M_WLAST,
+    output  [RP_COUNT-1:0][15:0]                            O_AOU_RX_AXI_M_WUSER,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_M_WVALID,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_M_WREADY,
 
     input   [RP_COUNT-1:0][AXI_ID_WD-1:0]                   I_AOU_TX_AXI_M_BID,
     input   [RP_COUNT-1:0][1:0]                             I_AOU_TX_AXI_M_BRESP,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_TX_AXI_M_BUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_M_BVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_TX_AXI_M_BREADY,
 
@@ -273,6 +280,7 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][3:0]                             I_AOU_TX_AXI_S_ARCACHE,
     input   [RP_COUNT-1:0][2:0]                             I_AOU_TX_AXI_S_ARPROT,
     input   [RP_COUNT-1:0][3:0]                             I_AOU_TX_AXI_S_ARQOS,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_TX_AXI_S_ARUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_S_ARVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_TX_AXI_S_ARREADY,
 
@@ -280,12 +288,14 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    I_AOU_RX_AXI_S_RDATA,
     input   [RP_COUNT-1:0][1:0]                             I_AOU_RX_AXI_S_RRESP,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_S_RLAST,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_RX_AXI_S_RUSER,
     input   [RP_COUNT-1:0][1:0]                             I_AOU_RX_AXI_S_RDLENGTH,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_S_RVALID,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_S_RREADY,
     output  [RP_COUNT-1:0][AXI_ID_WD-1:0]                   O_AOU_RX_AXI_S_RID,
     output  [RP_COUNT-1:0][1:0]                             O_AOU_RX_AXI_S_RRESP,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_S_RLAST,
+    output  [RP_COUNT-1:0][15:0]                            O_AOU_RX_AXI_S_RUSER,
     output  [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    O_AOU_RX_AXI_S_RDATA,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_FIFO_RREADY,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_S_RVALID_BLOCKED,
@@ -299,17 +309,20 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][3:0]                             I_AOU_TX_AXI_S_AWCACHE,
     input   [RP_COUNT-1:0][2:0]                             I_AOU_TX_AXI_S_AWPROT,
     input   [RP_COUNT-1:0][3:0]                             I_AOU_TX_AXI_S_AWQOS,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_TX_AXI_S_AWUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_S_AWVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_TX_AXI_S_AWREADY,
 
     input   [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]          I_AOU_TX_AXI_S_WDATA,
     input   [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]          I_AOU_TX_AXI_S_WSTRB,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_S_WLAST,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_TX_AXI_S_WUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_TX_AXI_S_WVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_TX_AXI_S_WREADY,
 
     output  [RP_COUNT-1:0][AXI_ID_WD-1:0]                   O_AOU_RX_AXI_S_BID,
     output  [RP_COUNT-1:0][1:0]                             O_AOU_RX_AXI_S_BRESP,
+    output  [RP_COUNT-1:0][15:0]                            O_AOU_RX_AXI_S_BUSER,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_S_BVALID,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_S_BREADY,
 
@@ -322,6 +335,7 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][3:0]                             I_AOU_RX_WLAST_GEN_AWCACHE,
     input   [RP_COUNT-1:0][2:0]                             I_AOU_RX_WLAST_GEN_AWPROT,
     input   [RP_COUNT-1:0][3:0]                             I_AOU_RX_WLAST_GEN_AWQOS,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_RX_WLAST_GEN_AWUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_WLAST_GEN_AWVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_WLAST_GEN_AWREADY,
 
@@ -329,12 +343,14 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0]                                  I_AOU_RX_WLAST_GEN_WDATAF,
     input   [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    I_AOU_RX_WLAST_GEN_WDATA,
     input   [RP_COUNT-1:0][AXI_MAX_STRB_WD-1:0]             I_AOU_RX_WLAST_GEN_WSTRB,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_RX_WLAST_GEN_WUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_WLAST_GEN_WVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_WLAST_GEN_WREADY,
 
     //To Early_BRESP_CTRL_AWCACHE
     input   [RP_COUNT-1:0][AXI_ID_WD-1:0]                   I_EARLY_BRESP_CTRL_BID,
     input   [RP_COUNT-1:0][1:0]                             I_EARLY_BRESP_CTRL_BRESP,
+    input   [RP_COUNT-1:0][15:0]                            I_EARLY_BRESP_CTRL_BUSER,
     input   [RP_COUNT-1:0]                                  I_EARLY_BRESP_CTRL_BVALID,
     output  [RP_COUNT-1:0]                                  O_EARLY_BRESP_CTRL_BREADY,
 
@@ -347,6 +363,7 @@ import packet_def_pkg::*;
     input   [RP_COUNT-1:0][3:0]                             I_AOU_RX_AXI_MM_ARCACHE,
     input   [RP_COUNT-1:0][2:0]                             I_AOU_RX_AXI_MM_ARPROT,
     input   [RP_COUNT-1:0][3:0]                             I_AOU_RX_AXI_MM_ARQOS,
+    input   [RP_COUNT-1:0][15:0]                            I_AOU_RX_AXI_MM_ARUSER,
     input   [RP_COUNT-1:0]                                  I_AOU_RX_AXI_MM_ARVALID,
     output  [RP_COUNT-1:0]                                  O_AOU_RX_AXI_MM_ARREADY,
 
@@ -383,23 +400,22 @@ import packet_def_pkg::*;
 `endif
 
     //From RX_CORE
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]         O_RD_REQ_FIFO_SDATA,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                               O_RD_REQ_FIFO_SVALID,
+    output  [RP_COUNT-1:0][REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]     O_RD_REQ_FIFO_SDATA,
+    output  [RP_COUNT-1:0][REQ_LANES-1:0]                           O_RD_REQ_FIFO_SVALID,
 
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0][AW_AR_FIFO_WIDTH-1:0]         O_WR_REQ_FIFO_SDATA,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_REQ_COUNT -1:0]                               O_WR_REQ_FIFO_SVALID,
+    output  [RP_COUNT-1:0][REQ_LANES-1:0][AW_AR_FIFO_WIDTH-1:0]     O_WR_REQ_FIFO_SDATA,
+    output  [RP_COUNT-1:0][REQ_LANES-1:0]                           O_WR_REQ_FIFO_SVALID,
 
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]   O_WR_DATA_FIFO_SDATA,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 O_WR_DATA_FIFO_SDATA_WDATAF,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_MAX_STRB_WD -1:0]           O_WR_DATA_FIFO_SDATA_STRB,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 O_WR_DATA_FIFO_SVALID,
+    output  [RP_COUNT-1:0][B_LANES-1:0][B_FIFO_WIDTH-1:0]           O_WR_RESP_FIFO_SDATA,
+    output  [RP_COUNT-1:0][B_LANES-1:0]                             O_WR_RESP_FIFO_SVALID,
 
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0][B_FIFO_WIDTH-1:0]         O_WR_RESP_FIFO_SDATA,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][MAX_WR_RESP_COUNT -1:0]                           O_WR_RESP_FIFO_SVALID,
-
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]   O_RD_DATA_FIFO_SDATA,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0][R_FIFO_EXT_DATA_WIDTH -1:0]     O_RD_DATA_FIFO_EXT_SDATA,
-    output  [RP_COUNT-1:0][DEC_MULTI-1:0][DATA_DEC_CNT-1:0]                                 O_RD_DATA_FIFO_SVALID,
+    // tagged granule stream to the W and R granule stores
+    output                                                          O_GRANULE_VALID,
+    output  [G_CNT-1:0][39:0]                                       O_GRANULE,
+    output  [RP_COUNT-1:0][G_CNT-1:0]                               O_WR_DATA_COVER,
+    output  [RP_COUNT-1:0][G_CNT-1:0]                               O_WR_DATA_START,
+    output  [RP_COUNT-1:0][G_CNT-1:0]                               O_RD_DATA_COVER,
+    output  [RP_COUNT-1:0][G_CNT-1:0]                               O_RD_DATA_START,
 
     //Interface for Error Handler
     output                                                  O_ERR_INFO_RID_MISMATCH_ERR,
@@ -429,34 +445,6 @@ import packet_def_pkg::*;
 );
 
 //----------------------------------------------------------------------------
-    localparam  RP0_RDATA_G_SIZE                 =  (RP0_AXI_DATA_WD == 256) ? R256b_G  :
-                                                    (RP0_AXI_DATA_WD == 512) ? R512b_G  :
-                                                    (RP0_AXI_DATA_WD == 1024)? R1024b_G : 0;
-    localparam  RP0_RDATA_FIFO_USAGE_PER_MSG     =  (RP0_AXI_DATA_WD == 256) ? 1  :
-                                                    (RP0_AXI_DATA_WD == 512) ? 2  :
-                                                    (RP0_AXI_DATA_WD == 1024)? 4 : 0;
-
-    localparam  RP1_RDATA_G_SIZE                 =  (RP1_AXI_DATA_WD == 256) ? R256b_G  :
-                                                    (RP1_AXI_DATA_WD == 512) ? R512b_G  :
-                                                    (RP1_AXI_DATA_WD == 1024)? R1024b_G : 0;
-    localparam  RP1_RDATA_FIFO_USAGE_PER_MSG     =  (RP1_AXI_DATA_WD == 256) ? 1  :
-                                                    (RP1_AXI_DATA_WD == 512) ? 2  :
-                                                    (RP1_AXI_DATA_WD == 1024)? 4 : 0;
-
-    localparam  RP2_RDATA_G_SIZE                 =  (RP2_AXI_DATA_WD == 256) ? R256b_G  :
-                                                    (RP2_AXI_DATA_WD == 512) ? R512b_G  :
-                                                    (RP2_AXI_DATA_WD == 1024)? R1024b_G : 0;
-    localparam  RP2_RDATA_FIFO_USAGE_PER_MSG     =  (RP2_AXI_DATA_WD == 256) ? 1  :
-                                                    (RP2_AXI_DATA_WD == 512) ? 2  :
-                                                    (RP2_AXI_DATA_WD == 1024)? 4 : 0;
-
-    localparam  RP3_RDATA_G_SIZE                 =  (RP3_AXI_DATA_WD == 256) ? R256b_G  :
-                                                    (RP3_AXI_DATA_WD == 512) ? R512b_G  :
-                                                    (RP3_AXI_DATA_WD == 1024)? R1024b_G : 0;
-    localparam  RP3_RDATA_FIFO_USAGE_PER_MSG     =  (RP3_AXI_DATA_WD == 256) ? 1  :
-                                                    (RP3_AXI_DATA_WD == 512) ? 2  :
-                                                    (RP3_AXI_DATA_WD == 1024)? 4 : 0;
-
     localparam  CNT_RP0_TX_AW_MAX_CREDIT    = $clog2(RP0_TX_AW_MAX_CREDIT +1);
     localparam  CNT_RP0_TX_AR_MAX_CREDIT    = $clog2(RP0_TX_AR_MAX_CREDIT +1);
     localparam  CNT_RP0_TX_W_MAX_CREDIT     = $clog2(RP0_TX_W_MAX_CREDIT  +1);
@@ -483,26 +471,26 @@ import packet_def_pkg::*;
 
     localparam  RP0_RX_AW_MAX_CREDIT        = RP0_RX_AW_FIFO_DEPTH     * AW_G;
     localparam  RP0_RX_AR_MAX_CREDIT        = RP0_RX_AR_FIFO_DEPTH     * AR_G;
-    localparam  RP0_RX_W_MAX_CREDIT         = (RP0_RX_W_FIFO_DEPTH/4)  * WF1024b_G;
-    localparam  RP0_RX_R_MAX_CREDIT         = (RP0_RX_R_FIFO_DEPTH/RP0_RDATA_FIFO_USAGE_PER_MSG)  * RP0_RDATA_G_SIZE;
+    localparam  RP0_RX_W_MAX_CREDIT         = RP0_RX_W_FIFO_DEPTH;      // one credit per granule
+    localparam  RP0_RX_R_MAX_CREDIT         = RP0_RX_R_FIFO_DEPTH;      // one credit per granule
     localparam  RP0_RX_B_MAX_CREDIT         = RP0_RX_B_FIFO_DEPTH      * B_G;
 
     localparam  RP1_RX_AW_MAX_CREDIT        = RP1_RX_AW_FIFO_DEPTH     * AW_G;
     localparam  RP1_RX_AR_MAX_CREDIT        = RP1_RX_AR_FIFO_DEPTH     * AR_G;
-    localparam  RP1_RX_W_MAX_CREDIT         = (RP1_RX_W_FIFO_DEPTH/4)  * WF1024b_G;
-    localparam  RP1_RX_R_MAX_CREDIT         = (RP1_RX_R_FIFO_DEPTH/RP1_RDATA_FIFO_USAGE_PER_MSG)  * RP1_RDATA_G_SIZE;
+    localparam  RP1_RX_W_MAX_CREDIT         = RP1_RX_W_FIFO_DEPTH;      // one credit per granule
+    localparam  RP1_RX_R_MAX_CREDIT         = RP1_RX_R_FIFO_DEPTH;      // one credit per granule
     localparam  RP1_RX_B_MAX_CREDIT         = RP1_RX_B_FIFO_DEPTH      * B_G;
 
     localparam  RP2_RX_AW_MAX_CREDIT        = RP2_RX_AW_FIFO_DEPTH     * AW_G;
     localparam  RP2_RX_AR_MAX_CREDIT        = RP2_RX_AR_FIFO_DEPTH     * AR_G;
-    localparam  RP2_RX_W_MAX_CREDIT         = (RP2_RX_W_FIFO_DEPTH/4)  * WF1024b_G;
-    localparam  RP2_RX_R_MAX_CREDIT         = (RP2_RX_R_FIFO_DEPTH/RP2_RDATA_FIFO_USAGE_PER_MSG)  * RP2_RDATA_G_SIZE;
+    localparam  RP2_RX_W_MAX_CREDIT         = RP2_RX_W_FIFO_DEPTH;      // one credit per granule
+    localparam  RP2_RX_R_MAX_CREDIT         = RP2_RX_R_FIFO_DEPTH;      // one credit per granule
     localparam  RP2_RX_B_MAX_CREDIT         = RP2_RX_B_FIFO_DEPTH      * B_G;
 
     localparam  RP3_RX_AW_MAX_CREDIT        = RP3_RX_AW_FIFO_DEPTH     * AW_G;
     localparam  RP3_RX_AR_MAX_CREDIT        = RP3_RX_AR_FIFO_DEPTH     * AR_G;
-    localparam  RP3_RX_W_MAX_CREDIT         = (RP3_RX_W_FIFO_DEPTH/4)  * WF1024b_G;
-    localparam  RP3_RX_R_MAX_CREDIT         = (RP3_RX_R_FIFO_DEPTH/RP3_RDATA_FIFO_USAGE_PER_MSG)  * RP3_RDATA_G_SIZE;
+    localparam  RP3_RX_W_MAX_CREDIT         = RP3_RX_W_FIFO_DEPTH;      // one credit per granule
+    localparam  RP3_RX_R_MAX_CREDIT         = RP3_RX_R_FIFO_DEPTH;      // one credit per granule
     localparam  RP3_RX_B_MAX_CREDIT         = RP3_RX_B_FIFO_DEPTH      * B_G;
 
     localparam  CNT_RP_TX_AW_MAX_CREDIT_MAX = max4(CNT_RP0_TX_AW_MAX_CREDIT, CNT_RP1_TX_AW_MAX_CREDIT, CNT_RP2_TX_AW_MAX_CREDIT, CNT_RP3_TX_AW_MAX_CREDIT);
@@ -523,12 +511,14 @@ import packet_def_pkg::*;
     logic    [RP_COUNT-1:0][3:0]                        w_early_bresp_ctrl_awcache      ;
     logic    [RP_COUNT-1:0][2:0]                        w_early_bresp_ctrl_awprot       ;
     logic    [RP_COUNT-1:0][3:0]                        w_early_bresp_ctrl_awqos        ;
+    logic    [RP_COUNT-1:0][15:0]                       w_early_bresp_ctrl_awuser       ;
     logic    [RP_COUNT-1:0]                             w_early_bresp_ctrl_awvalid      ;
     logic    [RP_COUNT-1:0]                             w_early_bresp_ctrl_awready      ;
 
     logic    [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0]     w_early_bresp_ctrl_wdata        ;
     logic    [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]     w_early_bresp_ctrl_wstrb        ;
     logic    [RP_COUNT-1:0]                             w_early_bresp_ctrl_wlast        ;
+    logic    [RP_COUNT-1:0][15:0]                       w_early_bresp_ctrl_wuser        ;
     logic    [RP_COUNT-1:0][1:0]                        w_early_bresp_ctrl_wdlen        ;
     logic    [RP_COUNT-1:0]                             w_early_bresp_ctrl_wvalid       ;
     logic    [RP_COUNT-1:0]                             w_early_bresp_ctrl_wready       ;
@@ -563,27 +553,27 @@ import packet_def_pkg::*;
     logic    [1:0]                                      w_rp3_tx_rp_sel                 ;
     logic                                               w_asymmetric_rp_sel             ;    
 //----------------------------------------------------------------------------
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][1:0]  w_rxcore_crdtgrant_wrespcred3   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][1:0]  w_rxcore_crdtgrant_wrespcred2   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][1:0]  w_rxcore_crdtgrant_wrespcred1   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][1:0]  w_rxcore_crdtgrant_wrespcred0   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rdatacred3   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rdatacred2   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rdatacred1   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rdatacred0   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wdatacred3   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wdatacred2   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wdatacred1   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wdatacred0   ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rreqcred3    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rreqcred2    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rreqcred1    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_rreqcred0    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wreqcred3    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wreqcred2    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wreqcred1    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0][2:0]  w_rxcore_crdtgrant_wreqcred0    ;
-    logic [DEC_MULTI-1:0][MAX_MISC_COUNT-1:0]       w_rxcore_crdtgrant_valid        ;
+    logic [MISC_LANES-1:0][1:0]  w_rxcore_crdtgrant_wrespcred3   ;
+    logic [MISC_LANES-1:0][1:0]  w_rxcore_crdtgrant_wrespcred2   ;
+    logic [MISC_LANES-1:0][1:0]  w_rxcore_crdtgrant_wrespcred1   ;
+    logic [MISC_LANES-1:0][1:0]  w_rxcore_crdtgrant_wrespcred0   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rdatacred3   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rdatacred2   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rdatacred1   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rdatacred0   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wdatacred3   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wdatacred2   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wdatacred1   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wdatacred0   ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rreqcred3    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rreqcred2    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rreqcred1    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_rreqcred0    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wreqcred3    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wreqcred2    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wreqcred1    ;
+    logic [MISC_LANES-1:0][2:0]  w_rxcore_crdtgrant_wreqcred0    ;
+    logic [MISC_LANES-1:0]       w_rxcore_crdtgrant_valid        ;
 
     logic [1:0]                             w_rxcore_msgcrdt_wrespcred      ;
     logic [2:0]                             w_rxcore_msgcrdt_rdatacred      ;
@@ -664,27 +654,37 @@ import packet_def_pkg::*;
     logic [3:0]                             w_rxcore_activation_op          ;
     logic                                   w_rxcore_activation_prop_req    ;
     logic                                   w_rxcore_activation_valid       ;
+    // AoU v0.8 profile exchange: configured profile (SFR) to the TX core,
+    // received profile (RX core) through the activation FSM to the SFR
+    logic [3:0][PROFILE_WD-1:0]             w_sfr_profile_cfg               ;
+    logic [3:0][PROFILE_WD-1:0]             w_rxcore_activation_profile     ;
+    logic [3:0][PROFILE_WD-1:0]             w_profile_rmt                   ;
+    logic                                   w_profile_rmt_we                ;
 
     logic [RP_COUNT-1:0][AXI_ID_WD-1:0]     w_aou_tx_axi_mm_rid             ;
     logic [RP_COUNT-1:0][1:0]               w_aou_tx_axi_mm_rdlen           ;
     logic [RP_COUNT-1:0][1023:0]            w_aou_tx_axi_mm_rdata           ;
     logic [RP_COUNT-1:0][1:0]               w_aou_tx_axi_mm_rresp           ;
+    logic [RP_COUNT-1:0][15:0]              w_aou_tx_axi_mm_ruser           ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_rlast           ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_rvalid          ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_rready          ;
 
     logic [RP_COUNT-1:0][AXI_ID_WD-1:0]     w_aou_tx_axi_mm_bid_256         ;
     logic [RP_COUNT-1:0][1:0]               w_aou_tx_axi_mm_bresp_256       ;
+    logic [RP_COUNT-1:0][15:0]              w_aou_tx_axi_mm_buser_256       ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bvalid_256      ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bready_256      ;
 
     logic [RP_COUNT-1:0][AXI_ID_WD-1:0]     w_aou_tx_axi_mm_bid_512         ;
     logic [RP_COUNT-1:0][1:0]               w_aou_tx_axi_mm_bresp_512       ;
+    logic [RP_COUNT-1:0][15:0]              w_aou_tx_axi_mm_buser_512       ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bvalid_512      ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bready_512      ;
 
     logic [RP_COUNT-1:0][AXI_ID_WD-1:0]     w_aou_tx_axi_mm_bid_1024        ;
     logic [RP_COUNT-1:0][1:0]               w_aou_tx_axi_mm_bresp_1024      ;
+    logic [RP_COUNT-1:0][15:0]              w_aou_tx_axi_mm_buser_1024      ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bvalid_1024     ;
     logic [RP_COUNT-1:0]                    w_aou_tx_axi_mm_bready_1024     ;
 
@@ -769,6 +769,7 @@ import packet_def_pkg::*;
     logic  [RP_COUNT-1:0][3:0]                            w_aou_tx_axi_s_arcache              ;
     logic  [RP_COUNT-1:0][2:0]                            w_aou_tx_axi_s_arprot               ;
     logic  [RP_COUNT-1:0][3:0]                            w_aou_tx_axi_s_arqos                ;
+    logic  [RP_COUNT-1:0][15:0]                           w_aou_tx_axi_s_aruser               ;
     logic  [RP_COUNT-1:0]                                 w_aou_tx_axi_s_arvalid              ;
     logic  [RP_COUNT-1:0]                                 w_aou_tx_axi_s_arready              ;
 
@@ -781,6 +782,7 @@ import packet_def_pkg::*;
     logic  [RP_COUNT-1:0][3:0]                            w_tmp_early_bresp_ctrl_awcache      ;
     logic  [RP_COUNT-1:0][2:0]                            w_tmp_early_bresp_ctrl_awprot       ;
     logic  [RP_COUNT-1:0][3:0]                            w_tmp_early_bresp_ctrl_awqos        ;
+    logic  [RP_COUNT-1:0][15:0]                           w_tmp_early_bresp_ctrl_awuser       ;
     logic  [RP_COUNT-1:0]                                 w_tmp_early_bresp_ctrl_awvalid      ;
     logic  [RP_COUNT-1:0]                                 w_tmp_early_bresp_ctrl_awready      ;
     
@@ -788,6 +790,7 @@ import packet_def_pkg::*;
     logic  [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0]         w_tmp_early_bresp_ctrl_wstrb        ;
     logic  [RP_COUNT-1:0]                                 w_tmp_early_bresp_ctrl_wlast        ;
     logic  [RP_COUNT-1:0][1:0]                            w_tmp_early_bresp_ctrl_wdlen        ;
+    logic  [RP_COUNT-1:0][15:0]                           w_tmp_early_bresp_ctrl_wuser        ;
     logic  [RP_COUNT-1:0]                                 w_tmp_early_bresp_ctrl_wvalid       ;
     logic  [RP_COUNT-1:0]                                 w_tmp_early_bresp_ctrl_wready       ;
     
@@ -795,6 +798,7 @@ import packet_def_pkg::*;
 
     logic  [RP_COUNT-1:0][AXI_ID_WD-1:0]                  w_early_bresp_ctrl_bid              ; 
     logic  [RP_COUNT-1:0][1:0]                            w_early_bresp_ctrl_bresp            ; 
+    logic  [RP_COUNT-1:0][15:0]                           w_early_bresp_ctrl_buser            ;
     logic  [RP_COUNT-1:0]                                 w_early_bresp_ctrl_bvalid           ; 
     logic  [RP_COUNT-1:0]                                 w_early_bresp_ctrl_bready           ; 
 
@@ -917,6 +921,9 @@ import packet_def_pkg::*;
         .INT_ACTIVATE_START                                             ( O_INT_ACTIVATE_START                  ),
         .INT_DEACTIVATE_START                                           ( O_INT_DEACTIVATE_START                ),
         .INT_FDI_LINK_DOWN                                              ( w_int_fdi_link_down                   ),
+        .O_PROFILE_CFG                                                  ( w_sfr_profile_cfg                     ),
+        .I_PROFILE_RMT                                                  ( w_profile_rmt                         ),
+        .I_PROFILE_RMT_WE                                               ( w_profile_rmt_we                      ),
 
         .O_AXI_SPLIT_TR_RP1_MAX_AWBURSTLEN                              ( w_axi_split_tr_max_awburstlen[1]      ),
         .O_AXI_SPLIT_TR_RP1_MAX_ARBURSTLEN                              ( w_axi_split_tr_max_arburstlen[1]      ),
@@ -1083,7 +1090,7 @@ import packet_def_pkg::*;
         .RP2_AXI_DATA_WD        ( RP2_AXI_DATA_WD       ),
         .RP3_AXI_DATA_WD        ( RP3_AXI_DATA_WD       ),
 
-        .DEC_MULTI              ( DEC_MULTI             )
+        .MISC_LANES             ( MISC_LANES            )
 
     ) u_aou_crd_ctrl
     (
@@ -1229,6 +1236,7 @@ import packet_def_pkg::*;
         .I_AOU_AXI_S_ARCACHE            ( I_AOU_TX_AXI_S_ARCACHE            ),
         .I_AOU_AXI_S_ARPROT             ( I_AOU_TX_AXI_S_ARPROT             ),
         .I_AOU_AXI_S_ARQOS              ( I_AOU_TX_AXI_S_ARQOS              ),
+        .I_AOU_AXI_S_ARUSER             ( I_AOU_TX_AXI_S_ARUSER             ),
         .I_AOU_AXI_S_ARVALID            ( w_aou_tx_axi_s_arvalid_tmp        ),
         .O_AOU_AXI_S_ARREADY            ( w_aou_tx_axi_s_arready_tmp        ),
                             
@@ -1236,6 +1244,7 @@ import packet_def_pkg::*;
         .O_AOU_AXI_S_RDATA              ( O_AOU_RX_AXI_S_RDATA              ),
         .O_AOU_AXI_S_RRESP              ( O_AOU_RX_AXI_S_RRESP              ),
         .O_AOU_AXI_S_RLAST              ( O_AOU_RX_AXI_S_RLAST              ),
+        .O_AOU_AXI_S_RUSER              ( O_AOU_RX_AXI_S_RUSER              ),
         .O_AOU_AXI_S_RVALID             ( w_aou_rx_axi_s_rvalid             ),
         .I_AOU_AXI_S_RREADY             ( I_AOU_RX_AXI_S_RREADY             ),
                             
@@ -1248,6 +1257,7 @@ import packet_def_pkg::*;
         .I_AOU_AXI_S_AWCACHE            ( w_early_bresp_ctrl_awcache        ),
         .I_AOU_AXI_S_AWPROT             ( w_early_bresp_ctrl_awprot         ),
         .I_AOU_AXI_S_AWQOS              ( w_early_bresp_ctrl_awqos          ),
+        .I_AOU_AXI_S_AWUSER             ( w_early_bresp_ctrl_awuser         ),
         .I_AOU_AXI_S_AWVALID            ( w_early_bresp_ctrl_awvalid        ),
         .O_AOU_AXI_S_AWREADY            ( w_early_bresp_ctrl_awready        ),
                                                
@@ -1255,11 +1265,13 @@ import packet_def_pkg::*;
         .I_AOU_AXI_S_WSTRB              ( w_early_bresp_ctrl_wstrb          ),
         .I_AOU_AXI_S_WLAST              ( w_early_bresp_ctrl_wlast          ),
         .I_AOU_AXI_S_WDLEN              ( w_early_bresp_ctrl_wdlen          ),
+        .I_AOU_AXI_S_WUSER              ( w_early_bresp_ctrl_wuser          ),
         .I_AOU_AXI_S_WVALID             ( w_early_bresp_ctrl_wvalid         ),
         .O_AOU_AXI_S_WREADY             ( w_early_bresp_ctrl_wready         ),
                             
         .O_AOU_AXI_S_BID                ( w_early_bresp_ctrl_bid            ),
         .O_AOU_AXI_S_BRESP              ( w_early_bresp_ctrl_bresp          ),
+        .O_AOU_AXI_S_BUSER              ( w_early_bresp_ctrl_buser          ),
         .O_AOU_AXI_S_BVALID             ( w_early_bresp_ctrl_bvalid         ),
         .I_AOU_AXI_S_BREADY             ( w_early_bresp_ctrl_bready         ),                    
                             
@@ -1272,6 +1284,7 @@ import packet_def_pkg::*;
         .O_AOU_AXI_M_ARCACHE            ( w_aou_tx_axi_s_arcache            ),
         .O_AOU_AXI_M_ARPROT             ( w_aou_tx_axi_s_arprot             ),
         .O_AOU_AXI_M_ARQOS              ( w_aou_tx_axi_s_arqos              ),
+        .O_AOU_AXI_M_ARUSER             ( w_aou_tx_axi_s_aruser             ),
         .O_AOU_AXI_M_ARVALID            ( w_aou_tx_axi_s_arvalid            ),
         .I_AOU_AXI_M_ARREADY            ( w_aou_tx_axi_s_arready            ),
                             
@@ -1279,6 +1292,7 @@ import packet_def_pkg::*;
         .I_AOU_AXI_M_RDATA              ( I_AOU_RX_AXI_S_RDATA              ),
         .I_AOU_AXI_M_RRESP              ( I_AOU_RX_AXI_S_RRESP              ),
         .I_AOU_AXI_M_RLAST              ( I_AOU_RX_AXI_S_RLAST              ),
+        .I_AOU_AXI_M_RUSER              ( I_AOU_RX_AXI_S_RUSER              ),
         .I_AOU_AXI_M_RVALID             ( I_AOU_RX_AXI_S_RVALID             ),
         .O_AOU_AXI_M_RREADY             ( O_AOU_RX_FIFO_RREADY              ),
                             
@@ -1291,6 +1305,7 @@ import packet_def_pkg::*;
         .O_AOU_AXI_M_AWCACHE            ( w_tmp_early_bresp_ctrl_awcache    ),
         .O_AOU_AXI_M_AWPROT             ( w_tmp_early_bresp_ctrl_awprot     ),
         .O_AOU_AXI_M_AWQOS              ( w_tmp_early_bresp_ctrl_awqos      ),
+        .O_AOU_AXI_M_AWUSER             ( w_tmp_early_bresp_ctrl_awuser     ),
         .O_AOU_AXI_M_AWVALID            ( w_tmp_early_bresp_ctrl_awvalid    ),
         .I_AOU_AXI_M_AWREADY            ( w_tmp_early_bresp_ctrl_awready    ),
                                                
@@ -1298,11 +1313,13 @@ import packet_def_pkg::*;
         .O_AOU_AXI_M_WSTRB              ( w_tmp_early_bresp_ctrl_wstrb      ),
         .O_AOU_AXI_M_WLAST              ( w_tmp_early_bresp_ctrl_wlast      ),
         .O_AOU_AXI_M_WDLEN              ( w_tmp_early_bresp_ctrl_wdlen      ),
+        .O_AOU_AXI_M_WUSER              ( w_tmp_early_bresp_ctrl_wuser      ),
         .O_AOU_AXI_M_WVALID             ( w_tmp_early_bresp_ctrl_wvalid     ),
         .I_AOU_AXI_M_WREADY             ( w_tmp_early_bresp_ctrl_wready     ),
                             
         .I_AOU_AXI_M_BID                ( I_EARLY_BRESP_CTRL_BID            ),
         .I_AOU_AXI_M_BRESP              ( I_EARLY_BRESP_CTRL_BRESP          ),
+        .I_AOU_AXI_M_BUSER              ( I_EARLY_BRESP_CTRL_BUSER          ),
         .I_AOU_AXI_M_BVALID             ( I_EARLY_BRESP_CTRL_BVALID         ),
         .O_AOU_AXI_M_BREADY             ( O_EARLY_BRESP_CTRL_BREADY         ),
 
@@ -1336,6 +1353,9 @@ import packet_def_pkg::*;
 
         .I_ACTMSG_ACTIVATION_OP            ( w_rxcore_activation_op         ),
         .I_ACTMSG_PROPERTYREQ              ( w_rxcore_activation_prop_req   ),
+        .I_ACTMSG_PROFILE                  ( w_rxcore_activation_profile    ),
+        .O_PROFILE_RMT                     ( w_profile_rmt                  ),
+        .O_PROFILE_RMT_WE                  ( w_profile_rmt_we               ),
         .I_ACTMSG_VALID                    ( w_rxcore_activation_valid      ),
 
         .O_ACTMSG_ACTIVATION_OP            ( w_txcore_activation_op         ),
@@ -1447,6 +1467,7 @@ import packet_def_pkg::*;
         .I_AOU_TX_AXI_AWCACHE           ( w_tmp_early_bresp_ctrl_awcache),
         .I_AOU_TX_AXI_AWPROT            ( w_tmp_early_bresp_ctrl_awprot ),
         .I_AOU_TX_AXI_AWQOS             ( w_tmp_early_bresp_ctrl_awqos  ),
+        .I_AOU_TX_AXI_AWUSER            ( w_tmp_early_bresp_ctrl_awuser ),
         .I_AOU_TX_AXI_AWVALID           ( w_tmp_early_bresp_ctrl_awvalid),
         .O_AOU_TX_AXI_AWREADY           ( w_tmp_early_bresp_ctrl_awready),
                                                
@@ -1454,6 +1475,7 @@ import packet_def_pkg::*;
         .I_AOU_TX_AXI_WSTRB             ( w_tmp_early_bresp_ctrl_wstrb  ),
         .I_AOU_TX_AXI_WLAST             ( w_tmp_early_bresp_ctrl_wlast  ),
         .I_AOU_TX_AXI_WDLEN             ( w_tmp_early_bresp_ctrl_wdlen  ),
+        .I_AOU_TX_AXI_WUSER             ( w_tmp_early_bresp_ctrl_wuser  ),
         .I_AOU_TX_AXI_WVALID            ( w_tmp_early_bresp_ctrl_wvalid ),
         .O_AOU_TX_AXI_WREADY            ( w_tmp_early_bresp_ctrl_wready ),
     
@@ -1466,21 +1488,25 @@ import packet_def_pkg::*;
         .I_AOU_TX_AXI_ARCACHE           ( w_aou_tx_axi_s_arcache        ),
         .I_AOU_TX_AXI_ARPROT            ( w_aou_tx_axi_s_arprot         ),
         .I_AOU_TX_AXI_ARQOS             ( w_aou_tx_axi_s_arqos          ),
+        .I_AOU_TX_AXI_ARUSER            ( w_aou_tx_axi_s_aruser         ),
         .I_AOU_TX_AXI_ARVALID           ( w_aou_tx_axi_s_arvalid        ),
         .O_AOU_TX_AXI_ARREADY           ( w_aou_tx_axi_s_arready        ),
 
         .I_AOU_TX_AXI_BID_256           ( w_aou_tx_axi_mm_bid_256       ),
         .I_AOU_TX_AXI_BRESP_256         ( w_aou_tx_axi_mm_bresp_256     ),
+        .I_AOU_TX_AXI_BUSER_256         ( w_aou_tx_axi_mm_buser_256     ),
         .I_AOU_TX_AXI_BVALID_256        ( w_aou_tx_axi_mm_bvalid_256    ),
         .O_AOU_TX_AXI_BREADY_256        ( w_aou_tx_axi_mm_bready_256    ),
 
         .I_AOU_TX_AXI_BID_512           ( w_aou_tx_axi_mm_bid_512       ),
         .I_AOU_TX_AXI_BRESP_512         ( w_aou_tx_axi_mm_bresp_512     ),
+        .I_AOU_TX_AXI_BUSER_512         ( w_aou_tx_axi_mm_buser_512     ),
         .I_AOU_TX_AXI_BVALID_512        ( w_aou_tx_axi_mm_bvalid_512    ),
         .O_AOU_TX_AXI_BREADY_512        ( w_aou_tx_axi_mm_bready_512    ),
 
         .I_AOU_TX_AXI_BID_1024          ( w_aou_tx_axi_mm_bid_1024      ),
         .I_AOU_TX_AXI_BRESP_1024        ( w_aou_tx_axi_mm_bresp_1024    ),
+        .I_AOU_TX_AXI_BUSER_1024        ( w_aou_tx_axi_mm_buser_1024    ),
         .I_AOU_TX_AXI_BVALID_1024       ( w_aou_tx_axi_mm_bvalid_1024   ),
         .O_AOU_TX_AXI_BREADY_1024       ( w_aou_tx_axi_mm_bready_1024   ),
 
@@ -1488,6 +1514,7 @@ import packet_def_pkg::*;
         .I_AOU_TX_AXI_RDLEN             ( w_aou_tx_axi_mm_rdlen         ),
         .I_AOU_TX_AXI_RDATA             ( w_aou_tx_axi_mm_rdata         ),
         .I_AOU_TX_AXI_RRESP             ( w_aou_tx_axi_mm_rresp         ),
+        .I_AOU_TX_AXI_RUSER             ( w_aou_tx_axi_mm_ruser         ),
         .I_AOU_TX_AXI_RLAST             ( w_aou_tx_axi_mm_rlast         ),
         .I_AOU_TX_AXI_RVALID            ( w_aou_tx_axi_mm_rvalid        ),
         .O_AOU_TX_AXI_RREADY            ( w_aou_tx_axi_mm_rready        ),
@@ -1526,6 +1553,7 @@ import packet_def_pkg::*;
 
         .I_AOU_ACTIVATION_OP            ( w_txcore_activation_op        ),
         .I_AOU_ACTIVATION_PROP_REQ      ( w_txcore_activation_prop_req  ),
+        .I_AOU_PROFILE_CFG              ( w_sfr_profile_cfg             ),
         .I_AOU_ACTIVATION_VALID         ( w_txcore_activation_valid     ),
         .O_AOU_ACTIVATION_READY         ( w_txcore_activation_ready     ),
         .O_AOU_TX_PENDING               ( w_tx_pending                  ),
@@ -1624,10 +1652,10 @@ import packet_def_pkg::*;
 
 //-------------------------------------------------------------
 
-    // RX PHY->decode width adapter: instantiate a mux when TWO_PHY is
-    // enabled (mux both PHY streams) or when the single PHY is narrower than
-    // the decode width (the 32B primary-width case). Otherwise PHY0 data
-    // matches the decode width and is wired through directly.
+    // RX PHY->decode width adapter: with TWO_PHY the two PHY streams are
+    // muxed onto one FDI_DEC_WD-wide beat stream; a single PHY feeds the RX
+    // decode directly at its own width (AOU_RX_FDI_IF collects the beats of a
+    // half flit whatever the beat width).
     logic                           w_fdi_pl_valid;
     logic   [FDI_DEC_WD-1:0]        w_fdi_pl_data;
     logic                           w_fdi_pl_flit_cancel;
@@ -1653,37 +1681,13 @@ import packet_def_pkg::*;
         .O_FDI_PL_FLIT_CANCEL       ( w_fdi_pl_flit_cancel      )
     );
 `else
-    generate if (FDI_IF_WD0 < FDI_DEC_WD) begin : g_rx_mux_sp
-        AOU_RX_CORE_IN_MUX #(
-            .FDI_IF_WD              ( FDI_DEC_WD                )
-        ) u_aou_rx_core_in_mux
-        (
-            .I_CLK                  ( I_CLK                     ),
-            .I_RESETN               ( I_RESETN                  ),
-            .I_PHY_TYPE             ( 1'b0                      ),
-            .I_FDI_PL_1_VALID       ( '0                        ),
-            .I_FDI_PL_1_DATA        ( '0                        ),
-            .I_FDI_PL_1_FLIT_CANCEL ( '0                        ),
-
-            .I_FDI_PL_0_VALID       ( I_FDI_PL_0_VALID          ),
-            .I_FDI_PL_0_DATA        ( I_FDI_PL_0_DATA           ),
-            .I_FDI_PL_0_FLIT_CANCEL ( I_FDI_PL_0_FLIT_CANCEL    ),
-
-            .O_FDI_PL_VALID         ( w_fdi_pl_valid            ),
-            .O_FDI_PL_DATA          ( w_fdi_pl_data             ),
-            .O_FDI_PL_FLIT_CANCEL   ( w_fdi_pl_flit_cancel      )
-        );
-    end else begin : g_rx_direct
-        assign w_fdi_pl_valid       = I_FDI_PL_0_VALID;
-        assign w_fdi_pl_data        = I_FDI_PL_0_DATA;
-        assign w_fdi_pl_flit_cancel = I_FDI_PL_0_FLIT_CANCEL;
-    end endgenerate
+    assign w_fdi_pl_valid       = I_FDI_PL_0_VALID;
+    assign w_fdi_pl_data        = I_FDI_PL_0_DATA;
+    assign w_fdi_pl_flit_cancel = I_FDI_PL_0_FLIT_CANCEL;
 `endif
 
     AOU_RX_CORE #(
-        .DEC_MULTI                        ( DEC_MULTI                         ),
-        .PHY_TYPE                         ( PHY_TYPE                          ),
-        .FDI_IF_WD                        ( FDI_DEC_WD                        ),
+        .FDI_IF_WD                          ( FDI_DEC_WD                        ),
 
         .AXI_PEER_DIE_MAX_DATA_WD           ( AXI_PEER_DIE_MAX_DATA_WD          ),
         .AXI_ADDR_WD                        ( AXI_ADDR_WD                       ),
@@ -1692,8 +1696,7 @@ import packet_def_pkg::*;
 
         .RP_COUNT                           ( RP_COUNT                          ),
         .AW_AR_FIFO_DATA_WIDTH              ( AW_AR_FIFO_WIDTH                  ),
-        .B_FIFO_DATA_WIDTH                  ( B_FIFO_WIDTH                      ),
-        .R_FIFO_EXT_DATA_WIDTH              ( R_FIFO_EXT_DATA_WIDTH             )
+        .B_FIFO_DATA_WIDTH                  ( B_FIFO_WIDTH                      )
 
     ) u_aou_rx_core
     (
@@ -1710,17 +1713,15 @@ import packet_def_pkg::*;
         .O_WR_REQ_FIFO_SDATA                ( O_WR_REQ_FIFO_SDATA               ),
         .O_WR_REQ_FIFO_SVALID               ( O_WR_REQ_FIFO_SVALID              ),
 
-        .O_WR_DATA_FIFO_SDATA               ( O_WR_DATA_FIFO_SDATA              ),
-        .O_WR_DATA_FIFO_SDATA_STRB          ( O_WR_DATA_FIFO_SDATA_STRB         ),
-        .O_WR_DATA_FIFO_SDATA_WDATAF        ( O_WR_DATA_FIFO_SDATA_WDATAF       ),
-        .O_WR_DATA_FIFO_SVALID              ( O_WR_DATA_FIFO_SVALID             ),
-
         .O_WR_RESP_FIFO_SDATA               ( O_WR_RESP_FIFO_SDATA              ),
         .O_WR_RESP_FIFO_SVALID              ( O_WR_RESP_FIFO_SVALID             ),
 
-        .O_RD_DATA_FIFO_SDATA               ( O_RD_DATA_FIFO_SDATA              ),
-        .O_RD_DATA_FIFO_EXT_SDATA           ( O_RD_DATA_FIFO_EXT_SDATA          ),
-        .O_RD_DATA_FIFO_SVALID              ( O_RD_DATA_FIFO_SVALID             ),
+        .O_GRANULE_VALID                    ( O_GRANULE_VALID                   ),
+        .O_GRANULE                          ( O_GRANULE                         ),
+        .O_WR_DATA_COVER                    ( O_WR_DATA_COVER                   ),
+        .O_WR_DATA_START                    ( O_WR_DATA_START                   ),
+        .O_RD_DATA_COVER                    ( O_RD_DATA_COVER                   ),
+        .O_RD_DATA_START                    ( O_RD_DATA_START                   ),
 
         .O_CRDTGRANT_WRESPCRED3             ( w_rxcore_crdtgrant_wrespcred3     ),
         .O_CRDTGRANT_WRESPCRED2             ( w_rxcore_crdtgrant_wrespcred2     ),
@@ -1754,6 +1755,7 @@ import packet_def_pkg::*;
 
         .O_ACTIVATION_OP                    ( w_rxcore_activation_op            ),
         .O_ACTIVATION_PROP_REQ              ( w_rxcore_activation_prop_req      ),
+        .O_ACTIVATION_PROFILE               ( w_rxcore_activation_profile       ),
         .O_ACTIVATION_VALID                 ( w_rxcore_activation_valid         )
     );
 
@@ -1806,12 +1808,14 @@ import packet_def_pkg::*;
                 .O_AOU_RX_AXI_M_ARCACHE                    ( O_AOU_RX_AXI_M_ARCACHE[i]          ),
                 .O_AOU_RX_AXI_M_ARPROT                     ( O_AOU_RX_AXI_M_ARPROT[i]           ),
                 .O_AOU_RX_AXI_M_ARQOS                      ( O_AOU_RX_AXI_M_ARQOS[i]            ),
+                .O_AOU_RX_AXI_M_ARUSER                     ( O_AOU_RX_AXI_M_ARUSER[i]           ),
                 .O_AOU_RX_AXI_M_ARVALID                    ( O_AOU_RX_AXI_M_ARVALID[i]          ),
                 .I_AOU_RX_AXI_M_ARREADY                    ( I_AOU_RX_AXI_M_ARREADY[i]          ),
 
                 .I_AOU_TX_AXI_M_RID                        ( I_AOU_TX_AXI_M_RID[i]              ),
                 .I_AOU_TX_AXI_M_RDATA                      ( I_AOU_TX_AXI_M_RDATA[i][RP_AXI_DATA_WD[i]-1:0] ),
                 .I_AOU_TX_AXI_M_RRESP                      ( I_AOU_TX_AXI_M_RRESP[i]            ),
+                .I_AOU_TX_AXI_M_RUSER                      ( I_AOU_TX_AXI_M_RUSER[i]            ),
                 .I_AOU_TX_AXI_M_RLAST                      ( I_AOU_TX_AXI_M_RLAST[i]            ),
                 .I_AOU_TX_AXI_M_RVALID                     ( I_AOU_TX_AXI_M_RVALID[i]           ),
                 .O_AOU_TX_AXI_M_RREADY                     ( O_AOU_TX_AXI_M_RREADY[i]           ),
@@ -1825,17 +1829,20 @@ import packet_def_pkg::*;
                 .O_AOU_RX_AXI_M_AWCACHE                    ( O_AOU_RX_AXI_M_AWCACHE[i]          ),
                 .O_AOU_RX_AXI_M_AWPROT                     ( O_AOU_RX_AXI_M_AWPROT[i]           ),
                 .O_AOU_RX_AXI_M_AWQOS                      ( O_AOU_RX_AXI_M_AWQOS[i]            ),
+                .O_AOU_RX_AXI_M_AWUSER                     ( O_AOU_RX_AXI_M_AWUSER[i]           ),
                 .O_AOU_RX_AXI_M_AWVALID                    ( O_AOU_RX_AXI_M_AWVALID[i]          ),
                 .I_AOU_RX_AXI_M_AWREADY                    ( I_AOU_RX_AXI_M_AWREADY[i]          ),
 
                 .O_AOU_RX_AXI_M_WDATA                      ( O_AOU_RX_AXI_M_WDATA[i][RP_AXI_DATA_WD[i]-1:0] ),
                 .O_AOU_RX_AXI_M_WSTRB                      ( O_AOU_RX_AXI_M_WSTRB[i][RP_AXI_STRB_WD[i]-1:0] ),
                 .O_AOU_RX_AXI_M_WLAST                      ( O_AOU_RX_AXI_M_WLAST[i]           ),
+                .O_AOU_RX_AXI_M_WUSER                      ( O_AOU_RX_AXI_M_WUSER[i]           ),
                 .O_AOU_RX_AXI_M_WVALID                     ( O_AOU_RX_AXI_M_WVALID[i]          ),
                 .I_AOU_RX_AXI_M_WREADY                     ( I_AOU_RX_AXI_M_WREADY[i]          ),
 
                 .I_AOU_TX_AXI_M_BID                        ( I_AOU_TX_AXI_M_BID[i]             ),
                 .I_AOU_TX_AXI_M_BRESP                      ( I_AOU_TX_AXI_M_BRESP[i]           ),
+                .I_AOU_TX_AXI_M_BUSER                      ( I_AOU_TX_AXI_M_BUSER[i]           ),
                 .I_AOU_TX_AXI_M_BVALID                     ( I_AOU_TX_AXI_M_BVALID[i]          ),
                 .O_AOU_TX_AXI_M_BREADY                     ( O_AOU_TX_AXI_M_BREADY[i]          ),
 
@@ -1859,17 +1866,20 @@ import packet_def_pkg::*;
                 .I_AOU_TX_AXI_S_AWCACHE                    ( I_AOU_TX_AXI_S_AWCACHE[i]         ),
                 .I_AOU_TX_AXI_S_AWPROT                     ( I_AOU_TX_AXI_S_AWPROT[i]          ),
                 .I_AOU_TX_AXI_S_AWQOS                      ( I_AOU_TX_AXI_S_AWQOS[i]           ),
+                .I_AOU_TX_AXI_S_AWUSER                     ( I_AOU_TX_AXI_S_AWUSER[i]          ),
                 .I_AOU_TX_AXI_S_AWVALID                    ( I_AOU_TX_AXI_S_AWVALID[i]         ),
                 .O_AOU_TX_AXI_S_AWREADY                    ( O_AOU_TX_AXI_S_AWREADY[i]         ),
 
                 .I_AOU_TX_AXI_S_WDATA                      ( I_AOU_TX_AXI_S_WDATA[i][RP_AXI_DATA_WD[i]-1:0] ),
                 .I_AOU_TX_AXI_S_WSTRB                      ( I_AOU_TX_AXI_S_WSTRB[i][RP_AXI_STRB_WD[i]-1:0] ),
                 .I_AOU_TX_AXI_S_WLAST                      ( I_AOU_TX_AXI_S_WLAST[i]           ),
+                .I_AOU_TX_AXI_S_WUSER                      ( I_AOU_TX_AXI_S_WUSER[i]           ),
                 .I_AOU_TX_AXI_S_WVALID                     ( I_AOU_TX_AXI_S_WVALID[i]          ),
                 .O_AOU_TX_AXI_S_WREADY                     ( O_AOU_TX_AXI_S_WREADY[i]          ),
 
                 .O_AOU_RX_AXI_S_BID                        ( O_AOU_RX_AXI_S_BID[i]             ),
                 .O_AOU_RX_AXI_S_BRESP                      ( O_AOU_RX_AXI_S_BRESP[i]           ),
+                .O_AOU_RX_AXI_S_BUSER                      ( O_AOU_RX_AXI_S_BUSER[i]           ),
                 .O_AOU_RX_AXI_S_BVALID                     ( O_AOU_RX_AXI_S_BVALID[i]          ),
                 .I_AOU_RX_AXI_S_BREADY                     ( I_AOU_RX_AXI_S_BREADY[i]          ),
 
@@ -1881,12 +1891,14 @@ import packet_def_pkg::*;
                 .I_AOU_RX_WLAST_GEN_AWCACHE                ( I_AOU_RX_WLAST_GEN_AWCACHE[i]     ),
                 .I_AOU_RX_WLAST_GEN_AWPROT                 ( I_AOU_RX_WLAST_GEN_AWPROT[i]      ),
                 .I_AOU_RX_WLAST_GEN_AWQOS                  ( I_AOU_RX_WLAST_GEN_AWQOS[i]       ),
+                .I_AOU_RX_WLAST_GEN_AWUSER                 ( I_AOU_RX_WLAST_GEN_AWUSER[i]      ),
                 .I_AOU_RX_WLAST_GEN_AWVALID                ( I_AOU_RX_WLAST_GEN_AWVALID[i]     ),
                 .O_AOU_RX_WLAST_GEN_AWREADY                ( O_AOU_RX_WLAST_GEN_AWREADY[i]     ),
 
                 .I_AOU_RX_WLAST_GEN_WDLENGTH               ( I_AOU_RX_WLAST_GEN_WDLENGTH[i]    ),
                 .I_AOU_RX_WLAST_GEN_WDATA                  ( I_AOU_RX_WLAST_GEN_WDATA[i]       ),
                 .I_AOU_RX_WLAST_GEN_WSTRB                  ( I_AOU_RX_WLAST_GEN_WSTRB[i]       ),
+                .I_AOU_RX_WLAST_GEN_WUSER                  ( I_AOU_RX_WLAST_GEN_WUSER[i]       ),
                 .I_AOU_RX_WLAST_GEN_WVALID                 ( I_AOU_RX_WLAST_GEN_WVALID[i]      ),
                 .O_AOU_RX_WLAST_GEN_WREADY                 ( O_AOU_RX_WLAST_GEN_WREADY[i]      ),
 
@@ -1898,11 +1910,13 @@ import packet_def_pkg::*;
                 .I_AOU_RX_AXI_MM_ARCACHE                   ( I_AOU_RX_AXI_MM_ARCACHE[i]        ),
                 .I_AOU_RX_AXI_MM_ARPROT                    ( I_AOU_RX_AXI_MM_ARPROT[i]         ),
                 .I_AOU_RX_AXI_MM_ARQOS                     ( I_AOU_RX_AXI_MM_ARQOS[i]          ),
+                .I_AOU_RX_AXI_MM_ARUSER                    ( I_AOU_RX_AXI_MM_ARUSER[i]         ),
                 .I_AOU_RX_AXI_MM_ARVALID                   ( I_AOU_RX_AXI_MM_ARVALID[i]        ),
                 .O_AOU_RX_AXI_MM_ARREADY                   ( O_AOU_RX_AXI_MM_ARREADY[i]        ),
                 
                 .I_EARLY_BRESP_CTRL_BID                    ( w_early_bresp_ctrl_bid[i]         ),
                 .I_EARLY_BRESP_CTRL_BRESP                  ( w_early_bresp_ctrl_bresp[i]       ),
+                .I_EARLY_BRESP_CTRL_BUSER                  ( w_early_bresp_ctrl_buser[i]       ),
                 .I_EARLY_BRESP_CTRL_BVALID                 ( w_early_bresp_ctrl_bvalid[i]      ),
                 .O_EARLY_BRESP_CTRL_BREADY                 ( w_early_bresp_ctrl_bready[i]      ),
                 
@@ -1915,27 +1929,32 @@ import packet_def_pkg::*;
                 .O_EARLY_BRESP_CTRL_AWCACHE                ( w_early_bresp_ctrl_awcache[i]     ),    
                 .O_EARLY_BRESP_CTRL_AWPROT                 ( w_early_bresp_ctrl_awprot[i]      ),    
                 .O_EARLY_BRESP_CTRL_AWQOS                  ( w_early_bresp_ctrl_awqos[i]       ),    
+                .O_EARLY_BRESP_CTRL_AWUSER                 ( w_early_bresp_ctrl_awuser[i]      ),
                 .O_EARLY_BRESP_CTRL_AWVALID                ( w_early_bresp_ctrl_awvalid[i]     ),    
                 .I_EARLY_BRESP_CTRL_AWREADY                ( w_early_bresp_ctrl_awready[i]     ),        
                                                                   
                 .O_EARLY_BRESP_CTRL_WDATA                  ( w_early_bresp_ctrl_wdata[i][RP_AXI_DATA_WD[i]-1:0] ), 
                 .O_EARLY_BRESP_CTRL_WSTRB                  ( w_early_bresp_ctrl_wstrb[i][RP_AXI_STRB_WD[i]-1:0] ),
                 .O_EARLY_BRESP_CTRL_WLAST                  ( w_early_bresp_ctrl_wlast[i]        ),
+                .O_EARLY_BRESP_CTRL_WUSER                  ( w_early_bresp_ctrl_wuser[i]        ),
                 .O_EARLY_BRESP_CTRL_WVALID                 ( w_early_bresp_ctrl_wvalid[i]       ),
                 .I_EARLY_BRESP_CTRL_WREADY                 ( w_early_bresp_ctrl_wready[i]       ),
 
                 .O_AOU_TX_AXI_BID_256                      ( w_aou_tx_axi_mm_bid_256[i]         ),
                 .O_AOU_TX_AXI_BRESP_256                    ( w_aou_tx_axi_mm_bresp_256[i]       ),
+                .O_AOU_TX_AXI_BUSER_256                    ( w_aou_tx_axi_mm_buser_256[i]       ),
                 .O_AOU_TX_AXI_BVALID_256                   ( w_aou_tx_axi_mm_bvalid_256[i]      ),
                 .I_AOU_TX_AXI_BREADY_256                   ( w_aou_tx_axi_mm_bready_256[i]      ),
 
                 .O_AOU_TX_AXI_BID_512                      ( w_aou_tx_axi_mm_bid_512[i]         ),
                 .O_AOU_TX_AXI_BRESP_512                    ( w_aou_tx_axi_mm_bresp_512[i]       ),
+                .O_AOU_TX_AXI_BUSER_512                    ( w_aou_tx_axi_mm_buser_512[i]       ),
                 .O_AOU_TX_AXI_BVALID_512                   ( w_aou_tx_axi_mm_bvalid_512[i]      ),
                 .I_AOU_TX_AXI_BREADY_512                   ( w_aou_tx_axi_mm_bready_512[i]      ),
 
                 .O_AOU_TX_AXI_BID_1024                     ( w_aou_tx_axi_mm_bid_1024[i]        ),
                 .O_AOU_TX_AXI_BRESP_1024                   ( w_aou_tx_axi_mm_bresp_1024[i]      ),
+                .O_AOU_TX_AXI_BUSER_1024                   ( w_aou_tx_axi_mm_buser_1024[i]      ),
                 .O_AOU_TX_AXI_BVALID_1024                  ( w_aou_tx_axi_mm_bvalid_1024[i]     ),
                 .I_AOU_TX_AXI_BREADY_1024                  ( w_aou_tx_axi_mm_bready_1024[i]     ),
 
@@ -1943,6 +1962,7 @@ import packet_def_pkg::*;
                 .O_AOU_TX_AXI_RDLEN                        ( w_aou_tx_axi_mm_rdlen[i]           ),
                 .O_AOU_TX_AXI_RDATA                        ( w_aou_tx_axi_mm_rdata[i]           ),
                 .O_AOU_TX_AXI_RRESP                        ( w_aou_tx_axi_mm_rresp[i]           ),
+                .O_AOU_TX_AXI_RUSER                        ( w_aou_tx_axi_mm_ruser[i]           ),
                 .O_AOU_TX_AXI_RLAST                        ( w_aou_tx_axi_mm_rlast[i]           ),
                 .O_AOU_TX_AXI_RVALID                       ( w_aou_tx_axi_mm_rvalid[i]          ),
                 .I_AOU_TX_AXI_RREADY                       ( w_aou_tx_axi_mm_rready[i]          ),

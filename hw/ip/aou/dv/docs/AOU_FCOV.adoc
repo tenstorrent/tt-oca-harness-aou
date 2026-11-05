@@ -41,8 +41,8 @@ Where the real holes are (details in <<aou-fcov-gaps>>):
   choice, and two of the bins can't occur as defined.
 * *The DUT never requests L1 itself.*
 * *The DUT's packer never puts 16 or more WriteResps in one flit.*
-* *The v0.8 behaviour the RTL doesn't implement yet:* the 4-granule
-  ActivateReq and the ERROR activation state.
+* *The v0.8 behaviour the RTL doesn't implement yet:* the ERROR activation
+  state.
 
 Several behaviours have no bins at all: registers, interrupts, QoS arbitration
 outcomes, the DUT's own splitter and aggregator, resets during traffic, and
@@ -321,8 +321,9 @@ has a bin added yet; each is recorded in the verification plan's road-map
 . *Link events with traffic in flight.* No bin combines a link event
   (Retrain, LinkError, L1, reset) with traffic in flight or the activation
   state. This is the riskiest interaction and only directed tests cover it.
-. *Profiles and FLEX/USER fields (AoU v0.8).* No bins. They need a v0.8 DUT,
-  like the other `v0.8` items.
+. *Profiles and FLEX/USER fields (AoU v0.8).* `cg_act_profile` counts the
+  profile fields exchanged in the ActivateReq and `cg_flex` the FLEX values of
+  the AXI messages; no bin crosses FLEX with the message type or the port.
 . *Credit encodings.* No bin records which credit encodings (0, 1, 4, ..., 128
   per class) were sent or received; the credit accounting checks are the only
   evidence that each one decodes correctly.
@@ -424,6 +425,13 @@ coverage model or its tooling.
   `cov/config/vcs/cov_exclude.hier`; reset-only FSM transitions through
   `cov/config/vcs/cov_fsm_reset.filter`. Line and branch exclusions are
   deferred to the end of closure.
+* The `v0.8` bins (the ERROR state, `cg_flit_occ` half-flit Misc limit) need an
+  AoU v0.8 DUT or partner; the four-granule ActivateReq bins lost the tag when
+  the DUT started sending it (profile exchange, `cg_act_profile`).
+* Verilator scores covergroups as zero; its code coverage (line, branch,
+  expression, toggle) is reported by module (`summary.txt`, lcov
+  `merged.info`), and the functional numbers come from the service on every
+  simulator.
 * Toggle coverage is collected and reviewed but is not a closure gate.
 
 ==== Covergroup Inventory

@@ -61,7 +61,7 @@
 | `aou_link_event_test.event-l1.active_phy-1.park_idle_phy-1.2x512-tp32_64` | `aou_link_event_test` | `+event=l1 +active_phy=1 +park_idle_phy=1` | 1 | `2x512-tp32_64` | 18.25 | 
 | `aou_link_event_test.event-retrain.active_phy-1.park_idle_phy-1.2x512-tp32_64` | `aou_link_event_test` | `+event=retrain +active_phy=1 +park_idle_phy=1` | 1 | `2x512-tp32_64` | 18.25 | 
 |===
-===== `testlists/datapath.toml` (41 scenarios)
+===== `testlists/datapath.toml` (42 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -101,6 +101,7 @@
 | `aou_attr_test` | `aou_attr_test` |  | 1-3 |  | 4.26,4.27,4.28,5.24,5.25,5.26,4.30 | 
 | `aou_attr_test.attr_excl-1` | `aou_attr_test` | `+attr_excl=1` | 1-3 |  | 4.25,5.23,4.26,4.27,4.28,5.24,5.25,5.26,4.30 | 
 | `aou_attr_test.attr_excl-1.attr_early-1` | `aou_attr_test` | `+attr_excl=1 +attr_early=1` | 1-2 | `1x512-sp64` | 4.25 | 
+| `aou_attr_test.attr_user-1.remote_bytes-128` | `aou_attr_test` | `+attr_user=1 +remote_bytes=128` | 1-2 |  | 4.30 | 
 | `aou_chan_test.chan-wfirst` | `aou_chan_test` | `+chan=wfirst` | 1-3 |  | 4.31 | 
 | `aou_chan_test.chan-ilv` | `aou_chan_test` | `+chan=ilv` | 1-3 |  | 8.14 | 
 | `aou_small_size_test` | `aou_small_size_test` |  | 1-2 |  | 4.1,5.1,14.10,14.11 | 
@@ -158,7 +159,7 @@
 | `aou_wdt_test.wdt_case-multi_rp.4x512-sp64` | `aou_wdt_test` | `+wdt_case=multi_rp` | 1-2 | `4x512-sp64` | 16.18,16.22,16.23 | 
 | `aou_wdt_test.wdt_case-multi_rp.4xmix4211-sp128` | `aou_wdt_test` | `+wdt_case=multi_rp` | 1-2 | `4xmix4211-sp128` | 16.18,16.22,16.23 | 
 |===
-===== `testlists/stress.toml` (58 scenarios)
+===== `testlists/stress.toml` (61 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -174,6 +175,9 @@
 | `aou_pack_test.pk-crdt` | `aou_pack_test` | `+pk=crdt` | 1-2 |  | 11.5 | 
 | `aou_pack_test.pk-b2b` | `aou_pack_test` | `+pk=b2b` | 1-2 |  | 11.1,11.2 | 
 | `aou_pack_test.pk-prof` | `aou_pack_test` | `+pk=prof` | 1-2 |  | 11.14 | 
+| `aou_pack_test.pk-edge.pk_start-23` | `aou_pack_test` | `+pk=edge +pk_start=23` | 1-2 |  | 6.9,6.4,6.5,6.6,6.7,6.8,11.3 | 
+| `aou_pack_test.pk-edge.pk_start-47` | `aou_pack_test` | `+pk=edge +pk_start=47` | 1-2 |  | 6.9,6.4,6.5,6.6,6.7,6.8 | 
+| `aou_pack_test.pk-wreq8` | `aou_pack_test` | `+pk=wreq8` | 1-2 |  | 6.18,11.6 | 
 | `aou_pattern_test.dp_pattern-walk1` | `aou_pattern_test` | `+dp_pattern=walk1` | 1-2 |  | 7.4 | 
 | `aou_pattern_test.dp_pattern-walk0` | `aou_pattern_test` | `+dp_pattern=walk0` | 1-2 |  | 7.5 | 
 | `aou_pattern_test.dp_pattern-ones` | `aou_pattern_test` | `+dp_pattern=ones` | 1-2 |  | 7.6 | 
@@ -221,7 +225,7 @@
 | `aou_qos_order_test.arb_mode-2.qos_tiers-2.qos_timer-promote.4xmix4211-sp128` | `aou_qos_order_test` | `+arb_mode=2 +qos_tiers=2 +qos_timer=promote` | 1-2 | `4xmix4211-sp128` | 13.15 | 
 | `aou_stress_test.st_bp-all.small_size_pct-5` | `aou_stress_test` | `+st_bp=all +small_size_pct=5` | 1-2 |  | 4.1,5.1,14.10,14.11 | 
 |===
-===== `testlists/link.toml` (53 scenarios)
+===== `testlists/link.toml` (56 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -267,6 +271,7 @@
 | `aou_act_rx_drain_test` | `aou_act_rx_drain_test` |  | 1-3 |  | 1.10 | 
 | `aou_rx_credit_test` | `aou_rx_credit_test` |  | 1-3 |  | 3.20,3.23 | 
 | `aou_rx_credit_test.loops-3` | `aou_rx_credit_test` | `+loops=3` | 1-3 | `2xmix-sp64-rxf` | 3.20,3.23,3.25 | 
+| `aou_rx_credit_test.loops-3.4xmix-sp256-rxf` | `aou_rx_credit_test` | `+loops=3` | 1-3 | `4xmix-sp256-rxf` | 3.20,3.23,3.25 | 
 | `aou_zero_credit_test.credit-wreq.deact-1` | `aou_zero_credit_test` | `+credit=wreq +deact=1` | 1-2 |  | 2.5 | 
 | `aou_zero_credit_test.credit-rreq.deact-1` | `aou_zero_credit_test` | `+credit=rreq +deact=1` | 1-2 |  | 2.5 | 
 | `aou_zero_credit_test.credit-wdata.deact-1` | `aou_zero_credit_test` | `+credit=wdata +deact=1` | 1-2 |  | 2.5 | 
@@ -278,6 +283,8 @@
 | `aou_remote_react_test` | `aou_remote_react_test` |  | 1-3 |  | 1.6,6.20,18.17 | 
 | `aou_act_flit_test.mode-act_req.v0p9draft` | `aou_act_flit_test` | `+mode=act_req +v0p9draft` | 1-3 |  | 1.12 | 
 | `aou_act_flit_test.mode-deact_rsp.v0p9draft` | `aou_act_flit_test` | `+mode=deact_rsp +v0p9draft` | 1-3 |  | 2.14 | 
+| `aou_act_profile_test` | `aou_act_profile_test` |  | 1-3 |  | 1.14,11.14 | 
+| `aou_act_profile_test.loops-3.skip_reset-1` | `aou_act_profile_test` | `+loops=3 +skip_reset=1` | 1-2 |  | 1.14,11.14 | 
 |===
 ===== `testlists/errors.toml` (17 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
@@ -388,7 +395,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | 
 |===
-===== `testlists/matrix.toml` (105 scenarios)
+===== `testlists/matrix.toml` (127 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -438,11 +445,14 @@
 | `aou_dw_test.remote_bytes-32_64_128_64` | `aou_dw_test` | `+remote_bytes=32,64,128,64` | 1 | `4x512-sp64` | 14.1,14.6,14.8,14.10,14.11,14.14,14.15,14.16 | 
 | `aou_perf_test.perf_mode-lat.1x512-sp64` | `aou_perf_test` | `+perf_mode=lat +aou_config=1x512-sp64` | 1 | `1x512-sp64` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-drain.1x512-sp64` | `aou_perf_test` | `+perf_mode=drain +aou_config=1x512-sp64` | 1 | `1x512-sp64` | 10.7 | 
+| `aou_perf_test.perf_mode-rxlat.1x512-sp64` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=1x512-sp64` | 1 | `1x512-sp64` | 10.4,10.5,10.6,10.14 | 
 | `aou_perf_test.perf_mode-lat.4x512-sp64` | `aou_perf_test` | `+perf_mode=lat +aou_config=4x512-sp64` | 1 | `4x512-sp64` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-drain.4x512-sp64` | `aou_perf_test` | `+perf_mode=drain +aou_config=4x512-sp64` | 1 | `4x512-sp64` | 10.7 | 
+| `aou_perf_test.perf_mode-rxlat.4x512-sp64` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=4x512-sp64` | 1 | `4x512-sp64` | 10.4,10.5,10.6,10.14 | 
 | `aou_perf_test.perf_mode-lat.4xmix4211-sp128` | `aou_perf_test` | `+perf_mode=lat +aou_config=4xmix4211-sp128` | 1 | `4xmix4211-sp128` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-lat.4xmix2144-sp64` | `aou_perf_test` | `+perf_mode=lat +aou_config=4xmix2144-sp64` | 1 | `4xmix2144-sp64` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-drain.4xmix4211-sp128` | `aou_perf_test` | `+perf_mode=drain +aou_config=4xmix4211-sp128` | 1 | `4xmix4211-sp128` | 10.7 | 
+| `aou_perf_test.perf_mode-rxlat.4xmix4211-sp128` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=4xmix4211-sp128` | 1 | `4xmix4211-sp128` | 10.4,10.5,10.6,10.14 | 
 | `aou_perf_test.perf_mode-drain.4xmix2144-sp64` | `aou_perf_test` | `+perf_mode=drain +aou_config=4xmix2144-sp64` | 1 | `4xmix2144-sp64` | 10.7 | 
 | `aou_perf_test.perf_mode-lat.1x256-sp32` | `aou_perf_test` | `+perf_mode=lat +aou_config=1x256-sp32` | 1 | `1x256-sp32` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-drain.1x256-sp32` | `aou_perf_test` | `+perf_mode=drain +aou_config=1x256-sp32` | 1 | `1x256-sp32` | 10.7 | 
@@ -471,6 +481,25 @@
 | `aou_pack_test.pk-mixed.1x512-sp64-nxt` | `aou_pack_test` | `+pk=mixed` | 1-2 | `1x512-sp64-nxt` | 6.3 | 
 | `aou_pack_test.pk-full.1x512-sp64-nxt` | `aou_pack_test` | `+pk=full` | 1-2 | `1x512-sp64-nxt` | 6.18 | 
 | `aou_stress_test.st_bp-all.1x512-sp64-nxt` | `aou_stress_test` | `+st_bp=all` | 1-2 | `1x512-sp64-nxt` | 7.16,10.15 | 
+| `aou_perf_test.perf_mode-lat.1x1024-sp128` | `aou_perf_test` | `+perf_mode=lat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.9 | 
+| `aou_perf_test.perf_mode-drain.1x1024-sp128` | `aou_perf_test` | `+perf_mode=drain +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.7 | 
+| `aou_perf_test.perf_mode-rxlat.1x1024-sp128` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14 | 
+| `aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128` | `aou_perf_test` | `+perf_mode=rxlat +perf_l3_one_msg=1 +perf_w_before_aw=1 +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14 | 
+| `aou_pack_test.pk-crossflit.1x1024-sp256` | `aou_pack_test` | `+pk=crossflit` | 1-2 | `1x1024-sp256` | 6.5,6.7,6.9 | 
+| `aou_pack_test.pk-mixed.1x1024-sp256` | `aou_pack_test` | `+pk=mixed` | 1-2 | `1x1024-sp256` | 6.3 | 
+| `aou_pack_test.pk-full.1x1024-sp256` | `aou_pack_test` | `+pk=full` | 1-2 | `1x1024-sp256` | 6.18 | 
+| `aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.1x1024-sp256` | `aou_dp_random_test` | `+dp_dir=both +l1_cancel_pct=40 +l1_cancel_mix=1` | 1-3 | `1x1024-sp256` | 18.24 | 
+| `aou_stress_test.st_bp-all.1x1024-sp256` | `aou_stress_test` | `+st_bp=all` | 1-2 | `1x1024-sp256` | 7.16,10.15 | 
+| `aou_perf_test.perf_mode-lat.1x1024-sp256` | `aou_perf_test` | `+perf_mode=lat +aou_config=1x1024-sp256` | 1 | `1x1024-sp256` | 10.4,10.5,10.9 | 
+| `aou_perf_test.perf_mode-drain.1x1024-sp256` | `aou_perf_test` | `+perf_mode=drain +aou_config=1x1024-sp256` | 1 | `1x1024-sp256` | 10.7 | 
+| `aou_perf_test.perf_mode-rxlat.1x1024-sp256` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=1x1024-sp256` | 1 | `1x1024-sp256` | 10.4,10.5,10.6,10.14 | 
+| `aou_mrp_test.mrp_scn-interleave.4xmix-sp256` | `aou_mrp_test` | `+mrp_scn=interleave` | 1-2 | `4xmix-sp256` | 12.6,12.19 | 
+| `aou_mrp_test.mrp_scn-crd_rr.4xmix-sp256` | `aou_mrp_test` | `+mrp_scn=crd_rr` | 1-2 | `4xmix-sp256` | 3.19 | 
+| `aou_perf_test.perf_mode-rxlat.4xmix-sp256` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=4xmix-sp256` | 1 | `4xmix-sp256` | 10.4,10.5,10.6,10.14 | 
+| `aou_dw_test.remote_bytes-32_64_128_32.4xmix-sp256` | `aou_dw_test` | `+remote_bytes=32,64,128,32` | 1-2 | `4xmix-sp256` | 14.2,14.4,14.6,14.7,14.12,14.13,12.18,14.10,14.11,14.14,14.15,14.16 | 
+| `aou_dw_test.remote_bytes-128_128_64_64.4xmix-sp256` | `aou_dw_test` | `+remote_bytes=128,128,64,64` | 1-2 | `4xmix-sp256` | 14.4,14.6,14.9,14.12,12.18,14.10,14.11,14.14,14.15,14.16 | 
+| `aou_dp_random_test.dp_dir-both.4xmix-sp256-rxf` | `aou_dp_random_test` | `+dp_dir=both` | 1-2 | `4xmix-sp256-rxf` | 10.3,7.16,8.9,8.10 | 
+| `aou_stress_test.st_bp-all.4xmix-sp256-rxf` | `aou_stress_test` | `+st_bp=all` | 1-2 | `4xmix-sp256-rxf` | 7.16,10.15 | 
 | `aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.remote_rp_count-2` | `aou_mrp_test` | `+mrp_scn=interleave +mrp_rps=0,1 +remote_rp_count=2` | 1-2 | `4x512-sp64` | 12.20 | 
 | `aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1` | `aou_mrp_test` | `+mrp_scn=solo +mrp_rps=0 +remote_rp_count=1` | 1-2 | `3x512-sp64` | 12.20 | 
 | `aou_mrp_test.remote_rp_count-4` | `aou_mrp_test` | `+remote_rp_count=4` | 1-2 | `1x512-sp64` | 12.20 | 
@@ -528,7 +557,7 @@
 | `aou_perf_test.perf_scn-S5.active_phy-1` | `aou_perf_test` | `+perf_scn=S5 +active_phy=1 +aou_config=2xmix-tp64_128` | 1 | `2xmix-tp64_128` | 10.13 | 
 | `aou_perf_test.perf_scn-S5.3x512-sp64` | `aou_perf_test` | `+perf_scn=S5 +aou_config=3x512-sp64` | 1 | `3x512-sp64` | 10.13 | 
 |===
-===== `testlists/assertions.toml` (29 scenarios)
+===== `testlists/assertions.toml` (32 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -561,6 +590,9 @@
 | `aou_t1_slice_test.rtl_asserts-1.1x256-sp32-assert` | `aou_t1_slice_test` | `+rtl_asserts=1` | 1 | `1x256-sp32-assert` | 11.18 | 
 | `aou_dp_random_test.dp_dir-both.rtl_asserts-1` | `aou_dp_random_test` | `+dp_dir=both +rtl_asserts=1` | 1 | `1x256-sp32-assert` | 11.18 | 
 | `aou_dw_test.remote_bytes-64.rtl_asserts-1` | `aou_dw_test` | `+remote_bytes=64 +rtl_asserts=1` | 1 | `1x256-sp32-assert` | 11.18 | 
+| `aou_t1_slice_test.rtl_asserts-1.1x1024-sp256-assert` | `aou_t1_slice_test` | `+rtl_asserts=1` | 1 | `1x1024-sp256-assert` | 11.18 | 
+| `aou_dp_random_test.dp_dir-both.rtl_asserts-1.1x1024-sp256-assert` | `aou_dp_random_test` | `+dp_dir=both +rtl_asserts=1` | 1 | `1x1024-sp256-assert` | 11.18 | 
+| `aou_dw_test.remote_bytes-32.rtl_asserts-1.1x1024-sp256-assert` | `aou_dw_test` | `+remote_bytes=32 +rtl_asserts=1` | 1 | `1x1024-sp256-assert` | 11.18 | 
 |===
 ===== `testlists/all.toml` (1 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]

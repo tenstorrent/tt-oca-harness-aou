@@ -9,46 +9,54 @@ Don't override. Generated from: aou_core
 
 - Absolute Address: 0x0
 - Base Offset: 0x0
-- Size: 0x88
+- Size: 0x120
 
 <p>Register map for AOU_CORE_SFR (APB slave). Addresses match RTL localparams. Fields with sw=r and no reset are driven by module inputs (I_*), connected in AOU_CORE.sv; stored fields (flops) have the stated reset.</p>
 
 |Offset|         Identifier         |              Name              |
 |------|----------------------------|--------------------------------|
-| 0x00 |         ip_version         |           IP Version           |
-| 0x04 |          aou_con0          |          AOU Control 0         |
-| 0x08 |          aou_init          |            AOU Init            |
-| 0x0C |     aou_interrupt_mask     |       AOU Interrupt Mask       |
-| 0x10 |        lp_linkreset        |          LP Linkreset          |
-| 0x14 |           dest_rp          |         Destination RP         |
-| 0x18 |        prior_rp_axi        |         Priority RP AXI        |
-| 0x1C |         prior_timer        |         Priority Timer         |
-| 0x20 |      axi_split_tr_rp0      |    AXI Split Transaction RP0   |
-| 0x24 |       error_info_rp0       |         Error Info RP0         |
-| 0x28 |  write_early_response_rp0  |    Write Early Response RP0    |
-| 0x2C |     axi_error_info0_rp0    |       AXI Error Info0 RP0      |
-| 0x30 |     axi_error_info1_rp0    |       AXI Error Info1 RP0      |
-| 0x34 | axi_slv_id_mismatch_err_rp0| AXI Slave ID Mismatch Error RP0|
-| 0x38 |      axi_split_tr_rp1      |    AXI Split Transaction RP1   |
-| 0x3C |       error_info_rp1       |         Error Info RP1         |
-| 0x40 |  write_early_response_rp1  |    Write Early Response RP1    |
-| 0x44 |     axi_error_info0_rp1    |       AXI Error Info0 RP1      |
-| 0x48 |     axi_error_info1_rp1    |       AXI Error Info1 RP1      |
-| 0x4C | axi_slv_id_mismatch_err_rp1| AXI Slave ID Mismatch Error RP1|
-| 0x50 |      axi_split_tr_rp2      |    AXI Split Transaction RP2   |
-| 0x54 |       error_info_rp2       |         Error Info RP2         |
-| 0x58 |  write_early_response_rp2  |    Write Early Response RP2    |
-| 0x5C |     axi_error_info0_rp2    |       AXI Error Info0 RP2      |
-| 0x60 |     axi_error_info1_rp2    |       AXI Error Info1 RP2      |
-| 0x64 | axi_slv_id_mismatch_err_rp2| AXI Slave ID Mismatch Error RP2|
-| 0x68 |      axi_split_tr_rp3      |    AXI Split Transaction RP3   |
-| 0x6C |       error_info_rp3       |         Error Info RP3         |
-| 0x70 |  write_early_response_rp3  |    Write Early Response RP3    |
-| 0x74 |     axi_error_info0_rp3    |       AXI Error Info0 RP3      |
-| 0x78 |     axi_error_info1_rp3    |       AXI Error Info1 RP3      |
-| 0x7C | axi_slv_id_mismatch_err_rp3| AXI Slave ID Mismatch Error RP3|
-| 0x80 |write_early_response_wdt_ctl|Write Early Response WDT Control|
-| 0x84 |   asymmetric_rp_proc_con   |Asymmetric RP Processing Control|
+| 0x000|         ip_version         |           IP Version           |
+| 0x004|          aou_con0          |          AOU Control 0         |
+| 0x008|          aou_init          |            AOU Init            |
+| 0x00C|     aou_interrupt_mask     |       AOU Interrupt Mask       |
+| 0x010|        lp_linkreset        |          LP Linkreset          |
+| 0x014|           dest_rp          |         Destination RP         |
+| 0x018|        prior_rp_axi        |         Priority RP AXI        |
+| 0x01C|         prior_timer        |         Priority Timer         |
+| 0x020|      axi_split_tr_rp0      |    AXI Split Transaction RP0   |
+| 0x024|       error_info_rp0       |         Error Info RP0         |
+| 0x028|  write_early_response_rp0  |    Write Early Response RP0    |
+| 0x02C|     axi_error_info0_rp0    |       AXI Error Info0 RP0      |
+| 0x030|     axi_error_info1_rp0    |       AXI Error Info1 RP0      |
+| 0x034| axi_slv_id_mismatch_err_rp0| AXI Slave ID Mismatch Error RP0|
+| 0x038|      axi_split_tr_rp1      |    AXI Split Transaction RP1   |
+| 0x03C|       error_info_rp1       |         Error Info RP1         |
+| 0x040|  write_early_response_rp1  |    Write Early Response RP1    |
+| 0x044|     axi_error_info0_rp1    |       AXI Error Info0 RP1      |
+| 0x048|     axi_error_info1_rp1    |       AXI Error Info1 RP1      |
+| 0x04C| axi_slv_id_mismatch_err_rp1| AXI Slave ID Mismatch Error RP1|
+| 0x050|      axi_split_tr_rp2      |    AXI Split Transaction RP2   |
+| 0x054|       error_info_rp2       |         Error Info RP2         |
+| 0x058|  write_early_response_rp2  |    Write Early Response RP2    |
+| 0x05C|     axi_error_info0_rp2    |       AXI Error Info0 RP2      |
+| 0x060|     axi_error_info1_rp2    |       AXI Error Info1 RP2      |
+| 0x064| axi_slv_id_mismatch_err_rp2| AXI Slave ID Mismatch Error RP2|
+| 0x068|      axi_split_tr_rp3      |    AXI Split Transaction RP3   |
+| 0x06C|       error_info_rp3       |         Error Info RP3         |
+| 0x070|  write_early_response_rp3  |    Write Early Response RP3    |
+| 0x074|     axi_error_info0_rp3    |       AXI Error Info0 RP3      |
+| 0x078|     axi_error_info1_rp3    |       AXI Error Info1 RP3      |
+| 0x07C| axi_slv_id_mismatch_err_rp3| AXI Slave ID Mismatch Error RP3|
+| 0x080|write_early_response_wdt_ctl|Write Early Response WDT Control|
+| 0x084|   asymmetric_rp_proc_con   |Asymmetric RP Processing Control|
+| 0x100|       profile_cfg_rp0      |       Profile Config RP0       |
+| 0x104|       profile_cfg_rp1      |       Profile Config RP1       |
+| 0x108|       profile_cfg_rp2      |       Profile Config RP2       |
+| 0x10C|       profile_cfg_rp3      |       Profile Config RP3       |
+| 0x110|       profile_rmt_rp0      |       Profile Remote RP0       |
+| 0x114|       profile_rmt_rp1      |       Profile Remote RP1       |
+| 0x118|       profile_rmt_rp2      |       Profile Remote RP2       |
+| 0x11C|       profile_rmt_rp3      |       Profile Remote RP3       |
 
 ### ip_version register
 
@@ -1181,3 +1189,239 @@ Don't override. Generated from: aou_core
 #### rp3_tx_rp_sel field
 
 <p>Local TX lane that RP3's requests are sent on when asymmetric_rp_en is set; the lane's DEST_RP field names the remote RP. Must be below RP_COUNT. Reset 3 (RP3 on lane 3).</p>
+
+### profile_cfg_rp0 register
+
+- Absolute Address: 0x100
+- Base Offset: 0x100
+- Size: 0x4
+
+<p>Profile announced for RP0 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|31:26|reserved_31_26|   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID sent for RP0. Constant 0 = Basic Profile (AoU v0.8 Ch. 11).</p>
+
+#### profile_rev field
+
+<p>ProfileRev sent for RP0: revision of the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+#### profile_opt field
+
+<p>ProfileOpt sent for RP0: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+### profile_cfg_rp1 register
+
+- Absolute Address: 0x104
+- Base Offset: 0x104
+- Size: 0x4
+
+<p>Profile announced for RP1 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|31:26|reserved_31_26|   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID sent for RP1. Constant 0 = Basic Profile (AoU v0.8 Ch. 11).</p>
+
+#### profile_rev field
+
+<p>ProfileRev sent for RP1: revision of the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+#### profile_opt field
+
+<p>ProfileOpt sent for RP1: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+### profile_cfg_rp2 register
+
+- Absolute Address: 0x108
+- Base Offset: 0x108
+- Size: 0x4
+
+<p>Profile announced for RP2 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|31:26|reserved_31_26|   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID sent for RP2. Constant 0 = Basic Profile (AoU v0.8 Ch. 11).</p>
+
+#### profile_rev field
+
+<p>ProfileRev sent for RP2: revision of the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+#### profile_opt field
+
+<p>ProfileOpt sent for RP2: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+### profile_cfg_rp3 register
+
+- Absolute Address: 0x10C
+- Base Offset: 0x10C
+- Size: 0x4
+
+<p>Profile announced for RP3 in the ActivateReq this die sends (AoU v0.8 Ch. 11). Read-only: this design implements the Basic Profile only, so the register reads 0/0/0 for every RP and the ActivateReq carries 0/0/0 for every RP it has (and zeros for one it does not). Writes are ignored. A profile-capable design makes these fields writable.</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|31:26|reserved_31_26|   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID sent for RP3. Constant 0 = Basic Profile (AoU v0.8 Ch. 11).</p>
+
+#### profile_rev field
+
+<p>ProfileRev sent for RP3: revision of the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+#### profile_opt field
+
+<p>ProfileOpt sent for RP3: profile-specific option bits, meaning defined by the profile identified by profile_id. Constant 0 (Basic Profile).</p>
+
+### profile_rmt_rp0 register
+
+- Absolute Address: 0x110
+- Base Offset: 0x110
+- Size: 0x4
+
+<p>Profile the peer announced for RP0 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp0 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|30:26|reserved_30_26|   r  | 0x0 |  — |
+|  31 |     rcvd     |   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID received for RP0. 0 = Basic Profile.</p>
+
+#### profile_rev field
+
+<p>ProfileRev received for RP0.</p>
+
+#### profile_opt field
+
+<p>ProfileOpt received for RP0.</p>
+
+#### rcvd field
+
+<p>1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3.</p>
+
+### profile_rmt_rp1 register
+
+- Absolute Address: 0x114
+- Base Offset: 0x114
+- Size: 0x4
+
+<p>Profile the peer announced for RP1 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp1 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|30:26|reserved_30_26|   r  | 0x0 |  — |
+|  31 |     rcvd     |   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID received for RP1. 0 = Basic Profile.</p>
+
+#### profile_rev field
+
+<p>ProfileRev received for RP1.</p>
+
+#### profile_opt field
+
+<p>ProfileOpt received for RP1.</p>
+
+#### rcvd field
+
+<p>1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3.</p>
+
+### profile_rmt_rp2 register
+
+- Absolute Address: 0x118
+- Base Offset: 0x118
+- Size: 0x4
+
+<p>Profile the peer announced for RP2 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp2 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|30:26|reserved_30_26|   r  | 0x0 |  — |
+|  31 |     rcvd     |   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID received for RP2. 0 = Basic Profile.</p>
+
+#### profile_rev field
+
+<p>ProfileRev received for RP2.</p>
+
+#### profile_opt field
+
+<p>ProfileOpt received for RP2.</p>
+
+#### rcvd field
+
+<p>1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3.</p>
+
+### profile_rmt_rp3 register
+
+- Absolute Address: 0x11C
+- Base Offset: 0x11C
+- Size: 0x4
+
+<p>Profile the peer announced for RP3 in the last ActivateReq this die accepted, i.e. one it answered with an ActivateAck (an ActivateReq rejected in ENABLED or during deactivation leaves the register unchanged). A peer sending the one-granule AoU v0.7 ActivateReq reads as 0/0/0 (Basic Profile). Software compares it with profile_cfg_rp3 and the local capabilities; hardware does not act on it. Holds its value until the next accepted ActivateReq or a reset (including aou_con0.aou_sw_reset).</p>
+
+| Bits|  Identifier  |Access|Reset|Name|
+|-----|--------------|------|-----|----|
+| 4:0 |  profile_id  |   r  | 0x0 |  — |
+| 9:5 |  profile_rev |   r  | 0x0 |  — |
+|25:10|  profile_opt |   r  | 0x0 |  — |
+|30:26|reserved_30_26|   r  | 0x0 |  — |
+|  31 |     rcvd     |   r  | 0x0 |  — |
+
+#### profile_id field
+
+<p>ProfileID received for RP3. 0 = Basic Profile.</p>
+
+#### profile_rev field
+
+<p>ProfileRev received for RP3.</p>
+
+#### profile_opt field
+
+<p>ProfileOpt received for RP3.</p>
+
+#### rcvd field
+
+<p>1 after at least one ActivateReq has been accepted since reset, i.e. the profile fields below are valid. Shared by profile_rmt_rp0..rp3.</p>

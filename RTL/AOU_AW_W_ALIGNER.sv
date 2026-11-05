@@ -48,6 +48,7 @@ module AOU_AW_W_ALIGNER #(
     input       [3: 0]                                  I_S_AWCACHE,
     input       [2: 0]                                  I_S_AWPROT,
     input       [AXI_QOS_WD-1: 0]                       I_S_AWQOS,
+    input       [15: 0]                                 I_S_AWUSER,
     input                                               I_S_AWVALID,
     output wire                                         O_S_AWREADY,
 
@@ -56,6 +57,7 @@ module AOU_AW_W_ALIGNER #(
     input       [AXI_SLV_NUM-1:0]                       I_S_WSTRB_FULL,
     input       [AXI_SLV_NUM-1:0]                       I_S_WLAST,
     input       [AXI_SLV_NUM-1:0][1:0]                  I_S_WDLEN,
+    input       [AXI_SLV_NUM-1:0][15: 0]                I_S_WUSER,
     input       [AXI_SLV_NUM-1:0]                       I_S_WVALID,
     output      [AXI_SLV_NUM-1:0]                       O_S_WREADY,
 
@@ -70,6 +72,7 @@ module AOU_AW_W_ALIGNER #(
     output wire [3: 0]                                  O_M_AWCACHE,
     output wire [2: 0]                                  O_M_AWPROT,
     output wire [AXI_QOS_WD-1: 0]                       O_M_AWQOS,
+    output wire [15: 0]                                 O_M_AWUSER,
     output wire                                         O_M_AWVALID,
     input                                               I_M_AWREADY,      
 
@@ -79,6 +82,7 @@ module AOU_AW_W_ALIGNER #(
     output wire                                         O_M_WSTRB_FULL,
     output wire                                         O_M_WLAST,
     output wire [1:0]                                   O_M_WDLEN,
+    output wire [15: 0]                                 O_M_WUSER,
     output wire                                         O_M_WVALID,
     input                                               I_M_WREADY
 
@@ -154,6 +158,8 @@ assign O_M_AWLOCK      = I_S_AWLOCK  ;
 assign O_M_AWCACHE     = I_S_AWCACHE ;
 assign O_M_AWPROT      = I_S_AWPROT  ;
 assign O_M_AWQOS       = I_S_AWQOS   ;
+// AWUSER travels with its AW; it becomes the WriteReq FLEX field (AoU v0.8 Basic Profile).
+assign O_M_AWUSER      = I_S_AWUSER  ;
 
 //==============================================================
 //                          W
@@ -204,6 +210,8 @@ assign O_M_WSTRB       = I_S_WSTRB[w_w_sel] ;
 assign O_M_WLAST       = I_S_WLAST[w_w_sel] ;
 assign O_M_WDLEN       = I_S_WDLEN[w_w_sel] ;
 assign O_M_WSTRB_FULL  = I_S_WSTRB_FULL[w_w_sel] ;
+// WUSER of the selected beat; it becomes that beat's WriteData FLEX field.
+assign O_M_WUSER       = I_S_WUSER[w_w_sel] ;
 assign O_M_WVALID      = |w_w_grant;
 
     for(p = 0; p < AXI_SLV_NUM; p = p + 1) begin : g_wready

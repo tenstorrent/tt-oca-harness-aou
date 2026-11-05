@@ -51,7 +51,7 @@ SIM_CFG = os.path.join(UVM_ROOT, "aou_sim_cfg.toml")
 DEFAULT_TOL = 0.03          # gate: measured >= (1 - tol) x model
 EPS_BYTES = 256             # above-model margin: one flit per window (quantization only)
 AXI_4K = 4096
-FDI_PHY_BYTES = {0: [32], 1: [64], 2: [128], 3: [32, 64], 4: [64, 128]}   # FDI_CONFIG -> PHY widths
+FDI_PHY_BYTES = {0: [32], 1: [64], 2: [128], 3: [32, 64], 4: [64, 128], 5: [256]}  # FDI_CONFIG -> PHY widths
 DIRS = ("l2r", "r2l")
 DRIFT_REL = 1e-4
 

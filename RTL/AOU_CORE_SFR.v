@@ -207,7 +207,16 @@ module AOU_CORE_SFR #(
  
     output                  INT_ACTIVATE_START,
     output                  INT_DEACTIVATE_START,
-    output                  INT_FDI_LINK_DOWN
+    output                  INT_FDI_LINK_DOWN,
+
+    // AoU v0.8 profile exchange (PROFILE_CFG_RPn / PROFILE_RMT_RPn, MAS 7.1):
+    // the profile this die announces per RP in its ActivateReq (constant 0,
+    // the Basic Profile, the only one this design implements: PROFILE_CFG_RPn
+    // are read-only), and the peer's, stored from each accepted ActivateReq.
+    // Flat: RPn at bits [26*n +: 26] = {ProfileID[4:0], ProfileRev[4:0], ProfileOpt[15:0]}.
+    output      [4*26-1:0]  O_PROFILE_CFG,
+    input       [4*26-1:0]  I_PROFILE_RMT,
+    input                   I_PROFILE_RMT_WE
 
 );
 
@@ -246,6 +255,25 @@ localparam SFR_AXI_ERROR_INFO1_RP3_ADDR             = 16'h0078;
 localparam SFR_AXI_SLV_ID_MISMATCH_ERR_RP3_ADDR     = 16'h007C;
 localparam SFR_WRITE_EARLY_RESPONSE_WDT_CTL_ADDR    = 16'h0080;
 localparam SFR_ASYMMETRIC_RP_PROC_CON_ADDR          = 16'h0084;
+localparam SFR_PROFILE_CFG_RP0_ADDR                 = 16'h0100;
+localparam SFR_PROFILE_CFG_RP1_ADDR                 = 16'h0104;
+localparam SFR_PROFILE_CFG_RP2_ADDR                 = 16'h0108;
+localparam SFR_PROFILE_CFG_RP3_ADDR                 = 16'h010C;
+localparam SFR_PROFILE_RMT_RP0_ADDR                 = 16'h0110;
+localparam SFR_PROFILE_RMT_RP1_ADDR                 = 16'h0114;
+localparam SFR_PROFILE_RMT_RP2_ADDR                 = 16'h0118;
+localparam SFR_PROFILE_RMT_RP3_ADDR                 = 16'h011C;
+
+// Profile exchange (AoU v0.8 Ch. 11). Register layout: [4:0] PROFILE_ID,
+// [9:5] PROFILE_REV, [25:10] PROFILE_OPT; PROFILE_RMT_RPn adds [31] RCVD.
+// Reset 0 is the Basic Profile. Configure before ACTIVATE_START (the value is
+// read when the ActivateReq is launched); PROFILE_RMT_RPn holds the last
+// accepted ActivateReq's fields until the next one or a reset.
+reg [25:0]          r_profile_rmt_rp0;
+reg [25:0]          r_profile_rmt_rp1;
+reg [25:0]          r_profile_rmt_rp2;
+reg [25:0]          r_profile_rmt_rp3;
+reg                 r_profile_rmt_rcvd;
 
 //Error set
 reg [9:0]           r_error_info_rp0_split_mismatch_bid;
@@ -1567,6 +1595,32 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
        r_asymmetric_rp_proc_con_rp3_tx_rp_sel  <= I_PWDATA[8:7];
     end
 end
+// PROFILE_CFG_RPn (RO, constant 0: this design implements the Basic Profile
+// only, ProfileID/Rev/Opt 0/0/0, and announces it for every RP; a write is
+// ignored) and PROFILE_RMT_RPn (RO, written by the activation FSM).
+// The message order is {ID, REV, OPT}; the register keeps ID in the low bits.
+function [25:0] f_profile_msg2reg;      // {ID, REV, OPT} -> register layout
+    input [25:0] m;
+    f_profile_msg2reg = {m[15:0], m[20:16], m[25:21]};
+endfunction
+
+always @(posedge I_PCLK or negedge I_PRESETN) begin
+    if (!I_PRESETN) begin
+        r_profile_rmt_rp0  <= 26'h0;
+        r_profile_rmt_rp1  <= 26'h0;
+        r_profile_rmt_rp2  <= 26'h0;
+        r_profile_rmt_rp3  <= 26'h0;
+        r_profile_rmt_rcvd <= 1'b0;
+    end else if (I_PROFILE_RMT_WE) begin
+        r_profile_rmt_rp0  <= f_profile_msg2reg(I_PROFILE_RMT[ 0 +: 26]);
+        r_profile_rmt_rp1  <= f_profile_msg2reg(I_PROFILE_RMT[26 +: 26]);
+        r_profile_rmt_rp2  <= f_profile_msg2reg(I_PROFILE_RMT[52 +: 26]);
+        r_profile_rmt_rp3  <= f_profile_msg2reg(I_PROFILE_RMT[78 +: 26]);
+        r_profile_rmt_rcvd <= 1'b1;
+    end
+end
+
+assign O_PROFILE_CFG = {(4*26){1'b0}};     // Basic Profile for every RP
 
 assign O_PREADY  = 1'b1;
 assign O_PSLVERR = 1'b0;
@@ -1647,6 +1701,14 @@ always @(posedge I_PCLK or negedge I_PRESETN) begin
             r_rdata <= { r_write_early_response_wdt_ctl_wdt_threshold};
         SFR_ASYMMETRIC_RP_PROC_CON_ADDR :
             r_rdata <= { 23'd0, r_asymmetric_rp_proc_con_rp3_tx_rp_sel, r_asymmetric_rp_proc_con_rp2_tx_rp_sel, r_asymmetric_rp_proc_con_rp1_tx_rp_sel, r_asymmetric_rp_proc_con_rp0_tx_rp_sel, r_asymmetric_rp_proc_con_asymmetric_rp_en};        
+        SFR_PROFILE_CFG_RP0_ADDR,
+        SFR_PROFILE_CFG_RP1_ADDR,
+        SFR_PROFILE_CFG_RP2_ADDR,
+        SFR_PROFILE_CFG_RP3_ADDR : r_rdata <= 32'd0;      // Basic Profile, read-only
+        SFR_PROFILE_RMT_RP0_ADDR : r_rdata <= {r_profile_rmt_rcvd, 5'd0, r_profile_rmt_rp0};
+        SFR_PROFILE_RMT_RP1_ADDR : r_rdata <= {r_profile_rmt_rcvd, 5'd0, r_profile_rmt_rp1};
+        SFR_PROFILE_RMT_RP2_ADDR : r_rdata <= {r_profile_rmt_rcvd, 5'd0, r_profile_rmt_rp2};
+        SFR_PROFILE_RMT_RP3_ADDR : r_rdata <= {r_profile_rmt_rcvd, 5'd0, r_profile_rmt_rp3};
         default:
             r_rdata <= 32'd0;
         endcase

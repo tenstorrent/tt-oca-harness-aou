@@ -51,7 +51,20 @@ class aou_link_ctrl extends uvm_object;
     m.op = op;
     m.property_req = prop;
     m.spec_rev = cfg.spec_rev;
+    fill_profile(m);
     return m;
+  endfunction
+
+  // v0.8 Ch. 11: our ActivateReq announces the configured profile of each RP
+  // we have; the fields of an RP we do not have are reserved (0). Also applied
+  // to an ActivateReq a test injects (aou_l3_model::send), unless it fixed the
+  // fields itself (profile_fixed).
+  function void fill_profile(aou_msg_act m);
+    for (int unsigned r = 0; r < AOU_RP_MAX; r++) begin
+      m.profile_id[r]  = (r < cfg.rp_count) ? cfg.profile_id[r]  : '0;
+      m.profile_rev[r] = (r < cfg.rp_count) ? cfg.profile_rev[r] : '0;
+      m.profile_opt[r] = (r < cfg.rp_count) ? cfg.profile_opt[r] : '0;
+    end
   endfunction
 
   function bit queued(bit [3:0] op);
