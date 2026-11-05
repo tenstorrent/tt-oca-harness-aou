@@ -177,13 +177,15 @@ class aou_base_test extends ocah_test;
   endtask
 
   // AOU-R31 (credits are sent in ENABLED): with nothing outstanding anywhere,
-  // every credit the DUT advertised must come back.
+  // every credit the DUT advertised must come back, and (T1-C40) it must have
+  // advertised all its RX FIFO allows; both get cred_return_cycles.
   task check_cred_return();
     string why;
     int unsigned n = 0;
     aou_l3_model m = env.l3.model;
     if (!m.cred_return_ready() || env.outstanding(why) != 0) return;
-    while (n < cfg.l3_cfg.cred_return_cycles && m.crd.tx_short(why) != 0) begin
+    while (n < cfg.l3_cfg.cred_return_cycles &&
+           (m.crd.tx_short(why) != 0 || m.adv_short() != 0)) begin
       @(env.lsm_vif.mon_cb);
       n++;
     end
