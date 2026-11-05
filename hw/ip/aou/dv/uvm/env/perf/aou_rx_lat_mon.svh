@@ -30,6 +30,7 @@
 // wf256/wf512/wf1024, r256/r512/r1024) through aou_perf_mon::put:
 //   rxlat.<window>.<kind>.{n,min,avg,max}  rxlat_first.<window>.<kind>.avg
 //   rxcrd.<window>.<kind>.{avg,max}        rxrate.<window>.<kind>
+//   rxsg.<window>.<kind>.avg               the start granule (0 = G0)
 // A message whose T_out falls inside the open window counts for it.
 // Messages the DUT splits (several M-port bursts) pair by their first burst
 // only; a message that never pairs is counted (n_unpaired) and not measured.
@@ -63,6 +64,7 @@ class aou_rx_lat_mon extends uvm_component;
     int unsigned rp;
     aou_cred_class_e cc;
     int unsigned granules;
+    int unsigned sg;         // start granule
     bit [9:0]  id;
     bit [63:0] addr;
     time       t_first;
@@ -94,6 +96,7 @@ class aou_rx_lat_mon extends uvm_component;
   protected time    t_open;
   protected real    lat_sum[string];
   protected real    lat_first_sum[string];
+  protected real    sg_sum[string];
   protected real    lat_min[string];
   protected real    lat_max[string];
   protected int unsigned lat_n[string];
@@ -187,6 +190,7 @@ class aou_rx_lat_mon extends uvm_component;
         m.rp = int'(am.rp);
         m.cc = am.cred_class();
         m.granules = n;
+        m.sg = am.start_granule;
         m.t_first = t_granule(rf, am.start_granule);
         last = am.start_granule + n - 1;
         case (am.msg_type)
@@ -316,12 +320,14 @@ class aou_rx_lat_mon extends uvm_component;
       lat_n[m.kind] = 0;
       lat_sum[m.kind] = 0.0;
       lat_first_sum[m.kind] = 0.0;
+      sg_sum[m.kind] = 0.0;
       lat_min[m.kind] = lat;
       lat_max[m.kind] = lat;
     end
     lat_n[m.kind]++;
     lat_sum[m.kind] += lat;
     lat_first_sum[m.kind] += lat_f;
+    sg_sum[m.kind] += real'(m.sg);
     if (lat < lat_min[m.kind]) lat_min[m.kind] = lat;
     if (lat > lat_max[m.kind]) lat_max[m.kind] = lat;
   endfunction
@@ -372,6 +378,7 @@ class aou_rx_lat_mon extends uvm_component;
     t_open = $time;
     lat_sum.delete();
     lat_first_sum.delete();
+    sg_sum.delete();
     lat_min.delete();
     lat_max.delete();
     lat_n.delete();
@@ -389,6 +396,7 @@ class aou_rx_lat_mon extends uvm_component;
       perf.put({"rxlat.", win, ".", k, ".avg"}, lat_sum[k] / real'(lat_n[k]));
       perf.put({"rxlat.", win, ".", k, ".max"}, lat_max[k]);
       perf.put({"rxlat_first.", win, ".", k, ".avg"}, lat_first_sum[k] / real'(lat_n[k]));
+      perf.put({"rxsg.", win, ".", k, ".avg"}, sg_sum[k] / real'(lat_n[k]));
       if (cyc > 0.0) perf.put({"rxrate.", win, ".", k}, real'(lat_n[k]) / cyc);
     end
     foreach (crd_n[k]) begin

@@ -33,6 +33,7 @@ class aou_perf_vseq extends aou_dp_vseq;
 
   aou_perf_mon   mon;
   aou_rx_lat_mon rx_lat;
+  aou_tx_lat_mon tx_lat;
   string         mode = "bw";
   string         scn;
 
@@ -48,6 +49,7 @@ class aou_perf_vseq extends aou_dp_vseq;
     if ($value$plusargs("perf_scn=%s", scn)) mode = "scn";
     if (mode == "rxlat" && !uvm_config_db#(aou_rx_lat_mon)::get(null, "*", "rx_lat_mon", rx_lat))
       `uvm_fatal(get_type_name(), "no rx_lat_mon in config_db")
+    if (mode == "rxlat") void'(uvm_config_db#(aou_tx_lat_mon)::get(null, "*", "tx_lat_mon", tx_lat));
   endtask
 
   function void full_rate();
@@ -75,12 +77,14 @@ class aou_perf_vseq extends aou_dp_vseq;
     wait_cycles(200);
     mon.open(name, one, scenario, dn, p.wr_pct);
     if (rx_lat != null) rx_lat.open(name);
+    if (tx_lat != null) tx_lat.open(name);
     traffic(dir, n, p);
     if (rx_lat != null) begin
       // Let the last credits come back before the window closes.
       drain();
       wait_cycles(100);
       rx_lat.close();
+      if (tx_lat != null) tx_lat.close();
     end
     mon.close();
   endtask

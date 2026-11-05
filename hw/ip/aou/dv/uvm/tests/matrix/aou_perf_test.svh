@@ -5,7 +5,12 @@
 // +perf_mode=lat|bw|drain|rxlat) measured by aou_perf_mon into perf.txt and
 // perf.json (docs/PERF_JSON.md) in the run directory. +perf_mode=rxlat adds
 // aou_rx_lat_mon: per-message RX latency from the FDI pins to the AXI
-// handshake (fdi-rx-plan 13), report only, rxlat.* lines in perf.txt. aou_perf_chk gates every
+// handshake (fdi-rx-plan 13) and aou_tx_lat_mon: per-message TX latency from the AXI
+// handshake to the FDI beat carrying the message's first granule, report only, rxlat.*
+// and txlat.* lines in perf.txt.
+// +perf_l3_one_msg=1 makes the remote die pack one message per flit, at G0 (a WriteReq
+// with its first WriteData), so the idle RX windows time a lone message from the
+// flit's first beat. aou_perf_chk gates every
 // bandwidth window against the committed d2d_model targets (T1-P02..P04); the
 // latency and drain windows are report only. The scoreboard still checks every
 // byte. aou_perf_seq replaces the random traffic with each window's exact
@@ -34,6 +39,7 @@ class aou_perf_test extends aou_dp_base_test;
   aou_perf_mon mon;
   aou_perf_chk chk;
   aou_rx_lat_mon rx_lat;
+  aou_tx_lat_mon tx_lat;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -63,6 +69,11 @@ class aou_perf_test extends aou_dp_base_test;
     // traffic watchdog.
     cfg.drain_timeout = 2000000;
     cfg.l3_cfg.pol.wdata_first_pct = 0;
+    if ($value$plusargs("perf_l3_one_msg=%s", mode) && mode == "1") begin
+      cfg.l3_cfg.pol.set_min_density();   // one message per flit, at G0
+      cfg.l3_cfg.pol.wreq_wdata_pair = 1'b1; // a WriteReq's WriteData shares its flit
+      cfg.l3_cfg.pol.wdata_first_pct = 0;
+    end
     if (!$value$plusargs("remote_bytes=%s", mode))
       foreach (cfg.rp_remote_bytes[r]) cfg.rp_remote_bytes[r] = cfg.rp_bytes[r];
     pin_knobs();
@@ -121,6 +132,11 @@ class aou_perf_test extends aou_dp_base_test;
       rx_lat.beat_bytes = mon.beat_bytes;
       rx_lat.n_rp = cfg.n_rp;
       uvm_config_db#(aou_rx_lat_mon)::set(null, "*", "rx_lat_mon", rx_lat);
+      tx_lat = aou_tx_lat_mon::type_id::create("tx_lat", this);
+      tx_lat.perf = mon;
+      tx_lat.beat_bytes = mon.beat_bytes;
+      tx_lat.n_rp = cfg.n_rp;
+      uvm_config_db#(aou_tx_lat_mon)::set(null, "*", "tx_lat_mon", tx_lat);
     end
   endfunction
 
@@ -144,6 +160,13 @@ class aou_perf_test extends aou_dp_base_test;
       env.fdi[cfg.lsm_cfg.active_phy].mon.ap_rx.connect(rx_lat.rx_flit_imp);
       foreach (env.m_sub[r]) env.m_sub[r].ap.connect(rx_lat.m_txn_imp);
       foreach (env.s_mgr[r]) env.s_mgr[r].ap.connect(rx_lat.s_txn_imp);
+    end
+    if (tx_lat != null) begin
+      tx_lat.clk_ns = mon.clk_ns;
+      env.fdi[cfg.lsm_cfg.active_phy].mon.ap_tx.connect(tx_lat.tx_flit_imp);
+      env.l3.ap_rx_msg.connect(tx_lat.dut_msg_imp);
+      foreach (env.m_sub[r]) env.m_sub[r].ap.connect(tx_lat.m_txn_imp);
+      foreach (env.s_mgr[r]) env.s_mgr[r].ap.connect(tx_lat.s_txn_imp);
     end
   endfunction
 endclass

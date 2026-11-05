@@ -850,6 +850,19 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+perf_mode=rxlat", "+aou_config=1x1024-sp128"]
 
+# Zero-load latency reference (MAS Table 8): the remote die packs one message per flit
+# at G0 (a WriteReq with its WriteData), the local manager drives AW and W in the same
+# cycle; txlat.idle_* (AXI handshake to the FDI beat carrying the message) and
+# rxlat_first.idle_* (flit first beat to AXI VALID) are the table's columns.
+[[tests]]
+name = "aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp128"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+perf_mode=rxlat", "+perf_l3_one_msg=1", "+perf_w_before_aw=1", "+aou_config=1x1024-sp128"]
+
 # 256 B FDI (FDI_CONFIG 5): one flit per cycle into the RX decoder (48 granules),
 # whole-flit cancel, the one-message-per-cycle TX packer (docs/fdi-rx-plan.md 7).
 # Packing across flits, cancels, random traffic both ways, back-pressure, the
@@ -1287,7 +1300,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 126
+expected_count = 127
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1400,6 +1413,7 @@ tests = [
   "aou_perf_test.perf_mode-lat.1x1024-sp128",
   "aou_perf_test.perf_mode-drain.1x1024-sp128",
   "aou_perf_test.perf_mode-rxlat.1x1024-sp128",
+  "aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128",
   "aou_pack_test.pk-crossflit.1x1024-sp256",
   "aou_pack_test.pk-mixed.1x1024-sp256",
   "aou_pack_test.pk-full.1x1024-sp256",

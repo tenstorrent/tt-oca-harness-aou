@@ -393,7 +393,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | 
 |===
-===== `testlists/matrix.toml` (126 scenarios)
+===== `testlists/matrix.toml` (127 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -482,6 +482,7 @@
 | `aou_perf_test.perf_mode-lat.1x1024-sp128` | `aou_perf_test` | `+perf_mode=lat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-drain.1x1024-sp128` | `aou_perf_test` | `+perf_mode=drain +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.7 | 
 | `aou_perf_test.perf_mode-rxlat.1x1024-sp128` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14 | 
+| `aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128` | `aou_perf_test` | `+perf_mode=rxlat +perf_l3_one_msg=1 +perf_w_before_aw=1 +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14 | 
 | `aou_pack_test.pk-crossflit.1x1024-sp256` | `aou_pack_test` | `+pk=crossflit` | 1-2 | `1x1024-sp256` | 6.5,6.7,6.9 | 
 | `aou_pack_test.pk-mixed.1x1024-sp256` | `aou_pack_test` | `+pk=mixed` | 1-2 | `1x1024-sp256` | 6.3 | 
 | `aou_pack_test.pk-full.1x1024-sp256` | `aou_pack_test` | `+pk=full` | 1-2 | `1x1024-sp256` | 6.18 | 

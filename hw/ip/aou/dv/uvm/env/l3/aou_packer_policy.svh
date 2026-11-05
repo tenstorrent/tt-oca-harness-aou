@@ -13,6 +13,10 @@ class aou_packer_policy extends uvm_object;
 
   // Messages started per flit; 0 is no limit (1 gives minimum density).
   int unsigned      max_msgs_per_flit;
+  // With max_msgs_per_flit, a WriteData placed right after a WriteReq does not
+  // count: the pair shares the flit (max_msgs_per_flit 1 then gives one
+  // request, or one WriteReq with its first WriteData, per flit).
+  bit               wreq_wdata_pair;
   // Percent chance of leaving 1..max_hole empty granules before a message.
   int unsigned      hole_pct;
   int unsigned      max_hole = 4;
@@ -147,11 +151,11 @@ class aou_packer_policy extends uvm_object;
   endfunction
 
   virtual function string convert2string();
-    return $sformatf({"max_msgs=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
+    return $sformatf({"max_msgs=%0d/pair=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
                       "cred_only=%0d empty=%0d%% cred=%0d misc_half=%0d hold=%0d ",
                       "prof=%0d%% zero_grants=%0d grant_span=%0d%% best_fit=%0d ",
                       "wdata_first=%0d%%/%0d hold_wreq=%b bulk_last=%0d"},
-                     max_msgs_per_flit, hole_pct, max_hole, start_granule, split_at,
+                     max_msgs_per_flit, wreq_wdata_pair, hole_pct, max_hole, start_granule, split_at,
                      allow_span, random_order, credit_only_flits, empty_flit_pct,
                      cred_method, misc_per_half_max, hold_credited, prof_pct,
                      zero_grants, grant_span_pct, best_fit, wdata_first_pct, wdata_first_beats,

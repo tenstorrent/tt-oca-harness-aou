@@ -2894,7 +2894,16 @@ Class `aou_perf_test` extends `aou_dp_base_test` (`uvm/tests/matrix/aou_perf_tes
 
 perf.json (docs/PERF_JSON.md) in the run directory. +perf_mode=rxlat adds
 aou_rx_lat_mon: per-message RX latency from the FDI pins to the AXI
-handshake (fdi-rx-plan 13), report only, rxlat.* lines in perf.txt. aou_perf_chk gates every
+handshake (fdi-rx-plan 13) and aou_tx_lat_mon: per-message TX latency from the AXI
+handshake to the FDI beat carrying the message's first granule, report only, rxlat.*
+and txlat.* lines in perf.txt.
+
+----
++perf_l3_one_msg=1 makes the remote die pack one message per flit, at G0 (a WriteReq
+----
+
+with its first WriteData), so the idle RX windows time a lone message from the
+flit's first beat. aou_perf_chk gates every
 bandwidth window against the committed d2d_model targets (T1-P02..P04); the
 latency and drain windows are report only. The scoreboard still checks every
 byte. aou_perf_seq replaces the random traffic with each window's exact
@@ -2995,6 +3004,7 @@ mixed every RP, both directions, half writes.
 | `aou_perf_test.perf_mode-lat.1x1024-sp128` | `+perf_mode=lat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.9
 | `aou_perf_test.perf_mode-drain.1x1024-sp128` | `+perf_mode=drain +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.7
 | `aou_perf_test.perf_mode-rxlat.1x1024-sp128` | `+perf_mode=rxlat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14
+| `aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128` | `+perf_mode=rxlat +perf_l3_one_msg=1 +perf_w_before_aw=1 +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14
 | `aou_perf_test.perf_mode-lat.1x1024-sp256` | `+perf_mode=lat +aou_config=1x1024-sp256` | 1 | `1x1024-sp256` | 10.4,10.5,10.9
 | `aou_perf_test.perf_mode-drain.1x1024-sp256` | `+perf_mode=drain +aou_config=1x1024-sp256` | 1 | `1x1024-sp256` | 10.7
 | `aou_perf_test.perf_mode-rxlat.1x1024-sp256` | `+perf_mode=rxlat +aou_config=1x1024-sp256` | 1 | `1x1024-sp256` | 10.4,10.5,10.6,10.14

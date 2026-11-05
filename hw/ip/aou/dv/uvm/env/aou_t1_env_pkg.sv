@@ -220,6 +220,7 @@ package aou_t1_env_pkg;
   `include "perf/aou_perf_targets.svh"
   `include "perf/aou_perf_mon.svh"
   `include "perf/aou_rx_lat_mon.svh"
+  `include "perf/aou_tx_lat_mon.svh"
   `include "perf/aou_perf_chk.svh"
   typedef class aou_t1_env;
   `include "aou_t1_vseqr.svh"

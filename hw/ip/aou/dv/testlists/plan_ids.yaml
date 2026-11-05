@@ -397,6 +397,7 @@ plan_ids:
   aou_perf_test.perf_mode-lat.1x1024-sp128: '10.4,10.5,10.9'
   aou_perf_test.perf_mode-drain.1x1024-sp128: '10.7'
   aou_perf_test.perf_mode-rxlat.1x1024-sp128: '10.4,10.5,10.6,10.14'
+  aou_perf_test.perf_mode-rxlat.perf_l3_one_msg-1.1x1024-sp128: '10.4,10.5,10.6,10.14'
   aou_perf_test.perf_mode-lat.1x1024-sp256: '10.4,10.5,10.9'
   aou_perf_test.perf_mode-drain.1x1024-sp256: '10.7'
   aou_perf_test.perf_mode-rxlat.1x1024-sp256: '10.4,10.5,10.6,10.14'
