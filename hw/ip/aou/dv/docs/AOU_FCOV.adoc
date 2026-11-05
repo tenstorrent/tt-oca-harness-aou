@@ -293,10 +293,14 @@ has a bin added yet; each is recorded in the verification plan's road-map
 (coverage closure, deferred) for follow-up.
 
 . *DUT-initiated L1 entry.* `cg_link_state` status Active × request L1 is a
-  hole: the DUT requests L1 only after the Adapter already reports L1, and
-  every L1 entry in the bench is the Adapter model's. Either the bin is wrong
-  for this DUT, or power-management entry by the protocol layer (UCIe r1.1
-  8.3) is untested. Check against the MAS low-power section.
+  hole the DUT can't fill: it requests L1 only after the Adapter reports L1,
+  because power-management entry is software's on the UCIe controller and the
+  bring-up controller follows what the Adapter reports (integration guide 3.15
+  and 6.6, MAS 7.3.6). The passing runs show 527 L1 entries, every one the
+  Adapter's, with the DUT's L1 request one cycle later. UCIe r1.1 8.2.9 has
+  the protocol layer start PM entry, so whether this DUT's behaviour fits a
+  UCIe-compliant controller is a question for the owners. Exclusion
+  candidate.
 . *Which ReadData answers a ReadReq.* AoU v0.8 adds a rule for the DLENGTH
   of the ReadData that answers a ReadReq. `cg_msg` counts ReadData sizes and
   `width_cg` counts ARSIZE, but nothing crosses a request's size with the size
@@ -310,8 +314,12 @@ has a bin added yet; each is recorded in the verification plan's road-map
   acknowledge, for example an ActivateAck in DISABLED. The `v0.8` bins start
   only from ACTIVATE, ENABLED and DEACTIVATE.
 . *DUT WriteResp density (DUT).* `cg_wresp_flit` rx 16-47 and 48 WriteResps
-  per flit are holes. The DUT's packer may never build such flits; that is the
-  DUT's choice, not a stimulus gap.
+  per flit are holes the DUT can't fill. Its TX packer (as the RTL shows;
+  the MAS doesn't say) takes at most one WriteResp into its ring for each FDI
+  chunk it sends, and the ring holds about 105 granules, so one flit carries at most about 12 WriteResps (6 with 128 B
+  chunks); the most measured under heavy two-way traffic with bursty
+  `pl_trdy` is 11. Exclusion candidate. The model's side (tx) is covered:
+  the remote die returns WriteResps in batches on about one seed in eight.
 . *Link events with traffic in flight.* No bin combines a link event
   (Retrain, LinkError, L1, reset) with traffic in flight or the activation
   state. This is the riskiest interaction and only directed tests cover it.

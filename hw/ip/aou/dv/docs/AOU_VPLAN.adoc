@@ -87,6 +87,14 @@ handful of bench additions, and coverage closure.
 * Always-on checkers for the FDI, the AoU messages, the AXI and APB ports, the
   DUT's status and interrupts, and the features that span layers (activation,
   credits, debug FIFOs, early-response back-pressure, software reset).
+* An always-on check (T1-C45) holding the DUT to the MAS 7.3.1 credit windows
+  during deactivation: request credits end with the flit carrying its
+  DeactivateAck, response credits with its DeactivateReq (header credits in
+  that flit allowed), and no WriteData follows its DeactivateReq; item 2.11 can
+  fail again.
+* Coverage bins tied to the plan items they evidence (`plan_ids` in `fc.json`);
+  `scripts/plan_status.py --fc` lists each stimulus-shape item's bins, hits and
+  holes.
 * Functional coverage of the FDI, link states, activation, packing, credits,
   AXI request shapes and attributes, width pairings, outstanding limits, early
   response and the watchdog (<<aou-dv-functional-coverage>>).
@@ -102,12 +110,10 @@ handful of bench additions, and coverage closure.
 | Item | What it takes | Depends on
 | TX throughput | Rerun the throughput windows and the full regression on the chosen fix; remove the expected-fail entries it closes | The fix for #131
 | *TODO:* burst-length sweep in the regression | The sweep scenarios exist (`aou_perf_test.perf_scn-S4` on `1x512-sp64` and on both PHYs of `2xmix-tp64_128`) and are tagged `blocked`. Land them in the regression (drop the tag, add them to the groups) once #131's fix is merged; no expected-fail entries. A smoke run of all three also shows remote-to-local read-data errors on 256-beat bursts, not yet triaged | The fix for #131; triage of the read-data errors
-| Deactivation credit windows | A check that holds the DUT to the MAS 7.3.1 credit windows during deactivation; since the combined credit mode was removed, item 2.11 passes because nothing can fail it | none
 | Requests in an ActivateAck's flit | Rerun `aou_act_flit_test` on the fix | The fix for #127
 | WLAST-generator assertions | Rerun the assertion builds | The owners' approach to #132
 | Outstanding counters | Scenarios that reach 1024 outstanding writes and reads, then rerun | The fix for #136
 | Dies with different RP counts | Scenarios for the mapping the pull request implements | Pull request #124
-| Coverage tied to plan items | Fill the `plan_ids` field of each bin, so the status page shows the bins behind each stimulus-shape item | none
 |===
 
 [[aou-vplan-deferred]]
@@ -127,16 +133,18 @@ handful of bench additions, and coverage closure.
 *Coverage closure (deferred, to follow up).* Spec behaviours with no bin, or
 holes that point at a real gap (<<aou-fcov-gaps>> has the detail):
 
-. *DUT-initiated L1 entry* is never exercised: every L1 entry in the bench is
-  the Adapter model's.
+. *DUT-initiated L1 entry* never happens: the DUT requests L1 only after the
+  Adapter reports L1 (PM entry is software's, on the UCIe controller), so
+  status Active × request L1 is unreachable. Exclusion proposed; whether it
+  matches UCIe 8.2.9 is an owner question.
 . *ReadData size against its ReadReq.* Nothing crosses a ReadReq's size with
   the DLENGTH of the ReadData that answers it (an AoU v0.8 rule).
 . *Traffic in DEACTIVATE.* No bins for responses sent after a side's own
   DeactivateReq, for who deactivated first, or for activation order.
 . *ERROR entered from DISABLED* (an inconsistent request or acknowledge) has no
   bin.
-. *Dense WriteResp flits.* Flits with 16 or more WriteResps from the DUT never
-  occur; that is the DUT packer's choice.
+. *Dense WriteResp flits.* The DUT's packer can't put 16 or more WriteResps
+  in one flit (at most about 12; 11 measured). Exclusion proposed.
 . *Link events with traffic in flight.* No bin combines a link event (Retrain,
   LinkError, L1, reset) with traffic in flight or the activation state; only
   directed tests cover it.
