@@ -152,11 +152,11 @@ class aou_mem extends uvm_object;
   // with a matching reservation (EXOKAY); a failed exclusive gets OKAY and
   // writes nothing. A normal write that hits an error region still writes its
   // bytes outside the region. Where there is no exclusive monitor an exclusive
-  // write is a normal one.
+  // write is a normal one, error regions included.
   function bit [1:0] axi_write(aou_axi_txn t, bit exclusive_en);
     bit [1:0] r = txn_resp(t);
     if (r != AOU_AXI_OKAY) begin
-      if (!t.lock) write_txn(t);
+      if (!t.lock || !excl_supported(t.addr)) write_txn(t);
       return r;
     end
     if (t.lock && excl_supported(t.addr)) begin

@@ -43,7 +43,7 @@ AXI-R16,aou_axi_monitor,,DUT,WSTRB is set only on the active byte lanes of each 
 AXI-R17,aou_axi_monitor,,DUT,Every request has completed by the end of the test,AXI4 A3.3
 AXI-R18,aou_axi_monitor,,DUT,No VALID signal is X or Z out of reset,AXI4 A3.1.2
 AXI-R19,aou_axi_monitor,,MODEL,"On an INCR-only port (the DUT's S ports) every AW/AR burst is INCR; anything else is a test-stimulus error (AoU carries no AxBURST, the DUT supports INCR only)",AoU 2.5 / Basic Profile BURST=INCR; DECISIONS D5
-AXI-S01,aou_scoreboard,,DUT,BRESP equals the target memory's response (error region; exclusive OKAY/EXOKAY, OKAY where the memory has no exclusive monitor); SLVERR allowed if outstanding at AOU_SW_RESET,AOU_TB_ARCH.adoc scoreboard rule
+AXI-S01,aou_scoreboard,,DUT,"BRESP equals the target memory's response (error region; exclusive OKAY/EXOKAY, OKAY where the memory has no exclusive monitor); SLVERR allowed if outstanding at AOU_SW_RESET",AOU_TB_ARCH.adoc scoreboard rule
 AXI-S02,aou_scoreboard,,DUT,After B the target memory holds the written bytes,AOU_TB_ARCH.adoc scoreboard rule
 AXI-S03,aou_scoreboard,,DUT,Each RRESP equals the target memory's response for that beat (EXOKAY only where the memory has an exclusive monitor); SLVERR allowed if outstanding at AOU_SW_RESET,AOU_TB_ARCH.adoc scoreboard rule
 AXI-S04,aou_scoreboard,,DUT,Read data equals golden memory on every active lane of OKAY/EXOKAY beats (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule

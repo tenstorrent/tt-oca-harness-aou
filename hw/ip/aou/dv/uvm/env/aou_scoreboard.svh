@@ -193,7 +193,7 @@ class aou_scoreboard extends uvm_scoreboard;
       if (t.bresp != exp)
         fail("AXI-S01", $sformatf("BRESP %0d, memory error region gives %0d", t.bresp, exp),
              t, path);
-      apply = !t.lock;
+      apply = !t.lock || !gold.excl_supported(t.addr);
     end else if (t.lock && !gold.excl_supported(t.addr)) begin
       // No exclusive monitor there: the subordinate ignores AxLOCK (AXI4 A7.2.4).
       if (t.bresp != AOU_AXI_OKAY)

@@ -413,7 +413,7 @@ args = ["+dp_dir=both", "+small_size_pct=5"]
 
 [[groups]]
 name = "datapath"
-expected_count = 39
+expected_count = 41
 tests = [
   "aou_small_size_test",
   "aou_small_size_test.remote_bytes-32_128_64_128",
@@ -449,6 +449,8 @@ tests = [
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.1x512-sp64",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-0.4x512-sp64",
   "aou_dp_outstanding_test.dp_mfull-600.dp_wr_pct-100.4x512-sp64",
+  "aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-100",
+  "aou_dp_outstanding_test.dp_sfull-1.dp_wr_pct-0",
   "aou_attr_test",
   "aou_attr_test.attr_excl-1",
   "aou_attr_test.attr_excl-1.attr_early-1",
