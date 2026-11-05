@@ -97,6 +97,17 @@ class aou_packer_policy extends uvm_object;
   // every WriteReq, up to the WDATA credit it advertised. The caller clears
   // the mask and kicks the model to let the WriteReqs go.
   bit [AOU_RP_MAX-1:0] hold_wreq_rps;
+  // Stimulus timing rather than layout, so the set_*() presets leave it: with
+  // wresp_batch non-zero the env holds our WriteResps back in windows
+  // (hold_wresp, aou_t1_env) until wresp_batch of them are queued or
+  // wresp_batch_wait cycles have passed, as a subordinate that returns its
+  // write responses in batches would. They then leave together, up to 48 in
+  // one flit (a WriteResp is one granule, v0.8 4.4). The hold applies only
+  // while the link is ENABLED and we have not asked to deactivate. 0 sends each
+  // WriteResp as soon as it has credit.
+  int unsigned      wresp_batch = 0;
+  int unsigned      wresp_batch_wait = 300;
+  bit               hold_wresp;
 
   function new(string name = "aou_packer_policy");
     super.new(name);
@@ -158,11 +169,11 @@ class aou_packer_policy extends uvm_object;
     return $sformatf({"max_msgs=%0d/pair=%0d hole=%0d%%/%0d start=%0d split=%0d span=%0d rand=%0d ",
                       "cred_only=%0d empty=%0d%% cred=%0d misc_half=%0d hold=%0d ",
                       "prof=%0d%% zero_grants=%0d grant_span=%0d%% best_fit=%0d ",
-                      "wdata_first=%0d%%/%0d hold_wreq=%b bulk_last=%0d"},
+                      "wdata_first=%0d%%/%0d hold_wreq=%b bulk_last=%0d wresp_batch=%0d/%0d"},
                      max_msgs_per_flit, wreq_wdata_pair, hole_pct, max_hole, start_granule,
                      split_at, allow_span, random_order, credit_only_flits, empty_flit_pct,
                      cred_method, misc_per_half_max, hold_credited, prof_pct,
                      zero_grants, grant_span_pct, best_fit, wdata_first_pct, wdata_first_beats,
-                     hold_wreq_rps, bulk_last);
+                     hold_wreq_rps, bulk_last, wresp_batch, wresp_batch_wait);
   endfunction
 endclass

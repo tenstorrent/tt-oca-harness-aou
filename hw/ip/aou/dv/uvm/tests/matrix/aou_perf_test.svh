@@ -72,6 +72,7 @@ class aou_perf_test extends aou_dp_base_test;
     // traffic watchdog.
     cfg.drain_timeout = 2000000;
     cfg.l3_cfg.pol.wdata_first_pct = 0;
+    cfg.l3_cfg.pol.wresp_batch = 0;
     if ($value$plusargs("perf_l3_one_msg=%s", mode) && mode == "1") begin
       cfg.l3_cfg.pol.set_min_density();   // one message per flit, at G0
       cfg.l3_cfg.pol.wreq_wdata_pair = 1'b1; // a WriteReq's WriteData shares its flit

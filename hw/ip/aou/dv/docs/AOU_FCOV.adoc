@@ -162,7 +162,7 @@ Code: `uvm/env/l3/aou_l3_cov.svh`, bins in `aou_l3_fc_bins.svh`.
 | `cg_flit_layout` | Where each message starts and whether it crosses into the next flit | start granule 0-47 × size in granules {1 (WriteResp, Activation), 2 (CrdtGrant), 3 (requests), 7/8, 14/15, 27/30 (data at 256/512/1024 bits), 4 (`v0.8` ActivateReq)}; size × fits in one flit or spans | `l3.cg_flit_layout`
 | `cg_span` | Which message types each side carried across a flit boundary | the 11 request and data types × tx/rx | `l3.cg_span`
 | `cg_flit_occ` | How full flits are | messages starting in the flit {0, 1, 2-4, 5-15, 16-48} × tx/rx; Misc messages other than Activation in each half {0, 1, 2}; granules carried over from the previous flit {0, 1-11, 12-30}; a flit that carries only credit | `l3.cg_flit_occ`
-| `cg_wresp_flit` | How densely WriteResps share a flit (rx: DUT) | WriteResps starting in one flit {1, 2, 3-4, 5-15, 16-47, 48} × tx/rx | `l3.cg_wresp_flit`
+| `cg_wresp_flit` | How densely WriteResps share a flit (rx: DUT; tx: the remote die, whose WriteResp batches on an eighth of the seeds reach 16-48) | WriteResps starting in one flit {1, 2, 3-4, 5-15, 16-47, 48} × tx/rx | `l3.cg_wresp_flit`
 | `cg_wr_order` (stimulus) | WriteData sent before its WriteReq, which AXI allows and AoU v0.8 5.7 leaves open | per WriteReq: its WriteData already sent {0, 1, 2-3, 4-15, 16+ messages}, all of the burst or part; other RPs with data ahead at the time {0, 1, 2+}; per RP | `l3.cg_wr_order`
 |===
 

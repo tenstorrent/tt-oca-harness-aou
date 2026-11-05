@@ -127,6 +127,7 @@ class aou_pack_test extends aou_dp_base_test;
         cfg.l1_gap_pct = 0;
         cfg.l1_bubble_pct = 0;
         cfg.remote_lat_max = 0;
+        pol.wresp_batch = 0;
         foreach (cfg.s_mgr_cfg[r]) begin
           cfg.s_mgr_cfg[r].timing.apply(AOU_AXI_TIMING_ZERO);
           cfg.m_sub_cfg[r].timing.apply(AOU_AXI_TIMING_ZERO);

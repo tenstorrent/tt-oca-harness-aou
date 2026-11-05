@@ -336,6 +336,11 @@ Traffic and remote-die knobs (run time, any T1 test):
   WriteReqs and WriteData; all three are legal.
 - `+remote_max_burst=2^n`: the remote splitter's longest burst (default 256).
   `+remote_max_burst_rand=1` re-picks it whenever the remote is idle.
+- `+wresp_batch=N` (16-48), `+wresp_batch_wait=C`: the remote die returns its
+  WriteResps in batches, holding them until N are queued or C cycles have passed,
+  so they leave up to 48 in one flit. An eighth of the seeds do this by default
+  (`aou_t1_env_cfg::randomize_knobs`); `+wresp_batch=0` turns it off. The
+  performance, watchdog and back-to-back packing tests keep it off.
 
 FDI corner knobs (run time, `testlists/fdi.toml`; without them a seed takes HOLES
 mostly, sometimes RANDOM or BURSTY, and sometimes random stalls, see

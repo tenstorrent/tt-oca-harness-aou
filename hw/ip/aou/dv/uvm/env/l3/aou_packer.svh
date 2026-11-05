@@ -92,17 +92,28 @@ class aou_packer extends uvm_object;
   // now. Once that data can't go (no WDATA credit, nothing queued) the
   // WriteReq goes, so the order never waits on credit the DUT returns only
   // after the WriteReq has arrived (its RX W FIFO holds the early data).
-  // A WriteReq on an RP of pol.hold_wreq_rps is held whatever its data does.
+  // A WriteReq on an RP of pol.hold_wreq_rps is held whatever its data does,
+  // and WriteResps while the env batches them (pol.hold_wresp, ENABLED only).
   function bit held(int i);
     int unsigned rp;
     int unsigned d;
     int unsigned own;
     rp = i / AOU_CC_NUM;
     if (i % AOU_CC_NUM == int'(AOU_CC_WREQ) && cfg.pol.hold_wreq_rps[rp]) return 1'b1;
+    if (i % AOU_CC_NUM == int'(AOU_CC_WRESP) && cfg.pol.hold_wresp &&
+        lnk.state == AOU_LS_ENABLED && !lnk.want_deact)
+      return 1'b1;
     if (wf_tgt[i].size() == 0 || wf_tgt[i][0] == 0) return 1'b0;
     d = rp * AOU_CC_NUM + int'(AOU_CC_WDATA);
     own = (wd_placed[rp] > wd_owed[rp]) ? wd_placed[rp] - wd_owed[rp] : 0;
     return own < wf_tgt[i][0] && q[d].size() > 0 && eligible(q[d][0]);
+  endfunction
+
+  function int unsigned queued_wresps();
+    int unsigned n = 0;
+    for (int unsigned r = 0; r < AOU_RP_MAX; r++)
+      n += q[r * AOU_CC_NUM + int'(AOU_CC_WRESP)].size();
+    return n;
   endfunction
 
   function int unsigned queued_msgs();

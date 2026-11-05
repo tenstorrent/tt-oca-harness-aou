@@ -44,7 +44,11 @@
 // that send WriteData ahead of their WriteReq, and how much of it
 // (aou_packer_policy; default 5% and 1 to the whole burst), over what the test sets;
 // +act_share_pct=N the share of the remote die's Activation flits that carry the
-// company 4.4 permits (aou_packer_policy::act_share_pct; default 50).
+// company 4.4 permits (aou_packer_policy::act_share_pct; default 50);
+// +wresp_batch=N, +wresp_batch_wait=C the remote die returns its WriteResps in
+// batches of up to N (16-48), holding them at most C cycles
+// (aou_packer_policy::wresp_batch; 0 turns it off; default: an eighth of the
+// seeds), over what the test sets.
 class aou_base_test extends ocah_test;
   `uvm_component_utils(aou_base_test)
 
@@ -134,12 +138,16 @@ class aou_base_test extends ocah_test;
     void'($value$plusargs("wdata_first_beats=%d", cfg.l3_cfg.pol.wdata_first_beats));
     void'($value$plusargs("act_share_pct=%d", cfg.l3_cfg.pol.act_share_pct));
     void'($value$plusargs("l3_bulk_last=%d", cfg.l3_cfg.pol.bulk_last));
+    void'($value$plusargs("wresp_batch=%d", cfg.l3_cfg.pol.wresp_batch));
+    void'($value$plusargs("wresp_batch_wait=%d", cfg.l3_cfg.pol.wresp_batch_wait));
     `uvm_info(get_type_name(), $sformatf({"remote wdata_first=%0d%% beats=%0d act_share=%0d%% ",
-                                          "bulk_last=%0d"},
+                                          "bulk_last=%0d wresp_batch=%0d/%0d cycles"},
                                          cfg.l3_cfg.pol.wdata_first_pct,
                                          cfg.l3_cfg.pol.wdata_first_beats,
                                          cfg.l3_cfg.pol.act_share_pct,
-                                         cfg.l3_cfg.pol.bulk_last), UVM_LOW)
+                                         cfg.l3_cfg.pol.bulk_last,
+                                         cfg.l3_cfg.pol.wresp_batch,
+                                         cfg.l3_cfg.pol.wresp_batch_wait), UVM_LOW)
     trdy_knobs();
     env = aou_t1_env::type_id::create("env", this);
     env.cfg = cfg;

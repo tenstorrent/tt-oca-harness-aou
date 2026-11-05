@@ -277,6 +277,14 @@ class aou_t1_env_cfg extends uvm_object;
     end
     l3_cfg.resp_fork = 1'($urandom_range(1));
     remote_lat_max = $urandom_range(30);
+    // An eighth of the seeds return the remote die's WriteResps in batches of
+    // 16 to 48 (aou_packer_policy::wresp_batch), so its densest WriteResp
+    // packing meets every test's traffic, not only the packing test's. A test
+    // that measures performance or depends on response timing turns it off.
+    if ($urandom_range(7) == 0) begin
+      l3_cfg.pol.wresp_batch = $urandom_range(48, 16);
+      l3_cfg.pol.wresp_batch_wait = $urandom_range(400, 100);
+    end
     fdi_knobs();
   endfunction
 

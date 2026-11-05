@@ -295,6 +295,30 @@ class aou_t1_env extends uvm_env;
         reset_flush(rst.last_which);
       end
     join_none
+    if (cfg.l3_cfg.pol.wresp_batch != 0) begin
+      fork
+        wresp_batch_loop();
+      join_none
+    end
+  endtask
+
+  // The remote die returns its WriteResps in batches (aou_packer_policy::
+  // wresp_batch): after a random gap, L3 holds them back until wresp_batch are
+  // queued or wresp_batch_wait cycles have passed, then lets them go together.
+  // The hold is bounded, so no response waits for long, and AXI puts no bound
+  // on when a write response comes.
+  task wresp_batch_loop();
+    aou_packer_policy pol = cfg.l3_cfg.pol;
+    forever begin
+      repeat ($urandom_range(2000, 200)) @(lsm_vif.mon_cb);
+      if (pol.wresp_batch == 0) return;
+      pol.hold_wresp = 1'b1;
+      for (int unsigned c = 0;
+           c < pol.wresp_batch_wait && l3.model.pk.queued_wresps() < pol.wresp_batch; c++)
+        @(lsm_vif.mon_cb);
+      pol.hold_wresp = 1'b0;
+      l3.model.kick();
+    end
   endtask
 
   // Reset contract (docs/AOU_TB_ARCH.adoc): called on every reset the reset
