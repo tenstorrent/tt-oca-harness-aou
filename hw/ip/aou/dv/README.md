@@ -235,8 +235,8 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
 | `1x512-sp64-nxt` | 1 | 512 | FDI_CFG_SP_64B | 1 | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
-| `1x1024-sp128` | 1 | 1024 | FDI_CFG_SP_128B | 1 | One 1024-bit RP on a 128-byte FDI: the single-RP 128 B RX latency reference (fdi-rx-plan 13) |
-| `1x1024-sp256` | 1 | 1024 | FDI_CFG_SP_256B | 1 | 256-byte FDI: one flit per cycle, 48 granules decoded per cycle, whole-flit cancel |
+| `1x1024-sp128` | 1 | 1024 | FDI_CFG_SP_128B | 1 | One 1024-bit RP on a 128-byte FDI: the zero-load latency reference (MAS 8.1 Table 8, `aou_perf_test +perf_mode=rxlat`) |
+| `1x1024-sp256` | 1 | 1024 | FDI_CFG_SP_256B | 1 | 256-byte FDI: one flit per cycle, one-step TX packer, 48 granules decoded per cycle, whole-flit cancel |
 | `4xmix-sp256` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | Mixed widths, every local width, 256-byte FDI |
 | `4xmix-sp256-rxf` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | `4xmix-sp256` with non-default RX FIFO depths (`AOU_RX_FIFO_ALT`) |
 
@@ -728,6 +728,21 @@ a checkout. Simulations never need it; they read the committed table.
 
 `D2D_COMPARE=<checkout> python3 scripts/test_perf_model.py` tests the adapter,
 including the MAS Table 9 limits and the model's own AoU specification check.
+
+Latency is measured per message rather than per window by
+`aou_perf_test +perf_mode=rxlat` (`matrix.toml`: six configurations plus
+`perf_l3_one_msg-1` on `1x1024-sp128`): idle, streaming, loaded and mixed
+windows in each direction. `aou_rx_lat_mon` times every message the remote die
+sends from its FDI beat (first and last granule) to the DUT's AXI handshake and
+the credit return; `aou_tx_lat_mon` times every message the DUT sends from the
+AXI handshake to the FDI beat carrying its first granule. Both write
+`rxlat.<window>.<kind>.{n,min,avg,max}`, `rxlat_first`, `rxcrd`, `rxrate`,
+`txlat`, `txlat_flit`, `rxsg`/`txsg` (start granule) lines to `perf.txt`.
+`+perf_l3_one_msg=1` makes the remote die send one message per flit at G0
+(a WriteReq with its first WriteData in one flit) and `+perf_w_before_aw=1`
+drives AW and W in the same cycle: that run's idle windows are MAS 8.1
+Table 8. `scripts/rx_lat_compare.py --base <perf.txt|dir> --new <perf.txt|dir>`
+tabulates two runs side by side (`--markdown`, `--metric avg|min|max`).
 
 ## Checker inventory
 

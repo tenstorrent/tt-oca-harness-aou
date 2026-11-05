@@ -17,7 +17,7 @@
 
 Open-source RTL implementation of the AXI-over-UCIe (AoU) protocol [[1]](#references), bridging AXI4 traffic [[3]](#references) over the Universal Chiplet Interconnect Express (UCIe) 3.0 Flit-Die Interface (FDI) [[2]](#references). This bridge enables native AXI transactions to traverse UCIe die-to-die interconnects, facilitating high-performance communication between heterogeneous chiplets in multi-die systems—such as CPUs, GPUs, AI accelerators, and custom IP blocks—without requiring protocol conversion through PCIe or CXL.
 
-Two top-level integration options are provided: `AOU_TOP` is a turn-key wrapper that includes an FDI bringup controller (`AOU_FDI_BRINGUP_CTRL`) for systems that want a self-contained UCIe FDI state machine, and `AOU_CORE_TOP` exposes the protocol engine directly for systems that already own the FDI bringup flow externally. Both top modules expose AXI4 master and slave interfaces, an APB3 configuration port [[4]](#references), and a parameterized FDI data plane: 32B / 64B / 128B FDI interfaces (single-PHY or two-PHY) selected via the `FDI_CONFIG` parameter for integration into UCIe-based chiplet designs. Error and status interrupts (link reset, slave/master errors, early-response errors and a per-RP write-transaction watchdog) are brought out as dedicated pins, each gated by the `AOU_INTERRUPT_MASK` register.
+Two top-level integration options are provided: `AOU_TOP` is a turn-key wrapper that includes an FDI bringup controller (`AOU_FDI_BRINGUP_CTRL`) for systems that want a self-contained UCIe FDI state machine, and `AOU_CORE_TOP` exposes the protocol engine directly for systems that already own the FDI bringup flow externally. Both top modules expose AXI4 master and slave interfaces, an APB3 configuration port [[4]](#references), and a parameterized FDI data plane: 32 B / 64 B / 128 B / 256 B FDI interfaces (single-PHY or two-PHY) selected via the `FDI_CONFIG` parameter for integration into UCIe-based chiplet designs. The AXI USER signals of every channel are carried as the AoU FLEX field in both directions (AoU v0.8 Basic Profile), and the Activation handshake exchanges the v0.8 per-RP profile fields. Error and status interrupts (link reset, slave/master errors, early-response errors and a per-RP write-transaction watchdog) are brought out as dedicated pins, each gated by the `AOU_INTERRUPT_MASK` register.
 
 ## Project Status
 
@@ -157,8 +157,8 @@ For security vulnerabilities, please see our [Security Policy](SECURITY.md) for 
 
 ## References
 
-1. **AXI over UCIe (AoU) Protocol Specification, v0.7**
-   *Access through Open Chiplet Atlas. This specification defines the native mapping of AMBA AXI transactions over UCIe die-to-die interconnects.*
+1. **AXI over UCIe (AoU) Protocol Specification, v0.7 and v0.8**
+   *Access through Open Chiplet Atlas. This specification defines the native mapping of AMBA AXI transactions over UCIe die-to-die interconnects. The design follows v0.7, with the v0.8 FLEX field (AXI USER) and Activation profile exchange; see the Micro-Architecture Specification, Section 1.1.*
    Contact: [Open Chiplet Atlas](https://openchipletatlas.org)
 
 2. **Universal Chiplet Interconnect Express (UCIe) Specification, Revision 3.0**
