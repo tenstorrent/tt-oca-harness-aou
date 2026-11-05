@@ -359,7 +359,8 @@ class aou_l3_cov extends uvm_object;
     if (fresh) begin
       p = fc_wresp_flit.cp("cp_nwresp"); `AOU_L3_FC_NWRESP(AOU_FC_REG)
       p = fc_wresp_flit.cp("cp_dir"); `AOU_FC_DIR_BINS(AOU_FC_REG)
-      void'(fc_wresp_flit.add_cross("x_nwresp_dir", "cp_nwresp cp_dir"));
+      p = fc_wresp_flit.add_cross("x_nwresp_dir", "cp_nwresp cp_dir");
+      `AOU_L3_FC_X_NWRESP(AOU_FC_REG)
       fc_wresp_flit.plan("6.2", "cp_nwresp", "two|few|many|dense|full");
       fc_wresp_flit.plan("6.2", "x_nwresp_dir", "two|few|many|dense|full,*");
       fc_wresp_flit.plan("6.18 11.9", "cp_nwresp", "full");

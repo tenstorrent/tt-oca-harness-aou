@@ -20,12 +20,15 @@ crosses included; a covergroup's own percentage weights each coverpoint and
 cross equally instead, so the two differ.
 
 Ignored bins never reach fc.json. Illegal bins (marked "illegal") are not
-counted; a hit on one is listed. A bin's "spec" tag is either a spec revision
-the RTL doesn't implement yet ("v0.8", "v0.9draft": the tag starts with "v"
-and a digit) or a stimulus note ("rare"). Revision-tagged bins are left out of
-every total and percentage and totalled apart, so the headline figure counts
-only what this RTL can reach; they join it when the DUT targets that revision.
-Other tags stay in the totals and are also totalled apart.
+counted; a hit on one is listed. A bin's "spec" tag is a spec revision the RTL
+doesn't implement yet ("v0.8", "v0.9draft": the tag starts with "v" and a
+digit), "rtl-limit" (a legal case this RTL never produces by design, such as a
+packing density its TX path can't reach) or a stimulus note ("rare"). Revision-
+and rtl-limit-tagged bins are left out of every total and percentage and
+totalled apart, so the headline figure counts only what this RTL can reach;
+they join it when the DUT targets that revision, or when the RTL changes and
+the tag is removed (a hit on an rtl-limit bin shows in its line). Other tags
+stay in the totals and are also totalled apart.
 
 A bin's plan_ids are the test-plan items (docs/test_plan_items.yaml) it is
 evidence for, set where the bins are declared: aou_fc_group::plan() calls for
@@ -134,11 +137,13 @@ class _Stats(dict):
 
 
 REVISION_RE = re.compile(r"^v\d")
+RTL_LIMIT = "rtl-limit"
 
 
-def is_revision(tag):
-    """A tag naming a spec revision the RTL doesn't implement yet (v0.8, v0.9draft)."""
-    return bool(tag and REVISION_RE.match(tag))
+def is_apart(tag):
+    """A tag whose bins stay out of the headline: a spec revision the RTL doesn't
+    implement yet (v0.8, v0.9draft), or a case this RTL never produces (rtl-limit)."""
+    return bool(tag and (REVISION_RE.match(tag) or tag == RTL_LIMIT))
 
 
 def counted(p):
@@ -147,21 +152,21 @@ def counted(p):
 
 
 def headline(p):
-    """The bins of a point the headline counts: counted, and no revision tag."""
-    return {n: b for n, b in counted(p).items() if not is_revision(b.get("spec"))}
+    """The bins of a point the headline counts: counted, and no apart tag."""
+    return {n: b for n, b in counted(p).items() if not is_apart(b.get("spec"))}
 
 
 def tally(points, spec=None):
     """(hit, total) over the counted bins. Without spec, the headline: every counted bin
-    but the revision-tagged ones. With spec, only the bins tagged with it."""
+    but the apart-tagged ones. With spec, only the bins tagged with it."""
     bins = [b for p in points.values() for b in counted(p).values()
-            if (not is_revision(b.get("spec")) if spec is None else b.get("spec") == spec)]
+            if (not is_apart(b.get("spec")) if spec is None else b.get("spec") == spec)]
     return sum(1 for b in bins if b["hits"]), len(bins)
 
 
 def tag_line(tag, hit, total, th, tt):
     """One summary line for a tag's bins: apart from the total, or inside it."""
-    if is_revision(tag):
+    if is_apart(tag):
         return f"{tag}-tagged bins: {hit}/{total} hit; not in the total above"
     return (f"{tag}-tagged bins: {hit}/{total} hit, counted in the total; without them "
             f"{th - hit}/{tt - total} ({pct(th - hit, tt - total):.2f}%)")

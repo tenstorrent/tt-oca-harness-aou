@@ -72,6 +72,13 @@
 `define AOU_L3_FC_NWRESP(B) \
   `B``_BIN(one, 1, 1) `B``_BIN(two, 2, 2) `B``_BIN(few, 3, 4) `B``_BIN(many, 5, 15) \
   `B``_BIN(dense, 16, 47) `B``_BIN(full, 48, 48)
+// The DUT's TX packer adds at most one WriteResp to its ring per FDI chunk it
+// sends and the ring holds about 105 granules, so a flit the DUT sends (rx)
+// carries at most about 12 (the most measured is 11): dense and full rx are
+// beyond this RTL (taken from the RTL; the MAS doesn't say). Tagged rather
+// than ignored, so they stay recorded and reported apart; if the packer
+// changes and they are hit, drop this line.
+`define AOU_L3_FC_X_NWRESP(B) `B``_TAG("dense|full,rx", "rtl-limit")
 // Misc messages other than Activation in one half-flit. AoU v0.8 4.4 allows at
 // most two, so three or more is a violation, not a target: the unpacker's
 // half-flit Misc check (AOU-R7) reports it.

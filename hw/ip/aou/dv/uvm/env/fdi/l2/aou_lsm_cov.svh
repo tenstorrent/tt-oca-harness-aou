@@ -68,7 +68,6 @@ class aou_lsm_cov extends uvm_object;
       fc_link_state.plan("22.2", "x_sts_req", "reset,active");
       fc_link_state.plan("18.13", "x_sts_req", "retrain,*");
       fc_link_state.plan("18.15", "x_sts_req", "l1,*");
-      fc_link_state.plan("18.15", "x_sts_req", "active,l1");
       fc_link_state.plan("22.7", "x_sts_req", "reset|linkerror|linkreset|disabled,nop");
     end
     fc_bringup_fsm = db.group("l2.cg_bringup_fsm", fresh);

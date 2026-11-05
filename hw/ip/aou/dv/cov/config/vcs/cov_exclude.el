@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //==================================================
-// VCS line, branch and FSM exclusions applied by `make cov_report` (urg -elfile), for code
+// VCS line, condition, branch and FSM exclusions applied by `make cov_report` (urg -elfile), for code
 // that no stimulus can reach. Every item states why; DECISIONS.md D10 lists what may be
 // excluded this way. Items are keyed by URG's module and block checksums: when the RTL
 // around an item changes, URG reports the item as not applied and it must be reviewed.
@@ -58,3 +58,26 @@ MODULE: AOU_FDI_BRINGUP_CTRL
 Fsm r_cur_st "3559343899"
 ANNOTATION: "UCIe has no direct L1 to Reset: the Adapter leaves L1 through Retrain"
 Transition ST_L1->ST_RESET "256->1"
+//
+// AOU_ERROR_INFO: the debug error-info window, a four-entry FIFO of error responses read
+// and popped over AXI through the RP's 1xN mux. Two conditions and one branch arm are
+// dead because of how the FIFO pointers and the mux work.
+// - The FIFO never holds more than four entries, so the next write pointer can equal the
+//   read pointer only when the FIFO holds three entries or is full, and then the wrap bits
+//   differ. "Pointers equal, same wrap" would need seven entries. Since a full FIFO makes
+//   the both-errors test true, the arm taken when it is false never sees a full FIFO.
+// - The mux drives RREADY to the window only while its own count of reads outstanding at
+//   the window is non-zero. The window keeps RVALID high for exactly as long, so RREADY
+//   never meets a low RVALID.
+CHECKSUM: "358194277 3164339724"
+ANNOTATION: "ModuleName: AOU_ERROR_INFO"
+MODULE: AOU_ERROR_INFO
+ANNOTATION: "Next write pointer equal to the read pointer with the same wrap bit needs seven entries; the FIFO holds four"
+Condition 20 "3083136076" "((nxt_w_ptr_1 == r_ptr) && (nxt_w_ex_ptr_1 != r_ex_ptr)) 1 -1" (2 "10")
+ANNOTATION: "The mux gates RREADY by its own count of reads outstanding at the window, which matches RVALID"
+Condition 41 "2248333721" "(O_S_RVALID && I_S_RREADY) 1 -1" (1 "01")
+CHECKSUM: "358194277 3575862221"
+ANNOTATION: "ModuleName: AOU_ERROR_INFO"
+MODULE: AOU_ERROR_INFO
+ANNOTATION: "A full FIFO makes the both-errors test true, so its other arm never sees a full FIFO"
+Branch 6 "2008515303" "(!I_RESETN)" (4) "(!I_RESETN) 0,1,0,-,0"

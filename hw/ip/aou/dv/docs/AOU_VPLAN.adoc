@@ -147,18 +147,12 @@ handful of bench additions, and coverage closure.
 *Coverage closure (deferred, to follow up).* Spec behaviours with no bin, or
 holes that point at a real gap (<<aou-fcov-gaps>> has the detail):
 
-. *DUT-initiated L1 entry* never happens: the DUT requests L1 only after the
-  Adapter reports L1 (PM entry is software's, on the UCIe controller), so
-  status Active × request L1 is unreachable. Exclusion proposed; whether it
-  matches UCIe 8.2.9 is an owner question.
 . *ReadData size against its ReadReq.* Nothing crosses a ReadReq's size with
   the DLENGTH of the ReadData that answers it (an AoU v0.8 rule).
 . *Traffic in DEACTIVATE.* No bins for responses sent after a side's own
   DeactivateReq, for who deactivated first, or for activation order.
 . *ERROR entered from DISABLED* (an inconsistent request or acknowledge) has no
   bin.
-. *Dense WriteResp flits.* The DUT's packer can't put 16 or more WriteResps
-  in one flit (at most about 12; 11 measured). Exclusion proposed.
 . *Link events with traffic in flight.* No bin combines a link event (Retrain,
   LinkError, L1, reset) with traffic in flight or the activation state; only
   directed tests cover it.

@@ -150,6 +150,9 @@ class FcReportTest(unittest.TestCase):
             # The illegal bin is out, and so is the revision-tagged one.
             self.assertEqual(fc_report.tally(pts), (1, 2))
             self.assertEqual(fc_report.tally(pts, "v0.8"), (0, 1))
+            # An rtl-limit tag stays apart the same way; a stimulus note doesn't.
+            self.assertTrue(fc_report.is_apart("rtl-limit"))
+            self.assertFalse(fc_report.is_apart("rare"))
             self.assertEqual(fc_report.illegal_hits(db), [("g", "cp", "bad", 2)])
             text = io.StringIO()
             fc_report.write_summary(text, db, {"PASS": 1}, "b")

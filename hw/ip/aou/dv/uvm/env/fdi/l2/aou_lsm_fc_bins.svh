@@ -43,13 +43,16 @@
   `B``_IGN(linkreset, LSM_REQ_LINKRESET, LSM_REQ_LINKRESET) \
   `B``_IGN(disabled, LSM_REQ_DISABLED, LSM_REQ_DISABLED)
 // Status x request pairs UCIe r1.1 Table 8-3 gives a meaning to and the bringup
-// model expects (FDI-M01): Reset NOP/Active; Active Active/L1; L1 L1/Active;
+// model expects (FDI-M01): Reset NOP/Active; Active Active; L1 L1/Active;
 // Retrain NOP then Active (the Retrain exit, FDI-R48); LinkError, LinkReset and
 // Disabled NOP (the DUT never takes the link down or restarts it: software
-// does, on the UCIe controller). Every other pair is ignored.
+// does, on the UCIe controller). Every other pair is ignored, Active/L1 too:
+// the DUT has no way to start PM entry (no register or pin asks it to), so it
+// requests L1 only after the Adapter reports L1, and PM entry is software's on
+// the UCIe controller after a deactivation (MAS 7.3.6).
 `define AOU_LSM_FC_X_STS_REQ(B) \
   `B``_XIGN("reset,l1|retrain|linkreset|disabled") \
-  `B``_XIGN("active,nop|retrain|linkreset|disabled") \
+  `B``_XIGN("active,nop|l1|retrain|linkreset|disabled") \
   `B``_XIGN("l1,nop|retrain|linkreset|disabled") \
   `B``_XIGN("retrain,l1|retrain|linkreset|disabled") \
   `B``_XIGN("linkerror,active|l1|retrain|linkreset|disabled") \

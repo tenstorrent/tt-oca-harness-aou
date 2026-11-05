@@ -33,8 +33,8 @@ out/<build>/merged/fc/ or a regression's union/fc/; repeatable, unioned). Each b
 names the plan items it is evidence for (plan_ids, set in the bench's coverage
 declarations), and the page then lists, per stimulus-shape item (one that bins
 name), its bins hit over total and its holes. Illegal bins aren't counted, and
-bins tagged with a spec revision the RTL doesn't implement (v0.8) are counted
-apart. This doesn't change an item's status.
+bins tagged with a spec revision the RTL doesn't implement (v0.8) or as beyond
+this RTL (rtl-limit) are counted apart. This doesn't change an item's status.
 """
 
 import argparse
@@ -318,16 +318,16 @@ def fc_by_item(bins, aliases):
 
 
 def fc_cells(entries):
-    """(hit/total, per-point counts, holes) of an item's bins; revision-tagged bins apart.
+    """(hit/total, per-point counts, holes) of an item's bins; revision- and rtl-limit-tagged bins apart.
     The AXI4 monitors' points are summed over their ports (axi4.*)."""
-    head = [e for e in entries if not fc_report.is_revision(e[3]["spec"])]
+    head = [e for e in entries if not fc_report.is_apart(e[3]["spec"])]
     hit = sum(1 for e in head if e[3]["hits"])
     pts = {}
     for g, pn, bn, b in head:
         c = pts.setdefault(f"{AXI4_PORT.sub('axi4.*.', g)}.{pn}", [0, 0])
         c[0] += 1 if b["hits"] else 0
         c[1] += 1
-    tagged = [e for e in entries if fc_report.is_revision(e[3]["spec"])]
+    tagged = [e for e in entries if fc_report.is_apart(e[3]["spec"])]
     total = f"{hit}/{len(head)}" + (f" (+{sum(1 for e in tagged if e[3]['hits'])}/{len(tagged)} "
                                     f"{'/'.join(sorted({e[3]['spec'] for e in tagged}))})" if tagged else "")
     holes = [f"{g}.{pn} {bn}" for g, pn, bn, b in head if not b["hits"]]
@@ -384,7 +384,7 @@ def render_md(rows, runs, unmatched, unknown, paths, args, fc=None):
     if fc is not None:
         w(f"\n## Coverage behind stimulus-shape items\n\nThe functional-coverage bins that name each item "
           f"({', '.join(md_escape(p) for p in args.fc)}). Bins hit over total, illegal bins left out and "
-          f"spec-revision-tagged bins in parentheses; points sum the AXI4 ports (axi4.*); holes list the first "
+          f"spec-revision- and rtl-limit-tagged bins in parentheses; points sum the AXI4 ports (axi4.*); holes list the first "
           f"bins no passing run hit.\n\n| ID | Title | Status | Bins hit | Points | Holes |\n|---|---|---|---|---|---|\n")
         for r in rows:
             if r["id"] in fc:

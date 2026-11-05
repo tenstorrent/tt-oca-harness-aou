@@ -35,8 +35,6 @@ only a snapshot.
 
 Where the real holes are (details in <<aou-fcov-gaps>>):
 
-* *The DUT never requests L1 itself.*
-* *The DUT's packer never puts 16 or more WriteResps in one flit.*
 * *The v0.8 behaviour the RTL doesn't implement yet:* the ERROR activation
   state.
 
@@ -60,8 +58,11 @@ interactions between link events and traffic in flight (<<aou-fcov-not-covered>>
   implement yet; `v0.9draft` marks a layout only the v0.9 draft of the AoU
   flit rules (4.4) allows. Bins with a revision tag are left out of the
   headline figure until the DUT targets that revision, and the reports total
-  them apart. `rare` marks stimulus that is deliberately infrequent; those bins
-  stay in the headline and are also totalled apart.
+  them apart. `rtl-limit` marks a legal case this RTL never produces by design
+  (the DUT's WriteResp packing density); those bins are also left out of the
+  headline and totalled apart, so a hit shows if the RTL changes, and the tag
+  is removed then. `rare` marks stimulus that is deliberately infrequent; those
+  bins stay in the headline and are also totalled apart.
 * *Direction:* _tx/rx_ is seen from the remote-die model (tx = model to DUT,
   rx = DUT to model). _l2r/r2l_ is the AXI path: a local manager through the
   DUT to the remote die, or the reverse.
@@ -116,7 +117,7 @@ Code: `uvm/env/fdi/l2/aou_lsm_cov.svh`, bins in `aou_lsm_fc_bins.svh`.
 [cols="2,3,5,2",options="header"]
 |===
 | Group | What it shows | Bins | Report name
-| `cg_link_state` | The Adapter states the DUT lives through, and what it requests in each | Transitions: Reset→Active; Active↔Retrain; Active→L1; L1→Retrain; Active→LinkReset→Reset; Active→Disabled→Reset; Active, Retrain or Reset→LinkError; LinkError→Reset. The 7 states. DUT requests NOP, Active, L1. Status × request: only the pairs UCIe r1.1 Table 8-3 gives a meaning to (Reset: NOP, Active; Active: Active, L1; L1: L1, Active; Retrain: NOP, Active; LinkError, LinkReset, Disabled: NOP) | `l2.cg_link_state`
+| `cg_link_state` | The Adapter states the DUT lives through, and what it requests in each | Transitions: Reset→Active; Active↔Retrain; Active→L1; L1→Retrain; Active→LinkReset→Reset; Active→Disabled→Reset; Active, Retrain or Reset→LinkError; LinkError→Reset. The 7 states. DUT requests NOP, Active, L1. Status × request: only the pairs UCIe r1.1 Table 8-3 gives a meaning to (Reset: NOP, Active; Active: Active; L1: L1, Active; Retrain: NOP, Active; LinkError, LinkReset, Disabled: NOP) | `l2.cg_link_state`
 | `cg_bringup_fsm` | The bring-up controller's sequence, in FDI terms | waiting for `pl_inband_pres` and giving up when it drops; the sideband wake handshake; the Active request and Active; Retrain and its return or link error; L1 and its two exits (clock wake, or a wake request); LinkError or link down back to Reset (17 transitions) | `l2.cg_bringup_fsm`
 |===
 
@@ -304,15 +305,14 @@ Spec behaviours with no bin, or holes that point at a real gap. None of them
 has a bin added yet; each is recorded in the verification plan's road-map
 (coverage closure, deferred) for follow-up.
 
-. *DUT-initiated L1 entry.* `cg_link_state` status Active × request L1 is a
-  hole the DUT can't fill: it requests L1 only after the Adapter reports L1,
-  because power-management entry is software's on the UCIe controller and the
-  bring-up controller follows what the Adapter reports (integration guide 3.15
-  and 6.6, MAS 7.3.6). The passing runs show 527 L1 entries, every one the
-  Adapter's, with the DUT's L1 request one cycle later. UCIe r1.1 8.2.9 has
-  the protocol layer start PM entry, so whether this DUT's behaviour fits a
-  UCIe-compliant controller is a question for the owners. Exclusion
-  candidate.
+. *DUT-initiated L1 entry.* The DUT has no way to start PM entry: no register
+  or pin asks it to, and it requests L1 only after the Adapter reports L1
+  (integration guide 3.15 and 6.6, MAS 7.3.6, where PM entry is software's on
+  the UCIe controller after a deactivation). The passing runs show 527 L1
+  entries, every one the Adapter's, with the DUT's L1 request one cycle later.
+  `cg_link_state` status Active × request L1 is therefore ignored. UCIe r1.1
+  8.2.9 has the protocol layer start PM entry, so a software-controlled L1
+  request is proposed as an enhancement; the bin returns if the DUT gains one.
 . *Which ReadData answers a ReadReq.* AoU v0.8 adds a rule for the DLENGTH
   of the ReadData that answers a ReadReq. `cg_msg` counts ReadData sizes and
   `width_cg` counts ARSIZE, but nothing crosses a request's size with the size
@@ -326,11 +326,13 @@ has a bin added yet; each is recorded in the verification plan's road-map
   acknowledge, for example an ActivateAck in DISABLED. The `v0.8` bins start
   only from ACTIVATE, ENABLED and DEACTIVATE.
 . *DUT WriteResp density (DUT).* `cg_wresp_flit` rx 16-47 and 48 WriteResps
-  per flit are holes the DUT can't fill. Its TX packer (as the RTL shows;
-  the MAS doesn't say) takes at most one WriteResp into its ring for each FDI
-  chunk it sends, and the ring holds about 105 granules, so one flit carries at most about 12 WriteResps (6 with 128 B
-  chunks); the most measured under heavy two-way traffic with bursty
-  `pl_trdy` is 11. Exclusion candidate. The model's side (tx) is covered:
+  per flit are cases the DUT can't produce, tagged `rtl-limit`. Its TX
+  packer (as the RTL shows; the MAS doesn't say) takes at most one WriteResp
+  into its ring for each FDI chunk it sends, and the ring holds about 105
+  granules, so one flit carries at most about 12 WriteResps (6 with 128 B
+  chunks; the 256 B FDI's one-step packer fills a whole flit from one cycle's
+  pops, so no more there); the most measured under heavy two-way traffic with
+  bursty `pl_trdy` is 11. The model's side (tx) is covered:
   the remote die returns WriteResps in batches on about one seed in eight.
 . *Link events with traffic in flight.* No bin combines a link event
   (Retrain, LinkError, L1, reset) with traffic in flight or the activation
