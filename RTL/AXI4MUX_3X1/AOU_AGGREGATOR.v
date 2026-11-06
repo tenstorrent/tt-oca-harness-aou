@@ -33,8 +33,7 @@ module AOU_AGGREGATOR #(
     parameter STRB_WD = DATA_WD / 8,
     parameter LEN_WD  = 8,
     parameter DATA_BYTE = DATA_WD / 8,
-    parameter RD_MO_CNT = 128,
-    parameter AOU_AGG_WCH_FIFO_DEPTH = 16 //It should be configured to a value greater than the maximum burst length of the local bus.
+    parameter RD_MO_CNT = 128
 ) 
 (
     input                           I_CLK,
@@ -401,9 +400,8 @@ endgenerate
 //---------------------------------------------
 //signal for aggregator operation
 generate
-// A debug-address write (I_S_AW_NO_AGG) is never merged: it is not split either, so
-// its length is not bounded by MAX_AWBURSTLEN and the W FIFO could not hold it; the
-// debug window ignores the write data anyway.
+// A debug-address write (I_S_AW_NO_AGG) is never merged, as it is never split: the
+// debug window ignores its write data and answers the access whole.
 if(DATA_WD == 256) begin
     assign w_en_aggregator_w = ~I_S_AW_NO_AGG && ~I_S_AWLOCK && I_S_AWCACHE[1] && (I_S_AWSIZE < 3'b101) & (|I_S_AWLEN);
 end else if (DATA_WD == 512) begin
@@ -662,21 +660,12 @@ assign  O_M_RREADY = (|r_rob_cur_burst_len) ? 1'b0      : I_S_RREADY;
 //   AW_FWD_RS, and WFIFO for WDATA aggregation
 //=====================================================================================
 
-localparam AOU_AGG_AWCH_PAYLOAD_WD = ID_WD + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4 + 3 + 4 + 1 + 16;  // + 1 for w_en_aggregator_w_mux_rs_out, + AWUSER
+// The trailing 16 is AWUSER.
+localparam AOU_AGG_AWCH_PAYLOAD_WD = ID_WD + ADDR_WD + LEN_WD + 3 + 2 + 1 + 4 + 3 + 4 + 16;
 wire [AOU_AGG_AWCH_PAYLOAD_WD - 1:0] w_aou_agg_awch_rs_sdata;
 wire [AOU_AGG_AWCH_PAYLOAD_WD - 1:0] w_aou_agg_awch_rs_mdata;
-wire                                 w_aou_agg_awch_rs_mvalid;
-wire                                 w_aou_agg_awch_rs_mready;
 
-wire                                 w_en_aggregator_w_mux_rs_out;
-wire                                 w_write_op_halt;
-wire                                 o_m_awvalid_tmp;
-wire                                 i_m_awready_tmp;
-wire                                 o_m_wvalid_tmp;
-wire                                 i_m_wready_tmp;
-
-assign w_aou_agg_awch_rs_sdata = {w_en_aggregator_w_mux, 
-                                  O_M_AWID_RS,
+assign w_aou_agg_awch_rs_sdata = {O_M_AWID_RS,
                                   O_M_AWADDR_RS,
                                   O_M_AWLEN_RS,
                                   O_M_AWSIZE_RS,
@@ -687,8 +676,7 @@ assign w_aou_agg_awch_rs_sdata = {w_en_aggregator_w_mux,
                                   O_M_AWQOS_RS,
                                   O_M_AWUSER_RS};
  
-assign {w_en_aggregator_w_mux_rs_out,
-        O_M_AWID,
+assign {O_M_AWID,
         O_M_AWADDR,
         O_M_AWLEN,
         O_M_AWSIZE,
@@ -710,14 +698,16 @@ AOU_FWD_RS #(
     .O_SREADY           ( I_M_AWREADY_RS           ),
     .I_SDATA            ( w_aou_agg_awch_rs_sdata  ),
 
-    .O_MVALID           ( o_m_awvalid_tmp          ),
-    .I_MREADY           ( i_m_awready_tmp          ),
+    .O_MVALID           ( O_M_AWVALID              ),
+    .I_MREADY           ( I_M_AWREADY              ),
     .O_MDATA            ( w_aou_agg_awch_rs_mdata  )
 );
 
 //----------------------------------------------------
 localparam AOU_AGG_WCH_PAYLOAD_WD = DATA_WD + STRB_WD + 1 + 16; // + WUSER
-localparam WCH_FIFO_FULL_CNT_WD   = $clog2(AOU_AGG_WCH_FIFO_DEPTH + 1); 
+// The FIFO's O_SREADY comes from its own pointers, so one entry would halve
+// W throughput.
+localparam int unsigned AOU_AGG_WCH_FIFO_DEPTH = 2;
 
 wire [AOU_AGG_WCH_PAYLOAD_WD - 1:0] w_aou_agg_wch_fifo_sdata;
 wire [AOU_AGG_WCH_PAYLOAD_WD - 1:0] w_aou_agg_wch_fifo_mdata;
@@ -734,8 +724,6 @@ assign {O_M_WDATA,
         O_M_WLAST,
         O_M_WUSER} = w_aou_agg_wch_fifo_mdata;
 
-wire [WCH_FIFO_FULL_CNT_WD-1:0] w_wch_fifo_full_cnt;
-
 AOU_SYNC_FIFO_REG #(
     .FIFO_WIDTH         ( AOU_AGG_WCH_PAYLOAD_WD    ),
     .FIFO_DEPTH         ( AOU_AGG_WCH_FIFO_DEPTH    )
@@ -748,57 +736,12 @@ AOU_SYNC_FIFO_REG #(
     .O_SREADY           ( I_M_WREADY_FIFO_IN        ),
     .I_SDATA            ( w_aou_agg_wch_fifo_sdata  ),
 
-    .O_MVALID           ( o_m_wvalid_tmp            ),
-    .I_MREADY           ( i_m_wready_tmp            ),
+    .O_MVALID           ( O_M_WVALID                ),
+    .I_MREADY           ( I_M_WREADY                ),
     .O_MDATA            ( w_aou_agg_wch_fifo_mdata  ),
 
     .O_EMPTY_CNT        (                           ),
-    .O_FULL_CNT         ( w_wch_fifo_full_cnt       ) 
+    .O_FULL_CNT         (                           )
 );
-
-//----------------------------------------------------
-localparam ST_IDLE = 2'b00;
-localparam ST_HALT = 2'b01;
-localparam ST_SEND = 2'b10;
-
-reg [1:0] r_cur_st, nxt_st;
-
-always @(*) begin
-    case (r_cur_st)
-        ST_IDLE : 
-            if (o_m_awvalid_tmp & w_en_aggregator_w_mux_rs_out & ({3'd0, w_wch_fifo_full_cnt} < (O_M_AWLEN + 1)))
-                nxt_st = ST_HALT ;
-            else
-                nxt_st = r_cur_st ;
-        ST_HALT :
-            if ({3'd0, w_wch_fifo_full_cnt} > O_M_AWLEN)
-                nxt_st = ST_SEND ;
-            else
-                nxt_st = r_cur_st ;
-        ST_SEND :
-            if (O_M_WLAST & O_M_WVALID & I_M_WREADY)
-                nxt_st = ST_IDLE;
-            else
-                nxt_st = r_cur_st ;
-        default :
-            nxt_st = ST_IDLE;
-    endcase
-end
-
-always @(posedge I_CLK or negedge I_RESETN) begin
-    if (!I_RESETN) begin
-        r_cur_st <= ST_IDLE; 
-    end else begin
-        r_cur_st <= nxt_st; 
-    end
-end
-
-assign w_write_op_halt = ((r_cur_st == ST_IDLE) & (o_m_awvalid_tmp & w_en_aggregator_w_mux_rs_out & ({3'd0, w_wch_fifo_full_cnt} < (O_M_AWLEN + 1)))) | ((r_cur_st == ST_HALT) & ({3'd0, w_wch_fifo_full_cnt} <= O_M_AWLEN));
-
-assign O_M_AWVALID     = ~w_write_op_halt & o_m_awvalid_tmp;
-assign i_m_awready_tmp = ~w_write_op_halt & I_M_AWREADY ;
-assign O_M_WVALID      = ~w_write_op_halt & o_m_wvalid_tmp;
-assign i_m_wready_tmp  = ~w_write_op_halt & I_M_WREADY ;
-
 
 endmodule

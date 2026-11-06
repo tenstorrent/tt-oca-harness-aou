@@ -37,7 +37,6 @@ import packet_def_pkg::*;
 
     parameter   M_RD_MO_CNT                 = 32,
     parameter   M_WR_MO_CNT                 = 32,
-    parameter   AOU_AGG_WCH_FIFO_DEPTH      = 16,
 
     localparam  AXI_ADDR_WD                 = 64,
     localparam  AXI_ID_WD                   = 10,
@@ -866,8 +865,7 @@ import packet_def_pkg::*;
         .ID_WD                          ( AXI_ID_WD                         ),
         .LEN_WD                         ( AXI_LEN_WD                        ),
         .RD_MO_CNT                      ( M_RD_MO_CNT                       ),
-        .WR_MO_CNT                      ( M_WR_MO_CNT                       ),
-        .AOU_AGG_WCH_FIFO_DEPTH         ( AOU_AGG_WCH_FIFO_DEPTH            )
+        .WR_MO_CNT                      ( M_WR_MO_CNT                       )
     ) u_aou_axi4mux_3x1_top
     (
         .I_CLK                          ( I_CLK                             ),

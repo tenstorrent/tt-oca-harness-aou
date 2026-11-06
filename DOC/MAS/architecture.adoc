@@ -472,7 +472,7 @@ Write aggregation is activated when *all* of the following conditions are met:
 1.  [.monospaced]#++AWSIZE++# is narrower than the full bus width ([.monospaced]#++AXSIZE < $clog2(DATA_WD/8)++#).
 2.  [.monospaced]#++AWLEN++# is non-zero (multi-beat burst).
 3.  The write is *modifiable* ([.monospaced]#++AWCACHE[1] = 1++#) and not exclusive ([.monospaced]#++AWLOCK = 0++#). Non-modifiable and exclusive writes must reach the manager port with their original size and length (AXI4 A4.3.1), so they bypass aggregation.
-4.  The write is not an access to the R/B response error debug address (xref:aou-724-rb-response-error-debug-fifo[7.2.4]). Such a write is not split either, so its length is not bounded by [.monospaced]#++MAX_AWBURSTLEN++# and the W FIFO could not be relied on to hold it; the debug window ignores the write data.
+4.  The write is not an access to the R/B response error debug address (xref:aou-724-rb-response-error-debug-fifo[7.2.4]). Such a write is not split either, and the debug window ignores its write data.
 
 When activated, the aggregator:
 
@@ -481,7 +481,7 @@ When activated, the aggregator:
 * OR-merges [.monospaced]#++WDATA++# and [.monospaced]#++WSTRB++# across consecutive narrow beats until a full-width beat is assembled, then emits the merged beat on the master W channel.
 * [.monospaced]#++AWBURST++# is passed through unchanged.
 
-A synchronous FIFO of [.monospaced]#++RPn_AGG_WCH_FIFO_DEPTH++# entries (default 16; it must exceed the longest write burst the local bus issues) decouples the AW and W channels. The AW is issued on the master side only after confirming that sufficient W FIFO space is available for the recalculated [.monospaced]#++AWLEN++#, preventing deadlocks when the downstream bus back-pressures the W channel.
+The promoted AW is issued on the master side through a one-entry register slice as soon as it is accepted, without waiting for its write data. Each merged beat passes through a two-entry W FIFO and is issued as soon as it is assembled. The AW therefore leads its W burst, as for a write that is not aggregated, and the burst occupies the master-side W channel for as long as its narrow beats take to arrive. Aggregation gives the target fewer, wider beats, but does not shorten the time the W channel is held.
 
 [caption=""]
 .Figure 13. Write Aggregation \-- Narrow-to-Wide Beat Merging

@@ -345,14 +345,6 @@ the first AW it issues for the request until the last B). As for reads, a split
 request holds one entry for all of its sub-bursts, so the manager port may have
 up to [.monospaced]#++RPn_M_WR_MO_CNT x ceil(beats / (MAX_AWBURSTLEN + 1))++# write
 bursts outstanding.
-
-|RP0_AGG_WCH_FIFO_DEPTH ... RP3_AGG_WCH_FIFO_DEPTH |localparam in
-[.monospaced]#++AOU_CORE_TOP++# (parameter of [.monospaced]#++AOU_CORE++#) |16 |Depth of the per-RP
-W-channel FIFO that decouples AW from W inside the AXI Aggregator. It must be
-greater than the longest write burst the local bus issues to the AXI manager
-port (the aggregator issues an AW only once the FIFO can hold the whole
-recalculated burst). Fixed at 16 in [.monospaced]#++AOU_CORE_TOP++#; change the localparams
-there to integrate a longer-burst local bus.
 |=======================================================================
 
 [[aou-ig-fdi_config-values]]
