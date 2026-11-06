@@ -291,7 +291,7 @@ The [.monospaced]#++MAX_AxBURSTLEN++# value must be of the form 2^n - 1. Legal v
 
 *Read path:* The [.monospaced]#++aou_split_tr_arch++# reorder buffer tracks the sub-burst sequence for each outstanding read. Slave-side [.monospaced]#++RLAST++# is asserted only when the final beat of the last sub-burst is received, reconstructing the original burst boundary. Intermediate [.monospaced]#++RLAST++# signals from the master side are consumed internally.
 
-*Write path:* B responses from sub-bursts are merged. The request's pending-ID table entry ([.monospaced]#++AOU_SPLIT_WR_PENDING_INFO++#) counts the sub-bursts still to be answered, and the splitter returns a single B response to the slave side once all sub-bursts have completed. If any sub-burst returns an error ([.monospaced]#++|I_M_BRESP_RS++#), the merged [.monospaced]#++BRESP_ERR++# flag is set, propagating the error to the slave-side response. The merged response carries the BUSER of the first sub-burst's B as its FLEX value (xref:aou-354-user-signals-and-the-flex-field[Section 3.5.4]).
+*Write path:* B responses from sub-bursts are merged. The request's pending-ID table entry ([.monospaced]#++AOU_SPLIT_WR_PENDING_INFO++#) counts the sub-bursts still to be answered and accumulates their BRESP as a bitwise OR, and the splitter returns a single B response to the slave side once all sub-bursts have completed, carrying that accumulated BRESP. A sub-burst answered with SLVERR or DECERR therefore makes the merged response an error ([.monospaced]#++BRESP[1] = 1++#). Separately, [.monospaced]#++O_BRESP_ERR++# pulses for each manager-side B that carries an error ([.monospaced]#++|I_M_BRESP_RS++#), not once per merged response, so a request with several failing sub-bursts pushes one entry per failing sub-burst into the xref:software-operation.adoc#aou-724-rb-response-error-debug-fifo[R/B response error debug FIFO]. The merged response carries the BUSER of the first sub-burst's B as its FLEX value (xref:aou-354-user-signals-and-the-flex-field[Section 3.5.4]).
 
 *ID mismatch detection:* The splitter exports [.monospaced]#++DEST_TABLE_RID_ERR++# and [.monospaced]#++DEST_TABLE_BID_ERR++# signals that flag responses with IDs not matching any outstanding transaction. These feed the xref:aou-4-interrupt[INT_MI0_ID_MISMATCH] interrupt source via [.monospaced]#++AOU_AXI4MUX_3X1_TOP++#.
 
@@ -356,7 +356,7 @@ The [.monospaced]#++AOU_EARLY_TABLE++# inside the controller maintains a trackin
 |Field |Purpose
 |[.monospaced]#++id++# |AXI write ID ([.monospaced]#++AWID++#)
 |[.monospaced]#++bufferable++# |[.monospaced]#++(AWCACHE[0] OR EARLY_ALWAYS_EN) AND NOT AWLOCK++# flag
-|[.monospaced]#++pending++# |Transaction is in flight (AW accepted, B not yet received from remote)
+|[.monospaced]#++pending++# |Transaction is in flight: set when its WLAST is accepted (its AW was accepted in the same cycle or earlier), cleared when the actual B from the remote die is consumed
 |[.monospaced]#++same_id_tr_cnt++# |Count of older pending transactions with the same AXI ID that have not yet been early-responded or actually responded
 |[.monospaced]#++early_go++# |Set when [.monospaced]#++same_id_tr_cnt++# reaches 0, indicating this entry is eligible for early response
 |[.monospaced]#++wid_numbering++# |Per-ID sequence number for matching B responses to the correct table entry
@@ -481,7 +481,7 @@ When activated, the aggregator:
 * OR-merges [.monospaced]#++WDATA++# and [.monospaced]#++WSTRB++# across consecutive narrow beats until a full-width beat is assembled, then emits the merged beat on the master W channel.
 * [.monospaced]#++AWBURST++# is passed through unchanged.
 
-A synchronous FIFO of [.monospaced]#++RPn_AGG_WCH_FIFO_DEPTH++# entries (default 16; it must exceed the longest write burst the local bus issues) decouples the AW and W channels. The AW is issued on the master side only after confirming that sufficient W FIFO space is available for the recalculated [.monospaced]#++AWLEN++#, preventing deadlocks when the downstream bus back-pressures the W channel.
+A synchronous FIFO of [.monospaced]#++RPn_AGG_WCH_FIFO_DEPTH++# entries (default 16; it must exceed the longest write burst the local bus issues) decouples the AW and W channels. The AW of an aggregated write is held on the master side until the W FIFO holds every beat of the recalculated burst ([.monospaced]#++AWLEN + 1++# merged beats), preventing deadlocks when the downstream bus back-pressures the W channel. Writes that bypass aggregation issue their AW without this wait.
 
 [caption=""]
 .Figure 13. Write Aggregation \-- Narrow-to-Wide Beat Merging
