@@ -40,6 +40,14 @@ class ucie_fdi_fcov extends uvm_object implements ucie_fdi_cov;
   // started inside a TX flit; length in cycles.
   int unsigned t_outcome;
   int unsigned t_len;
+  // cg_error: a pl_error, by the cancel unit (0, 1 a 128B half; 2 the flit at
+  // 256 B; 3 every flit of a wider transfer) times 4 plus the transfer of the
+  // unit it rode on (0 first, 1 inside, 2 last, 3 the only one).
+  int unsigned e_code;
+  // cg_corrupt: a TX transfer of flits with lp_corrupt_crc: 0 on the second
+  // 128B half only, 1 on both, 2 on the flit (256 B), 3 on every flit of a
+  // wider transfer.
+  int unsigned k_kind;
 
   covergroup cg_xfer;
     cp_dir: coverpoint x_rx {
@@ -149,6 +157,28 @@ class ucie_fdi_fcov extends uvm_object implements ucie_fdi_cov;
     }
   endgroup
 
+  covergroup cg_error;
+    cp_where: coverpoint e_code {
+      bins half0_first = {0};
+      bins half0_inside = {1};
+      bins half0_last = {2};
+      bins half1_first = {4};
+      bins half1_inside = {5};
+      bins half1_last = {6};
+      bins flit = {11};
+      bins transfer = {15};
+    }
+  endgroup
+
+  covergroup cg_corrupt;
+    cp_kind: coverpoint k_kind {
+      bins second_half = {0};
+      bins both_halves = {1};
+      bins flit = {2};
+      bins transfer = {3};
+    }
+  endgroup
+
   function new(string name = "ucie_fdi_fcov");
     super.new(name);
     cg_xfer = new();
@@ -157,6 +187,8 @@ class ucie_fdi_fcov extends uvm_object implements ucie_fdi_cov;
     cg_abandon = new();
     cg_lanes = new();
     cg_trdy = new();
+    cg_error = new();
+    cg_corrupt = new();
   endfunction
 
   virtual function void sample_xfer(ucie_fdi_dir_e dir, int unsigned beat_bytes,
@@ -205,6 +237,19 @@ class ucie_fdi_fcov extends uvm_object implements ucie_fdi_cov;
     cg_trdy.sample();
   endfunction
 
+  // A pl_error on transfer pos (0 first, 1 inside, 2 last, 3 the only one) of
+  // cancel unit `unit` (see e_code).
+  function void sample_error(int unsigned unit, int unsigned pos);
+    e_code = unit * 4 + pos;
+    cg_error.sample();
+  endfunction
+
+  // A TX transfer of flits with lp_corrupt_crc; h0: also on the first half.
+  function void sample_corrupt(bit h0);
+    k_kind = fdi_bytes > FLIT_BYTES ? 3 : fdi_bytes == FLIT_BYTES ? 2 : int'(h0);
+    cg_corrupt.sample();
+  endfunction
+
   // Each covergroup's coverage, for the end-of-test report (type scores).
   // Not asked of Verilator: 5.052 does not score covergroups, and asking it
   // leaves internal variables undriven (lint).
@@ -213,9 +258,11 @@ class ucie_fdi_fcov extends uvm_object implements ucie_fdi_cov;
     return "not scored by this simulator";
 `else
     return $sformatf({"xfer %0.1f%% cancel %0.1f%% stall %0.1f%% abandon %0.1f%% lanes %0.1f%% ",
-                      "trdy %0.1f%%"}, cg_xfer.get_coverage(), cg_cancel.get_coverage(),
-                     cg_stall.get_coverage(), cg_abandon.get_coverage(),
-                     cg_lanes.get_coverage(), cg_trdy.get_coverage());
+                      "trdy %0.1f%% error %0.1f%% corrupt %0.1f%%"}, cg_xfer.get_coverage(),
+                     cg_cancel.get_coverage(), cg_stall.get_coverage(),
+                     cg_abandon.get_coverage(), cg_lanes.get_coverage(),
+                     cg_trdy.get_coverage(), cg_error.get_coverage(),
+                     cg_corrupt.get_coverage());
 `endif
   endfunction
 endclass

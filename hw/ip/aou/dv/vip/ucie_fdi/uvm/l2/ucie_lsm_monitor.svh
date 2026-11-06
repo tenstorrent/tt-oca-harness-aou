@@ -24,14 +24,15 @@ class ucie_lsm_monitor extends uvm_monitor;
   local bit          prev_vld;
   local bit          prev_dllp[2];
   local bit          prev_crd[2];
+  local bit          prev_cc[2];
 
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, R62, R63, R65, N_RULES
+    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, R61, R62, R63, R65, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
       "FDI-R14", "FDI-R15", "FDI-R16", "FDI-R18", "FDI-R19", "FDI-R25", "FDI-R26", "FDI-R28",
-      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R62", "FDI-R63", "FDI-R65"};
+      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R61", "FDI-R62", "FDI-R63", "FDI-R65"};
   local int unsigned n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
@@ -55,6 +56,7 @@ class ucie_lsm_monitor extends uvm_monitor;
         prev_vld = 1'b0;
         prev_dllp = '{default: 1'b0};
         prev_crd = '{default: 1'b0};
+        prev_cc = '{default: 1'b0};
       end
       foreach (observers[i]) observers[i].observe(cur, prev);
       prev = cur;
@@ -173,13 +175,22 @@ class ucie_lsm_monitor extends uvm_monitor;
     prev_vld = vld;
   endfunction
 
-  // Protocol Layer outputs the link rules out: no DLLPs when the negotiated
-  // protocol is Streaming (UCIe r3.0 Table 10-3 lp_dllp: not
-  // used for Streaming), and no Retimer credits (the model has no Retimer; on
-  // FDI they exist for Raw Format only). One report per assertion.
+  // Protocol Layer outputs the link rules out (UCIe r3.0 Table 10-3):
+  // lp_corrupt_crc only when the protocol includes CXL.cachemem, no DLLPs when
+  // it is Streaming (lp_dllp: not used for Streaming), and no Retimer credits
+  // (the model has no Retimer; on FDI they exist for Raw Format only). One
+  // report per assertion.
   local function void check_phy_outputs(int unsigned p);
     bit dllp = mb_vif[p].mon_cb.lp_dllp_valid !== 1'b0;
     bit crd = mb_vif[p].mon_cb.lp_retimer_crd !== 1'b0;
+    bit cc = mb_vif[p].mon_cb.lp_corrupt_crc !== 1'b0;
+    if (!protocol_has_cachemem(cfg.protocol)) begin
+      chk(R61);
+      if (cc && !prev_cc[p])
+        err(R61, $sformatf("phy%0d lp_corrupt_crc=%0b with protocol %04b (no CXL.cachemem)", p,
+                           mb_vif[p].mon_cb.lp_corrupt_crc, cfg.protocol));
+    end
+    prev_cc[p] = cc;
     if (protocol_is_streaming(cfg.protocol)) begin
       chk(R62);
       if (dllp && !prev_dllp[p])

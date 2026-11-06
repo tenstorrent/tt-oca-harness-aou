@@ -87,6 +87,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
             main_loop();
             react_loop();
             pm_exit_loop();
+            error_loop();
             while (lsm_vif.drv_cb.rst_n === 1'b1) @(lsm_vif.drv_cb);
           join_any
           disable fork;
@@ -123,6 +124,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     set_rx_req(1'b0);
     foreach (gate[i]) gate[i].open = 1'b0;
     foreach (gate[i]) gate[i].rx_early = 1'b0;
+    foreach (gate[i]) gate[i].retrain_req = 1'b0;
     link_active = 1'b0;
     down_reset = 1'b0;
     wake_ack_hold = 1'b0;
@@ -185,6 +187,27 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       set_state(LSM_RETRAIN);
       wait_req(LSM_REQ_ACTIVE, "FDI-R41");
       active_entry();
+      reacting = 1'b0;
+    end
+  endtask
+
+  // A framing error the Adapter flagged on pl_error (an L1 gate's
+  // retrain_req): the Adapter retrains the link (UCIe r3.0 Table 10-3
+  // pl_error), and the PL driver replays the cancelled half once the link is
+  // Active again. Waits for any event in progress; one Retrain serves every
+  // request made before it.
+  local task error_loop();
+    forever begin
+      bit req;
+      @(lsm_vif.drv_cb);
+      if (busy || ev_busy || reacting || state != LSM_ACTIVE || !link_active) continue;
+      foreach (gate[i]) req |= gate[i].retrain_req;
+      if (!req) continue;
+      reacting = 1'b1;
+      foreach (gate[i]) gate[i].retrain_req = 1'b0;
+      `uvm_info(get_type_name(), "pl_error: the Adapter retrains the link", UVM_MEDIUM)
+      if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_RETRAIN_ON_ERROR);
+      do_retrain(cfg.dwell());
       reacting = 1'b0;
     end
   endtask

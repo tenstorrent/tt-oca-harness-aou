@@ -13,6 +13,13 @@
 // rest; the first flit's cancel plan is the transfer's, and a cancel covers
 // every flit in it (UCIe r3.0 10.3.1). A LinkError mid-flit (gate abort)
 // abandons the flit at once.
+//
+// With cfg.error_pct a flit meets a framing error instead of its cancel plan
+// (UCIe r3.0 Table 10-3 pl_error): pl_error rides with pl_valid on one
+// transfer of a cancel unit; the unit is finished and cancelled (with
+// pl_valid low: no replay can follow at once), the driver asks L2 for a
+// Retrain (gate.retrain_req) and replays the unit once the gate has closed and
+// opened again.
 class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
   `uvm_component_utils(ucie_fdi_pl_driver)
 
@@ -101,11 +108,41 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     @(vif.drv_cb);
   endtask
 
+  // After a framing error: L2 retrains the link (it closes the gate, takes the
+  // link through Retrain and opens it again), then the replay goes on.
+  // ok 0: the flit was dropped (reset, LinkError or a link reset under the
+  // layers above).
+  local task wait_retrain(output bit ok);
+    int unsigned n;
+    bit closed = !cfg.gate.open;
+    cfg.gate.retrain_req = cfg.gate.open;
+    cfg.gate.rx_busy = 1'b0;
+    while (!(closed && cfg.gate.open)) begin
+      if (vif.drv_cb.rst_n !== 1'b1 || cfg.gate.abort || epoch != cfg.gate.epoch) begin
+        if (cfg.gate.abort) cfg.gate.n_abandoned += lanes.size();
+        `uvm_info(get_type_name(), "link down while waiting to replay after pl_error; flit dropped",
+                  UVM_MEDIUM)
+        ok = 1'b0;
+        return;
+      end
+      if (++n == cfg.error_retrain_timeout) begin
+        `uvm_error(get_type_name(), $sformatf("no Retrain %0d cycles after pl_error; replaying", n))
+        break;
+      end
+      idle_cycle(1'b0);
+      closed |= !cfg.gate.open;
+    end
+    cfg.gate.rx_busy = 1'b1;
+    ok = 1'b1;
+  endtask
+
   local task drive_flit();
     ucie_flit_item it = lanes[0];  // its plan is the transfer's
     int unsigned seg_half[$];
     ucie_fdi_cancel_e seg_cancel[$];
     int unsigned bph = cfg.bph();
+    int err_seg = -1;              // the segment that carries pl_error
+    int unsigned err_beat;         // ... on this transfer of it
 
     if (!valid_beat_bytes(cfg.beat_bytes))
       `uvm_fatal(get_type_name(), $sformatf("unsupported beat_bytes %0d", cfg.beat_bytes))
@@ -153,6 +190,29 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
       end
     end
 
+    // A framing error replaces the plan: one unit is flagged and cancelled, then
+    // the flit goes through. Only while the link is Active (pl_error needs the
+    // Receiver active, r3.0 Table 10-3).
+    if (cfg.error_pct != 0 && cfg.gate.open && $urandom_range(99) < cfg.error_pct) begin
+      int unsigned u = halves_per_flit(cfg.beat_bytes) == 1 ? 0 : $urandom_range(1);
+      seg_half.delete();
+      seg_cancel.delete();
+      if (u == 1) begin
+        seg_half.push_back(0); seg_cancel.push_back(UCIE_CANCEL_NONE);
+      end
+      err_seg = seg_half.size();
+      seg_half.push_back(u); seg_cancel.push_back(UCIE_CANCEL_IDLE);
+      seg_half.push_back(u); seg_cancel.push_back(UCIE_CANCEL_NONE);
+      if (u == 0 && halves_per_flit(cfg.beat_bytes) == 2) begin
+        seg_half.push_back(1); seg_cancel.push_back(UCIE_CANCEL_NONE);
+      end
+      err_beat = $urandom_range(bph - 1);
+      if (cfg.poison_cancelled && !it.has_cancel()) begin
+        poison.randomize_payload();
+        poison.randomize_adapter_bytes();
+      end
+    end
+
     repeat (it.pre_gap) idle_cycle(1'b0);
     foreach (lanes[l]) lanes[l].t_start = $time;
     cancel_next = 1'b0;
@@ -177,14 +237,21 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
         vif.drv_cb.pl_valid <= 1'b1;
         vif.drv_cb.pl_flit_cancel <= cancel_next;
         vif.drv_cb.pl_data <= beat(idx, cancelled && cfg.poison_cancelled);
+        vif.drv_cb.pl_error <= s == err_seg && b == err_beat;
         cancel_next = 1'b0;
         @(vif.drv_cb);
+        vif.drv_cb.pl_error <= 1'b0;
       end
       case (seg_cancel[s])
         UCIE_CANCEL_IDLE:  idle_cycle(1'b1);
         UCIE_CANCEL_VALID: cancel_next = 1'b1;
         default: ;
       endcase
+      if (s == err_seg) begin
+        bit ok;
+        wait_retrain(ok);
+        if (!ok) return;
+      end
     end
     foreach (lanes[l]) begin
       lanes[l].t_end = $time;

@@ -44,10 +44,11 @@ Nothing the model does every clock allocates an object.
 | Done | Extension API: link-state observers and a mainband coverage collector (interface classes), flit analysis ports; own rule ledger, self-test | - |
 | Done | FDI widths of 32, 64, 128 and 256 bytes; at 256 B a flit is one transfer and its cancel covers the whole flit | - |
 | Done | FDI widths of 512 and 1024 bytes: 2 or 4 flits per transfer, NOP lanes on RX, a cancel covers every flit of the transfer (see "Flit widths 512 and 1024 B") | - |
+| Done | `pl_error` (framing errors the Adapter flags, cancels and retrains after) and checks of `lp_corrupt_crc`, both applying to every flit of a transfer at 512 B and up | - |
 | Done | Covergroups of the model's own: a mainband collector per FDI (`ucie_fdi_fcov`) and a link-state observer (`ucie_lsm_fcov`), plain SystemVerilog, on by default (`fcov_en`); see "Coverage" | - |
 | Done | Every FDI signal but `pl_cfg`/`lp_cfg` on the interfaces: the negotiated protocol, format, speed and width from the config objects, the Physical Layer's training and L1 indications, stream IDs; DLLP, Retimer credit and error outputs tied idle; the Protocol Layer's DLLP, Retimer credit and stream outputs checked (see "Signals") | - |
 | Next | Protocol-Layer-initiated PM entry (`lp_state_req` = L1/L2), today not modelled | - |
-| Deferred | Other flit formats (68B, Standard 256B), RDI, the sideband (`pl_cfg`/`lp_cfg`, not on the interfaces), DLLPs, `pl_cerror`/`pl_nferror`/`pl_trainerror`, `pl_error` | a user who needs them |
+| Deferred | Other flit formats (68B, Standard 256B), RDI, the sideband (`pl_cfg`/`lp_cfg`, not on the interfaces), DLLPs, `pl_cerror`/`pl_nferror`/`pl_trainerror` | a user who needs them |
 | Deferred | A home outside the AoU bench: tt-oca-harness's shared VIP or a repository of its own (see "Moving it out of the AoU bench") | a second consumer |
 
 ## Contents
@@ -83,6 +84,7 @@ r3.0 (r1.1 §8.2.x is r3.0 §10.2.x, §8.3.x is §10.3.x).
 | Bring-up | §8.2.8, §8.3.3.1 | clock handshake, `pl_inband_pres`, the Protocol Layer's NOP->Active request, Active |
 | State machine | §8.3.3 | Retrain (§8.3.3.4), L1 entry and remote exit (§8.2.9), LinkReset (§8.3.3.5), Disabled (§8.3.3.6), LinkError incl. mid-flit and on `lp_linkerror` (§8.3.3.7), the restart after a link-down (§8.3.3.8) |
 | Negotiated link | r3.0 Table 10-3 | `pl_protocol`, `pl_protocol_flitfmt` (Format 6) and `pl_protocol_vld` with the bringup; `pl_speedmode`, `pl_max_speedmode`, `pl_lnk_cfg` and the stream ID from the config objects; `pl_phyinl1` in L1, `pl_phyinrecenter` while training (optional) |
+| Errors | r3.0 Table 10-3, §10.3.1 | RX: `pl_error` with `pl_valid` on one transfer of a 128B half (from 256 B up, of the transfer), the half finished and cancelled, a Retrain, then the replay (`error_pct`); TX: `lp_corrupt_crc` checked for placement and protocol |
 
 ## Signals
 
@@ -97,8 +99,8 @@ link-wide ones on `ucie_fdi_lsm_if`. A Protocol Layer without some of them leave
 | `lp_valid`, `lp_irdy`, `lp_data`, `lp_stallack` | mainband | checks | r3.0 §10.2.4, §10.3.2 |
 | `pl_stream[7:0]` | mainband | holds `ucie_fdi_cfg.stream` (an integration may tie it, §10.2.1) | r3.0 Table 10-3 |
 | `lp_stream[7:0]` | mainband | checks it names the link's stream with `lp_valid` (FDI-R64); idle: `stream` | r3.0 Table 10-3 |
-| `pl_error` | mainband | holds 0 | r3.0 Table 10-3 |
-| `lp_corrupt_crc` | mainband | not checked; idle: 0 | r3.0 Table 10-3 |
+| `pl_error` | mainband | pulses with `pl_valid` on a framing error (`error_pct`, default 0); see "Errors" (FDI-R06, R58 check the model) | r3.0 Table 10-3, §10.3.1 |
+| `lp_corrupt_crc` | mainband | checks its placement (FDI-R59, R60) and that the protocol includes CXL.cachemem (FDI-R61); idle: 0 | r3.0 Table 10-3, §10.3.1 |
 | `pl_dllp[31:0]`, `pl_dllp_valid`, `pl_dllp_ofc` | mainband | hold 0: DLLPs are not modelled (they serve PCIe and CXL.io; 32 bits is §10.3.1's NDLLP for wide FDIs) | r3.0 Table 10-3, §10.2.4.1 |
 | `lp_dllp[31:0]`, `lp_dllp_valid`, `lp_dllp_ofc` | mainband | checks no DLLP while the protocol is Streaming (FDI-R62); idle: 0 | r3.0 Table 10-3 |
 | `pl_retimer_crd` | mainband | holds 0: no Retimer | r3.0 Table 10-3 |
@@ -326,11 +328,13 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `poison_cancelled` | 1 | cancelled halves carry random bytes |
 | `partial_beat_pct` | 0 | 512 and 1024 B: chance an RX transfer carries fewer flits than it could, the empty lanes zero (NOPs) |
 | `stream` | 04h | `pl_stream`, and what `lp_stream` must carry (FDI-R64); must name `ucie_lsm_cfg.protocol` |
+| `error_pct` | 0 | chance an RX flit meets a framing error: `pl_error`, the half cancelled, a Retrain, the replay (only in Active) |
+| `error_retrain_timeout` | 100000 | cycles the PL driver waits for that Retrain before it reports an error and replays anyway |
 | `checks_en`, `cov_en` | 1, 1 | monitor checks; coverage calls to `mon.cov` |
 | `fcov_en` | 1 | the model's own covergroups (`ucie_fdi_fcov`); `+ucie_fcov` overrides it |
 | `check_tx_adapter_bytes` | 1 | FDI-R45 |
 | `irdy_reset_grace` | 4 | cycles `lp_irdy` may stay high after entering Reset (FDI-R44) |
-| `gate` | | `ucie_fdi_gate`, shared with L2: `open`, `rx_early`, `abort`, `epoch`, `quiet()` (true from the edge after a TX flit's last transfer, so the state never changes on that edge) |
+| `gate` | | `ucie_fdi_gate`, shared with L2: `open`, `rx_early`, `abort`, `epoch`, `retrain_req` (a framing error asks L2 to retrain), `quiet()` (true from the edge after a TX flit's last transfer, so the state never changes on that edge) |
 
 ### L1: classes
 
@@ -413,6 +417,7 @@ check the Protocol Layer, "model" rules check the Adapter model itself.
 | FDI-R01 | a TX beat transfers only on `lp_irdy & lp_valid & pl_trdy` | `ucie_fdi_monitor` | §8.2.4 | unchanged: one beat is the flit | unchanged: one beat is 2 or 4 flits |
 | FDI-R02 | design: no bubbles inside a TX flit | `ucie_fdi_monitor` | §8.2.4 | nothing to check: a TX flit is one beat, so it has no inside | nothing to check: a TX flit is one beat, so it has no inside |
 | FDI-R05 | model: `pl_flit_cancel` only in the cycle after the last beat of a 128B half | `ucie_fdi_monitor` | Table 8-2 | in the cycle after the flit's one beat; it cancels the whole flit, since both halves end in that transfer | in the cycle after the beat; it cancels every flit of the beat (r3.0 §10.3.1) |
+| FDI-R06 | model: a 128B half (from 256 B up, the transfer) that carried `pl_error` is cancelled, and no RX data follows until the link has left Active to retrain | `ucie_fdi_monitor` | r3.0 Table 10-3 | the flit's one transfer | every flit of the transfer (§10.3.1) |
 | FDI-R07 | `pl_stallreq` and `lp_stallack` low at reset exit | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
 | FDI-R08 | model: `pl_stallreq` rises with `lp_stallack` low, falls with it high | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
 | FDI-R09 | design: `lp_stallack` rises with `pl_stallreq` high, falls with it low | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
@@ -436,6 +441,10 @@ check the Protocol Layer, "model" rules check the Adapter model itself.
 | FDI-R48 | design: a Retrain from Active ends with NOP->Active | `ucie_lsm_driver` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R49 | design: `lp_linkerror` released once the Adapter reports LinkError | `ucie_lsm_driver` | §8.3.3.7 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R57 | design: `lp_stallack` within `stall_timeout` cycles of `pl_stallreq` (liveness bound) | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
+| FDI-R58 | model: `pl_error` only while the Receiver is active | `ucie_fdi_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
+| FDI-R59 | design: `lp_corrupt_crc` only with `lp_valid`, on the last transfer of a 128B half | `ucie_fdi_monitor` | r3.0 Table 10-3 | any transfer: each ends both halves | any transfer; it applies to every flit of it (§10.3.1) |
+| FDI-R60 | design: `lp_corrupt_crc` on a flit's first half is repeated on its second | `ucie_fdi_monitor` | r3.0 Table 10-3 | nothing to check: both halves end in one transfer | as at 256 B |
+| FDI-R61 | design: `lp_corrupt_crc` only when the protocol includes CXL.cachemem | `ucie_lsm_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
 | FDI-R62 | design: no `lp_dllp_valid` while the protocol is Streaming | `ucie_lsm_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
 | FDI-R63 | design: `lp_retimer_crd` never asserts (no Retimer; FDI exposes it for Raw Format only) | `ucie_lsm_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
 | FDI-R64 | design: `lp_stream` names the link's stream on the first beat of every TX flit | `ucie_fdi_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
@@ -494,8 +503,10 @@ means anything.
 | `cg_clk` | `ucie_lsm_fcov` | `lp_clk_ack` rising | the state: Reset, Active, L1, LinkReset, LinkError, Disabled |
 | `cg_wake` | `ucie_lsm_fcov` | `pl_wake_ack` rising | the state: Reset, L1 (an exit the Protocol Layer starts), Retrain |
 | `cg_rx_active` | `ucie_lsm_fcov` | `pl_rx_active_req` changing | entry in Reset or Retrain, exit in Active or LinkError |
-| `cg_event` | `ucie_lsm_fcov` | every link event the driver runs, and what it does on its own | the bringup, Retrain (ending in Active, LinkError, LinkReset or Disabled), LinkError (at a boundary, mid-flit, on `lp_linkerror`), L1 entry and exit (by the Adapter or on `lp_wake_req`), LinkReset and Disabled (each also escalated to LinkError), the clock wake, an abort (`LSM_EV_INBAND_DROP` has none: it is for a link a test keeps in Reset) |
+| `cg_event` | `ucie_lsm_fcov` | every link event the driver runs, and what it does on its own | the bringup, Retrain (ending in Active, LinkError, LinkReset or Disabled), LinkError (at a boundary, mid-flit, on `lp_linkerror`), a Retrain after `pl_error`, L1 entry and exit (by the Adapter or on `lp_wake_req`), LinkReset and Disabled (each also escalated to LinkError), the clock wake, an abort (`LSM_EV_INBAND_DROP` has none: it is for a link a test keeps in Reset) |
 | `cg_abort` | `ucie_lsm_fcov` | every abort | where (Reset, after the wake, after the Active request, in L1) and what it ends in (LinkError, LinkReset, Disabled, Reset) |
+| `cg_error` | `ucie_fdi_fcov` | every `pl_error` | the unit (half 0 or 1, the flit at 256 B, every flit of a wider transfer) × the transfer it rode on (first, inside, last of a half; the only one from 256 B up) |
+| `cg_corrupt` | `ucie_fdi_fcov` | every TX transfer with `lp_corrupt_crc` | the second half only, both halves, the flit (256 B), every flit of a wider transfer |
 
 The mainband collector is an `ucie_fdi_cov` like a bench's and takes the rest through
 methods of its own (`sample_lanes`, `sample_trdy`); the link-state one is an observer
@@ -532,7 +543,8 @@ make test UVM_HOME=<uvm-core checkout> SIM=verilator TEST=ucie_fdi_events_test P
 | `ucie_fdi_smoke_test` | traffic both ways: cancels of every shape (whole-transfer cancels from 256 B up), short RX transfers with NOP lanes at 512 and 1024 B, bubbles, gaps, `pl_trdy` policy, stand-alone and mid-flit stalls, random Adapter bytes; fails if no RX flit was cancelled |
 | `ucie_fdi_events_test` | the same under Retrain, L1 entry and exit, a clock wake, LinkError entered mid-flit, LinkReset, Disabled and a Retrain ending in LinkError, with `pl_phyinrecenter` reporting the training |
 | `ucie_fdi_cov_test` | the events test's traffic under every link event and ending the model has, for its coverage: Retrains ending in each state, LinkReset and Disabled escalated to LinkError, L1 exits by both sides, a LinkError the stub requests, and aborts at every point into every state; stalls keep their `pl_trdy` policy, and some are as short as the model makes them |
-| `ucie_fdi_neg_test` | the model's checks against one deliberate violation by the stub (`+neg=dllp\|retimer\|stream`): the rule that must catch it (FDI-R62, R63, R64) has to fire, and its errors are expected |
+| `ucie_fdi_error_test` | the smoke test's traffic on a CXL.2 link (stream 03h) with framing errors (`error_pct` 10: `pl_error`, cancel, Retrain, replay) and the stub asking for corrupted CRCs (`lp_corrupt_crc` on the second half or both); fails if neither happened |
+| `ucie_fdi_neg_test` | the model's checks against one deliberate violation by the stub (`+neg=dllp\|retimer\|stream\|corrupt_mid\|corrupt_h0\|corrupt_proto`): the rule that must catch it (FDI-R62, R63, R64, R59, R60, R61) has to fire, and its errors are expected; `corrupt_mid` and `corrupt_h0` need an FDI of 128 B or less |
 
 Knobs: `+beat_bytes=32|64|128|256|512|1024`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus
 the model's plusargs. A run passes with no `UVM_ERROR` and no `UVM_FATAL`. Verilator
@@ -545,8 +557,12 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
   Standard 256B formats, no Raw Format.
 - FDI widths up to 1024 bytes (four flits per clock). UCIe r3.0 §10.3.1 also allows
   wider multiples of 256 B; `MAX_BEAT_BYTES` and `valid_beat_bytes` would grow with them.
-- `pl_error` and `lp_corrupt_crc`, which at 512 B and up apply to every flit of the
-  clock like `pl_flit_cancel`, are not modelled.
+- `pl_error` is a framing error the Adapter detects in Flit mode with Retry: it
+  cancels the half and retrains. Raw Format's forwarding of the Physical Layer's
+  `pl_error`, and its escalation without Retry, are not modelled.
+- `lp_corrupt_crc` is checked, not acted on: corrupting the CRC and overwriting the
+  Retry buffer are the Adapter's internals, and what the next flit carries is the
+  protocol layer's.
 - From 256 B up a half cannot be cancelled on its own: the interface has one cancel
   cycle per transfer. Cancel plans that name a half become whole-transfer cancels.
 - No sideband: the configuration channel (`pl_cfg`/`lp_cfg` and their valid and

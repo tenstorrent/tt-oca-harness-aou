@@ -16,7 +16,8 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     EV_BRINGUP, EV_RETRAIN, EV_RETRAIN_TO_LINKERROR, EV_RETRAIN_TO_LINKRESET,
     EV_RETRAIN_TO_DISABLED, EV_LINKERROR, EV_LINKERROR_MID_FLIT, EV_LINKERROR_ON_REQUEST,
     EV_L1_ENTRY, EV_L1_EXIT, EV_L1_EXIT_ON_WAKE, EV_LINK_RESET, EV_LINK_RESET_TO_LINKERROR,
-    EV_DISABLED, EV_DISABLED_TO_LINKERROR, EV_INBAND_DROP, EV_CLK_WAKE, EV_ABORT
+    EV_DISABLED, EV_DISABLED_TO_LINKERROR, EV_INBAND_DROP, EV_CLK_WAKE, EV_ABORT,
+    EV_RETRAIN_ON_ERROR
   } ev_e;
 
   bit [7:0]    tr;        // {previous, current} pl_state_sts
@@ -104,6 +105,7 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
       bins disabled_to_linkerror = {EV_DISABLED_TO_LINKERROR};
       bins clk_wake = {EV_CLK_WAKE};
       bins abort = {EV_ABORT};
+      bins retrain_on_error = {EV_RETRAIN_ON_ERROR};
     }
   endgroup
 
@@ -184,8 +186,9 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
   endfunction
 
   // What the driver does on its own: a LinkError entered mid-flit, or one the
-  // Protocol Layer requested (lp_linkerror), and an L1 exit the Protocol Layer
-  // started (lp_wake_req in L1).
+  // Protocol Layer requested (lp_linkerror), an L1 exit the Protocol Layer
+  // started (lp_wake_req in L1), and a Retrain after a framing error
+  // (pl_error).
   function void sample_own(ev_e e);
     ev = e;
     cg_event.sample();

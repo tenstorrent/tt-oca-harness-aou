@@ -26,10 +26,17 @@
 //    flit with a non-zero Protocol ID and an all-zero payload, which the
 //    scoreboard skips.
 //  - lp_stream is tied to `stream`; no DLLPs or Retimer credits.
+//  - With `corrupt_pct`, a transfer of flits asks the Adapter to corrupt their
+//    CRC (lp_corrupt_crc, UCIe r3.0 Table 10-3): with lp_valid on the last
+//    transfer of the second 128B half, or of both halves; from 256 B up on the
+//    one transfer. Only legal when the protocol includes CXL.cachemem.
 //  - `bad` makes one deliberate violation, on the first beat of a flit after
 //    the eighth one sent, for the negative tests of the model's checks
 //    (ucie_fdi_neg_test): "dllp" an lp_dllp_valid pulse, "retimer" an
-//    lp_retimer_crd pulse, "stream" a wrong lp_stream.
+//    lp_retimer_crd pulse, "stream" a wrong lp_stream; "corrupt_mid"
+//    lp_corrupt_crc on a transfer that does not end a half, "corrupt_h0" on the
+//    first half only (both up to 128 B), "corrupt_proto" a well-placed one
+//    while the protocol has no CXL.cachemem.
 class ucie_pl_stub extends uvm_component;
   `uvm_component_utils(ucie_pl_stub)
 
@@ -46,6 +53,9 @@ class ucie_pl_stub extends uvm_component;
   string       bad;          // a deliberate violation (see above); "" for none
   bit          wake_in_l1;   // start a PM exit in L1 (lp_wake_req)
   bit          linkerror_req; // request a LinkError (lp_linkerror) once
+  int unsigned corrupt_pct;  // chance a transfer of flits carries lp_corrupt_crc
+  int unsigned n_corrupt;    // transfers sent with lp_corrupt_crc
+  local bit [MAX_BEATS_PER_FLIT-1:0] cc_mask;  // the transfers of cur with lp_corrupt_crc
   bit          bad_done;
 
   local ucie_flit_item txq[$];
@@ -104,6 +114,7 @@ class ucie_pl_stub extends uvm_component;
     mb.lp_data <= '0;
     mb.lp_stallack <= 1'b0;
     mb.lp_corrupt_crc <= 1'b0;
+    cc_mask = '0;
     mb.lp_stream <= stream;
     mb.lp_dllp <= '0;
     mb.lp_dllp_valid <= 1'b0;
@@ -184,14 +195,40 @@ class ucie_pl_stub extends uvm_component;
         int unsigned fpb = flits_per_beat(beat_bytes);
         while (cur.size() < fpb && txq.size() != 0) cur.push_back(txq.pop_front());
         while (cur.size() < fpb) cur.push_back(filler());
+        cc_mask = corrupt_plan();
       end
       presenting = cur.size() != 0 && active && rx_on && trdy && !stallack && !stallreq;
     end
-    misbehave(presenting && beat == 0 && !bad_done && bad != "" && n_sent >= 8);
+    misbehave(presenting && beat == 0 && !bad_done && bad inside {"dllp", "retimer", "stream"} &&
+              n_sent >= 8);
     mb.lp_stallack <= stallack;
+    mb.lp_corrupt_crc <= presenting && cc_mask[beat];
     mb.lp_valid <= presenting;
     mb.lp_irdy <= presenting;
     mb.lp_data <= presenting ? beat_data() : '0;
+  endfunction
+
+  // Which transfers of the next flit carry lp_corrupt_crc: the last of a 128B
+  // half (the second, or both), or a deliberate misplacement (`bad`).
+  local function bit [MAX_BEATS_PER_FLIT-1:0] corrupt_plan();
+    int unsigned bpf = beats_per_flit(beat_bytes);
+    int unsigned bph = beats_per_half(beat_bytes);
+    bit [MAX_BEATS_PER_FLIT-1:0] m = '0;
+    if (!bad_done && n_sent >= 8 && bad inside {"corrupt_mid", "corrupt_h0", "corrupt_proto"}) begin
+      bad_done = 1'b1;
+      n_corrupt++;
+      case (bad)
+        "corrupt_mid": m[0] = 1'b1;
+        "corrupt_h0":  m[bph-1] = 1'b1;
+        default:       m[bpf-1] = 1'b1;
+      endcase
+      return m;
+    end
+    if ($urandom_range(99) >= corrupt_pct) return m;
+    n_corrupt++;
+    m[bpf-1] = 1'b1;
+    if (bph < bpf && $urandom_range(1) != 0) m[bph-1] = 1'b1;
+    return m;
   endfunction
 
   // The violation `bad` names, in this cycle when `now`; the idle values otherwise.
