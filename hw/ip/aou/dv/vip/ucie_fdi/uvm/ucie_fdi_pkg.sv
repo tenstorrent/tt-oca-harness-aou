@@ -19,9 +19,12 @@ package ucie_fdi_pkg;
   // The most transfers one flit can take (at the narrowest FDI).
   localparam int MAX_BEATS_PER_FLIT = FLIT_BYTES / MIN_BEAT_BYTES;
 
-  // UCIe pl_state_sts Active; the same value in the UCIe and RTL encodings.
-  localparam logic [3:0] FDI_STS_ACTIVE = 4'h1;
-  localparam logic [3:0] FDI_STS_RESET  = 4'h0;
+  // UCIe pl_state_sts values the mainband checks need (r3.0 Table 10-3); the
+  // same in the UCIe and RTL encodings.
+  localparam logic [3:0] FDI_STS_ACTIVE    = 4'h1;
+  localparam logic [3:0] FDI_STS_RESET     = 4'h0;
+  localparam logic [3:0] FDI_STS_LINKERROR = 4'hA;
+  localparam logic [3:0] FDI_STS_RETRAIN   = 4'hB;
 
   // What the Adapter reports as negotiated (UCIe r3.0 Table 10-3). pl_protocol: bit 3 is "with Management Transport" (1001b is
   // Management Transport alone); the low bits 000b PCIe, 011b CXL.1 (CXL.io),

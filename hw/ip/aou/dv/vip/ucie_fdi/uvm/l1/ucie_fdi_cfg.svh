@@ -61,7 +61,10 @@ class ucie_fdi_cfg extends uvm_object;
   // collector; +ucie_fcov=0|1 overrides it.
   bit            fcov_en = 1'b1;
   bit            check_tx_adapter_bytes = 1'b1;
-  int unsigned   irdy_reset_grace = 4; // cycles lp_irdy may stay high after entering Reset
+  // FDI-R44: cycles lp_irdy may stay high after LinkError -> Reset. UCIe r3.0
+  // Table 10-3 allows "a few clocks" there and gives no number, so this is a
+  // liveness bound; on any other entry to Reset lp_irdy must already be low.
+  int unsigned   irdy_reset_grace = 4;
 
   ucie_fdi_gate   gate;
 

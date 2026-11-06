@@ -268,6 +268,93 @@ class ucie_fdi_error_test extends ucie_fdi_smoke_test;
   endfunction
 endclass
 
+// Wait (bounded) until the stub has a flit to send back.
+task automatic wait_flit_queued(ucie_fdi_selftest_env env);
+  int unsigned n;
+  while (env.pl.idle() && n < 50000) begin
+    @(env.pl.lsm.mon_cb);
+    n++;
+  end
+endtask
+
+// The cov test's events and traffic with a Protocol Layer that does what UCIe
+// r3.0 allows but a stricter reading would reject (ucie_pl_stub): it presents
+// flits without waiting for pl_trdy and keeps them up through Retrain,
+// LinkError and the start of LinkReset and Disabled, and a few clocks into
+// Reset after LinkError (`early`); drives lp_valid without lp_irdy between
+// flits (`valid`); drops lp_clk_ack and lp_rx_active_sts 30 clocks after
+// their requests (`hs_lag`); holds lp_linkerror 25000 clocks into LinkError
+// (`le_hold`); and raises lp_wake_req a clock after its Active request in
+// Reset (`wake_late`). +legal=all (default) or a comma-separated list of
+// those names. Any error fails the run. Before the cov test's events, the TX
+// is held back (tx_hold) through a Retrain, a LinkReset, a Disabled and a
+// LinkError, so a flit is sure to wait out each of them presented.
+class ucie_fdi_legal_test extends ucie_fdi_cov_test;
+  `uvm_component_utils(ucie_fdi_legal_test)
+
+  string legal = "all";
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  // Whether +legal names `what` (or is "all").
+  function bit on(string what);
+    string rest = {legal, ","};
+    int b = 0;
+    if (legal == "all") return 1'b1;
+    for (int i = 0; i < rest.len(); i++)
+      if (rest[i] == ",") begin
+        if (rest.substr(b, i - 1) == what) return 1'b1;
+        b = i + 1;
+      end
+    return 1'b0;
+  endfunction
+
+  function void configure();
+    super.configure();
+    void'($value$plusargs("legal=%s", legal));
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.early_present = on("early");
+    env.pl.valid_alone = on("valid");
+    env.pl.hs_lag = on("hs_lag") ? 30 : 0;
+    env.pl.linkerror_hold = on("le_hold") ? 25000 : 0;
+    env.pl.wake_late = on("wake_late");
+    `uvm_info(get_type_name(), $sformatf("legal behaviours: %s", legal), UVM_NONE)
+  endfunction
+
+  local task lev(ucie_lsm_ev_e kind);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::of(kind);
+    s.start(env.lsm.sqr);
+  endtask
+
+  task events();
+    wait_flit_queued(env);
+    env.fdi_cfg.tx_hold = 1'b1;
+    lev(LSM_EV_RETRAIN);
+    lev(LSM_EV_LINK_RESET);
+    lev(LSM_EV_DISABLED);
+    lev(LSM_EV_LINKERROR);
+    env.fdi_cfg.tx_hold = 1'b0;
+    super.events();
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (env.pl.early_present && env.pl.n_presented_down == 0)
+      `uvm_error(get_type_name(), "no flit was presented outside Active")
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf("clocks a flit was presented outside Active: %0d",
+                                         env.pl.n_presented_down), UVM_NONE)
+  endfunction
+endclass
+
 // Demotes the errors of one rule to infos and counts them (ucie_fdi_neg_test).
 class ucie_fdi_expect_catcher extends uvm_report_catcher;
   string       rule;
@@ -288,15 +375,25 @@ class ucie_fdi_expect_catcher extends uvm_report_catcher;
 endclass
 
 // Negative test of the model's checks: the stub makes one deliberate violation
-// (+neg=dllp|retimer|stream|corrupt_mid|corrupt_h0|corrupt_proto, see
-// ucie_pl_stub::bad; corrupt_mid and corrupt_h0 need an FDI of 128 B or less),
-// and the rule that must catch it has to fire; its errors are expected and
-// demoted. Any other error still fails the run.
+// (+neg=dllp|retimer|stream|corrupt_mid|corrupt_h0|corrupt_proto|clk_ack|
+// irdy_reset|wake|wake_held, see ucie_pl_stub::bad; corrupt_mid and
+// corrupt_h0 need an FDI of 128 B or less), or the top breaks the Adapter
+// (ucie_fdi_selftest_top): with +neg=xfer it forces pl_trdy high for a clock
+// while the stub presents a flit in Retrain (needs an FDI of 256 B or more,
+// where that transfer is a whole flit), with +neg=le_exit it reports Reset
+// for a clock while the stub holds lp_linkerror in LinkError, with
+// +neg=rx_inactive it drops pl_rx_active_req in Active while flits go on. The
+// rule that must catch it has to fire, as often as the violation is made
+// (wake_held: the first bringup and the one after each of three LinkErrors);
+// its errors are expected and demoted. Any other error still fails the run.
+// xfer and irdy_reset hold the TX back (tx_hold) through a Retrain, a
+// LinkReset and a Disabled, with the stub presenting early.
 class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
   `uvm_component_utils(ucie_fdi_neg_test)
 
   ucie_fdi_expect_catcher catcher;
   string                  neg;
+  int unsigned            min_n = 1;  // reports the violation must draw
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -319,6 +416,20 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
           `uvm_fatal(get_type_name(), {"+neg=", neg, " needs an FDI of 128 B or less"})
       end
       "corrupt_proto": catcher.rule = "FDI-R61";
+      "clk_ack":    catcher.rule = "FDI-R18";
+      "irdy_reset": catcher.rule = "FDI-R44";
+      "wake":       catcher.rule = "FDI-R16";
+      "wake_held": begin
+        catcher.rule = "FDI-R16";
+        min_n = 4;
+      end
+      "le_exit":     catcher.rule = "FDI-R49";
+      "rx_inactive": catcher.rule = "FDI-R35";
+      "xfer": begin
+        catcher.rule = "FDI-R43";
+        if (env.fdi_cfg.bpf() != 1)
+          `uvm_fatal(get_type_name(), "+neg=xfer needs an FDI of 256 B or more")
+      end
       default:   `uvm_fatal(get_type_name(), {"+neg: unknown violation ", neg})
     endcase
     uvm_report_cb::add(null, catcher);
@@ -327,15 +438,48 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
   function void connect_phase(uvm_phase phase);
     super.connect_phase(phase);
     env.pl.bad = neg;
+    env.pl.early_present = neg inside {"xfer", "irdy_reset"};
   endfunction
+
+  local task nev(ucie_lsm_ev_e kind);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::of(kind);
+    s.start(env.lsm.sqr);
+  endtask
+
+  task events();
+    if (neg == "wake_held") begin
+      repeat (3) nev(LSM_EV_LINKERROR);
+      return;
+    end
+    if (neg == "le_exit") begin
+      // A LinkError the stub requests and then holds, which the top cuts short.
+      int unsigned n_react = env.lsm.drv.n_le_react;
+      env.pl.linkerror_hold = 200;
+      env.pl.linkerror_req = 1'b1;
+      repeat (20000) begin
+        @(env.pl.lsm.mon_cb);
+        if (env.lsm.drv.n_le_react != n_react) break;
+      end
+      // The Adapter, already down, only brings the link up again.
+      nev(LSM_EV_LINKERROR);
+      return;
+    end
+    if (!(neg inside {"xfer", "irdy_reset"})) return;
+    wait_flit_queued(env);
+    env.fdi_cfg.tx_hold = 1'b1;
+    nev(LSM_EV_RETRAIN);
+    nev(LSM_EV_LINK_RESET);
+    nev(LSM_EV_DISABLED);
+    env.fdi_cfg.tx_hold = 1'b0;
+  endtask
 
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
-    if (catcher.n == 0)
-      `uvm_error(get_type_name(), $sformatf("%s: the stub's %s violation was not caught",
-                                            catcher.rule, neg))
+    if (catcher.n < min_n)
+      `uvm_error(get_type_name(), $sformatf("the %s violation was not caught (%s, %0d of %0d)",
+                                            neg, catcher.rule, catcher.n, min_n))
     else
-      `uvm_info(get_type_name(), $sformatf("%s caught the stub's %s violation (%0d reports)",
+      `uvm_info(get_type_name(), $sformatf("%s caught the %s violation (%0d reports)",
                                            catcher.rule, neg, catcher.n), UVM_NONE)
   endfunction
 endclass
