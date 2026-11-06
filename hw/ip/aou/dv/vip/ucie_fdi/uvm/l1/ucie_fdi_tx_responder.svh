@@ -52,14 +52,14 @@ class ucie_fdi_tx_responder extends uvm_component;
       trdy_q = 1'b0;
       stallreq_q = 1'b0;
       tx_beat = 0;
-      cfg.gate.tx_busy = 1'b0;
+      cfg.gate.set_tx_busy(1'b0);
       return;
     end
     if (trdy_q && vif.drv_cb.lp_valid === 1'b1 && vif.drv_cb.lp_irdy === 1'b1)
       tx_beat = (tx_beat + 1) % cfg.bpf();
     // LinkError mid-flit: the partial DUT flit is abandoned, never accepted.
     if (cfg.gate.abort) tx_beat = 0;
-    cfg.gate.tx_busy = tx_beat != 0;
+    cfg.gate.set_tx_busy(tx_beat != 0);
 
     if (stall_want && !stallreq_q && !ack) begin
       stallreq_q = 1'b1;

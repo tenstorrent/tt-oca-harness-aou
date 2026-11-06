@@ -329,7 +329,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `checks_en`, `cov_en` | 1, 1 | monitor checks; coverage calls to `mon.cov` |
 | `check_tx_adapter_bytes` | 1 | FDI-R45 |
 | `irdy_reset_grace` | 4 | cycles `lp_irdy` may stay high after entering Reset (FDI-R44) |
-| `gate` | | `ucie_fdi_gate`, shared with L2: `open`, `rx_early`, `abort`, `epoch`, `quiet()` |
+| `gate` | | `ucie_fdi_gate`, shared with L2: `open`, `rx_early`, `abort`, `epoch`, `quiet()` (true from the edge after a TX flit's last transfer, so the state never changes on that edge) |
 
 ### L1: classes
 
