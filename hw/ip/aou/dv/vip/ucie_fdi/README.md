@@ -333,7 +333,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `checks_en`, `cov_en` | 1, 1 | monitor checks; coverage calls to `mon.cov` |
 | `fcov_en` | 1 | the model's own covergroups (`ucie_fdi_fcov`); `+ucie_fcov` overrides it |
 | `check_tx_adapter_bytes` | 1 | FDI-R45 |
-| `irdy_reset_grace` | 4 | cycles `lp_irdy` may stay high after entering Reset (FDI-R44) |
+| `irdy_reset_grace` | 4 | cycles `lp_irdy` may stay high after LinkError -> Reset (FDI-R44); r3.0 Table 10-3 allows "a few clocks" there and gives no number, so this is a liveness bound. On any other entry to Reset `lp_irdy` must already be low |
 | `gate` | | `ucie_fdi_gate`, shared with L2: `open`, `rx_early`, `abort`, `epoch`, `retrain_req` (a framing error asks L2 to retrain), `quiet()` (true from the edge after a TX flit's last transfer, so the state never changes on that edge) |
 
 ### L1: classes
@@ -374,7 +374,9 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `checks_en` | 1 | monitor checks |
 | `cov_en` | 1 | for observers that collect link-state coverage |
 | `fcov_en` | 1 | the model's own link-state covergroups (`ucie_lsm_fcov`); `+ucie_fcov` overrides it |
-| `ref_slack` | 3 | cycles a Protocol Layer output may lag its cause |
+| `hs_fall_timeout` | 1000 | cycles `lp_clk_ack` and `lp_rx_active_sts` may stay high after their request fell (FDI-R19, R28); r3.0 orders the falls but gives no time, so a liveness bound; 0: off |
+| `wake_req_window` | 16 | cycles after a request that leaves a clock-gated state within which `lp_wake_req` may still rise, when it was not already high in the request's cycle (FDI-R16); r3.0 §10.2.3.1 rule 5 lets the request go first but gives no time, so a liveness bound; 0: the same cycle |
+| `linkerror_hold_report` | 0 | report once (an info) when `lp_linkerror` holds the Adapter in LinkError this many cycles past the dwell (0: never); the Adapter waits either way |
 
 ### L2: classes
 
@@ -412,7 +414,7 @@ violation is counted in `ucie_rule_log`.* A violation is a `uvm_error` with the
 checker's class name as the ID and the message starting `FDI-Rnn:`. "Design" rules
 check the Protocol Layer, "model" rules check the Adapter model itself.
 
-| Rule | Checks | Checker | UCIe r1.1 | At 256 B | At 512/1024 B |
+| Rule | Checks | Checker | UCIe (r1.1 unless marked r3.0) | At 256 B | At 512/1024 B |
 |---|---|---|---|---|---|
 | FDI-R01 | a TX beat transfers only on `lp_irdy & lp_valid & pl_trdy` | `ucie_fdi_monitor` | §8.2.4 | unchanged: one beat is the flit | unchanged: one beat is 2 or 4 flits |
 | FDI-R02 | design: no bubbles inside a TX flit | `ucie_fdi_monitor` | §8.2.4 | nothing to check: a TX flit is one beat, so it has no inside | nothing to check: a TX flit is one beat, so it has no inside |
@@ -425,21 +427,20 @@ check the Protocol Layer, "model" rules check the Adapter model itself.
 | FDI-R12 | design: at least one flop between `pl_stallreq` and `lp_stallack` | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
 | FDI-R13 | design: `lp_stallack` rises only at a flit boundary | `ucie_fdi_monitor` | §8.3.2 | always met: every cycle between TX beats is a flit boundary | always met, as at 256 B |
 | FDI-R14, R15 | model: `pl_wake_ack` follows `lp_wake_req` | `ucie_lsm_monitor` | §8.2.3.1 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R16 | design: `lp_wake_req` high when `lp_state_req` changes leaving Reset, PM, LinkReset or Disabled | `ucie_lsm_monitor` | §8.2.3, §8.2.3.1 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R18, R19 | design: `lp_clk_ack` answers `pl_clk_req` a clock later at the earliest, and falls after it | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.3.2 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R16 | design: a request leaving a clock-gated state (`lp_state_req` to Active, LinkReset or Disabled, or `lp_linkerror` rising, in Reset, PM, LinkReset or Disabled) uses the wake handshake: `lp_wake_req` high in the request's cycle, or rising within `wake_req_window` cycles after it and before the status leaves the gated state (one that fell before the request does not count) | `ucie_lsm_monitor` | r3.0 §10.2.3, §10.2.3.1 rule 5 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R18, R19 | design: `lp_clk_ack` answers `pl_clk_req` a clock later at the earliest, and falls after it, within `hs_fall_timeout` | `ucie_lsm_monitor`, `ucie_lsm_driver` | r3.0 Table 10-3, §10.2.3.2 rules 2 and 3 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R25, R29 | model: `pl_rx_active_req` rules; both rx_active signals low before leaving Active | `ucie_lsm_monitor` | §8.2.7 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R26, R28 | design: `lp_rx_active_sts` answers `pl_rx_active_req` | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.7 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R26, R28 | design: `lp_rx_active_sts` answers `pl_rx_active_req`, and falls after it, within `hs_fall_timeout` | `ucie_lsm_monitor`, `ucie_lsm_driver` | r3.0 §10.2.7 rules 2 and 4 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R33 | design: NOP for at least a clock before Active from Reset | `ucie_lsm_monitor`, `ucie_lsm_driver` | §8.2.8, §8.3.3.1 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R35 | model: flits to the Protocol Layer only in Active (or Reset with the Receiver active) | `ucie_fdi_monitor` | §8.2.7, §8.2.8 | unchanged | unchanged; NOP lanes count as flits on the wire |
+| FDI-R35 | model: flits to the Protocol Layer only while its Receiver is Active: `pl_rx_active_req` and `lp_rx_active_sts` both 1 with `pl_state_sts` Reset, Retrain or Active | `ucie_fdi_monitor` | r3.0 §10.2.7 rules 3 and 6 | unchanged | unchanged; NOP lanes count as flits on the wire |
 | FDI-R41 | design: Active requested after a PM exit | `ucie_lsm_driver` | §8.2.9 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R42 | design: `lp_valid` only with `lp_irdy` | `ucie_fdi_monitor` | Table 8-2 | unchanged | unchanged |
-| FDI-R43 | design: a TX flit starts only in Active | `ucie_fdi_monitor` | §8.2.4, §8.3.3 | unchanged | unchanged |
-| FDI-R44 | design: `lp_irdy` low in Reset | `ucie_fdi_monitor` | Table 8-2 | unchanged | unchanged |
+| FDI-R43 | model: a TX transfer (`lp_valid`, `lp_irdy`, `pl_trdy`) only in Active, or in LinkError while `pl_stallreq` drains the Protocol Layer. Presenting a flit and waiting outside Active is legal, and `lp_valid` without `lp_irdy` transfers nothing | `ucie_fdi_monitor` | r3.0 §10.2.4, Table 10-3 `pl_trdy`, §10.3.2, §10.3.3.7 | unchanged | unchanged |
+| FDI-R44 | design: `lp_irdy` low in Reset, but for `irdy_reset_grace` cycles after LinkError -> Reset | `ucie_fdi_monitor` | r3.0 Table 10-3 `lp_irdy` | unchanged | unchanged |
 | FDI-R45 | design: TX Protocol ID non-zero, other Flit Header and CRC bytes zero | `ucie_fdi_monitor` | §2.4.4, §3.3.4 | unchanged: the same bytes, collected from one beat | checked in every lane: the Protocol Layer sends valid data on the full width (r3.0 §10.3.1), so an empty lane (Protocol ID 00b) fails |
 | FDI-R46 | design: no reserved `lp_state_req` value | `ucie_lsm_monitor` | Table 8-2 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R47 | design: no Retrain request outside Raw Format | `ucie_lsm_monitor` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R48 | design: a Retrain from Active ends with NOP->Active | `ucie_lsm_driver` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R49 | design: `lp_linkerror` released once the Adapter reports LinkError | `ucie_lsm_driver` | §8.3.3.7 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R49 | model: the Adapter stays in LinkError while `lp_linkerror` is 1, however long the Protocol Layer holds it (the driver waits with no bound) | `ucie_lsm_monitor` | r3.0 Table 10-3 `lp_linkerror`, §10.3.3.7 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R57 | design: `lp_stallack` within `stall_timeout` cycles of `pl_stallreq` (liveness bound) | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
 | FDI-R58 | model: `pl_error` only while the Receiver is active | `ucie_fdi_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
 | FDI-R59 | design: `lp_corrupt_crc` only with `lp_valid`, on the last transfer of a 128B half | `ucie_fdi_monitor` | r3.0 Table 10-3 | any transfer: each ends both halves | any transfer; it applies to every flit of it (§10.3.1) |
@@ -544,7 +545,8 @@ make test UVM_HOME=<uvm-core checkout> SIM=verilator TEST=ucie_fdi_events_test P
 | `ucie_fdi_events_test` | the same under Retrain, L1 entry and exit, a clock wake, LinkError entered mid-flit, LinkReset, Disabled and a Retrain ending in LinkError, with `pl_phyinrecenter` reporting the training |
 | `ucie_fdi_cov_test` | the events test's traffic under every link event and ending the model has, for its coverage: Retrains ending in each state, LinkReset and Disabled escalated to LinkError, L1 exits by both sides, a LinkError the stub requests, and aborts at every point into every state; stalls keep their `pl_trdy` policy, and some are as short as the model makes them |
 | `ucie_fdi_error_test` | the smoke test's traffic on a CXL.2 link (stream 03h) with framing errors (`error_pct` 10: `pl_error`, cancel, Retrain, replay) and the stub asking for corrupted CRCs (`lp_corrupt_crc` on the second half or both); fails if neither happened |
-| `ucie_fdi_neg_test` | the model's checks against one deliberate violation by the stub (`+neg=dllp\|retimer\|stream\|corrupt_mid\|corrupt_h0\|corrupt_proto`): the rule that must catch it (FDI-R62, R63, R64, R59, R60, R61) has to fire, and its errors are expected; `corrupt_mid` and `corrupt_h0` need an FDI of 128 B or less |
+| `ucie_fdi_legal_test` | the cov test with a Protocol Layer doing what UCIe r3.0 allows (`+legal=all`, or a comma-separated list): `early` presents flits without waiting for `pl_trdy` and through Retrain, LinkError, the start of LinkReset and Disabled, and a few clocks into Reset after LinkError; `valid` drives `lp_valid` without `lp_irdy` between flits; `hs_lag` drops `lp_clk_ack` and `lp_rx_active_sts` 30 clocks after their requests; `le_hold` holds `lp_linkerror` 25000 clocks into LinkError; `wake_late` raises `lp_wake_req` a clock after its Active request. Any error fails it |
+| `ucie_fdi_neg_test` | the model's checks against one deliberate violation (`+neg=dllp\|retimer\|stream\|corrupt_mid\|corrupt_h0\|corrupt_proto\|clk_ack\|irdy_reset\|wake\|wake_held\|xfer\|le_exit\|rx_inactive`): the rule that must catch it (FDI-R62, R63, R64, R59, R60, R61, R18, R44, R16, R16, R43, R49, R35) has to fire, as often as the violation is made, and its errors are expected; `corrupt_mid` and `corrupt_h0` need an FDI of 128 B or less. `clk_ack` is an `lp_clk_ack` pulse without `pl_clk_req`, `irdy_reset` a flit presented through LinkReset and Disabled into Reset, `wake` an Active request in Reset with `lp_wake_req` never raised, `wake_held` the same with `lp_wake_req` held through LinkError and dropped on entry to Reset, over a bringup and three LinkErrors (four reports). Adapter faults the top forces: with `xfer` `pl_trdy` high for a clock while a flit waits in Retrain (256 B or more), with `le_exit` Reset for a clock while the stub holds `lp_linkerror` in LinkError, with `rx_inactive` `pl_rx_active_req` low in Active while flits go on |
 
 Knobs: `+beat_bytes=32|64|128|256|512|1024`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus
 the model's plusargs. A run passes with no `UVM_ERROR` and no `UVM_FATAL`. Verilator
@@ -589,7 +591,8 @@ config's `source_lists`) and adds `aou_fdi_layer_pkg`:
   pins, status outputs, internal triggers).
 - `aou_fdi_layer`: one component and a `ucie_lsm_observer`. It drives those pins
   (idle on reset, `pulse_sw()`), steps the reference model of the DUT's bringup
-  controller (`aou_bringup_model`) every clock, checks that the DUT never requests L2,
+  controller (`aou_bringup_model`, with its own comparison slack `ref_slack`, apart
+  from the model's liveness bounds) every clock, checks that the DUT never requests L2,
   and holds the coverage collectors. The bench's envs create it and call
   `attach(lsm)` in `connect_phase`.
 - `aou_fdi_cov` (a `ucie_fdi_cov`, set on every mainband monitor) and `aou_lsm_cov`

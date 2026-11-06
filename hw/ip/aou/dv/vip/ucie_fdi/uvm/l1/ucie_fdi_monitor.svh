@@ -16,7 +16,10 @@
 // a lane the DUT leaves empty is an error), and an RX beat is that many
 // flits, of which the zero-padded lanes are NOPs.
 // Reset flushes both directions, and so does a LinkError the Adapter entered
-// mid-flit (gate abort; UCIe r1.1 8.3.3.7): the partial flits are abandoned.
+// mid-flit (gate abort; UCIe r3.0 §10.3.3.7): the partial flits are abandoned.
+// The Protocol Layer may present a flit (lp_valid, lp_irdy) in any state but
+// Reset and wait for pl_trdy (r3.0 10.2.4, Table 10-3 lp_irdy); only a transfer
+// needs Active (FDI-R43), and lp_valid alone transfers nothing.
 // Errors (UCIe r3.0 Table 10-3, 10.3.1): a cancel unit that carried pl_error
 // must be cancelled and no RX data may follow until the link has left Active
 // (FDI-R06), and pl_error needs the Receiver active (FDI-R58); lp_corrupt_crc
@@ -75,7 +78,9 @@ class ucie_fdi_monitor extends uvm_monitor;
   local bit           prev_sr;
   local bit           prev_sa;
   local logic [3:0]   prev_sts;
-  local int unsigned  since_reset_sts;
+  // Cycles left in which lp_irdy may still be high in Reset: only after
+  // LinkError -> Reset (FDI-R44).
+  local int unsigned  irdy_grace;
   local int unsigned  sr_cycles;
   local int unsigned  sa_cycles;
   local bit           sr_mid;
@@ -83,17 +88,16 @@ class ucie_fdi_monitor extends uvm_monitor;
   local int unsigned  trdy_low;     // cycles of the current pl_trdy-low run
   local bit           trdy_low_in;  // ... which started inside a TX flit
   local bit           trdy_low_ok;  // ... all in Active, with no stall handshake or hold
-  local bit           abandoned;  // left Active mid-flit; until the next Active
   local bit           abandon_h_done;  // ... right after a whole 128B half: its cancel may follow
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R01, R02, R05, R06, R07, R08, R09, R10, R12, R13, R35, R42, R43, R44, R45, R57, R58, R59,
-    R60, R64, N_RULES
+    R01, R02, R05, R06, R07, R08, R09, R10, R12, R13, R35, R43, R44, R45, R57, R58, R59, R60,
+    R64, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
       "FDI-R01", "FDI-R02", "FDI-R05", "FDI-R06", "FDI-R07", "FDI-R08", "FDI-R09", "FDI-R10",
-      "FDI-R12", "FDI-R13", "FDI-R35", "FDI-R42", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57",
-      "FDI-R58", "FDI-R59", "FDI-R60", "FDI-R64"};
+      "FDI-R12", "FDI-R13", "FDI-R35", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57", "FDI-R58",
+      "FDI-R59", "FDI-R60", "FDI-R64"};
   local int unsigned  n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
@@ -150,12 +154,16 @@ class ucie_fdi_monitor extends uvm_monitor;
       if (vif.mon_cb.pl_stallreq !== 1'b0 || vif.mon_cb.lp_stallack !== 1'b0)
         err(R07, "pl_stallreq and lp_stallack must both be low at reset exit");
       prev_sts = sts;
-      since_reset_sts = 0;
+      irdy_grace = 0;
     end
-    if (sts != prev_sts && sts == FDI_STS_RESET) since_reset_sts = 0;
-    else if (since_reset_sts < 1000) since_reset_sts++;
+    // UCIe r3.0 Table 10-3 lp_irdy: "On a LinkError to Reset transition, it is
+    // permitted for lp_irdy to be asserted for a few clocks but it must be
+    // de-asserted eventually"; on any other entry to Reset it must be low.
+    if (sts == FDI_STS_RESET && prev_sts != FDI_STS_RESET)
+      irdy_grace = prev_sts == FDI_STS_LINKERROR ? cfg.irdy_reset_grace : 0;
+    else if (irdy_grace != 0)
+      irdy_grace--;
     if (prev_sts == FDI_STS_ACTIVE && sts != FDI_STS_ACTIVE && cfg.gate.abort) abandon();
-    if (sts == FDI_STS_ACTIVE) abandoned = 1'b0;
     sample_tx(sts);
     sample_stall();
     sample_rx(sts);
@@ -164,9 +172,9 @@ class ucie_fdi_monitor extends uvm_monitor;
   endfunction
 
   // The Adapter left Active mid-flit: the DUT must drop its partial TX flit and
-  // the partial RX flit it got. A DUT TX flit still presented afterwards is that
-  // abandoned flit, not a new one (FDI-R43 waits for the next Active; FDI-R44
-  // still requires lp_irdy low in Reset).
+  // the partial RX flit it got (UCIe r3.0 §10.3.3.7). It may keep presenting a
+  // flit in LinkError (pl_trdy stays low, so nothing transfers); FDI-R44 still
+  // requires lp_irdy low in Reset once the grace after LinkError has run out.
   local function void abandon();
     if (tx_beat != 0) begin
       n_tx_abandoned++;
@@ -186,24 +194,23 @@ class ucie_fdi_monitor extends uvm_monitor;
     tx_cur.delete(); tx_beat = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
     rx_cur.delete(); rx_beat = 0; rx_bubbles = 0; rx_half_done = 1'b0;
     rx_err_unit = 1'b0;
-    abandoned = 1'b1;
   endfunction
 
   local function void sample_tx(logic [3:0] sts);
     bit v = vif.mon_cb.lp_valid === 1'b1;
     bit i = vif.mon_cb.lp_irdy === 1'b1;
     bit t = vif.mon_cb.pl_trdy === 1'b1;
-    if (v) chk(R42);
-    if (v && !i) err(R42, "lp_valid without lp_irdy");
     // lp_stream is relevant with lp_valid (UCIe r3.0 Table 10-3); checked on
     // a flit's first beat, so a wrong value is one report per flit.
     if (v && tx_beat == 0) chk(R64);
     if (v && tx_beat == 0 && vif.mon_cb.lp_stream !== cfg.stream)
       err(R64, $sformatf("lp_stream %02h with lp_valid; the link carries stream %02h",
                          vif.mon_cb.lp_stream, cfg.stream));
-    if (sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace) chk(R44);
-    if (i && sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace)
-      err(R44, "lp_irdy high while pl_state_sts is Reset");
+    if (sts == FDI_STS_RESET && irdy_grace == 0) chk(R44);
+    if (i && sts == FDI_STS_RESET && irdy_grace == 0)
+      err(R44, prev_sts == FDI_STS_RESET ? "lp_irdy high while pl_state_sts is Reset" :
+                                          $sformatf("lp_irdy high on entry to Reset from 0x%0h",
+                                                    prev_sts));
     if (vif.mon_cb.lp_stallack === 1'b1) chk(R10);
     if (vif.mon_cb.lp_stallack === 1'b1 && (v || i))
       err(R10, $sformatf("lp_valid=%0b lp_irdy=%0b while lp_stallack is high", v, i));
@@ -218,9 +225,14 @@ class ucie_fdi_monitor extends uvm_monitor;
       tx_cc_h0 = 1'b0;
       tx_cc_any = 1'b0;
     end
-    if (tx_beat == 0 && v && !abandoned) chk(R43);
-    if (tx_beat == 0 && v && sts != FDI_STS_ACTIVE && !abandoned)
-      err(R43, $sformatf("TX flit starts while pl_state_sts=0x%0h", sts));
+    // FDI-R43: data moves only in Active, or in LinkError while the Adapter
+    // drains the Protocol Layer under a stall handshake (UCIe r3.0 Table 10-3
+    // pl_trdy, §10.3.3.7; §10.3.2 rule 7). Presenting a flit and waiting through
+    // Retrain, LinkReset or Disabled is legal: the Adapter keeps pl_trdy low.
+    if (v && i && t) chk(R43);
+    if (v && i && t && sts != FDI_STS_ACTIVE &&
+        !(sts == FDI_STS_LINKERROR && vif.mon_cb.pl_stallreq === 1'b1))
+      err(R43, $sformatf("TX transfer (beat %0d) while pl_state_sts=0x%0h", tx_beat, sts));
 
     if (t && sts == FDI_STS_ACTIVE && vif.mon_cb.pl_stallreq !== 1'b1 &&
         vif.mon_cb.lp_stallack !== 1'b1)
@@ -415,14 +427,16 @@ class ucie_fdi_monitor extends uvm_monitor;
     rx_half_done = 1'b0;
     abandon_h_done = 1'b0;
 
-    // UCIe r1.1 8.2.7 rule 3: with rx_active req and sts both 1 the Receiver
-    // is Active even while pl_state_sts is still Reset (+fdi_rx_early). Retrain
-    // carries no mainband flits, so the rule stays strict there.
+    // FDI-R35, UCIe r3.0 10.2.7: flits only while the Receiver is Active,
+    // pl_rx_active_req and lp_rx_active_sts both 1 with pl_state_sts Reset,
+    // Retrain or Active (rule 3; Reset with +fdi_rx_early). In Active with the
+    // request low no flit may be sent either (rule 6).
     if (v) chk(R35);
     if (v && sts == FDI_STS_RESET) n_rx_beats_reset++;
-    if (v && sts != FDI_STS_ACTIVE && !(sts == FDI_STS_RESET && vif.mon_cb.rx_active === 1'b1))
-      err(R35, $sformatf("pl_valid while pl_state_sts=0x%0h (rx_active %0b)", sts,
-                               vif.mon_cb.rx_active === 1'b1));
+    if (v && !(vif.mon_cb.rx_active === 1'b1 &&
+               sts inside {FDI_STS_RESET, FDI_STS_RETRAIN, FDI_STS_ACTIVE}))
+      err(R35, $sformatf("pl_valid while pl_state_sts=0x%0h with the Receiver %s", sts,
+                         vif.mon_cb.rx_active === 1'b1 ? "active" : "not active"));
     if (!v) begin
       if (rx_cur.size() == 0) begin
         if (rx_gap < 1000) rx_gap++;

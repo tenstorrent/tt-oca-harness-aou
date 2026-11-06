@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Samples the link-state signals every clock and checks the Protocol Layer
-// (DUT) side of the FDI handshakes (UCIe r1.1 8.2.3-8.2.8), and the Protocol
+// (DUT) side of the FDI handshakes (UCIe r3.0 §10.2.3-10.2.8), and the Protocol
 // Layer outputs on each FDI that the negotiated protocol rules out (DLLPs,
-// Retimer credits). A protocol layer,
-// checker or scoreboard that follows the link state implements
+// Retimer credits). Where r3.0 orders two events but gives no time between
+// them (a request and a wake handshake that follows it, a request falling and
+// its acknowledge following), the bound is a liveness knob of ucie_lsm_cfg. A
+// protocol layer, checker or scoreboard that follows the link state implements
 // ucie_lsm_observer and registers with add_observer(); every clock, after the
 // rule checks, each observer gets this clock's sample and the previous one.
 class ucie_lsm_monitor extends uvm_monitor;
@@ -21,6 +23,8 @@ class ucie_lsm_monitor extends uvm_monitor;
   local ucie_lsm_observer observers[$];
   local int unsigned clk_ack_late;
   local int unsigned rx_sts_late;
+  local int unsigned wake_wait;  // cycles a request has waited for lp_wake_req; 0: none
+  local ucie_lsm_state_e wake_from;  // ... and the clock-gated state it leaves
   local bit          prev_vld;
   local bit          prev_dllp[2];
   local bit          prev_crd[2];
@@ -28,11 +32,12 @@ class ucie_lsm_monitor extends uvm_monitor;
 
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, R61, R62, R63, R65, N_RULES
+    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, R49, R61, R62, R63, R65, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
       "FDI-R14", "FDI-R15", "FDI-R16", "FDI-R18", "FDI-R19", "FDI-R25", "FDI-R26", "FDI-R28",
-      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R61", "FDI-R62", "FDI-R63", "FDI-R65"};
+      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R49", "FDI-R61", "FDI-R62", "FDI-R63",
+      "FDI-R65"};
   local int unsigned n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
@@ -53,6 +58,7 @@ class ucie_lsm_monitor extends uvm_monitor;
         check_status();
         for (int p = 0; p < cfg.n_phy && p < 2; p++) check_phy_outputs(p);
       end else begin
+        wake_wait = 0;
         prev_vld = 1'b0;
         prev_dllp = '{default: 1'b0};
         prev_crd = '{default: 1'b0};
@@ -100,18 +106,7 @@ class ucie_lsm_monitor extends uvm_monitor;
       chk(R47);
     end
     if (c.req == LSM_REQ_ACTIVE && p.req != LSM_REQ_ACTIVE && c.sts == LSM_RESET) chk(R33);
-    // UCIe r1.1 8.2.3.1: a request that leaves Reset or PM (Active, LinkReset,
-    // Disabled; Table 8-3) needs the wake handshake, so lp_wake_req is already
-    // high when the request changes. Echoing L1/L2 or NOP leaves nothing.
-    // The r3.0 wake handshake rules extend this to every state where clock gating is
-    // permitted, which adds LinkReset and Disabled (8.2.3).
-    if (c.req != p.req && c.req inside {LSM_REQ_ACTIVE, LSM_REQ_LINKRESET, LSM_REQ_DISABLED} &&
-        p.sts inside {LSM_RESET, LSM_L1, LSM_L2, LSM_LINKRESET, LSM_DISABLED}) begin
-      chk(R16);
-      if (!c.wake_req)
-        err(R16, $sformatf("lp_state_req %s -> %s in %s with lp_wake_req low", p.req.name(),
-                           c.req.name(), p.sts.name()));
-    end
+    check_wake(c, p);
     if (c.clk_ack != p.clk_ack) begin
       chk(R18);
       chk(R19);
@@ -135,14 +130,18 @@ class ucie_lsm_monitor extends uvm_monitor;
       err(R33, $sformatf("Active request in Reset not preceded by NOP (was %s)", p.req.name()));
     if (c.clk_ack && !p.clk_ack && !p.clk_req)
       err(R18, "lp_clk_ack rose without pl_clk_req in the previous cycle");
+    // r3.0 §10.2.3.2 rule 3 and §10.2.7 rule 4 order the falls, with no time:
+    // hs_fall_timeout is a liveness bound (0: off).
     clk_ack_late = (c.clk_ack && !c.clk_req) ? clk_ack_late + 1 : 0;
-    if (clk_ack_late == cfg.ref_slack + 1)
-      err(R19, "lp_clk_ack stays high after pl_clk_req fell");
+    if (cfg.hs_fall_timeout != 0 && clk_ack_late == cfg.hs_fall_timeout + 1)
+      err(R19, $sformatf("lp_clk_ack still high %0d cycles after pl_clk_req fell",
+                         cfg.hs_fall_timeout));
     if (c.rx_active_sts && !p.rx_active_sts && !p.rx_active_req)
       err(R26, "lp_rx_active_sts rose without pl_rx_active_req in the previous cycle");
     rx_sts_late = (c.rx_active_sts && !c.rx_active_req) ? rx_sts_late + 1 : 0;
-    if (rx_sts_late == cfg.ref_slack + 1)
-      err(R28, "lp_rx_active_sts stays high after pl_rx_active_req fell");
+    if (cfg.hs_fall_timeout != 0 && rx_sts_late == cfg.hs_fall_timeout + 1)
+      err(R28, $sformatf("lp_rx_active_sts still high %0d cycles after pl_rx_active_req fell",
+                         cfg.hs_fall_timeout));
     // Adapter-side rules, kept here as a self-check of the L2 driver.
     if (c.wake_ack && !p.wake_ack && !p.wake_req)
       err(R14, "pl_wake_ack rose without lp_wake_req in the previous cycle");
@@ -155,6 +154,54 @@ class ucie_lsm_monitor extends uvm_monitor;
     if (p.sts == LSM_ACTIVE && !(c.sts inside {LSM_ACTIVE, LSM_LINKERROR}) &&
         (p.rx_active_req || p.rx_active_sts))
       err(R29, $sformatf("left Active for %s with rx_active req/sts still high", c.sts.name()));
+    // r3.0 Table 10-3 lp_linkerror: the Adapter stays in LinkError "as long as
+    // lp_linkerror=1" (and §10.3.3.7 leaves it on the Protocol Layer's request
+    // only with lp_linkerror = 0). p.linkerror is what the Adapter saw when it
+    // changed the status.
+    if (p.sts == LSM_LINKERROR && c.sts != LSM_LINKERROR) begin
+      chk(R49);
+      if (p.linkerror)
+        err(R49, $sformatf("left LinkError for %s while lp_linkerror was 1", c.sts.name()));
+    end
+  endfunction
+
+  // FDI-R16, UCIe r3.0 §10.2.3.1: a request that moves away from a state where
+  // clock gating is permitted (Reset, LinkReset, Disabled, PM; §10.2.3) uses the
+  // wake handshake. That is a change of lp_state_req to Active, LinkReset or
+  // Disabled, or lp_linkerror rising (echoing L1/L2 or NOP leaves nothing).
+  // The handshake must be under way at the request: lp_wake_req high in that
+  // cycle. Rule 5 lets the request change without waiting for pl_wake_ack, so
+  // lp_wake_req may instead rise after it, within wake_req_window cycles (a
+  // liveness bound; r3.0 has none) and before the status leaves the gated
+  // state: a handshake that comes only after the transition was not used for
+  // it. An lp_wake_req that fell before the request does not count, even with
+  // pl_wake_ack still high: the Protocol Layer has withdrawn its wake request
+  // (rule 3 has it fall first, ending the handshake), and the Adapter may gate
+  // its clocks again from then on.
+  local function void check_wake(ucie_lsm_obs_t c, ucie_lsm_obs_t p);
+    bit gated = p.sts inside {LSM_RESET, LSM_L1, LSM_L2, LSM_LINKRESET, LSM_DISABLED};
+    bit by_req = c.req != p.req && c.req inside {LSM_REQ_ACTIVE, LSM_REQ_LINKRESET,
+                                                 LSM_REQ_DISABLED};
+    bit by_le = c.linkerror && !p.linkerror;
+    if (gated && (by_req || by_le)) begin
+      chk(R16);
+      if (c.wake_req || wake_wait != 0) return;
+      wake_from = p.sts;
+      if (cfg.wake_req_window == 0) wake_late();
+      else wake_wait = 1;
+      return;
+    end
+    if (wake_wait == 0) return;
+    if (c.wake_req) wake_wait = 0;
+    else if (c.sts != wake_from || ++wake_wait > cfg.wake_req_window) wake_late();
+  endfunction
+
+  local function void wake_late();
+    err(R16, $sformatf({"a request leaving %s (lp_state_req or lp_linkerror) without lp_wake_req ",
+                        "high in its cycle or rising within %0d cycles after it, before the ",
+                        "status moved on"},
+                       wake_from.name(), cfg.wake_req_window));
+    wake_wait = 0;
   endfunction
 
   // Adapter-side: pl_protocol_vld is 1 whenever pl_inband_pres is 1 in Reset

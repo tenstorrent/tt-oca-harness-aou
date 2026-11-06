@@ -35,8 +35,8 @@ class ucie_lsm_cfg extends uvm_object;
   // unless +sw_restart_delay=N sets it.
   int unsigned  sw_restart_delay = 300;
   // Chance an Adapter-initiated LinkError is entered mid-flit: without the flit
-  // boundary, while a flit is in flight in either direction (UCIe r1.1
-  // 8.3.3.7 needs neither a stall nor a boundary). +le_mid_flit_pct.
+  // boundary, while a flit is in flight in either direction (UCIe r3.0
+  // §10.3.3.7 needs neither a stall nor a boundary). +le_mid_flit_pct.
   int unsigned  le_mid_flit_pct = 0;
   // Cycles the Adapter forwards RX flits in Reset before Active. UCIe r1.1
   // 8.2.7: once pl_rx_active_req and lp_rx_active_sts are both 1 the
@@ -67,7 +67,20 @@ class ucie_lsm_cfg extends uvm_object;
   bit           cov_en = 1'b1;          // for observers that collect link-state coverage
   // The model's own covergroups (ucie_lsm_fcov); +ucie_fcov=0|1 overrides it.
   bit           fcov_en = 1'b1;
-  int unsigned  ref_slack = 3;           // cycles a Protocol Layer output may lag its cause
+  // Liveness bounds of the Protocol Layer checks where UCIe r3.0 orders two
+  // events but gives no time between them; 0 turns the check off.
+  // FDI-R19, R28: cycles lp_clk_ack and lp_rx_active_sts may stay high after
+  // their request fell (r3.0 10.2.3.2 rule 3, 10.2.7 rule 4).
+  int unsigned  hs_fall_timeout = 1000;
+  // FDI-R16: a request that leaves a clock-gated state needs lp_wake_req high
+  // in its cycle, or rising at most this many cycles after it (r3.0 §10.2.3.1
+  // rule 5 lets the request go first); 0 asks for it in the very cycle of the
+  // request.
+  int unsigned  wake_req_window = 16;
+  // A LinkError the Adapter must hold because lp_linkerror stays 1 (r3.0 Table
+  // 10-3): report it once (an info) after this many cycles past the dwell (0:
+  // never). The Adapter keeps waiting either way; holding is legal.
+  int unsigned  linkerror_hold_report = 0;
 
   function new(string name = "ucie_lsm_cfg");
     super.new(name);

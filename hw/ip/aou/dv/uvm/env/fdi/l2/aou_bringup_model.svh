@@ -50,6 +50,10 @@ class aou_bringup_model extends uvm_object;
 
   ucie_lsm_cfg     cfg;
   aou_lsm_cov     cov;
+  // Cycles a DUT output may lag the prediction before it is a mismatch. The
+  // bench's own tolerance for this DUT, apart from the UCIe model's liveness
+  // bounds (ucie_lsm_cfg).
+  int unsigned    ref_slack = 3;
   aou_brg_state_e st = BRG_RESET;
   int unsigned    n_mismatch;
 
@@ -120,7 +124,7 @@ class aou_bringup_model extends uvm_object;
       return 1'b0;
     end
     miss[idx]++;
-    return miss[idx] == cfg.ref_slack + 1;
+    return miss[idx] == ref_slack + 1;
   endfunction
 
   local function void mismatch(int unsigned idx, string what, string detail);

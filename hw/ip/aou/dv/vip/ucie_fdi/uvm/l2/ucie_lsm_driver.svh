@@ -11,10 +11,11 @@
 //
 // With cfg.react_en and cfg.react_linkerror_en the Adapter also answers the
 // DUT's lp_linkerror while no event runs and the link is
-// Active (r1.1 Table 8-2): LinkError, held while lp_linkerror is 1, then
-// Reset on its own internal request after the dwell (software clearing the
-// error; §8.3.3.7). A later LSM_EV_LINKERROR, the test's own answer to the
-// same request, then only runs the bringup. The model answers no other
+// Active (r3.0 Table 10-3): LinkError, then Reset on its own internal request
+// after the dwell (software clearing the error; r3.0 §10.3.3.7). Every
+// LinkError, whoever entered it, is held while lp_linkerror is 1 (Table 10-3:
+// "It must stay there as long as lp_linkerror=1"). A later LSM_EV_LINKERROR,
+// the test's own answer to the same request, then only runs the bringup. The model answers no other
 // request of the Protocol Layer: a PM entry the Protocol Layer requests
 // (lp_state_req L1/L2) is not modelled.
 // The link is restarted by software on the UCIe controller, not by the DUT:
@@ -160,7 +161,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         continue;
       if (lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
         reacting = 1'b1;
-        `uvm_info(get_type_name(), "lp_linkerror: Adapter enters LinkError (Table 8-2)", UVM_LOW)
+        `uvm_info(get_type_name(), "lp_linkerror: Adapter enters LinkError (r3.0 Table 10-3)",
+                  UVM_LOW)
         n_le_react++;
         if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_LINKERROR_ON_REQUEST);
         linkerror_down(cfg.dwell());
@@ -413,7 +415,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // ends there instead after the dwell (all legal exits of Retrain, §8.3.3;
   // no clk_req handshake: rules 21/22 cover Reset, LinkReset, Disabled and PM
   // only). A LinkError the DUT raises on lp_linkerror meanwhile is answered as
-  // in Active (Table 8-2: LinkError, held while lp_linkerror is 1).
+  // in Active (r3.0 Table 10-3: LinkError, held while lp_linkerror is 1).
   task do_retrain(int unsigned dwell, ucie_lsm_state_e to = LSM_UNKNOWN);
     int unsigned trig = 0;
     int unsigned n = 0;
@@ -439,8 +441,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       @(lsm_vif.drv_cb);
       n++;
       if (cfg.react_en && cfg.react_linkerror_en && lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
-        `uvm_info(get_type_name(), "lp_linkerror in Retrain: Adapter enters LinkError (Table 8-2)",
-                  UVM_LOW)
+        `uvm_info(get_type_name(),
+                  "lp_linkerror in Retrain: Adapter enters LinkError (r3.0 Table 10-3)", UVM_LOW)
         n_le_react++;
         if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_LINKERROR_ON_REQUEST);
         linkerror_down(cfg.dwell());
@@ -521,41 +523,34 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endfunction
 
   // LinkError, the dwell as minimum residency, then Reset on the Adapter's
-  // internal request (software clearing the error; §8.3.3.7). A LinkError the
-  // DUT asked for on lp_linkerror is held while lp_linkerror is 1 (Table 8-2,
-  // wait_linkerror_release).
+  // internal request (software clearing the error; §10.3.3.7) once
+  // lp_linkerror is 0 (leave_linkerror).
   local task linkerror_down(int unsigned dwell);
-    bit by_lp = lsm_vif.drv_cb.lp_linkerror === 1'b1;
     close_gates();
-    by_lp |= lsm_vif.drv_cb.lp_linkerror === 1'b1;
     set_state(LSM_LINKERROR);
     set_inband(1'b0);
     rx_active(1'b0);
     wait_cycles(dwell);
-    if (by_lp) wait_linkerror_release();
-    set_state(LSM_RESET);
+    leave_linkerror();
   endtask
 
-  // Table 8-2: the Adapter stays in LinkError while lp_linkerror is 1. The
-  // Protocol Layer lowers it once the Adapter has reported LinkError, so the
-  // wait is short; lp_linkerror still high after req_timeout cycles is an
-  // error, and the Adapter leaves anyway so the test goes on.
-  local task wait_linkerror_release();
+  // LinkError -> Reset. UCIe r3.0 Table 10-3 lp_linkerror: the Adapter stays
+  // in LinkError "as long as lp_linkerror=1", and the Protocol Layer may hold
+  // it as long as it likes, so the wait has no bound and no error (the monitor
+  // checks the exit, FDI-R49). cfg.linkerror_hold_report only reports it.
+  local task leave_linkerror();
     int unsigned n;
-    ucie_rule_log::check("FDI-R49", get_type_name());
     while (lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
       @(lsm_vif.drv_cb);
       n++;
-      if (cfg.req_timeout != 0 && n == cfg.req_timeout) begin
-        ucie_rule_log::fire("FDI-R49", get_type_name());
-        `uvm_error(get_type_name(), $sformatf({"FDI-R49: lp_linkerror still 1 after %0d cycles in ",
-                   "a LinkError the DUT requested, with the Adapter reporting LinkError: the ",
-                   "Adapter cannot leave while it is held (UCIe r1.1 Table 8-2); leaving anyway"},
-                   n))
-        return;
-      end
+      if (n == cfg.linkerror_hold_report)
+        `uvm_info(get_type_name(), $sformatf({"lp_linkerror still 1 after %0d cycles: the ",
+                  "Adapter stays in LinkError while it is held (UCIe r3.0 Table 10-3)"}, n),
+                  UVM_NONE)
     end
-    `uvm_info(get_type_name(), $sformatf("lp_linkerror released (+%0d cycles)", n), UVM_MEDIUM)
+    if (n != 0)
+      `uvm_info(get_type_name(), $sformatf("lp_linkerror released (+%0d cycles)", n), UVM_MEDIUM)
+    set_state(LSM_RESET);
   endtask
 
   // PM entry: stall the DUT TX at a flit boundary first (§8.3.2, FDI-R38).
@@ -617,6 +612,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       set_state(LSM_LINKERROR);
       wait_cycles(dwell);
       clk_handshake(1'b0);
+      leave_linkerror();
+      return;
     end
     set_state(LSM_RESET);
   endtask
@@ -708,7 +705,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     wake_ack_hold = 1'b0;
     wait_cycles(dwell);
     clk_handshake(1'b0);
-    set_state(LSM_RESET);
+    if (it.to == LSM_LINKERROR) leave_linkerror();
+    else set_state(LSM_RESET);
     if (cfg.rebringup_after_down) do_bringup();
   endtask
 

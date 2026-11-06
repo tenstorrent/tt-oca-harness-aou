@@ -5,21 +5,35 @@
 // it answers the FDI handshakes and loops every flit the Adapter delivers
 // (the mainband monitor's ap_rx) back on its TX side.
 //  - lp_clk_ack and lp_rx_active_sts follow their requests one clock later
-//    (UCIe r1.1 §8.2.3.2, §8.2.7).
+//    (UCIe r3.0 §10.2.3.2, §10.2.7); with `hs_lag` they fall that many clocks
+//    after their request does (rule 3 and rule 4 give no time).
 //  - lp_wake_req is high while the link is wanted up: in Reset once
 //    pl_inband_pres is 1, and in Active and Retrain (§8.2.3.1); low in L1, so
 //    the Adapter's PM exit stays its own (the self-test's L1 events), unless
 //    `wake_in_l1` asks the stub to start the exit itself (r3.0 §10.2.9).
 //  - `linkerror_req` raises lp_linkerror in Active and holds it until the
-//    Adapter reports LinkError (r3.0 Table 10-3), then clears itself.
+//    Adapter reports LinkError (r3.0 Table 10-3), then clears itself; with
+//    `linkerror_hold` it keeps it high that many clocks into LinkError, which
+//    the Adapter must sit out ("It must stay there as long as lp_linkerror=1").
 //  - lp_state_req: in Reset NOP, then Active once pl_wake_ack is high
 //    (§8.2.8, §8.3.3.1); Active in Active; in Retrain NOP for a clock, then
-//    Active (§8.3.3.4); L1 in L1; NOP elsewhere.
+//    Active (§8.3.3.4); L1 in L1; NOP elsewhere. With `wake_late` it requests
+//    Active in Reset without waiting for pl_wake_ack and raises lp_wake_req a
+//    clock after the request (r3.0 §10.2.3.1 rule 5 orders them no further).
 //  - TX: a flit starts only in Active with the Receiver active and pl_trdy
 //    high, then runs to its end with no bubbles (§8.2.4). pl_stallreq is
 //    acknowledged at the next flit boundary, a clock later at the earliest
 //    (§8.3.2). A flit cut off when the Adapter leaves Active mid-flit is sent
 //    again from its start, so the loopback loses nothing.
+//  - With `early_present` a queued flit is presented (lp_valid, lp_irdy)
+//    without waiting for pl_trdy, in Active and through Retrain and LinkError,
+//    and for the first `down_present` clocks of LinkReset or Disabled (r3.0
+//    §10.2.4: the Adapter just keeps pl_trdy low; Table 10-3 lp_irdy forbids
+//    only Reset). After LinkError -> Reset lp_irdy stays up `irdy_linger` more
+//    clocks, which Table 10-3 allows ("a few clocks"). Never with a stall
+//    under way, nor in Reset otherwise, L1 or L2.
+//  - With `valid_alone` lp_valid toggles without lp_irdy between flits, which
+//    transfers nothing (Table 10-3 lp_irdy).
 //  - On a 512 or 1024 B FDI a TX transfer carries 2 or 4 flits; one sent
 //    with fewer flits queued fills the other lanes with a Protocol Flit with
 //    empty slots (UCIe r3.0 10.3.1: valid data on the full width), here a
@@ -36,7 +50,14 @@
 //    lp_retimer_crd pulse, "stream" a wrong lp_stream; "corrupt_mid"
 //    lp_corrupt_crc on a transfer that does not end a half, "corrupt_h0" on the
 //    first half only (both up to 128 B), "corrupt_proto" a well-placed one
-//    while the protocol has no CXL.cachemem.
+//    while the protocol has no CXL.cachemem; "clk_ack" an lp_clk_ack pulse
+//    without pl_clk_req (once, in Active); "irdy_reset" a flit presented
+//    through LinkReset and Disabled and into the Reset that follows (needs
+//    `early_present`); "wake" requests Active in Reset with lp_wake_req
+//    never raised; "wake_held" does the same but holds lp_wake_req through
+//    LinkError (rule 3 allows that) and drops it on entry to the Reset that
+//    follows, before its request there: a handshake over before the request
+//    is not one used for it (r3.0 §10.2.3.1).
 class ucie_pl_stub extends uvm_component;
   `uvm_component_utils(ucie_pl_stub)
 
@@ -55,6 +76,15 @@ class ucie_pl_stub extends uvm_component;
   bit          linkerror_req; // request a LinkError (lp_linkerror) once
   int unsigned corrupt_pct;  // chance a transfer of flits carries lp_corrupt_crc
   int unsigned n_corrupt;    // transfers sent with lp_corrupt_crc
+  // Legal behaviours the model must accept (see above).
+  bit          early_present;
+  int unsigned down_present = 4;
+  int unsigned irdy_linger = 2;
+  bit          valid_alone;
+  int unsigned hs_lag;
+  int unsigned linkerror_hold;
+  bit          wake_late;
+  int unsigned n_presented_down; // clocks a flit was presented outside Active
   local bit [MAX_BEATS_PER_FLIT-1:0] cc_mask;  // the transfers of cur with lp_corrupt_crc
   bit          bad_done;
 
@@ -64,6 +94,12 @@ class ucie_pl_stub extends uvm_component;
   local bit            presenting;
   local bit            stallack;
   local bit            nop_seen;
+  local ucie_lsm_state_e st;       // pl_state_sts as last seen
+  local ucie_lsm_state_e st_from;  // ... and the state before it
+  local int unsigned   st_cycles;  // clocks since st was entered
+  local int unsigned   clk_low;    // clocks pl_clk_req has been low
+  local int unsigned   rx_low;     // clocks pl_rx_active_req has been low
+  local int unsigned   le_held;    // clocks lp_linkerror was held in LinkError
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -95,8 +131,8 @@ class ucie_pl_stub extends uvm_component;
         drive_reset();
         continue;
       end
-      lsm.lp_clk_ack <= lsm.mon_cb.pl_clk_req;
-      lsm.lp_rx_active_sts <= lsm.mon_cb.pl_rx_active_req;
+      track_state(sts_decode(mb.mon_cb.pl_state_sts));
+      handshakes();
       state_req(mb.mon_cb.pl_state_sts);
       linkerror(mb.mon_cb.pl_state_sts);
       tx(mb.mon_cb.pl_state_sts);
@@ -125,6 +161,56 @@ class ucie_pl_stub extends uvm_component;
     stallack = 1'b0;
     nop_seen = 1'b0;
     bad_done = 1'b0;
+    st = LSM_RESET;
+    st_from = LSM_RESET;
+    st_cycles = 0;
+    clk_low = 0;
+    rx_low = 0;
+    le_held = 0;
+  endfunction
+
+  local function void track_state(ucie_lsm_state_e s);
+    if (s != st) begin
+      st_from = st;
+      st = s;
+      st_cycles = 0;
+    end else if (st_cycles < 1000) begin
+      st_cycles++;
+    end
+  endfunction
+
+  // lp_clk_ack and lp_rx_active_sts: up a clock after their request, down
+  // hs_lag clocks after it falls (one clock with hs_lag 0); "clk_ack" pulses
+  // lp_clk_ack once without pl_clk_req.
+  local function void handshakes();
+    bit creq = lsm.mon_cb.pl_clk_req === 1'b1;
+    bit rreq = lsm.mon_cb.pl_rx_active_req === 1'b1;
+    clk_low = creq ? 0 : clk_low + 1;
+    rx_low = rreq ? 0 : rx_low + 1;
+    lsm.lp_clk_ack <= creq || lsm.mon_cb.lp_clk_ack === 1'b1 && clk_low < hs_lag;
+    lsm.lp_rx_active_sts <= rreq || lsm.mon_cb.lp_rx_active_sts === 1'b1 && rx_low < hs_lag;
+    if (bad == "clk_ack" && !bad_done && n_sent >= 8 && st == LSM_ACTIVE && !creq &&
+        lsm.mon_cb.lp_clk_ack !== 1'b1) begin
+      bad_done = 1'b1;
+      lsm.lp_clk_ack <= 1'b1;
+    end
+  endfunction
+
+  // The "wake" and "wake_held" violations: no lp_wake_req for a request in Reset.
+  local function bit no_wake();
+    return bad inside {"wake", "wake_held"};
+  endfunction
+
+  // Whether early_present may present a flit in this state (see above).
+  local function bit may_present();
+    case (st)
+      LSM_ACTIVE, LSM_RETRAIN, LSM_LINKERROR: return 1'b1;
+      LSM_LINKRESET, LSM_DISABLED: return bad == "irdy_reset" || st_cycles < down_present;
+      LSM_RESET: return (st_from == LSM_LINKERROR ||
+                         bad == "irdy_reset" && st_from inside {LSM_LINKRESET, LSM_DISABLED}) &&
+                        st_cycles < irdy_linger;
+      default:                                return 1'b0;
+    endcase
   endfunction
 
   local function void state_req(logic [3:0] sts);
@@ -133,9 +219,15 @@ class ucie_pl_stub extends uvm_component;
     case (sts_decode(sts))
       LSM_RESET: begin
         bit up = lsm.mon_cb.pl_inband_pres === 1'b1;
-        lsm.lp_wake_req <= up;
-        if (up && nop_seen && lsm.mon_cb.pl_wake_ack === 1'b1) lsm.lp_state_req <= act;
-        else lsm.lp_state_req <= nop;
+        if (wake_late || no_wake()) begin
+          // The request first, lp_wake_req a clock after it (or never).
+          lsm.lp_wake_req <= !no_wake() && up && lsm.mon_cb.lp_state_req === act;
+          lsm.lp_state_req <= up && nop_seen ? act : nop;
+        end else begin
+          lsm.lp_wake_req <= up;
+          if (up && nop_seen && lsm.mon_cb.pl_wake_ack === 1'b1) lsm.lp_state_req <= act;
+          else lsm.lp_state_req <= nop;
+        end
         nop_seen = up;
       end
       LSM_ACTIVE: begin
@@ -154,7 +246,7 @@ class ucie_pl_stub extends uvm_component;
         nop_seen = 1'b0;
       end
       default: begin
-        lsm.lp_wake_req <= 1'b0;
+        lsm.lp_wake_req <= bad == "wake_held" && sts_decode(sts) == LSM_LINKERROR;
         lsm.lp_state_req <= nop;
         nop_seen = 1'b0;
       end
@@ -162,9 +254,16 @@ class ucie_pl_stub extends uvm_component;
   endfunction
 
   local function void linkerror(logic [3:0] sts);
-    if (sts_decode(sts) == LSM_LINKERROR) linkerror_req = 1'b0;
-    lsm.lp_linkerror <= linkerror_req && sts_decode(sts) == LSM_ACTIVE ||
-                        lsm.mon_cb.lp_linkerror === 1'b1 && sts_decode(sts) != LSM_LINKERROR;
+    bit in_le = sts_decode(sts) == LSM_LINKERROR;
+    bit cur_le = lsm.mon_cb.lp_linkerror === 1'b1;
+    if (in_le) linkerror_req = 1'b0;
+    if (!in_le) begin
+      le_held = 0;
+    end else if (cur_le && le_held < linkerror_hold) begin
+      le_held++;
+      return;  // lp_linkerror stays 1
+    end
+    lsm.lp_linkerror <= linkerror_req && sts_decode(sts) == LSM_ACTIVE || cur_le && !in_le;
   endfunction
 
   local function void tx(logic [3:0] sts);
@@ -197,13 +296,17 @@ class ucie_pl_stub extends uvm_component;
         while (cur.size() < fpb) cur.push_back(filler());
         cc_mask = corrupt_plan();
       end
-      presenting = cur.size() != 0 && active && rx_on && trdy && !stallack && !stallreq;
+      if (early_present)
+        presenting = cur.size() != 0 && !stallack && !stallreq && may_present();
+      else
+        presenting = cur.size() != 0 && active && rx_on && trdy && !stallack && !stallreq;
     end
+    if (presenting && !active) n_presented_down++;
     misbehave(presenting && beat == 0 && !bad_done && bad inside {"dllp", "retimer", "stream"} &&
               n_sent >= 8);
     mb.lp_stallack <= stallack;
     mb.lp_corrupt_crc <= presenting && cc_mask[beat];
-    mb.lp_valid <= presenting;
+    mb.lp_valid <= presenting || valid_alone && !stallack && $urandom_range(1) != 0;
     mb.lp_irdy <= presenting;
     mb.lp_data <= presenting ? beat_data() : '0;
   endfunction
