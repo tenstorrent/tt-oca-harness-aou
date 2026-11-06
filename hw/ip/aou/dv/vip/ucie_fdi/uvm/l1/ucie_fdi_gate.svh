@@ -12,7 +12,8 @@ class ucie_fdi_gate extends uvm_object;
   // after the rx_active handshake, UCIe r1.1 8.2.7; +fdi_rx_early).
   bit rx_early = 1'b0;
   bit rx_busy = 1'b0;  // PL driver is inside a flit (including its replays)
-  bit tx_busy = 1'b0;  // TX responder has seen part of a DUT flit
+  bit tx_busy = 1'b0;  // TX responder has seen part of a DUT flit (set_tx_busy)
+  local realtime tx_done_t = -1.0;  // when tx_busy last fell
   // L2 left Active mid-flit (LinkError, UCIe r1.1 8.3.3.7): L1 abandons the
   // flits in progress at once instead of finishing them. Cleared when the
   // gate opens again.
@@ -31,7 +32,17 @@ class ucie_fdi_gate extends uvm_object;
     return open || rx_early;
   endfunction
 
+  // The TX responder updates tx_busy on every clock edge. It falls on the edge
+  // of a flit's last transfer, and on that same edge the Protocol Layer may
+  // legally raise lp_valid for its next flit. quiet() stays false until the
+  // following edge, so L2 never changes pl_state_sts on the edge of the last
+  // transfer, whichever order the simulator runs the two processes in.
+  function void set_tx_busy(bit b);
+    if (tx_busy && !b) tx_done_t = $realtime;
+    tx_busy = b;
+  endfunction
+
   function bit quiet();
-    return !rx_busy && !tx_busy;
+    return !rx_busy && !tx_busy && tx_done_t != $realtime;
   endfunction
 endclass
