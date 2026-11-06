@@ -26,6 +26,11 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
   ev_e         ev;
   int unsigned ab_at;     // abort: 0 Reset, 1 after the wake, 2 after the Active request, 3 in L1
   int unsigned ab_to;     // abort: 0 LinkError, 1 LinkReset, 2 Disabled, 3 Reset
+  int unsigned rq_code;   // cg_reset_req: see there
+  // The Protocol Layer's progress towards the request that ends this Reset or
+  // Retrain, as the driver judges it: 0 none, 1 NOP seen, 2 requested.
+  int unsigned rq_prog;
+  bit          rq_level;  // Retrain entered from L1: Active is a level
 
   covergroup cg_state;
     cp_tr: coverpoint tr {
@@ -84,6 +89,27 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     }
   endgroup
 
+  // lp_state_req around the exit from Reset (UCIe r3.0 §10.3.3.1 rule 1,
+  // §10.3.3.8) and the rx_active handshake before the request (§10.2.7 rule
+  // 1): an Active request after a NOP with pl_inband_pres 1 (the request) or
+  // 0 (the early training trigger), an Active held into Reset from the state
+  // before or reached from another request in Reset (no request either way),
+  // and pl_rx_active_req rising in Reset or Retrain before the Protocol Layer
+  // requested Active (cfg.remote_active_first_pct). "Before the request" is
+  // judged by the NOP->Active progress since the entry to that state, so an
+  // Active held into a Retrain entered from Active (§10.3.3.4 rule 1) or into
+  // Reset is no request.
+  covergroup cg_reset_req;
+    cp_req: coverpoint rq_code {
+      bins nop_active = {0};
+      bins nop_active_before_inband = {1};
+      bins active_held_into_reset = {2};
+      bins other_to_active = {3};
+      bins rx_active_first_in_reset = {4};
+      bins rx_active_first_in_retrain = {5};
+    }
+  endgroup
+
   // LSM_EV_INBAND_DROP has no bin: it is meant for a link left in Reset
   // (auto_bringup 0), where a test drives the bringup itself.
   covergroup cg_event;
@@ -132,10 +158,15 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     cg_rx_active = new();
     cg_event = new();
     cg_abort = new();
+    cg_reset_req = new();
   endfunction
 
   virtual function void observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
-    if (!(cur.rst_n && prev.rst_n)) return;
+    if (!(cur.rst_n && prev.rst_n)) begin
+      rq_prog = 0;
+      rq_level = 1'b0;
+      return;
+    end
     if (cur.pl_state_sts != prev.pl_state_sts) begin
       tr = {prev.pl_state_sts, cur.pl_state_sts};
       cg_state.sample();
@@ -153,6 +184,41 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
       else rx_code = prev.sts == LSM_LINKERROR ? 3 : 2;
       cg_rx_active.sample();
     end
+    if (cur.sts == LSM_RESET && cur.req == LSM_REQ_ACTIVE) begin
+      if (prev.sts != LSM_RESET) sample_rq(2);
+      else if (prev.req == LSM_REQ_NOP) sample_rq(cur.inband_pres ? 0 : 1);
+      else if (prev.req != LSM_REQ_ACTIVE) sample_rq(3);
+    end
+    if (cur.rx_active_req && !prev.rx_active_req && rq_prog != 2 &&
+        prev.sts inside {LSM_RESET, LSM_RETRAIN})
+      sample_rq(prev.sts == LSM_RESET ? 4 : 5);
+    track_request(cur, prev);
+  endfunction
+
+  // rq_prog, the way the driver follows lp_state_req: in Reset NOP then
+  // Active is the request, back to NOP withdraws it and any other request
+  // starts over (§10.3.3.1 rule 1); in a Retrain entered from Active NOP then
+  // Active, kept once made (§10.3.3.4 rule 1); in one entered from L1 Active
+  // as a level. Counts from the first clock that shows the state.
+  local function void track_request(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
+    if (cur.sts != prev.sts) begin
+      rq_prog = 0;
+      rq_level = cur.sts == LSM_RETRAIN && prev.sts == LSM_L1;
+    end
+    if (cur.sts == LSM_RESET) begin
+      if (cur.req == LSM_REQ_NOP) rq_prog = 1;
+      else if (cur.req == LSM_REQ_ACTIVE) rq_prog = rq_prog != 0 ? 2 : 0;
+      else rq_prog = 0;
+    end else if (cur.sts == LSM_RETRAIN) begin
+      if (rq_level) rq_prog = cur.req == LSM_REQ_ACTIVE ? 2 : rq_prog;
+      else if (rq_prog == 0 && cur.req == LSM_REQ_NOP) rq_prog = 1;
+      else if (rq_prog == 1 && cur.req == LSM_REQ_ACTIVE) rq_prog = 2;
+    end
+  endfunction
+
+  local function void sample_rq(int unsigned c);
+    rq_code = c;
+    cg_reset_req.sample();
   endfunction
 
   // A link event as the driver starts it.
@@ -201,9 +267,10 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     return "not scored by this simulator";
 `else
     return $sformatf({"state %0.1f%% clk %0.1f%% wake %0.1f%% rx_active %0.1f%% event %0.1f%% ",
-                      "abort %0.1f%%"}, cg_state.get_coverage(), cg_clk.get_coverage(),
-                     cg_wake.get_coverage(), cg_rx_active.get_coverage(),
-                     cg_event.get_coverage(), cg_abort.get_coverage());
+                      "abort %0.1f%% reset_req %0.1f%%"}, cg_state.get_coverage(),
+                     cg_clk.get_coverage(), cg_wake.get_coverage(), cg_rx_active.get_coverage(),
+                     cg_event.get_coverage(), cg_abort.get_coverage(),
+                     cg_reset_req.get_coverage());
 `endif
   endfunction
 endclass

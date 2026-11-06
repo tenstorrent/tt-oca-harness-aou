@@ -18,11 +18,20 @@
 // the test's own answer to the same request, then only runs the bringup. The model answers no other
 // request of the Protocol Layer: a PM entry the Protocol Layer requests
 // (lp_state_req L1/L2) is not modelled.
-// The link is restarted by software on the UCIe controller, not by the DUT:
-// after LinkError/LinkReset/Disabled -> Reset the Adapter waits
-// cfg.sw_restart_delay cycles (software's Start UCIe Link Training) and then
-// trains again by itself, without waiting for a NOP->Active request
-// (§8.3.3.8 allows either trigger).
+// After LinkError/LinkReset/Disabled -> Reset the training restarts on
+// cfg.restart_on (UCIe r3.0 §10.3.3.8 allows either trigger): by default
+// software on the UCIe controller restarts it (cfg.sw_restart_delay cycles,
+// its Start UCIe Link Training), or the Protocol Layer's NOP->Active on
+// lp_state_req does, even before pl_inband_pres, or whichever comes first.
+//
+// In Reset the Adapter starts the Active entry only on a request: lp_state_req
+// NOP for at least one clock while pl_state_sts is Reset, then Active (r3.0
+// §10.3.3.1 rule 1, Table 10-4 note a). The NOP may come at any time in that
+// Reset, before pl_inband_pres too; an Active held into Reset from the state
+// before (an exit request in LinkError, LinkReset or Disabled, Table 10-4) is
+// not one. track_reset_req follows it, afresh on every entry to Reset. With
+// cfg.remote_active_first_pct the rx_active handshake of an Active entry from
+// Reset or Retrain may come before the request (the remote die went first).
 //
 // The status outputs follow the state: pl_protocol_vld rises with
 // pl_inband_pres and falls on entry to LinkError or Reset (r3.0 Table 10-3),
@@ -71,6 +80,14 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   local bit       wake_ack_q;
   local bit       wake_ack_hold; // an abort keeps pl_wake_ack low (ucie_lsm_item::hold_wake_ack)
   local bit       rx_req_q;
+  // lp_state_req in Reset (track_reset_req): rst_req 0 nothing yet, 1 NOP
+  // seen, 2 Active after a NOP (a request; back to 1 on NOP); pl_restart the
+  // Protocol Layer has given NOP->Active in this Reset (the training trigger,
+  // r3.0 §10.3.3.8, kept when it returns to NOP); rst_t when the status last
+  // entered Reset (the request is observed from the next clock on).
+  local int unsigned rst_req;
+  local bit       pl_restart;
+  local time      rst_t;
   local ucie_fdi_gate         gate[$];  // of each mainband agent
   local ucie_fdi_tx_responder rsp[$];   // of each mainband agent; null when passive
 
@@ -96,6 +113,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
             react_loop();
             pm_exit_loop();
             error_loop();
+            reset_req_loop();
+            restart_loop();
             while (lsm_vif.drv_cb.rst_n === 1'b1) @(lsm_vif.drv_cb);
           join_any
           disable fork;
@@ -136,6 +155,9 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     link_active = 1'b0;
     down_reset = 1'b0;
     wake_ack_hold = 1'b0;
+    rst_req = 0;
+    pl_restart = 1'b0;
+    rst_t = $time;
   endtask
 
   local task main_loop();
@@ -202,6 +224,57 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     end
   endtask
 
+  // Follows lp_state_req in Reset on every clock, so a NOP given while no
+  // event waits for the request (before pl_inband_pres, say) still counts.
+  local task reset_req_loop();
+    forever begin
+      @(lsm_vif.drv_cb);
+      track_reset_req();
+    end
+  endtask
+
+  // lp_state_req while pl_state_sts is Reset (UCIe r3.0 §10.3.3.1 rule 1):
+  // NOP seen for a clock, then Active, is a request; a held Active, or one
+  // that follows any other request, is not. Samples from the clock after the
+  // status entered Reset (set_state restarts it). Every process that decides
+  // on rst_req or pl_restart calls this first, on a clock edge, so it decides
+  // on that clock's sample whichever process the simulator runs first; a
+  // second call on the same sample changes nothing.
+  local function void track_reset_req();
+    logic [3:0] r;
+    if (state != LSM_RESET || $time == rst_t) return;
+    r = lsm_vif.drv_cb.lp_state_req;
+    if (r === req_code(LSM_REQ_NOP)) begin
+      rst_req = 1;
+    end else if (r === req_code(LSM_REQ_ACTIVE)) begin
+      if (rst_req != 0) begin
+        rst_req = 2;
+        pl_restart = 1'b1;
+      end
+    end else begin
+      rst_req = 0;
+    end
+  endfunction
+
+  // cfg.restart_on PL or EITHER: a link left in Reset after a link-down, with
+  // no event running, trains again on the Protocol Layer's NOP->Active (UCIe
+  // r3.0 §10.3.3.8: "The Adapter must trigger this on RDI if the Protocol
+  // Layer has triggered this even if pl_inband_pres = 0").
+  local task restart_loop();
+    forever begin
+      @(lsm_vif.drv_cb);
+      track_reset_req();
+      if (cfg.restart_on == LSM_RESTART_SW || !cfg.react_en || busy || ev_busy || reacting ||
+          state != LSM_RESET || !down_reset || !pl_restart)
+        continue;
+      reacting = 1'b1;
+      `uvm_info(get_type_name(), "NOP->Active in Reset: the Adapter trains the link again",
+                UVM_MEDIUM)
+      do_bringup();
+      reacting = 1'b0;
+    end
+  endtask
+
   // A framing error the Adapter flagged on pl_error (an L1 gate's
   // retrain_req): the Adapter retrains the link (UCIe r3.0 Table 10-3
   // pl_error), and the PL driver replays the cancelled half once the link is
@@ -259,6 +332,11 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     // keeps the value: a bringup raises it when training starts.
     if (s == LSM_RETRAIN) set_recenter(1'b1);
     else if (s != LSM_RESET) set_recenter(1'b0);
+    if (s == LSM_RESET && state != LSM_RESET) begin
+      rst_t = $time;
+      rst_req = 0;
+      pl_restart = 1'b0;
+    end
     state = s;
     if (s inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) down_reset = 1'b1;
     for (int p = 0; p < cfg.n_phy && p < 2; p++) begin
@@ -347,6 +425,76 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     wait_dut("lp_state_req", req_code(r), rule);
   endtask
 
+  // In Reset: wait for the Protocol Layer's request to leave it, NOP for a
+  // clock and then Active (track_reset_req; UCIe r3.0 §10.3.3.1 rule 1); an
+  // error after req_timeout cycles (FDI-R33, a liveness bound). Called on a
+  // clock edge; a trigger withdrawn to NOP by this clock is no request.
+  local task wait_reset_active();
+    int unsigned n;
+    ucie_rule_log::check("FDI-R33", get_type_name());
+    track_reset_req();
+    while (rst_req != 2) begin
+      @(lsm_vif.drv_cb);
+      track_reset_req();
+      n++;
+      if (cfg.req_timeout != 0 && n == cfg.req_timeout) begin
+        ucie_rule_log::fire("FDI-R33", get_type_name());
+        `uvm_error(get_type_name(), $sformatf({"FDI-R33: no request to leave Reset (lp_state_req ",
+                   "NOP for a clock, then Active) in %0d cycles; lp_state_req is 0x%0h"}, n,
+                   lsm_vif.drv_cb.lp_state_req))
+        return;
+      end
+    end
+  endtask
+
+  // After a link-down, in Reset: wait for what restarts the training
+  // (cfg.restart_on; UCIe r3.0 §10.3.3.8).
+  local task restart_wait();
+    int unsigned n;
+    if (!down_reset) return;
+    case (cfg.restart_on)
+      LSM_RESTART_SW: begin
+        if (cfg.sw_restart_delay != 0)
+          `uvm_info(get_type_name(), $sformatf(
+                    "link-down: software restarts the link in %0d cycles", cfg.sw_restart_delay),
+                    UVM_MEDIUM)
+        wait_cycles(cfg.sw_restart_delay);
+      end
+      LSM_RESTART_PL: begin
+        ucie_rule_log::check("FDI-R33", get_type_name());
+        track_reset_req();
+        while (!pl_restart) begin
+          @(lsm_vif.drv_cb);
+          track_reset_req();
+          if (cfg.req_timeout != 0 && ++n == cfg.req_timeout) begin
+            ucie_rule_log::fire("FDI-R33", get_type_name());
+            `uvm_error(get_type_name(), $sformatf({"FDI-R33: link-down, and no NOP->Active on ",
+                       "lp_state_req to restart the training in %0d cycles"}, n))
+            break;
+          end
+        end
+      end
+      default: begin
+        track_reset_req();
+        while (!pl_restart && n < cfg.sw_restart_delay) begin
+          @(lsm_vif.drv_cb);
+          track_reset_req();
+          n++;
+        end
+      end
+    endcase
+    if (pl_restart)
+      `uvm_info(get_type_name(), "link-down: the Protocol Layer's NOP->Active restarts the link",
+                UVM_MEDIUM)
+    down_reset = 1'b0;
+  endtask
+
+  // Whether this Active entry starts with the rx_active handshake, before the
+  // Protocol Layer's request (cfg.remote_active_first_pct).
+  local function bit remote_first();
+    return cfg.remote_active_first_pct != 0 && $urandom_range(99) < cfg.remote_active_first_pct;
+  endfunction
+
   local task wake_responder();
     forever begin
       @(lsm_vif.drv_cb);
@@ -395,10 +543,12 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endtask
 
   // With cfg.rx_early the RX mainband opens once rx_active req and sts are
-  // both 1, while pl_state_sts is still Reset (UCIe r1.1 8.2.7 rule 3).
+  // both 1, while pl_state_sts is still Reset (UCIe r3.0 §10.2.7 rule 3). An
+  // rx_active handshake already started (remote_first) is only completed.
   local task active_entry();
     wait_cycles(cfg.lat());
-    rx_active(1'b1);
+    if (rx_req_q) wait_dut("lp_rx_active_sts", 4'h1, "FDI-R26");
+    else rx_active(1'b1);
     if (cfg.rx_early > 0 && state == LSM_RESET) begin
       foreach (gate[i]) gate[i].abort = 1'b0;
       foreach (gate[i]) gate[i].rx_early = !parked(i);
@@ -417,45 +567,49 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // -------------------------------------------------------------------------
 
   // UCIe r3.0 §10.2.8: clk_req handshake, inband_pres, then wait for the
-  // DUT's NOP->Active request (FDI-R33 in the monitor) and run the Active
-  // entry. pl_clk_req is high from before pl_inband_pres until the status has
-  // left Reset (§10.2.3.2 rules 5 and 7); with cfg.clk_req_hold_bringup 0 it
-  // is released as pl_inband_pres rises (the Protocol Layer, still ungated
-  // then, sees it) and raised again before pl_rx_active_req and Active.
-  // After a link-down the training is software's to restart (its Start UCIe
-  // Link Training write, cfg.sw_restart_delay cycles later); the DUT waits in
-  // Reset meanwhile and should request nothing.
+  // DUT's request to leave Reset (NOP for a clock, then Active; §10.3.3.1
+  // rule 1, FDI-R33) and run the Active entry. pl_clk_req is high from before
+  // pl_inband_pres until the status has left Reset (§10.2.3.2 rules 5 and 7);
+  // with cfg.clk_req_hold_bringup 0 it is released as pl_inband_pres rises
+  // (the Protocol Layer, still ungated then, sees it) and raised again before
+  // pl_rx_active_req and Active. After a link-down the training waits for its
+  // restart (restart_wait, cfg.restart_on; §10.3.3.8). With remote_first the
+  // rx_active handshake comes before the request (§10.2.7 rule 1, §10.2.8
+  // step 4), under pl_clk_req.
   task do_bringup();
     move_to(LSM_RESET);
-    if (down_reset && cfg.sw_restart_delay != 0) begin
-      `uvm_info(get_type_name(), $sformatf("link-down: software restarts the link in %0d cycles",
-                                           cfg.sw_restart_delay), UVM_MEDIUM)
-      wait_cycles(cfg.sw_restart_delay);
-    end
-    down_reset = 1'b0;
+    restart_wait();
     wait_cycles(cfg.lat());
     clk_handshake(1'b1);
     set_recenter(1'b1);
     wait_cycles(cfg.lat());
     set_inband(1'b1);
     if (!cfg.clk_req_hold_bringup) clk_handshake(1'b0);
-    wait_req(LSM_REQ_ACTIVE, "FDI-R33");
+    if (remote_first()) begin
+      @(lsm_vif.drv_cb);
+      if (!clk_req_q) clk_handshake(1'b1);
+      rx_active(1'b1);
+    end
+    wait_reset_active();
     if (!clk_req_q) clk_handshake(1'b1);
     active_entry();
     clk_release();
   endtask
 
-  // Retrain entered from Active ends on a NOP->Active request (§8.3.3.4
-  // rule 1). The Adapter registers that transition whenever it happens in
-  // Retrain, including during the dwell, and starts Active entry after both
-  // the dwell and the transition. With `to` LinkError, LinkReset or Disabled it
-  // ends there instead after the dwell (all legal exits of Retrain, §8.3.3;
+  // Retrain entered from Active ends on a NOP->Active request (UCIe r3.0
+  // §10.3.3.4 rule 1). The Adapter registers that transition whenever it
+  // happens in Retrain, including during the dwell, and starts Active entry
+  // after both the dwell and the transition; with remote_first it raises
+  // pl_rx_active_req a clock into the dwell, before the request
+  // (§10.2.7 rule 1). With `to` LinkError, LinkReset or Disabled it
+  // ends there instead after the dwell (all legal exits of Retrain, §10.3.3;
   // no clk_req handshake: UCIe r3.0 §10.2.3.2 rules 6 and 7 cover Reset,
   // LinkReset, Disabled and PM only). A LinkError the DUT raises on lp_linkerror meanwhile is answered as
   // in Active (r3.0 Table 10-3: LinkError, held while lp_linkerror is 1).
   task do_retrain(int unsigned dwell, ucie_lsm_state_e to = LSM_UNKNOWN);
     int unsigned trig = 0;
     int unsigned n = 0;
+    bit          rx_first;
     if (state != LSM_ACTIVE) begin
       `uvm_error(get_type_name(), $sformatf("Retrain requested in %s; ignored", state.name()))
       return;
@@ -474,9 +628,12 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       return;
     end
     ucie_rule_log::check("FDI-R48", get_type_name());
+    rx_first = remote_first();
     while (n < dwell || trig < 2) begin
       @(lsm_vif.drv_cb);
       n++;
+      if (rx_first && n == 1 && !rx_req_q && lsm_vif.drv_cb.lp_rx_active_sts === 1'b0)
+        set_rx_req(1'b1);
       if (cfg.react_en && cfg.react_linkerror_en && lsm_vif.drv_cb.lp_linkerror === 1'b1) begin
         `uvm_info(get_type_name(),
                   "lp_linkerror in Retrain: Adapter enters LinkError (r3.0 Table 10-3)", UVM_LOW)
@@ -497,7 +654,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     active_entry();
   endtask
 
-  // NOP->Active progress in Retrain: 0 none, 1 NOP seen, 2 Active after NOP.
+  // NOP->Active progress in Retrain: 0 none, 1 NOP seen, 2 Active after NOP
+  // (stays 2: the Adapter has taken the request).
   local function int unsigned retrain_trigger(int unsigned trig);
     logic [3:0] r = lsm_vif.drv_cb.lp_state_req;
     if (trig == 0 && r === req_code(LSM_REQ_NOP)) return 1;
@@ -707,8 +865,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       wait_cycles(dwell);
     end else begin
       if (state != LSM_RESET) link_down(LSM_LINKRESET, dwell);
-      if (down_reset && cfg.sw_restart_delay != 0) wait_cycles(cfg.sw_restart_delay);
-      down_reset = 1'b0;
+      restart_wait();
       wait_cycles(cfg.lat());
       if (it.at != LSM_AB_RESET) begin
         // Training done; pl_clk_req released with pl_inband_pres rising, so
@@ -724,7 +881,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     wake_ack_hold = it.hold_wake_ack;
     if (it.at == LSM_AB_REQ_ACTIVE) begin
       set_clk_req(1'b1);
-      wait_req(LSM_REQ_ACTIVE, it.in_l1 ? "FDI-R41" : "FDI-R33");
+      // In L1 the request is taken as a level (r3.0 §10.3.3.4 rule 1); in
+      // Reset it is NOP for a clock, then Active (§10.3.3.1 rule 1).
+      if (it.in_l1) wait_req(LSM_REQ_ACTIVE, "FDI-R41");
+      else wait_reset_active();
       wait_cycles(it.gap);
     end else if (it.gap != 0) begin
       set_clk_req(1'b1);
@@ -741,7 +901,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       // Presence again with pl_clk_req held (rule 20), which wakes the DUT.
       if (!clk_req_q) clk_handshake(1'b1);
       set_inband(1'b1);
-      wait_req(LSM_REQ_ACTIVE, "FDI-R33");
+      wait_reset_active();
       active_entry();
       clk_release();
       return;
