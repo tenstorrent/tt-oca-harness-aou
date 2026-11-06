@@ -1353,7 +1353,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 127
+expected_count = 132
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1446,6 +1446,11 @@ tests = [
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1",
   "aou_mrp_test.remote_rp_count-4",
   "aou_mrp_test.remote_rp_count-3",
+  "aou_mrp_test.remote_rp_count-1.rp_map_pct-100.4x512-sp64",
+  "aou_mrp_test.remote_rp_count-2.rp_map_pct-100.4xmix4211-sp128",
+  "aou_mrp_test.remote_rp_count-3.rp_map_pct-100.4xmix2144-sp64",
+  "aou_mrp_test.remote_rp_count-2.rp_map_pct-100.3x512-sp64",
+  "aou_mrp_test.remote_rp_count-1.rp_map_pct-100.2xmix41-sp128",
   "aou_split_test.remote_bytes-128.split-255.4xmix4211-sp128",
   "aou_split_test.remote_bytes-128.split-3.4xmix4211-sp128",
   "aou_split_test.remote_bytes-64.split-15.4xmix4211-sp128",
