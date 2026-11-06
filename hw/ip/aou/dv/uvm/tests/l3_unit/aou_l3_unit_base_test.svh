@@ -126,6 +126,8 @@ class aou_l3_unit_base_test extends uvm_test;
     c.spec_rev = rev == AOU_SPEC_V07 ? spec_rev : rev;
     c.rp_count = rp_count;
     c.chk = chk;
+    // The peer is another model, not the DUT: MAS 7.3.1 does not bind it.
+    c.chk_deact_crd_window = 1'b0;
     return c;
   endfunction
 

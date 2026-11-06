@@ -89,6 +89,12 @@ class aou_t1_wdt_chk extends uvm_component;
     fc_wdt = db.group("env.cg_wdt", fresh);
     if (fresh) begin
       p = fc_wdt.cp("cp_ev"); `AOU_T1_WDT_FC_EV(AOU_FC_REG)
+      fc_wdt.plan("16.18", "cp_ev", "expiry_early_*|expiry_thr_small|expiry_thr_large|expiry_rp*");
+      fc_wdt.plan("16.20", "cp_ev", "expiry_thr_zero");
+      fc_wdt.plan("16.21", "cp_ev", "expiry_masked|unmask_while_set");
+      fc_wdt.plan("16.19", "cp_ev", "aw_restart_near|aw_restart_edge");
+      fc_wdt.plan("16.22", "cp_ev", "w1c_while_hung|re_expiry_after_*");
+      fc_wdt.plan("16.23", "cp_ev", "multi_rp_set");
     end
   endfunction
 

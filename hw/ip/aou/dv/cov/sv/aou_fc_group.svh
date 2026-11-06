@@ -4,6 +4,13 @@
 // The service's copy of one covergroup: coverpoints first, in the order
 // sample() takes their values, then crosses over them. Every instance of the
 // owning class feeds the same group, as the covergroup's type coverage does.
+//
+// plan() names the test-plan items (docs/test_plan_items.yaml) the bins are
+// evidence for, as space-separated IDs (strings, so 4.10 never becomes 4.1):
+//   g.plan("8.1");                         every bin of the group
+//   g.plan("4.9 5.9", "cp_len");           every bin of a coverpoint or cross
+//   g.plan("4.1", "x_txn", "wr,*,one,*");  the bins matching a pattern
+// Call it after the points are declared. check-config checks every ID.
 class aou_fc_group;
   localparam int MAX_CP = 8;
 
@@ -11,6 +18,7 @@ class aou_fc_group;
   aou_fc_point   pts[$];
   int unsigned   n_cp;
   longint unsigned samples;
+  string         plan_ids;      // the items every bin of the group serves
 
   function new(string group_name);
     name = group_name;
@@ -42,6 +50,20 @@ class aou_fc_group;
     p.make_cross(pts);
     pts.push_back(p);
     return p;
+  endfunction
+
+  function void plan(string ids, string pt = "", string pat = "");
+    if (pt == "") begin
+      plan_ids = (plan_ids == "") ? ids : {plan_ids, " ", ids};
+      return;
+    end
+    foreach (pts[i]) begin
+      if (pts[i].name == pt) begin
+        pts[i].add_plan(pat, ids);
+        return;
+      end
+    end
+    `uvm_fatal("aou_fc_group", $sformatf("%s: no coverpoint or cross %s", name, pt))
   endfunction
 
   function int unsigned cp_index(string cp_name);

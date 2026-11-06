@@ -11,6 +11,8 @@
 | `cg_crd_rr` | `env.cg_crd_rr` | `aou_t1_crd_rr_chk` | `uvm/env/aou_t1_crd_rr_chk.svh` | `cp_owed` | -
 | `cg_early_tbl` | `env.cg_early_tbl` | `aou_t1_early_tbl_chk` | `uvm/env/aou_t1_early_tbl_chk.svh` | `cp_ev` | -
 | `cg_mo` | `env.cg_mo` | `aou_t1_mo_chk` | `uvm/env/aou_t1_mo_chk.svh` | `cp_dir`, `cp_occ` | `x_mo`
+| `cg_rp_map_req` | `env.cg_rp_map_req` | `aou_t1_rp_map_chk` | `uvm/env/aou_t1_rp_map_chk.svh` | `cp_dir`, `cp_port`, `cp_lane`, `cp_route` | `x_target`, `x_route_dir`
+| `cg_rp_map_cfg` | `env.cg_rp_map_cfg` | `aou_t1_rp_map_chk` | `uvm/env/aou_t1_rp_map_chk.svh` | `cp_shape`, `cp_pair`, `cp_merge`, `cp_width`, `cp_wide` | `x_pair_merge`
 | `cg_stray_dack` | `env.cg_stray_dack` | `aou_t1_status` | `uvm/env/aou_t1_status.svh` | `cp_outcome` | -
 | `cg_wdt` | `env.cg_wdt` | `aou_t1_wdt_chk` | `uvm/env/aou_t1_wdt_chk.svh` | `cp_ev` | -
 | `attr_cg` | `xfer.attr_cg` | `aou_t1_xfer_cov` | `uvm/env/aou_t1_xfer_cov.svh` | `cp_path`, `cp_dir`, `cp_qos`, `cp_prot`, `cp_cache` | `x_qos`, `x_prot`, `x_cache`

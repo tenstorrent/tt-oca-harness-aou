@@ -32,6 +32,14 @@
 class aou_t1_xfer_cov extends uvm_component;
   `uvm_component_utils(aou_t1_xfer_cov)
 
+  // The nine pairings of a DUT RP width with a remote RP width (DUT first) and
+  // the plan item of each.
+  localparam string WIDTH_PAIRS[9] = '{"w512,w256", "w1024,w256", "w1024,w512",
+                                       "w256,w512", "w256,w1024", "w512,w1024",
+                                       "w256,w256", "w512,w512", "w1024,w1024"};
+  localparam string WIDTH_PAIR_IDS[9] = '{"14.1", "14.2", "14.3", "14.4", "14.5", "14.6",
+                                          "14.7", "14.8", "14.9"};
+
   typedef enum int {EV_W_LEAD = 0, EV_W_EARLY = 1, EV_M_ILV = 2, EV_MSG_ILV = 3,
                     EV_S_ILV = 4} ev_e;
 
@@ -199,6 +207,15 @@ class aou_t1_xfer_cov extends uvm_component;
       void'(fc_attr.add_cross("x_qos", "cp_path cp_dir cp_qos"));
       void'(fc_attr.add_cross("x_prot", "cp_path cp_dir cp_prot"));
       void'(fc_attr.add_cross("x_cache", "cp_path cp_dir cp_cache"));
+      fc_attr.plan("4.28 5.26", "cp_qos");
+      fc_attr.plan("4.27 5.25", "cp_prot");
+      fc_attr.plan("4.26 5.24", "cp_cache");
+      fc_attr.plan("4.28", "x_qos", "*,wr,*");
+      fc_attr.plan("5.26", "x_qos", "*,rd,*");
+      fc_attr.plan("4.27", "x_prot", "*,wr,*");
+      fc_attr.plan("5.25", "x_prot", "*,rd,*");
+      fc_attr.plan("4.26", "x_cache", "*,wr,*");
+      fc_attr.plan("5.24", "x_cache", "*,rd,*");
     end
     fc_excl = db.group("xfer.excl_cg", fresh);
     if (fresh) begin
@@ -206,10 +223,18 @@ class aou_t1_xfer_cov extends uvm_component;
       p = fc_excl.cp("cp_dir"); `AOU_XFER_FC_DIR(AOU_FC_REG)
       p = fc_excl.cp("cp_resp"); `AOU_XFER_FC_EXRESP(AOU_FC_REG)
       void'(fc_excl.add_cross("x_excl", "cp_path cp_dir cp_resp"));
+      fc_excl.plan("4.25", "cp_dir", "wr");
+      fc_excl.plan("5.23", "cp_dir", "rd");
+      fc_excl.plan("4.25 5.23", "cp_path");
+      fc_excl.plan("4.25 5.23", "cp_resp");
+      fc_excl.plan("4.25", "x_excl", "*,wr,*");
+      fc_excl.plan("5.23", "x_excl", "*,rd,*");
     end
     fc_chan = db.group("xfer.chan_cg", fresh);
     if (fresh) begin
       p = fc_chan.cp("cp_event"); `AOU_XFER_FC_EVENT(AOU_FC_REG)
+      fc_chan.plan("4.31", "cp_event", "w_before_aw");
+      fc_chan.plan("8.14", "cp_event", "m_r_interleave|rdata_msg_interleave|s_r_interleave");
     end
     fc_width = db.group("xfer.width_cg", fresh);
     if (fresh) begin
@@ -224,6 +249,13 @@ class aou_t1_xfer_cov extends uvm_component;
       void'(fc_width.add_cross("x_pair_req", "cp_path cp_dut cp_rem cp_req"));
       p = fc_width.add_cross("x_pair_size", "cp_path cp_dir cp_dut cp_rem cp_size");
       `AOU_XFER_FC_X_SIZE(AOU_FC_REG)
+      // Each DUT x remote width pairing (DUT first) and the item that names it.
+      foreach (WIDTH_PAIRS[i]) begin
+        fc_width.plan(WIDTH_PAIR_IDS[i], "x_pair", WIDTH_PAIRS[i]);
+        fc_width.plan(WIDTH_PAIR_IDS[i], "x_pair_dir", {"*,*,", WIDTH_PAIRS[i]});
+        fc_width.plan(WIDTH_PAIR_IDS[i], "x_pair_req", {"*,", WIDTH_PAIRS[i], ",*"});
+        fc_width.plan(WIDTH_PAIR_IDS[i], "x_pair_size", {"*,*,", WIDTH_PAIRS[i], ",*"});
+      end
     end
     fc_mwr = db.group("xfer.mwr_cg", fresh);
     if (fresh) begin
@@ -231,6 +263,15 @@ class aou_t1_xfer_cov extends uvm_component;
       p = fc_mwr.cp("cp_rem"); `AOU_XFER_FC_WIDTH(AOU_FC_REG)
       p = fc_mwr.cp("cp_beats"); `AOU_XFER_FC_BEATS(AOU_FC_REG)
       void'(fc_mwr.add_cross("x_mwr", "cp_dut cp_rem cp_beats"));
+      foreach (WIDTH_PAIRS[i]) fc_mwr.plan(WIDTH_PAIR_IDS[i], "x_mwr", {WIDTH_PAIRS[i], ",*"});
+      fc_mwr.plan("14.10", "cp_beats", "single");
+      fc_mwr.plan("14.11", "cp_beats", "multi");
+      fc_mwr.plan("14.10", "x_mwr", "*,*,single");
+      fc_mwr.plan("14.11", "x_mwr", "*,*,multi");
+      fc_mwr.plan("14.12", "x_mwr", "w256,w512|w1024,multi");
+      fc_mwr.plan("14.12", "x_mwr", "w512,w1024,multi");
+      fc_mwr.plan("14.13", "x_mwr", "w512|w1024,w256,multi");
+      fc_mwr.plan("14.13", "x_mwr", "w1024,w512,multi");
     end
     fc_small = db.group("xfer.small_cg", fresh);
     if (fresh) begin
@@ -240,6 +281,9 @@ class aou_t1_xfer_cov extends uvm_component;
       `AOU_XFER_FC_SMALL_RARE(AOU_FC_REG)
       p = fc_small.add_cross("x_small", "cp_path cp_dir cp_small");
       `AOU_XFER_FC_X_SMALL_RARE(AOU_FC_REG)
+      fc_small.plan("4.1 5.1", "cp_small");
+      fc_small.plan("4.1", "x_small", "*,wr,*");
+      fc_small.plan("5.1", "x_small", "*,rd,*");
     end
     fc_split = db.group("xfer.split_cg", fresh);
     if (fresh) begin

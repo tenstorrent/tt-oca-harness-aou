@@ -49,8 +49,18 @@ class aou_l3_model extends uvm_object;
   int unsigned    rx_msgs;
   int unsigned    tx_msgs;
   int             grant_epoch = -1;  // lnk.epoch of the DUT's last CrdtGrant
-  // The flit being received carries the DUT's DeactivateAck (peer_adv_ok).
+  // The flit being received carries the DUT's DeactivateAck (peer_adv_ok) or
+  // its DeactivateReq (T1-C45).
   bit             dut_dack_flit;
+  bit             dut_dreq_flit;
+  // T1-C45: the DUT's DeactivateReq / DeactivateAck of this deactivation came
+  // in an earlier flit, and whether that DeactivateReq was the one a
+  // DEACTIVATE_FORCE write sends. Held past DISABLED (the DUT may still be in
+  // DEACTIVATE, lnk.peer_late) until the DUT's next ActivateReq or ActivateAck,
+  // or a reset.
+  bit             dut_dreq_done;
+  bit             dut_dack_done;
+  bit             dut_dreq_forced;
   string          name_tag = "remote";
 
   function new(string name = "aou_l3_model");
@@ -151,6 +161,7 @@ class aou_l3_model extends uvm_object;
       dut_rd_late[r] = 0;
     end
     foreach (crd.rx_occupancy[r, c]) crd.rx_occupancy[r][c] = 0;
+    clear_deact_window();
     lnk.recover();
     rx_unp.reset();
     tx_unp.reset();
@@ -339,6 +350,7 @@ class aou_l3_model extends uvm_object;
 
     // 1. Activation messages: at G0, so before everything else in the flit.
     dut_dack_flit = 1'b0;
+    dut_dreq_flit = 1'b0;
     foreach (rx_unp.done[i]) begin
       if ($cast(a, rx_unp.done[i])) rx_act(a);
     end
@@ -355,6 +367,8 @@ class aou_l3_model extends uvm_object;
       cov.sample_flit(f, misc_in_half(f, 0), misc_in_half(f, 1));
       sample_grants(f, AOU_L3_RX);
     end
+    dut_dreq_done |= dut_dreq_flit;
+    dut_dack_done |= dut_dack_flit;
     void'(crd.tick());
     lnk.tick_dack_hold();
     maybe_release_deact();
@@ -387,10 +401,54 @@ class aou_l3_model extends uvm_object;
         dut_rd_late[r] = 0;
       end
     end
-    if (!lnk.on_rcvd(a))
+    // The DUT's next activation ends the deactivation T1-C45 tracks.
+    if (a.op inside {AOU_ACT_REQ, AOU_ACT_ACK}) clear_deact_window();
+    if (!lnk.on_rcvd(a)) begin
       viol("AOU-R40", $sformatf("DUT %s while %s", a.kind(), lnk.state.name()));
-    else if (a.op == AOU_DEACT_ACK)
+    end else if (a.op == AOU_DEACT_ACK) begin
       dut_dack_flit = 1'b1;
+    end else if (a.op == AOU_DEACT_REQ) begin
+      dut_dreq_flit = 1'b1;
+      dut_dreq_forced = a.forced_deact_mark() && cfg.force_deact_window();
+    end
+  endfunction
+
+  function void clear_deact_window();
+    {dut_dreq_flit, dut_dreq_done, dut_dack_done, dut_dreq_forced} = '0;
+  endfunction
+
+  // T1-C45, the DUT's side of MAS 7.3.1 (stricter than v0.8 8.4, which also
+  // lets request credits follow a die's DeactivateAck and says nothing on
+  // response credits):
+  // - request credits (WriteReq, ReadReq, WriteData) are advertised until our
+  //   DeactivateReq reaches the DUT; one already committed may go out with its
+  //   DeactivateAck, so none in a flit after the one carrying that Ack. When
+  //   our DeactivateReq arrived is not visible on the wire, so credits before
+  //   the DUT's DeactivateAck are not judged (interim);
+  // - response credits (ReadData, WriteResp) are advertised until the DUT's
+  //   own DeactivateReq, so none in a flit after the one carrying it, and no
+  //   CrdtGrant behind it in that flit. The flit's header MsgCredit is not
+  //   ordered among its messages (MAS 7.3.1 "Header credits"), so it may
+  //   carry them. Not judged after the DeactivateReq a DEACTIVATE_FORCE write
+  //   sends: the DUT's requests may still be open then, and the MAS defines no
+  //   credit rule for that escape hatch.
+  // hdr: the credit came in the flit header's MsgCredit, not in a CrdtGrant.
+  // Returns why the credit is out of its window, or "" when it is not.
+  function string dut_deact_crd_why(aou_cred_class_e c, bit hdr);
+    if (!cfg.chk_deact_crd_window) return "";
+    if (lnk.state == AOU_LS_DEACTIVATE || lnk.peer_late || dut_dreq_done || dut_dack_done)
+      ledger_chk("T1-C45");
+    if (req_class(c)) return dut_dack_done ? "in a flit after its DeactivateAck" : "";
+    if (dut_dreq_forced) return "";
+    if (dut_dreq_done) return "in a flit after its DeactivateReq";
+    if (dut_dreq_flit && !hdr) return "behind its DeactivateReq";
+    return "";
+  endfunction
+
+  function void chk_deact_crd(aou_cred_class_e c, bit hdr, string what);
+    string why = dut_deact_crd_why(c, hdr);
+    if (why != "")
+      viol("T1-C45", $sformatf("DUT %s %s %s (MAS 7.3.1)", what, aou_cc_name(c), why));
   endfunction
 
   // Credits may come from the DUT after its ActivateAck and until DISABLED
@@ -441,8 +499,9 @@ class aou_l3_model extends uvm_object;
           viol(why == "before its ActivateAck" ? "AOU-R29" : "AOU-R26",
                $sformatf("DUT MsgCredit %s RP%0d=%0d %s", aou_cc_name(aou_cred_class_e'(c)), r,
                          n[c], why));
-        end else if (peer_adv_funds(aou_cred_class_e'(c))) begin
-          rx_tx_grant(r, aou_cred_class_e'(c), n[c]);
+        end else begin
+          chk_deact_crd(aou_cred_class_e'(c), 1'b1, $sformatf("MsgCredit RP%0d=%0d", r, n[c]));
+          if (peer_adv_funds(aou_cred_class_e'(c))) rx_tx_grant(r, aou_cred_class_e'(c), n[c]);
         end
       end
     end
@@ -464,12 +523,14 @@ class aou_l3_model extends uvm_object;
           viol("AOU-R24", $sformatf("DUT initial CrdtGrant has no %s credit for RP%0d",
                                     aou_cc_name(aou_cred_class_e'(c)), r));
         if (n != 0) begin
-          if (!peer_adv_ok(aou_cred_class_e'(c), why))
+          if (!peer_adv_ok(aou_cred_class_e'(c), why)) begin
             viol(why == "before its ActivateAck" ? "AOU-R29" : "AOU-R26",
                  $sformatf("DUT CrdtGrant %s RP%0d=%0d %s", aou_cc_name(aou_cred_class_e'(c)),
                            r, n, why));
-          else if (peer_adv_funds(aou_cred_class_e'(c)))
-            rx_tx_grant(r, aou_cred_class_e'(c), n);
+          end else begin
+            chk_deact_crd(aou_cred_class_e'(c), 1'b0, $sformatf("CrdtGrant RP%0d=%0d", r, n));
+            if (peer_adv_funds(aou_cred_class_e'(c))) rx_tx_grant(r, aou_cred_class_e'(c), n);
+          end
         end
       end
     end
@@ -508,6 +569,13 @@ class aou_l3_model extends uvm_object;
     end else if (c inside {AOU_CC_WREQ, AOU_CC_RREQ} && lnk.dreq_rcvd) begin
       viol("AOU-R34", $sformatf("DUT %s at flit#%0d G%0d after its DeactivateReq",
                                 aou_cc_name(c), f.seq, pos));
+    end else if (c == AOU_CC_WDATA && cfg.chk_deact_crd_window && lnk.dreq_rcvd) begin
+      // T1-C45: WriteData is a request-related message (MAS 7.3.1) and stops
+      // at the DUT's DeactivateReq too, except after a forced one.
+      ledger_chk("T1-C45");
+      if (!dut_dreq_forced)
+        viol("T1-C45", $sformatf("DUT WriteData at flit#%0d G%0d after its DeactivateReq (%s)",
+                                 f.seq, pos, "MAS 7.3.1"));
     end
     // A DUT message within a few flits of the grant that ended its zero
     // credit: the DUT was waiting for that credit.

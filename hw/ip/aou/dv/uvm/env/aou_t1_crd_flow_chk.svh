@@ -47,9 +47,14 @@
 // of the class on any RP:
 //   T1-C01 (independent per-RP progress): the stall reaches block_cycles
 //          while another RP is starved. One RP without credit must not hold
-//          back the others (tenstorrent/tt-oca-harness-aou#97).
+//          back the others (tenstorrent/tt-oca-harness-aou#97). For WriteReq
+//          and WriteData the RP with credit must also be next in write order
+//          (as for T1-C43).
 //   T1-C02 (work conservation): the stall reaches idle_cycles.
-// Each is reported once per stall. The bounds come from the env config
+// Each is reported once per stall. Ports merged onto one TX lane by the
+// asymmetric RP mapping share its credit and serialise their writes (MAS
+// 3.10.4): T1-C01 does not set one against another, nor judge a port while a
+// port of its lane is starved. The bounds come from the env config
 // (crd_block_cycles, crd_idle_cycles); report_phase prints the longest stall
 // seen, the margin to tune them by.
 //
@@ -84,6 +89,10 @@
 //          the DUT then holds all credited traffic on purpose (PR #26, see
 //          aou_t1_crd_block_chk). Any other cycle pauses the wait; a message of class c the DUT sends on
 //          x's wire RP, a reset, DISABLED or a new activation restarts it.
+//          On a lane the asymmetric RP mapping merges, a port's write is not
+//          next while another port of the lane has a write accepted and not
+//          yet sent: the lane sends them one at a time in an order its
+//          arbiter picks (MAS 3.10.4), which this checker does not judge.
 //          A wait that reaches
 //          starve_cycles (env cfg crd_starve_cycles) is reported once. The wait
 //          covers sharing the TX with the other RPs and classes; the bound
@@ -105,6 +114,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
   virtual aou_fdi_lsm_if lsm_vif;
   aou_t1_crd_block_chk blk;   // the ID-mismatch hold; null: none
   aou_t1_early_tbl_chk early; // early-table occupancy; null: none
+  aou_t1_rp_map_chk rp_map;   // wire RP and own ID of each port's messages; null: identity
   bit             enable = 1'b1;
   int unsigned    block_cycles = 256;
   int unsigned    idle_cycles = 4096;
@@ -189,6 +199,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
       p = fc_crd.cp("cp_cls"); `AOU_T1_CRD_FC_CLS(AOU_FC_REG)
       p = fc_crd.cp("cp_ev"); `AOU_T1_CRD_FC_EV(AOU_FC_REG)
       void'(fc_crd.add_cross("x_cls_ev", "cp_cls cp_ev"));
+      fc_crd.plan("3.15");
     end
   endfunction
 
@@ -202,12 +213,13 @@ class aou_t1_crd_flow_chk extends uvm_component;
     void'($value$plusargs("crd_starve_cycles=%d", starve_cycles));
   endfunction
 
-  // The wire RP local RP x's messages carry (DEST_RP, register mirror).
-  function int unsigned wire_of(int unsigned x);
-    uvm_reg_field f;
-    if (rm == null) return x;
-    f = rm.dest_rp.get_field_by_name($sformatf("rp%0d_dest", x));
-    return (f == null) ? x : int'(f.get_mirrored_value());
+  // The wire RP local RP x's messages of class c carry: the requests of its S
+  // port go on its TX lane's DEST_RP, the responses of its M port on its own
+  // (asymmetric RP mapping, MAS 3.10; aou_t1_rp_map_chk).
+  function int unsigned wire_of(int unsigned x, aou_cred_class_e c);
+    if (rp_map == null) return x;
+    return (c inside {AOU_CC_WREQ, AOU_CC_RREQ, AOU_CC_WDATA}) ? rp_map.req_wire(x) :
+                                                                  rp_map.rsp_wire(x);
   endfunction
 
   // Granules of the largest message of class c the DUT can send for x.
@@ -225,8 +237,13 @@ class aou_t1_crd_flow_chk extends uvm_component;
     endcase
   endfunction
 
+  // Granules of class c the remote die has advertised on x's wire RP.
+  function int unsigned cred_held(int unsigned x, int c);
+    return model.crd.rx_outstanding[wire_of(x, aou_cred_class_e'(c))][c];
+  endfunction
+
   function bit cred(int unsigned x, aou_cred_class_e c);
-    return model.crd.rx_outstanding[wire_of(x)][c] >= need(x, c);
+    return cred_held(x, c) >= need(x, c);
   endfunction
 
   function bit work(int unsigned x, aou_cred_class_e c);
@@ -301,10 +318,17 @@ class aou_t1_crd_flow_chk extends uvm_component;
   // x is next in c's order (T1-C43). Write data: x's oldest write still owing
   // data is the oldest the DUT has sent. A WriteReq: no write the DUT has sent
   // still owes data (from the RTL's aligner, see the header).
+  // On a lane the asymmetric RP mapping merges, the ports' writes go one at a
+  // time in an order the lane's arbiter picks (MAS 3.10.4), so a port is next
+  // only while no other port of its lane has a write accepted and unsent.
   function bit at_head(int unsigned x, aou_cred_class_e c);
+    if (c inside {AOU_CC_WREQ, AOU_CC_WDATA})
+      for (int unsigned y = 0; y < cfg.n_rp; y++)
+        if (y != x && same_lane(x, y) && (aw_pend[y].size() != 0 || w_need[y] > w_got[y]))
+          return 1'b0;
     if (c == AOU_CC_WREQ) return w_ord_rp.size() == 0;
     if (c != AOU_CC_WDATA) return 1'b1;
-    return w_ord_rp.size() != 0 && w_ord_rp[0] == wire_of(x);
+    return w_ord_rp.size() != 0 && w_ord_rp[0] == wire_of(x, c);
   endfunction
 
   // Some AXI port holds the DUT back on this edge: an M-port AW, W or AR, or an
@@ -328,7 +352,8 @@ class aou_t1_crd_flow_chk extends uvm_component;
       if (queued(x, aou_cred_class_e'(c)) && !cred(x, aou_cred_class_e'(c))) begin
         why = $sformatf("RP%0d has %s queued without credit (%0d of %0d granules)", x,
                         aou_cc_name(aou_cred_class_e'(c)),
-                        model.crd.rx_outstanding[wire_of(x)][c], need(x, aou_cred_class_e'(c)));
+                        cred_held(x, c),
+                        need(x, aou_cred_class_e'(c)));
         return 1'b1;
       end
     end
@@ -339,26 +364,35 @@ class aou_t1_crd_flow_chk extends uvm_component;
     aou_msg_req   q;
     aou_msg_wresp b;
     aou_msg_rdata d;
+    int           px = -1;
+    bit [9:0]     id;
     aou_cred_class_e c = m.cred_class();
     if (c == AOU_CC_NONE) return;
     sent[c] = 1'b1;
     last_msg[c] = cyc;
     if (model != null) link_check();
     w_order(m);
+    // A request on a merged lane carries a remapped ID: the port and its own
+    // ID come from the mapping.
+    if ($cast(q, m)) begin
+      id = q.id;
+      if (rp_map != null) rp_map.resolve(m, px, id);
+    end
     for (int unsigned x = 0; x < cfg.n_rp; x++) begin
-      if (wire_of(x) != int'(m.rp)) continue;
+      if (wire_of(x, c) != int'(m.rp)) continue;
+      if (q != null && rp_map != null && px != int'(x)) continue;
       rp_wait[x][c] = 0;
       rp_rep[x][c] = 1'b0;
-      if ($cast(q, m)) begin
+      if (q != null) begin
         if (c == AOU_CC_WREQ) begin
           bit answered;
-          if (drop_aw(x, q.id, answered)) begin
-            if (!answered) aw_sent[x].push_back(q.id);
+          if (drop_aw(x, id, answered)) begin
+            if (!answered) aw_sent[x].push_back(id);
             return;
           end
         end
-        if (c == AOU_CC_RREQ && drop_id(ar_pend[x], q.id)) begin
-          ar_sent[x].push_back(q.id);
+        if (c == AOU_CC_RREQ && drop_id(ar_pend[x], id)) begin
+          ar_sent[x].push_back(id);
           return;
         end
       end else if ($cast(b, m)) begin
@@ -566,6 +600,13 @@ class aou_t1_crd_flow_chk extends uvm_component;
            mb_vif[p].mon_cb.pl_state_sts == aou_fdi_pkg::FDI_STS_ACTIVE;
   endfunction
 
+  // The DUT could send a message of class c for x on this edge: the link is
+  // open, the Adapter takes a beat and the remote die has advertised credit
+  // for the message. Waits on the DUT's answers count only these cycles.
+  function bit can_send(int unsigned x, aou_cred_class_e c);
+    return link_open() && fdi_ready() && cred(x, c);
+  endfunction
+
   protected function void sample(int unsigned c, int unsigned ev);
     s_cls = c;
     s_ev = ev;
@@ -628,8 +669,13 @@ class aou_t1_crd_flow_chk extends uvm_component;
     for (int unsigned x = 0; x < cfg.n_rp; x++) cover_rp(x, any_st && !st[x]);
     for (int c = 0; c < AOU_CC_NUM; c++) begin
       el[c] = -1;
+      // Write classes count only for an RP next in write order (as T1-C43): a
+      // WriteReq or WriteData waiting for an earlier write's data is the
+      // documented order (MAS 3.2.1), not a lack of independence.
       for (int unsigned x = 0; x < cfg.n_rp && el[c] < 0; x++)
-        if (eligible(x, aou_cred_class_e'(c))) el[c] = int'(x);
+        if (eligible(x, aou_cred_class_e'(c)) &&
+            (!(c inside {AOU_CC_WREQ, AOU_CC_WDATA}) || at_head(x, aou_cred_class_e'(c))))
+          el[c] = int'(x);
       if (sent[c] || el[c] < 0) begin
         stall[c] = 0;
         rep[c] = 1'b0;
@@ -666,7 +712,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
     aou_rule_log::fire("T1-C43", get_type_name());
     `uvm_error(get_type_name(), $sformatf(
         {"T1-C43: RP%0d has credit (%0d granules) and a queued %s%s, but the DUT sent no %s ",
-         "on it for %0d such cycles"}, x, model.crd.rx_outstanding[wire_of(x)][c], cn,
+         "on it for %0d such cycles"}, x, cred_held(x, c), cn,
         c == AOU_CC_WDATA ? " and is next in write order" : "", cn, rp_wait[x][c]))
   endfunction
 
@@ -678,17 +724,26 @@ class aou_t1_crd_flow_chk extends uvm_component;
     return 1'b0;
   endfunction
 
+  // Ports the asymmetric RP mapping merges onto one lane share its credit and
+  // send their writes one at a time (MAS 3.10.4): one waiting for the other is
+  // not a lack of independence between RPs.
+  function bit same_lane(int unsigned x, int unsigned y);
+    return rp_map != null && rp_map.lane(x) == rp_map.lane(y);
+  endfunction
+
   protected function void report_c01(int c, int x, bit st[AOU_RP_MAX], string why[AOU_RP_MAX]);
     string cn = aou_cc_name(aou_cred_class_e'(c));
+    // x may be waiting behind a lane-mate without credit.
+    for (int unsigned y = 0; y < cfg.n_rp; y++) if (y != x && st[y] && same_lane(x, y)) return;
     for (int unsigned y = 0; y < cfg.n_rp; y++) begin
-      if (y == x || !st[y]) continue;
+      if (y == x || !st[y] || same_lane(x, y)) continue;
       rep[c] = 1'b1;
       n_c01++;
       aou_rule_log::fire("T1-C01", get_type_name());
       `uvm_error(get_type_name(), $sformatf(
           {"T1-C01: RP%0d %s blocked %0d cycles: credit (%0d granules) and a queued %s, ",
            "no %s sent on any RP, while %s"},
-          x, cn, stall[c], model.crd.rx_outstanding[wire_of(x)][c], cn, cn, why[y]))
+          x, cn, stall[c], cred_held(x, c), cn, cn, why[y]))
       return;
     end
   endfunction
@@ -700,7 +755,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
     aou_rule_log::fire("T1-C02", get_type_name());
     `uvm_error(get_type_name(), $sformatf(
         {"T1-C02: RP%0d has credit (%0d granules) and a queued %s, but no %s was sent on any ",
-         "RP for %0d cycles"}, x, model.crd.rx_outstanding[wire_of(x)][c], cn, cn, stall[c]))
+         "RP for %0d cycles"}, x, cred_held(x, c), cn, cn, stall[c]))
   endfunction
 
   function void report_phase(uvm_phase phase);

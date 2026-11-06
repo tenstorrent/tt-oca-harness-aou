@@ -33,7 +33,9 @@
 // reported). pat is an aou_fc_point::mark pattern.
 `define AOU_FC_REG_XIGN(pat) p.mark(pat, aou_fc_point::KIND_IGNORE);
 `define AOU_FC_REG_XILL(pat, r) p.mark(pat, aou_fc_point::KIND_ILLEGAL, r);
-// The spec revision a bin needs (service only; reports show such bins apart).
+// A bin's tag (service only): the spec revision it needs, "rtl-limit" for a
+// legal case this RTL never produces, or a stimulus note ("rare"). Reports
+// show tagged bins apart; revision and rtl-limit bins stay out of the headline.
 `define AOU_FC_CG_TAG(pat, s)
 `define AOU_FC_REG_TAG(pat, s) p.tag(pat, s);
 

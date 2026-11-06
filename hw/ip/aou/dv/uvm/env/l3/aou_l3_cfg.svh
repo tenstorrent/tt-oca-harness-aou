@@ -95,6 +95,10 @@ class aou_l3_cfg extends uvm_object;
   // Checks on the DUT.
   bit                chk_deact_quiesce = 1'b1;   // AOU-R33
   bit                chk_end_state = 1'b1;       // AOU-R28/R36 at end of test
+  // T1-C45: the DUT's credits and request messages keep to the MAS 7.3.1
+  // deactivation windows, which are narrower than v0.8 8.4. Off where the
+  // peer is another model, which advertises across the full v0.8 window.
+  bit                chk_deact_crd_window = 1'b1;
   // AOU-R31: once quiescent in ENABLED, every credit the DUT advertised is
   // back within cred_return_cycles (MAS 7.1: LP threshold 0 still launches a
   // flit for pending MsgCredit-header credits).

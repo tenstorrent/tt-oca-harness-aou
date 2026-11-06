@@ -25,6 +25,14 @@ class aou_t1_env_cfg extends uvm_object;
   // 7.2.3), so the model keeps the v0.7 reaction and the tests their
   // expectations.
   bit            error_state_en = 1'b0;
+  // Asymmetric RP mapping (ASYMMETRIC_RP_PROC_CON, MAS 3.10.4): the register
+  // value the base sequence programs while the DUT is DISABLED, before the
+  // first activation and again after any reset that cleared it. -2: drawn in
+  // finalize(); -1: left at its reset value. rp_map_pct is the share of seeds
+  // that enable the mapping (+rp_map_pct); +rp_map=<hex> sets the value. The
+  // checkers follow the register mirror, never this field.
+  int            rp_map = -2;
+  int unsigned   rp_map_pct = 50;
 
   // Agent configs
   aou_fdi_cfg    fdi_cfg[AOU_T1_N_PHY];
@@ -181,6 +189,10 @@ class aou_t1_env_cfg extends uvm_object;
       if (rp_remote_bytes[r] > AOU_T1_PEER_MAX_BYTES) rp_remote_bytes[r] = AOU_T1_PEER_MAX_BYTES;
     l3_cfg.spec_rev = spec_rev;
     l3_cfg.error_state_en = error_state_en;
+    if (rp_map == -2) draw_rp_map();
+    // MAS overview 2.2: exclusive accesses are not issued on a merged route (its read
+    // and write may reach the remote die under different IDs, 3.10.5).
+    for (int unsigned r = 0; r < n_rp; r++) s_mgr_cfg[r].lock_en = !rp_map_merged(r);
     l3_cfg.rp_count = (remote_rp_count != 0) ? remote_rp_count : n_rp;
     l3_cfg.peer_rp_count = n_rp;
     // The credit the DUT may advertise (MAS 3.9) on the RPs both dies have.
@@ -197,6 +209,61 @@ class aou_t1_env_cfg extends uvm_object;
       m_sub_cfg[r].user_mode = user_mode;
       r_mgr_cfg[r].data_bytes = remote_bytes_of(r);
     end
+  endfunction
+
+  // A legal mapping for this seed. Half of the seeds that leave it disabled
+  // still write random lane selects, which the DUT must ignore (MAS 3.10.4).
+  // An enabled mapping picks each port's lane below the RP count both dies
+  // have, since DEST_RP (identity unless a test sets it) sends lane n to the
+  // remote die's RP n: every port of a 4-RP DUT facing a 1-RP die lands on
+  // lane 0 (MAS 3.10.1). One seed in five enables the identity mapping. Every
+  // partition of the ports is legal (one merge group on 2 or 3 RPs, at most
+  // two on 4). The selects of RPs the build lacks are left at reset or drawn
+  // at random: the RTL ignores them, the RDL and MAS 3.10.3 can be read as
+  // requiring them below RP_COUNT (taken from the RTL).
+  // The regression's seeds are small and shared by every scenario, and every
+  // test reaches this draw at the same point of its random stream, so the
+  // draw also hashes the test's name: each test and seed gets its own mapping,
+  // and a rerun of the same test and seed the same one.
+  protected int unsigned rp_map_rng;
+  protected function int unsigned rp_map_rand(int unsigned n);
+    rp_map_rng ^= rp_map_rng << 13;
+    rp_map_rng ^= rp_map_rng >> 17;
+    rp_map_rng ^= rp_map_rng << 5;
+    return rp_map_rng % n;
+  endfunction
+
+  function void draw_rp_map();
+    int unsigned eff = (remote_rp_count != 0 && remote_rp_count < n_rp) ? remote_rp_count : n_rp;
+    bit [8:0] v = 9'h1C8;
+    string test = "";
+    rp_map = -1;
+    if (n_rp < 2) return;
+    void'($value$plusargs("UVM_TESTNAME=%s", test));
+    rp_map_rng = $urandom | 32'd1;
+    foreach (test[i]) rp_map_rng = (rp_map_rng * 32'd31 + int'(test[i])) | 32'd1;
+    if (rp_map_rand(100) >= rp_map_pct) begin
+      if (rp_map_rand(2) == 0) return;
+      for (int unsigned r = 0; r < 4; r++) v[1 + 2 * r +: 2] = 2'(rp_map_rand(4));
+      v[0] = 1'b0;
+    end else begin
+      bit ident = rp_map_rand(5) == 0 && eff == n_rp;
+      v[0] = 1'b1;
+      for (int unsigned r = 0; r < n_rp; r++)
+        v[1 + 2 * r +: 2] = ident ? 2'(r) : 2'(rp_map_rand(eff));
+      if (rp_map_rand(2) == 0)
+        for (int unsigned r = n_rp; r < 4; r++) v[1 + 2 * r +: 2] = 2'(rp_map_rand(4));
+    end
+    rp_map = int'(v);
+  endfunction
+
+  // Port r shares its lane with another port under the drawn mapping.
+  function bit rp_map_merged(int unsigned r);
+    bit [8:0] v = 9'(rp_map);
+    if (rp_map < 0 || !v[0] || r >= n_rp) return 1'b0;
+    for (int unsigned q = 0; q < n_rp; q++)
+      if (q != r && v[1 + 2 * q +: 2] == v[1 + 2 * r +: 2]) return 1'b1;
+    return 1'b0;
   endfunction
 
   // The remote die's AXI data bytes on RP r.
@@ -277,6 +344,14 @@ class aou_t1_env_cfg extends uvm_object;
     end
     l3_cfg.resp_fork = 1'($urandom_range(1));
     remote_lat_max = $urandom_range(30);
+    // An eighth of the seeds return the remote die's WriteResps in batches of
+    // 16 to 48 (aou_packer_policy::wresp_batch), so its densest WriteResp
+    // packing meets every test's traffic, not only the packing test's. A test
+    // that measures performance or depends on response timing turns it off.
+    if ($urandom_range(7) == 0) begin
+      l3_cfg.pol.wresp_batch = $urandom_range(48, 16);
+      l3_cfg.pol.wresp_batch_wait = $urandom_range(400, 100);
+    end
     fdi_knobs();
   endfunction
 
@@ -315,11 +390,11 @@ class aou_t1_env_cfg extends uvm_object;
     return $sformatf({"n_rp=%0d remote_rp_count=%0d rp_bytes=%p remote_bytes=%0d ",
                       "rp_remote_bytes=%p phy=%0d/%0d fdi_beat_bytes=%0d ",
                       "spec=%s timing=%s remote_lat<=%0d resp_fork=%0b ",
-                      "l1 cancel/bubble=%0d/%0d fill_hold b/r=%4b/%4b"},
+                      "l1 cancel/bubble=%0d/%0d fill_hold b/r=%4b/%4b rp_map=%0h"},
                      n_rp, remote_rp_count, rp_bytes, remote_bytes, rp_remote_bytes,
                      lsm_cfg.active_phy,
                      lsm_cfg.n_phy, fdi_cfg[lsm_cfg.active_phy].beat_bytes, spec_rev.name(),
                      local_timing.name(), remote_lat_max, l3_cfg.resp_fork, l1_cancel_pct,
-                     l1_bubble_pct, bh, rh);
+                     l1_bubble_pct, bh, rh, rp_map);
   endfunction
 endclass

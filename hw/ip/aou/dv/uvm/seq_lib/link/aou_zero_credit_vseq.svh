@@ -11,7 +11,10 @@
 // +grant=<credits> +T1_TXN=<transactions>.
 // +starve_rp=<r> (plan 3.15/12.14): only RP r has no credit of the class;
 // traffic runs on every RP, and the others' may complete while RP r's stays
-// queued.
+// queued. For a request class the starved credit is that of the remote RP
+// local port r sends on: its TX lane's DEST_RP under the asymmetric RP mapping
+// (MAS 3.10.4), which every port merged with it shares, so those ports are
+// starved with it.
 // +limit=<k> with +credit=wreq|rreq (plan 8.3/8.6): every RP gets credit for
 // exactly k requests and the remote die returns none of it until released,
 // with more than k requests queued per RP.
@@ -112,15 +115,21 @@ class aou_zero_credit_vseq extends aou_link_base_vseq;
     aou_t1_traffic_cfg ps = profile_for(c);
     aou_t1_traffic_cfg po = profile_for(c);
     int unsigned n = 0;
+    int unsigned w;
     if (cfg.n_rp < 2) `uvm_fatal(get_type_name(), "+starve_rp needs a build with several RPs")
     if (sr >= cfg.n_rp)
       `uvm_fatal(get_type_name(), $sformatf("+starve_rp=%0d, build has %0d RPs", sr, cfg.n_rp))
-    ps.rp_mask = 4'(1 << sr);
+    link_up();
+    program_rp_map();
+    // The wire RP starved, and the ports whose traffic needs its credit.
+    w = (dir == AOU_T1_R2L) ? sr : env.rp_map.req_wire(sr);
+    ps.rp_mask = '0;
+    for (int unsigned x = 0; x < cfg.n_rp; x++)
+      if (x == sr || (dir != AOU_T1_R2L && env.rp_map.req_wire(x) == w)) ps.rp_mask[x] = 1'b1;
     po.rp_mask = 4'((1 << cfg.n_rp) - 1) & ~ps.rp_mask;
     `uvm_info(get_type_name(), $sformatf("RP%0d has no %s credit, %s traffic on every RP",
                                          sr, aou_cc_name(c), dir.name()), UVM_LOW)
-    link_up();
-    cfg.l3_cfg.rx_starve[sr][c] = 1'b1;
+    cfg.l3_cfg.rx_starve[w][c] = 1'b1;
     env.l3.model.crd.reset_link();
     sw_activate();
     others_done = 1'b0;
@@ -142,12 +151,12 @@ class aou_zero_credit_vseq extends aou_link_base_vseq;
     if (n_traffic == 0)
       `uvm_error(get_type_name(), $sformatf("T1-L11: RP%0d traffic completed with no %s credit",
                                             sr, aou_cc_name(c)))
-    if (env.l3.model.crd.rx_outstanding[sr][c] != 0)
+    if (env.l3.model.crd.rx_outstanding[w][c] != 0)
       `uvm_error(get_type_name(), $sformatf(
           "T1-L12: %0d %s credits outstanding on RP%0d, none granted",
-          env.l3.model.crd.rx_outstanding[sr][c], aou_cc_name(c), sr))
-    cfg.l3_cfg.rx_starve[sr][c] = 1'b0;
-    grant_rp(c, sr, grant);
+          env.l3.model.crd.rx_outstanding[w][c], aou_cc_name(c), w))
+    cfg.l3_cfg.rx_starve[w][c] = 1'b0;
+    grant_rp(c, w, grant);
     wait_traffic();
     wait (others_done);
     drain();

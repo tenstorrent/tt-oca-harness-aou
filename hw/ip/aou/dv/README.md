@@ -30,7 +30,7 @@ Trieu and Quang Le (VNCHIPLabs); see [Acknowledgements](#acknowledgements).
 | --- | --- | --- |
 | Python 3.9 or later | every script | `tomllib` (3.11) is used when present; a subset TOML reader covers older interpreters; `scripts/bugs/*` also need PyYAML (`pip install -r requirements.txt` at the repository root) |
 | GNU Make, Git, a C++ compiler | the standalone flow | |
-| Verilator 5.052 | `SIM=verilator` | What CI builds (`.github/workflows/uvm-smoke.yml`); `--timing` and `randomize()` through z3 |
+| Verilator 5.052 or later | `SIM=verilator` | CI builds the version pinned in `.github/tool-versions.env` (`VERILATOR_VERSION`, `.github/workflows/uvm-smoke.yml`); `--timing` and `randomize()` through z3 |
 | Verible (`verible-verilog-lint`) | `make lint` | The version CI pins in `.github/tool-versions.env` (`VERIBLE_VERSION`) |
 | VCS | `SIM=vcs` | The default when `vcs` is on `PATH`; the full regressions and coverage run here |
 | LSF (`bsub`) | builds and runs at scale | Optional: `LSF=0` runs on the current host; site options in the git-ignored `site/site.mk` |
@@ -72,7 +72,7 @@ machine of your own, never a shared login host.
 ```sh
 python3 scripts/regress.py --help                       # every option, every step
 python3 scripts/regress.py --sim vcs --rid full1        # every CONFIG, every bench, every testlist
-python3 scripts/regress.py --sim verilator --rid full1v # the same on Verilator, without the RTL assertions
+python3 scripts/regress.py --sim verilator --rid full1v # the same on Verilator
 python3 scripts/regress.py --sim vcs --rid pr1 --configs "1x512-sp64 2x512-tp32_64" --items "smoke ci assertions"
 python3 scripts/regress.py --sim vcs --rid nop1 --lists all,-perf  # every testlist but perf
 python3 scripts/regress.py --sim vcs --rid full1 --dry-run   # the plan and the run counts only
@@ -84,8 +84,7 @@ What it does, in steps (`STEPS=build,run,summary`, plus `cov` with `COV=1`):
 1. **build**: `make build` of the T1 bench (`TB=t1`) and the register bench (`TB=reg`)
    for every configuration (`make configs`), the `RTL_ASSERT=1` build of every
    configuration with a `<CONFIG>-assert` target, and the two model unit benches
-   (`TB=l3_unit`, `TB=axi_selftest`): 27 builds on VCS. The RTL assertions are VCS-only
-   ([RTL assertions](#rtl-assertions)), so on Verilator they are skipped with a note: 22 builds.
+   (`TB=l3_unit`, `TB=axi_selftest`): 27 builds.
 2. **run**: one `scripts/run_list.py` per build, with `--per-list`: T1 runs every
    testlist `all.toml` includes except `assertions.toml`, which runs on the `-assert`
    builds; the register bench runs `registers.toml` and the unit benches their own
@@ -235,8 +234,8 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `2x512-tp32_64` | 2 | 512 each | FDI_CFG_TP_32B_64B | 2 | Two-PHY FDI with a 32-byte PHY0, two RPs at one width |
 | `1x512-sp64-nxt` | 1 | 512 | FDI_CFG_SP_64B | 1 | `TX_NXT_PACKING_EN` 1: the registered TX packer output stage |
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
-| `1x1024-sp128` | 1 | 1024 | FDI_CFG_SP_128B | 1 | One 1024-bit RP on a 128-byte FDI: the single-RP 128 B RX latency reference (fdi-rx-plan 13) |
-| `1x1024-sp256` | 1 | 1024 | FDI_CFG_SP_256B | 1 | 256-byte FDI: one flit per cycle, 48 granules decoded per cycle, whole-flit cancel |
+| `1x1024-sp128` | 1 | 1024 | FDI_CFG_SP_128B | 1 | One 1024-bit RP on a 128-byte FDI: the zero-load latency reference (MAS 8.1 Table 8, `aou_perf_test +perf_mode=rxlat`) |
+| `1x1024-sp256` | 1 | 1024 | FDI_CFG_SP_256B | 1 | 256-byte FDI: one flit per cycle, one-step TX packer, 48 granules decoded per cycle, whole-flit cancel |
 | `4xmix-sp256` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | Mixed widths, every local width, 256-byte FDI |
 | `4xmix-sp256-rxf` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | `4xmix-sp256` with non-default RX FIFO depths (`AOU_RX_FIFO_ALT`) |
 
@@ -336,6 +335,11 @@ Traffic and remote-die knobs (run time, any T1 test):
   WriteReqs and WriteData; all three are legal.
 - `+remote_max_burst=2^n`: the remote splitter's longest burst (default 256).
   `+remote_max_burst_rand=1` re-picks it whenever the remote is idle.
+- `+wresp_batch=N` (16-48), `+wresp_batch_wait=C`: the remote die returns its
+  WriteResps in batches, holding them until N are queued or C cycles have passed,
+  so they leave up to 48 in one flit. An eighth of the seeds do this by default
+  (`aou_t1_env_cfg::randomize_knobs`); `+wresp_batch=0` turns it off. The
+  performance, watchdog and back-to-back packing tests keep it off.
 
 FDI corner knobs (run time, `testlists/fdi.toml`; without them a seed takes HOLES
 mostly, sometimes RANDOM or BURSTY, and sometimes random stalls, see
@@ -729,6 +733,21 @@ a checkout. Simulations never need it; they read the committed table.
 `D2D_COMPARE=<checkout> python3 scripts/test_perf_model.py` tests the adapter,
 including the MAS Table 9 limits and the model's own AoU specification check.
 
+Latency is measured per message rather than per window by
+`aou_perf_test +perf_mode=rxlat` (`matrix.toml`: six configurations plus
+`perf_l3_one_msg-1` on `1x1024-sp128`): idle, streaming, loaded and mixed
+windows in each direction. `aou_rx_lat_mon` times every message the remote die
+sends from its FDI beat (first and last granule) to the DUT's AXI handshake and
+the credit return; `aou_tx_lat_mon` times every message the DUT sends from the
+AXI handshake to the FDI beat carrying its first granule. Both write
+`rxlat.<window>.<kind>.{n,min,avg,max}`, `rxlat_first`, `rxcrd`, `rxrate`,
+`txlat`, `txlat_flit`, `rxsg`/`txsg` (start granule) lines to `perf.txt`.
+`+perf_l3_one_msg=1` makes the remote die send one message per flit at G0
+(a WriteReq with its first WriteData in one flit) and `+perf_w_before_aw=1`
+drives AW and W in the same cycle: that run's idle windows are MAS 8.1
+Table 8. `scripts/rx_lat_compare.py --base <perf.txt|dir> --new <perf.txt|dir>`
+tabulates two runs side by side (`--markdown`, `--metric avg|min|max`).
+
 ## Checker inventory
 
 `uvm/env/checkers/rules.csv` lists every rule the testbench checks, with exactly one
@@ -761,8 +780,8 @@ directory, and `run_list.py --target <CONFIG>-assert` runs on it. A firing asser
 `$finish` before the UVM report, which `check_run.py` judges FAIL.
 `testlists/assertions.toml` is the representative regression (plan 11.18);
 its entries pass `+rtl_asserts=1`, which is fatal on a build without the
-assertions, so they cannot pass on an ordinary build. The assertions use SVA
-ranges (`##[0:500]`), so the build is VCS-only for now.
+assertions, so they cannot pass on an ordinary build. Both simulators build them
+(Verilator from 5.052, which handles their SVA ranges such as `##[0:500]`).
 
 ## Building against a candidate RTL fix
 
