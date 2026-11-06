@@ -481,7 +481,7 @@ When activated, the aggregator:
 * OR-merges [.monospaced]#++WDATA++# and [.monospaced]#++WSTRB++# across consecutive narrow beats until a full-width beat is assembled, then emits the merged beat on the master W channel.
 * [.monospaced]#++AWBURST++# is passed through unchanged.
 
-A synchronous FIFO of [.monospaced]#++RPn_AGG_WCH_FIFO_DEPTH++# entries (default 16; it must exceed the longest write burst the local bus issues) decouples the AW and W channels. The AW of an aggregated write is held on the master side until the W FIFO holds every beat of the recalculated burst ([.monospaced]#++AWLEN + 1++# merged beats), preventing deadlocks when the downstream bus back-pressures the W channel. Writes that bypass aggregation issue their AW without this wait.
+A synchronous FIFO of [.monospaced]#++RPn_AGG_WCH_FIFO_DEPTH++# entries (default 16; it must exceed the longest write burst the local bus issues) decouples the AW and W channels. The AW is issued on the master side only after confirming that sufficient W FIFO space is available for the recalculated [.monospaced]#++AWLEN++#, preventing deadlocks when the downstream bus back-pressures the W channel.
 
 [caption=""]
 .Figure 13. Write Aggregation \-- Narrow-to-Wide Beat Merging
