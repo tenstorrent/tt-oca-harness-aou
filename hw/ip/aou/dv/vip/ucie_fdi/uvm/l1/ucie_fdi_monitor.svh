@@ -17,6 +17,12 @@
 // flits, of which the zero-padded lanes are NOPs.
 // Reset flushes both directions, and so does a LinkError the Adapter entered
 // mid-flit (gate abort; UCIe r1.1 8.3.3.7): the partial flits are abandoned.
+// Errors (UCIe r3.0 Table 10-3, 10.3.1): a cancel unit that carried pl_error
+// must be cancelled and no RX data may follow until the link has left Active
+// (FDI-R06), and pl_error needs the Receiver active (FDI-R58); lp_corrupt_crc
+// comes with lp_valid on the last transfer of a 128B half (FDI-R59), on both
+// halves if on the first (FDI-R60). At 512 B and up they, like
+// pl_flit_cancel, apply to every flit of the transfer.
 class ucie_fdi_monitor extends uvm_monitor;
   `uvm_component_utils(ucie_fdi_monitor)
 
@@ -47,6 +53,8 @@ class ucie_fdi_monitor extends uvm_monitor;
   int unsigned n_tx_ready;
   int unsigned n_rx_nops;        // uncancelled RX NOP flits, discarded
   int unsigned n_rx_part;        // 512/1024 B: RX beats with fewer flits than lanes
+  int unsigned n_rx_errors;      // RX cancel units flagged on pl_error
+  int unsigned n_tx_corrupt;     // TX transfers of flits with lp_corrupt_crc
 
   local ucie_flit_item tx_cur[$];  // the flits of the current beat(s), one per lane
   local int unsigned  tx_beat;
@@ -58,6 +66,10 @@ class ucie_fdi_monitor extends uvm_monitor;
   local int unsigned  rx_gap;
   local int unsigned  rx_bubbles;
   local bit           rx_half_done;
+  local bit           rx_err_unit;  // pl_error in the current cancel unit
+  local bit           rx_err_wait;  // ... cancelled; no RX data until the link leaves Active
+  local bit           tx_cc_h0;     // lp_corrupt_crc on the first half of the current TX flit
+  local bit           tx_cc_any;    // ... on any transfer of it
 
   local bit           prev_rst_n;
   local bit           prev_sr;
@@ -75,11 +87,13 @@ class ucie_fdi_monitor extends uvm_monitor;
   local bit           abandon_h_done;  // ... right after a whole 128B half: its cancel may follow
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R01, R02, R05, R07, R08, R09, R10, R12, R13, R35, R42, R43, R44, R45, R57, R64, N_RULES
+    R01, R02, R05, R06, R07, R08, R09, R10, R12, R13, R35, R42, R43, R44, R45, R57, R58, R59,
+    R60, R64, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
-      "FDI-R01", "FDI-R02", "FDI-R05", "FDI-R07", "FDI-R08", "FDI-R09", "FDI-R10", "FDI-R12",
-      "FDI-R13", "FDI-R35", "FDI-R42", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57", "FDI-R64"};
+      "FDI-R01", "FDI-R02", "FDI-R05", "FDI-R06", "FDI-R07", "FDI-R08", "FDI-R09", "FDI-R10",
+      "FDI-R12", "FDI-R13", "FDI-R35", "FDI-R42", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57",
+      "FDI-R58", "FDI-R59", "FDI-R60", "FDI-R64"};
   local int unsigned  n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
@@ -118,8 +132,9 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (tx_beat != 0 || rx_beat != 0)
       `uvm_info(get_type_name(), $sformatf("%s: dropping partial flits (tx beat %0d, rx beat %0d)",
                                            why, tx_beat, rx_beat), UVM_MEDIUM)
-    tx_cur.delete(); tx_beat = 0; tx_gap = 0; tx_stall = 0;
+    tx_cur.delete(); tx_beat = 0; tx_gap = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
     rx_cur.delete(); rx_beat = 0; rx_gap = 0; rx_bubbles = 0; rx_half_done = 1'b0;
+    rx_err_unit = 1'b0; rx_err_wait = 1'b0;
     prev_sr = 1'b0; prev_sa = 1'b0; sr_cycles = 0; sa_cycles = 0;
   endfunction
 
@@ -168,8 +183,9 @@ class ucie_fdi_monitor extends uvm_monitor;
                 "left Active mid-flit: TX beat %0d, RX beat %0d abandoned", tx_beat, rx_beat),
                 UVM_MEDIUM)
     abandon_h_done = rx_cur.size() != 0 && rx_half_done;
-    tx_cur.delete(); tx_beat = 0; tx_stall = 0;
+    tx_cur.delete(); tx_beat = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
     rx_cur.delete(); rx_beat = 0; rx_bubbles = 0; rx_half_done = 1'b0;
+    rx_err_unit = 1'b0;
     abandoned = 1'b1;
   endfunction
 
@@ -199,6 +215,8 @@ class ucie_fdi_monitor extends uvm_monitor;
       tx_cur.delete();
       tx_beat = 0;
       tx_stall = 0;
+      tx_cc_h0 = 1'b0;
+      tx_cc_any = 1'b0;
     end
     if (tx_beat == 0 && v && !abandoned) chk(R43);
     if (tx_beat == 0 && v && sts != FDI_STS_ACTIVE && !abandoned)
@@ -209,6 +227,7 @@ class ucie_fdi_monitor extends uvm_monitor;
       n_tx_ready++;
     if (fcov != null) sample_trdy_run(sts, t);
     if (tx_beat != 0 && !t) tx_stall++;
+    check_corrupt(v, v && i && t);
     if (!(v && i && t)) begin
       if (tx_beat == 0 && tx_gap < 1000) tx_gap++;
       return;
@@ -230,8 +249,39 @@ class ucie_fdi_monitor extends uvm_monitor;
     tx_beat++;
     if (tx_beat == cfg.bpf()) begin
       foreach (tx_cur[l]) publish_tx(tx_cur[l], l);
+      if (tx_cc_any) begin
+        n_tx_corrupt++;
+        if (fcov != null) fcov.sample_corrupt(tx_cc_h0);
+      end
       tx_cur.delete();
       tx_beat = 0;
+      tx_cc_h0 = 1'b0;
+      tx_cc_any = 1'b0;
+    end
+  endfunction
+
+  // lp_corrupt_crc (UCIe r3.0 Table 10-3): asserted with lp_valid for the last
+  // transfer of a 128B half (from 256 B up every transfer ends both halves),
+  // and on the second half whenever on the first. xfer: this cycle transfers
+  // a beat (tx_beat is still its index). Whether the protocol allows it at all
+  // is the link-state monitor's check (FDI-R61).
+  local function void check_corrupt(bit v, bit xfer);
+    bit cc = vif.mon_cb.lp_corrupt_crc === 1'b1;
+    bit last_of_half = ((tx_beat + 1) % cfg.bph()) == 0;
+    bit second_half = cfg.bph() < cfg.bpf() && tx_beat + 1 == cfg.bpf();
+    if (cc) chk(R59);
+    if (cc && !v) err(R59, "lp_corrupt_crc without lp_valid");
+    if (!xfer) return;
+    if (cc && !last_of_half)
+      err(R59, $sformatf("lp_corrupt_crc on transfer %0d of a TX flit, not the last of a 128B half",
+                         tx_beat));
+    if (second_half && tx_cc_h0) begin
+      chk(R60);
+      if (!cc) err(R60, "lp_corrupt_crc on the first 128B half of a TX flit but not the second");
+    end
+    if (cc && last_of_half) begin
+      tx_cc_any = 1'b1;
+      if (!second_half && cfg.bph() < cfg.bpf()) tx_cc_h0 = 1'b1;
     end
   endfunction
 
@@ -317,6 +367,23 @@ class ucie_fdi_monitor extends uvm_monitor;
   local function void sample_rx(logic [3:0] sts);
     bit v = vif.mon_cb.pl_valid === 1'b1;
     bit c = vif.mon_cb.pl_flit_cancel === 1'b1;
+    bit e = vif.mon_cb.pl_error === 1'b1;
+    if (e) chk(R58);
+    if (e && vif.mon_cb.rx_active !== 1'b1) err(R58, "pl_error while the Receiver is not active");
+    // FDI-R06: the unit that carried pl_error is cancelled in its cancel cycle,
+    // and then nothing comes until the link leaves Active (to retrain).
+    if (rx_half_done && rx_err_unit) begin
+      chk(R06);
+      if (!c) err(R06, "a 128B half (from 256 B up, a transfer) with pl_error was not cancelled");
+      rx_err_unit = 1'b0;
+      rx_err_wait = c;
+    end
+    if (sts != FDI_STS_ACTIVE) rx_err_wait = 1'b0;
+    if (rx_err_wait && v) begin
+      chk(R06);
+      err(R06, "RX data after a pl_error before the link left Active to retrain");
+      rx_err_wait = 1'b0;
+    end
     if (c) chk(R05);
     if (c && abandon_h_done) begin
       n_rx_cancels++;
@@ -376,6 +443,15 @@ class ucie_fdi_monitor extends uvm_monitor;
       rx_gap = 0;
       rx_bubbles = 0;
     end
+    if (e && !rx_err_unit) begin
+      int unsigned bph = cfg.bph();
+      int unsigned unit = cfg.bpf() == 1 ? (cfg.fpb() > 1 ? 3 : 2) : rx_beat / bph;
+      int unsigned in_unit = rx_beat % bph;
+      int unsigned pos = bph == 1 ? 3 : in_unit == 0 ? 0 : in_unit == bph - 1 ? 2 : 1;
+      rx_err_unit = 1'b1;
+      n_rx_errors++;
+      if (fcov != null) fcov.sample_error(unit, pos);
+    end
     // A replay after a cancel rewrites every lane (fewer flits leave NOPs).
     foreach (rx_cur[l]) rx_cur[l].put_beat(cfg.beat_bytes, rx_beat, vif.mon_cb.pl_data, l);
     rx_beat++;
@@ -416,10 +492,12 @@ class ucie_fdi_monitor extends uvm_monitor;
                                           "mid-flit, %0d of them with pl_trdy low); %0d TX ",
                                           "and %0d RX flits abandoned mid-flit; %0d RX beats ",
                                           "in Reset; %0d RX NOP flits discarded, %0d RX beats ",
-                                          "not full"}, cfg.phy,
+                                          "not full; %0d RX errors (pl_error), %0d TX ",
+                                          "transfers with lp_corrupt_crc"}, cfg.phy,
                                          n_tx_flits, n_rx_flits, n_rx_cancels, n_cancels_stalled,
                                          n_rx_cancel_h1, n_rx_cancel_rep, n_stalls, n_stalls_mid,
                                          n_stalls_trdy0, n_tx_abandoned, n_rx_abandoned,
-                                         n_rx_beats_reset, n_rx_nops, n_rx_part), UVM_LOW)
+                                         n_rx_beats_reset, n_rx_nops, n_rx_part, n_rx_errors,
+                                         n_tx_corrupt), UVM_LOW)
   endfunction
 endclass

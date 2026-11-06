@@ -239,6 +239,35 @@ class ucie_fdi_cov_test extends ucie_fdi_events_test;
   endtask
 endclass
 
+// The smoke test's traffic with errors both ways, on a link whose protocol
+// includes CXL.cachemem (CXL.2, stream 03h): the Adapter flags framing errors
+// on pl_error, then cancels the half and retrains before the replay, and the
+// stub asks for corrupted CRCs on lp_corrupt_crc.
+class ucie_fdi_error_test extends ucie_fdi_smoke_test;
+  `uvm_component_utils(ucie_fdi_error_test)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    env.fdi_cfg.error_pct = 10;
+    env.fdi_cfg.stream = 8'h03;
+    env.lsm_cfg.protocol = UCIE_PROTO_CXL2;
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.corrupt_pct = 20;
+  endfunction
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (env.fdi.mon.n_rx_errors == 0) `uvm_error(get_type_name(), "no pl_error was sent")
+    if (env.fdi.mon.n_tx_corrupt == 0) `uvm_error(get_type_name(), "no lp_corrupt_crc was seen")
+  endfunction
+endclass
+
 // Demotes the errors of one rule to infos and counts them (ucie_fdi_neg_test).
 class ucie_fdi_expect_catcher extends uvm_report_catcher;
   string       rule;
@@ -259,9 +288,10 @@ class ucie_fdi_expect_catcher extends uvm_report_catcher;
 endclass
 
 // Negative test of the model's checks: the stub makes one deliberate violation
-// (+neg=dllp|retimer|stream, see ucie_pl_stub::bad), and the rule that must
-// catch it has to fire; its errors are expected and demoted. Any other error
-// still fails the run.
+// (+neg=dllp|retimer|stream|corrupt_mid|corrupt_h0|corrupt_proto, see
+// ucie_pl_stub::bad; corrupt_mid and corrupt_h0 need an FDI of 128 B or less),
+// and the rule that must catch it has to fire; its errors are expected and
+// demoted. Any other error still fails the run.
 class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
   `uvm_component_utils(ucie_fdi_neg_test)
 
@@ -280,6 +310,15 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       "dllp":    catcher.rule = "FDI-R62";
       "retimer": catcher.rule = "FDI-R63";
       "stream":  catcher.rule = "FDI-R64";
+      "corrupt_mid", "corrupt_h0": begin
+        catcher.rule = neg == "corrupt_mid" ? "FDI-R59" : "FDI-R60";
+        // A protocol where lp_corrupt_crc applies, so only the placement is wrong.
+        env.fdi_cfg.stream = 8'h03;
+        env.lsm_cfg.protocol = UCIE_PROTO_CXL2;
+        if (env.fdi_cfg.bpf() == 1)
+          `uvm_fatal(get_type_name(), {"+neg=", neg, " needs an FDI of 128 B or less"})
+      end
+      "corrupt_proto": catcher.rule = "FDI-R61";
       default:   `uvm_fatal(get_type_name(), {"+neg: unknown violation ", neg})
     endcase
     uvm_report_cb::add(null, catcher);

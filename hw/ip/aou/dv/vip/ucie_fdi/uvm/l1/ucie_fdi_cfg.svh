@@ -44,6 +44,15 @@ class ucie_fdi_cfg extends uvm_object;
   // 10-3): tied to this value, as an integration may do (r3.0 10.2.1), and the one lp_stream must carry with lp_valid (FDI-R64). The
   // default is Stack 0 Streaming, matching ucie_lsm_cfg::protocol.
   bit [7:0]      stream = UCIE_STREAM_S0_STREAMING;
+  // pl_error (UCIe r3.0 Table 10-3): the chance an RX flit meets a framing
+  // error the Adapter detects. pl_error pulses with pl_valid on one transfer
+  // of a 128B half (from 256 B up, of the transfer); the Adapter finishes that
+  // half, cancels it, retrains the link (the link-state agent runs a Retrain)
+  // and only then replays it. Only in Active. 0 (default): never.
+  int unsigned   error_pct = 0;
+  // Cycles the PL driver waits for that Retrain before it reports an error and
+  // replays anyway (no active link-state agent).
+  int unsigned   error_retrain_timeout = 100000;
 
   // Monitor
   bit            checks_en = 1'b1;

@@ -53,7 +53,7 @@ FDI-R02,ucie_fdi_monitor,,DUT,No bubbles inside a TX flit: lp_valid and lp_irdy 
 FDI-R03,by construction (ucie_fdi_pl_driver),,MODEL,RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes),UCIe r1.1 8.2.4
 FDI-R04,via AOU-R3,,DUT,Flit byte k is FDI byte k mod N of transfer floor(k/N) both ways (a mis-mapped DUT flit decodes to undefined granules),UCIe r1.1 8.3.1
 FDI-R05,ucie_fdi_monitor,,MODEL,"pl_flit_cancel only in the cycle after the last beat of a 128B half; on a 256 B FDI after the flit's one beat, cancelling the whole flit (L1; checks the Adapter)",UCIe r1.1 Table 8-2 pl_flit_cancel
-FDI-R06,n/a,,N/A,On pl_error the Adapter completes and cancels the partial flit (the DUT has no pl_error input),UCIe r1.1 Table 8-2 pl_error
+FDI-R06,ucie_fdi_monitor,,MODEL,"A 128B half (from 256 B up, the transfer) on which pl_error is asserted is finished and cancelled, and no RX data follows until the link has left Active to retrain (L1; checks the Adapter; the DUT has no pl_error input)",UCIe r3.0 Table 10-3 pl_error / 10.3.1
 FDI-R07,ucie_fdi_monitor,,DUT,pl_stallreq and lp_stallack both low at reset exit (L1; checks the both),UCIe r1.1 8.3.2
 FDI-R08,ucie_fdi_monitor,by construction (ucie_fdi_tx_responder),MODEL,pl_stallreq rises only with lp_stallack low and falls only with lp_stallack high (L1; checks the Adapter),UCIe r1.1 8.3.2
 FDI-R09,ucie_fdi_monitor,,DUT,lp_stallack rises only with pl_stallreq high and falls only with pl_stallreq low (L1; checks the DUT),UCIe r1.1 8.3.2
@@ -99,6 +99,10 @@ FDI-R48,ucie_lsm_driver,,DUT,Retrain entered from Active ends with a NOP->Active
 FDI-R49,ucie_lsm_driver,aou_bringup_model (FDI-M07),DUT,"A LinkError the Protocol Layer requested on lp_linkerror: lp_linkerror falls within req_timeout once the Adapter reports LinkError, so the Adapter can leave on its own; the Protocol Layer requests nothing to leave it (L2; checks the DUT)",UCIe r1.1 8.3.3.7 / Table 8-2
 FDI-R56,aou_fdi_layer,aou_bringup_model (FDI-M01),DUT,"The DUT never requests L2 on lp_state_req (L2 is not implemented, integration guide 6.6.6 GAP-3; without that request the Adapter cannot enter L2, UCIe r1.1 8.2.9) (L2; checks the DUT)",integration guide 6.6.6 GAP-3; UCIe r1.1 8.2.9
 FDI-R57,ucie_fdi_monitor,,DUT,lp_stallack answers pl_stallreq within stall_timeout cycles (the Protocol Layer stalls at the next flit boundary; liveness bound of the testbench) (L1; checks the DUT),UCIe r1.1 8.3.2
+FDI-R58,ucie_fdi_monitor,,MODEL,pl_error only while the Receiver is active (pl_rx_active_req and lp_rx_active_sts both 1) (L1; checks the Adapter),UCIe r3.0 Table 10-3 pl_error
+FDI-R59,ucie_fdi_monitor,,DUT,"lp_corrupt_crc only with lp_valid, on the last transfer of a 128B half (from 256 B up, any transfer) (L1; checks the DUT)",UCIe r3.0 Table 10-3 lp_corrupt_crc / 10.3.1
+FDI-R60,ucie_fdi_monitor,,DUT,lp_corrupt_crc on the first 128B half of a flit is repeated on its second half (L1; checks the DUT),UCIe r3.0 Table 10-3 lp_corrupt_crc
+FDI-R61,ucie_lsm_monitor,,DUT,lp_corrupt_crc only when the negotiated protocol includes CXL.cachemem (L2; checks the DUT),UCIe r3.0 Table 10-3 lp_corrupt_crc
 FDI-R62,ucie_lsm_monitor,,DUT,No DLLP transfer (lp_dllp_valid) while the negotiated protocol is Streaming (L2; checks the DUT),UCIe r3.0 Table 10-3 lp_dllp
 FDI-R63,ucie_lsm_monitor,,DUT,lp_retimer_crd never asserts: no Retimer is present and FDI exposes Retimer credits for Raw Format only (L2; checks the DUT),UCIe r3.0 Table 10-3 lp_retimer_crd
 FDI-R64,ucie_fdi_monitor,,DUT,lp_stream with lp_valid names the link's stream (ucie_fdi_cfg::stream) (L1; checks the DUT),UCIe r3.0 Table 10-3 lp_stream
