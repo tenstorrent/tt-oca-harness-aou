@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Sends n_flits flits with random cancel plans and gaps. Payloads are all
-// zero (what that means is the protocol layer's: an empty flit for AoU)
+// zero (what an all-zero payload means is up to the protocol layer above)
 // unless random_payload is set or flits are queued in `payloads`, which go
 // first.
 class ucie_flit_seq extends uvm_sequence #(ucie_flit_item);

@@ -22,18 +22,26 @@
 //    empty slots (UCIe r3.0 10.3.1: valid data on the full width), here a
 //    flit with a non-zero Protocol ID and an all-zero payload, which the
 //    scoreboard skips.
+//  - lp_stream is tied to `stream`; no DLLPs or Retimer credits.
+//  - `bad` makes one deliberate violation, on the first beat of a flit after
+//    the eighth one sent, for the negative tests of the model's checks
+//    (ucie_fdi_neg_test): "dllp" an lp_dllp_valid pulse, "retimer" an
+//    lp_retimer_crd pulse, "stream" a wrong lp_stream.
 class ucie_pl_stub extends uvm_component;
   `uvm_component_utils(ucie_pl_stub)
 
   virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb;
   virtual ucie_fdi_lsm_if lsm;
   int unsigned beat_bytes = 64;
+  bit [7:0]    stream = UCIE_STREAM_S0_STREAMING;  // lp_stream, tied as an integration would
 
   uvm_analysis_imp #(ucie_flit_item, ucie_pl_stub) rx_imp;
 
   int unsigned n_sent;       // flits whose last beat transferred
   int unsigned n_restarted;  // flits cut off mid-flit and sent again
   int unsigned n_fill;       // empty flits sent to fill a wide transfer
+  string       bad;          // a deliberate violation (see above); "" for none
+  bit          bad_done;
 
   local ucie_flit_item txq[$];
   local ucie_flit_item cur[$];  // the flits of the transfer, one per lane
@@ -89,10 +97,17 @@ class ucie_pl_stub extends uvm_component;
     mb.lp_irdy <= 1'b0;
     mb.lp_data <= '0;
     mb.lp_stallack <= 1'b0;
+    mb.lp_corrupt_crc <= 1'b0;
+    mb.lp_stream <= stream;
+    mb.lp_dllp <= '0;
+    mb.lp_dllp_valid <= 1'b0;
+    mb.lp_dllp_ofc <= 1'b0;
+    mb.lp_retimer_crd <= 1'b0;
     beat = 0;
     presenting = 1'b0;
     stallack = 1'b0;
     nop_seen = 1'b0;
+    bad_done = 1'b0;
   endfunction
 
   local function void state_req(logic [3:0] sts);
@@ -160,10 +175,19 @@ class ucie_pl_stub extends uvm_component;
       end
       presenting = cur.size() != 0 && active && rx_on && trdy && !stallack && !stallreq;
     end
+    misbehave(presenting && beat == 0 && !bad_done && bad != "" && n_sent >= 8);
     mb.lp_stallack <= stallack;
     mb.lp_valid <= presenting;
     mb.lp_irdy <= presenting;
     mb.lp_data <= presenting ? beat_data() : '0;
+  endfunction
+
+  // The violation `bad` names, in this cycle when `now`; the idle values otherwise.
+  local function void misbehave(bit now);
+    if (now) bad_done = 1'b1;
+    mb.lp_dllp_valid <= now && bad == "dllp";
+    mb.lp_retimer_crd <= now && bad == "retimer";
+    mb.lp_stream <= (now && bad == "stream") ? ~stream : stream;
   endfunction
 
   local function ucie_fdi_beat_t beat_data();

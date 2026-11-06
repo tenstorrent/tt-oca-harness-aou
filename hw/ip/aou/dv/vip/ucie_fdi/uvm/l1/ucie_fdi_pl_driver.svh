@@ -35,6 +35,13 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     vif.drv_cb.pl_valid <= 1'b0;
     vif.drv_cb.pl_flit_cancel <= 1'b0;
     vif.drv_cb.pl_data <= '0;
+    vif.drv_cb.pl_error <= 1'b0;
+    // Tied: the stream ID, and no DLLPs or Retimer credits (not modelled).
+    vif.drv_cb.pl_stream <= cfg.stream;
+    vif.drv_cb.pl_dllp <= '0;
+    vif.drv_cb.pl_dllp_valid <= 1'b0;
+    vif.drv_cb.pl_dllp_ofc <= 1'b0;
+    vif.drv_cb.pl_retimer_crd <= 1'b0;
     forever begin
       seq_item_port.try_next_item(req);
       if (req == null) begin

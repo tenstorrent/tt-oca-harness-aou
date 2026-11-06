@@ -48,6 +48,20 @@ class ucie_lsm_cfg extends uvm_object;
   // waits for Active. 0 (off) keeps RX flits to Active. +fdi_rx_early=N.
   int unsigned  rx_early = 0;
 
+  // What the Adapter reports as negotiated and how the link runs (UCIe r3.0
+  // Table 10-3). The format is always Format 6
+  // (pl_protocol_flitfmt 0110b); pl_protocol_vld rises with pl_inband_pres and
+  // falls on the next entry to LinkError or Reset. The defaults: Streaming, 32
+  // GT/s, a x16 module.
+  bit [3:0]     protocol = UCIE_PROTO_STREAMING;  // pl_protocol
+  bit [2:0]     speedmode = 3'b101;    // pl_speedmode: 32 GT/s
+  bit           max_speedmode = 1'b0;  // pl_max_speedmode (r3.0): at most 32 GT/s
+  bit [2:0]     lnk_cfg = 3'b010;      // pl_lnk_cfg: x16
+  // pl_phyinrecenter: 0 holds it low (no training reported). 1 raises it while
+  // the link trains, from the bringup's pl_clk_req handshake to Active, and in
+  // Retrain (r3.0 Table 10-3: training, or the Adapter not yet Active).
+  bit           recenter_en = 1'b0;
+
   // Monitor
   bit           checks_en = 1'b1;
   bit           cov_en = 1'b1;          // for observers that collect link-state coverage
@@ -67,8 +81,10 @@ class ucie_lsm_cfg extends uvm_object;
 
   function string convert2string();
     return $sformatf({"n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
-                      "clk_hold=%0b sw_restart_delay=%0d"},
+                      "clk_hold=%0b sw_restart_delay=%0d protocol=%04b speedmode=%03b ",
+                      "max_speedmode=%0b lnk_cfg=%03b recenter=%0b"},
                      n_phy, active_phy, lat_min, lat_max, auto_bringup,
-                     clk_req_hold_bringup, sw_restart_delay);
+                     clk_req_hold_bringup, sw_restart_delay, protocol, speedmode, max_speedmode,
+                     lnk_cfg, recenter_en);
   endfunction
 endclass

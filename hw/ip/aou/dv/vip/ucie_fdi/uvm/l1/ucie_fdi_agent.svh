@@ -28,6 +28,8 @@ class ucie_fdi_agent extends uvm_agent;
     if (!valid_beat_bytes(cfg.beat_bytes))
       `uvm_fatal(get_type_name(), $sformatf("beat_bytes %0d not 32/64/128/256/512/1024",
                                             cfg.beat_bytes))
+    if (!(cfg.stream[7:4] inside {4'h0, 4'h1}) || !(cfg.stream[3:0] inside {[4'h1:4'h5]}))
+      `uvm_fatal(get_type_name(), $sformatf("stream %02h is a reserved stream ID", cfg.stream))
     mon = ucie_fdi_monitor::type_id::create("mon", this);
     mon.cfg = cfg;
     mon.vif = vif;
