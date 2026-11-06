@@ -100,6 +100,9 @@ class aou_t1_mo_chk extends uvm_component;
       p = fc_mo.cp("cp_dir"); `AOU_T1_MO_FC_DIR(AOU_FC_REG)
       p = fc_mo.cp("cp_occ"); `AOU_T1_MO_FC_OCC(AOU_FC_REG)
       void'(fc_mo.add_cross("x_mo", "cp_dir cp_occ"));
+      fc_mo.plan("8.1");
+      fc_mo.plan("9.20", "cp_occ", "full");
+      fc_mo.plan("9.20", "x_mo", "*,full");
     end
   endfunction
 

@@ -442,7 +442,7 @@ help:
 	  'make perf_targets          Regenerate uvm/env/perf/aou_perf_targets.svh (needs D2D_COMPARE)' \
 	  'make perf_check            Judge out/**/perf.json against the targets (out/perf_check.md)' \
 	  'make stale-check           Warn if the build is older than its sources or defines' \
-	  'make check-config          Sim configs, testlists, rules, bug citations, RAL, plan items and docs freshness (no simulator)' \
+	  'make check-config          Sim configs, testlists, rules, bug citations, RAL, plan items, coverage plan IDs and docs freshness (no simulator)' \
 	  'make lint                  check-config, then Verible and Verilator lint of the testbench' \
 	  'make check-public          List internal references before a public push' \
 	  'make clean / clean-out     Remove build/ / remove run results in out/' \
@@ -554,6 +554,7 @@ check-config:
 	python3 -I $(UVM_ROOT)/scripts/check_rules.py
 	python3 -I $(UVM_ROOT)/scripts/check_testlists.py
 	python3 -I $(UVM_ROOT)/scripts/check_bug_refs.py
+	python3 -I $(UVM_ROOT)/scripts/fc_report.py --check-plan-ids
 
 # The T1 top is linted twice: with the DUT's parameter defaults and with
 # AOU_TX_NXT_PACKING=1 (TX_NXT_PACKING_EN, the -nxt target), so both generate

@@ -149,6 +149,16 @@ class aou_attr_vseq extends aou_dp_vseq;
     bit [63:0] base = EXCL_BASE + 64'(r) * 64'h1_0000 + (l2r ? 64'h0 : 64'h8000);
     string who = $sformatf("RP%0d %s", r, l2r ? "local->remote" : "remote->local");
     int unsigned n = 0;
+    // A local port that shares its lane with another under the seed's RP
+    // mapping issues no exclusive access: its reads and writes may reach the
+    // remote die under different IDs (MAS 3.10.5, overview 2.2). The env
+    // config makes that decision once, as the port's lock_en. The remote
+    // die's requests are not remapped, so its rounds always run.
+    if (l2r && !cfg.s_mgr_cfg[r].lock_en) begin
+      `uvm_info(get_type_name(), $sformatf("%s: no exclusive rounds, the port's lane is merged",
+                                           who), UVM_LOW)
+      return;
+    end
     foreach (shapes[i]) begin
       bit [2:0] sz = 3'(shapes[i][0]);
       bit [7:0] ln = 8'(shapes[i][1]);

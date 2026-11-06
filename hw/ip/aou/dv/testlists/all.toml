@@ -293,7 +293,7 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.take_pair-1.dbg_len-15",
-  "aou_axi_err_resp_test.part-fifo.take_pair-1.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48.4x512-sp64",
+  "aou_axi_err_resp_test.part-fifo.take_pair-1.take_group-3.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48",
   "aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32",
@@ -365,7 +365,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 517
+expected_count = 522
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -640,7 +640,7 @@ tests = [
   "aou_axi_err_resp_test.part-fifo.take_overlap-4.take_flood-15.read_after_pop-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.pop_lead-16.wresp_crd-1.crd_delay-256.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.take_pair-1.dbg_len-15",
-  "aou_axi_err_resp_test.part-fifo.take_pair-1.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48.4x512-sp64",
+  "aou_axi_err_resp_test.part-fifo.take_pair-1.take_group-3.take_wflood-6.dbg_len-3.wresp_crd-1.crd_delay-48",
   "aou_axi_err_resp_test.part-fifo.err_len-1.err_off-32.agg_en-1.remote_bytes-32.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_len-3.err_off-32.agg_en-1.remote_bytes-32.max_awburstlen-3.max_arburstlen-1.4x512-sp64",
   "aou_axi_err_resp_test.part-fifo.err_off-32.1x256-sp32",
@@ -804,6 +804,11 @@ tests = [
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1",
   "aou_mrp_test.remote_rp_count-4",
   "aou_mrp_test.remote_rp_count-3",
+  "aou_mrp_test.remote_rp_count-1.rp_map_pct-100.4x512-sp64",
+  "aou_mrp_test.remote_rp_count-2.rp_map_pct-100.4xmix4211-sp128",
+  "aou_mrp_test.remote_rp_count-3.rp_map_pct-100.4xmix2144-sp64",
+  "aou_mrp_test.remote_rp_count-2.rp_map_pct-100.3x512-sp64",
+  "aou_mrp_test.remote_rp_count-1.rp_map_pct-100.2xmix41-sp128",
   "aou_perf_test.perf_scn-S1.1x512-sp64",
   "aou_perf_test.perf_scn-S1.4x512-sp64",
   "aou_perf_test.perf_scn-S1.3x512-sp64",

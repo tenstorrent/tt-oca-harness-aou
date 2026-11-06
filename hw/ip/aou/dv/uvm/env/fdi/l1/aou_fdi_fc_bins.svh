@@ -14,8 +14,22 @@
 `define AOU_FDI_FC_REPEAT(B) `B``_BIN(first, 1, 1) `B``_BIN(second, 2, 2) `B``_BIN(more, 3, 3)
 `define AOU_FDI_FC_LAT(B) \
   `B``_BIN(l2, 2, 2) `B``_BIN(l3, 3, 3) `B``_BIN(l4_6, 4, 6) `B``_BIN(l7_up, 7, 7)
-`define AOU_FDI_FC_HOLD(B) `B``_BIN(h1, 1, 1) `B``_BIN(h2_4, 2, 4) `B``_BIN(h5_up, 5, 5)
+// lp_stallack can't be held for only one cycle: it may not fall while
+// pl_stallreq is high (FDI-R09), and pl_stallreq may fall only after it has
+// seen lp_stallack high (FDI-R08), so the acknowledge lasts at least 2 cycles.
+`define AOU_FDI_FC_HOLD(B) `B``_IGN(h1, 1, 1) `B``_BIN(h2_4, 2, 4) `B``_BIN(h5_up, 5, 5)
 `define AOU_FDI_FC_WHERE(B) `B``_BIN(boundary, 0, 0) `B``_BIN(mid_flit, 1, 1)
 `define AOU_FDI_FC_TRDY_AT_REQ(B) `B``_BIN(trdy_high, 0, 0) `B``_BIN(trdy_low, 1, 1)
+// Stall-handshake crosses that are no target. The monitor records pl_trdy low
+// at the request only for a request inside a flit (the UCIe r1.1 8.3.2 corner
+// it is there for), so a flit-boundary request is always trdy_high. The
+// acknowledge latency is the DUT's choice: it answers a request at a flit
+// boundary in 2 cycles and one inside a flit in 3 or more (it can't
+// acknowledge inside a flit, FDI-R13), so the other latencies can't be reached
+// by stimulus.
+`define AOU_FDI_FC_X_WHERE_LAT(B) \
+  `B``_XIGN("boundary,l3|l4_6|l7_up") \
+  `B``_XIGN("mid_flit,l2")
+`define AOU_FDI_FC_X_WHERE_TRDY(B) `B``_XIGN("boundary,trdy_low")
 `define AOU_FDI_FC_TX_STALLED(B) `B``_BIN(tx_running, 0, 0) `B``_BIN(tx_stalled, 1, 1)
 `define AOU_FDI_FC_ABANDON(B) `B``_BIN(tx_flit, 0, 0) `B``_BIN(rx_flit, 1, 1)

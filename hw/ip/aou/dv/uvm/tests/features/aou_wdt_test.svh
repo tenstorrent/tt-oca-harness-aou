@@ -75,6 +75,9 @@ class aou_wdt_test extends aou_dp_base_test;
   function void configure_test();
     // The hung writes' responses wait in parallel, not one after another.
     cfg.l3_cfg.resp_fork = 1'b1;
+    // The watchdog's count ends at the response, so it must come when the
+    // remote die is done with the write, not held back for a batch.
+    cfg.l3_cfg.pol.wresp_batch = 0;
   endfunction
 
   function void end_of_elaboration_phase(uvm_phase phase);

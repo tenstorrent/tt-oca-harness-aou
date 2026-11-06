@@ -36,6 +36,10 @@ class aou_qos_order_test extends aou_dp_base_test;
   function void configure();
     super.configure();
     if (cfg.n_rp < 2) `uvm_fatal(get_type_name(), "needs a multi-RP CONFIG (4x512-sp64)")
+    // aou_qos_order_chk predicts the TX core's order between ports from their
+    // wire RPs; ports merged onto one lane add an arbitration stage it does not
+    // model (MAS 3.10.4), so the asymmetric RP mapping stays disabled.
+    cfg.rp_map_pct = 0;
   endfunction
 
   function void build_phase(uvm_phase phase);

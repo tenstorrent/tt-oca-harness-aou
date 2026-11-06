@@ -104,8 +104,8 @@ class Regress(unittest.TestCase):
     def test_dry_run_verilator(self):
         p = self.regress("--sim", "verilator", "--rid", "d1", "--dry-run")
         self.assertEqual(p.returncode, 0, p.stderr)
-        self.assertIn("assert: skipped", p.stdout)
-        self.assertIn("# build: 4 job(s)", p.stdout)     # t1, reg, l3_unit, axi_selftest
+        self.assertNotIn("assert: skipped", p.stdout)
+        self.assertIn("# build: 5 job(s)", p.stdout)     # t1, reg, t1 -assert, l3_unit, axi_selftest
         self.assertIn("run(s) in all", p.stdout)
         self.assertEqual(self.calls("build"), [])
         self.assertEqual(self.calls("run"), [])

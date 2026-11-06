@@ -166,7 +166,7 @@ class aou_axi_rand_seq extends aou_axi_base_seq;
     bit          is_small;
     bit [2:0]    mn;
     wr = ($urandom_range(99) < wr_pct);
-    l  = ($urandom_range(99) < lock_pct);
+    l  = ($urandom_range(99) < lock_pct) && p_sequencer.cfg.lock_en;
     b  = AOU_AXI_INCR;
     randcase
       fixed_pct:                   b = AOU_AXI_FIXED;
