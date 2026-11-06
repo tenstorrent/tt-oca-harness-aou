@@ -109,7 +109,7 @@ endclass
 // The smoke test's traffic under the Adapter's link events: Retrain, an L1
 // entry and remote exit, a clock-request wake, LinkError (entered mid-flit),
 // LinkReset and Disabled, each followed by the bringup again, and a Retrain
-// that ends in LinkError.
+// that ends in LinkError. pl_phyinrecenter reports the training here.
 class ucie_fdi_events_test extends ucie_fdi_smoke_test;
   `uvm_component_utils(ucie_fdi_events_test)
 
@@ -120,6 +120,7 @@ class ucie_fdi_events_test extends ucie_fdi_smoke_test;
   function void configure();
     n_flits = 600;
     env.lsm_cfg.le_mid_flit_pct = 100;
+    env.lsm_cfg.recenter_en = 1'b1;
   endfunction
 
   local task ev(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
@@ -145,4 +146,66 @@ class ucie_fdi_events_test extends ucie_fdi_smoke_test;
     ev(LSM_EV_IDLE);
     ev(LSM_EV_RETRAIN, LSM_LINKERROR);
   endtask
+endclass
+
+// Demotes the errors of one rule to infos and counts them (ucie_fdi_neg_test).
+class ucie_fdi_expect_catcher extends uvm_report_catcher;
+  string       rule;
+  int unsigned n;
+
+  function new(string name = "ucie_fdi_expect_catcher");
+    super.new(name);
+  endfunction
+
+  function action_e catch();
+    string m = get_message();
+    if (get_severity() == UVM_ERROR && rule != "" && m.substr(0, rule.len() - 1) == rule) begin
+      n++;
+      set_severity(UVM_INFO);
+    end
+    return THROW;
+  endfunction
+endclass
+
+// Negative test of the model's checks: the stub makes one deliberate violation
+// (+neg=dllp|retimer|stream, see ucie_pl_stub::bad), and the rule that must
+// catch it has to fire; its errors are expected and demoted. Any other error
+// still fails the run.
+class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
+  `uvm_component_utils(ucie_fdi_neg_test)
+
+  ucie_fdi_expect_catcher catcher;
+  string                  neg;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    n_flits = 60;
+    if (!$value$plusargs("neg=%s", neg)) neg = "stream";
+    catcher = new("catcher");
+    case (neg)
+      "dllp":    catcher.rule = "FDI-R62";
+      "retimer": catcher.rule = "FDI-R63";
+      "stream":  catcher.rule = "FDI-R64";
+      default:   `uvm_fatal(get_type_name(), {"+neg: unknown violation ", neg})
+    endcase
+    uvm_report_cb::add(null, catcher);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.bad = neg;
+  endfunction
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (catcher.n == 0)
+      `uvm_error(get_type_name(), $sformatf("%s: the stub's %s violation was not caught",
+                                            catcher.rule, neg))
+    else
+      `uvm_info(get_type_name(), $sformatf("%s caught the stub's %s violation (%0d reports)",
+                                           catcher.rule, neg, catcher.n), UVM_NONE)
+  endfunction
 endclass

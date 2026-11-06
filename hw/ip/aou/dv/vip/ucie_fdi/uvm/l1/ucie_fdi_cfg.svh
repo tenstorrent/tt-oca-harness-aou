@@ -40,6 +40,10 @@ class ucie_fdi_cfg extends uvm_object;
   // Link (UCIe r3.0 10.3.1). Without it a transfer is short only when the
   // sequence has no more flits ready.
   int unsigned   partial_beat_pct = 0;
+  // pl_stream, the stream ID of the data on this FDI (UCIe r3.0 Table
+  // 10-3): tied to this value, as an integration may do (r3.0 10.2.1), and the one lp_stream must carry with lp_valid (FDI-R64). The
+  // default is Stack 0 Streaming, matching ucie_lsm_cfg::protocol.
+  bit [7:0]      stream = UCIE_STREAM_S0_STREAMING;
 
   // Monitor
   bit            checks_en = 1'b1;
@@ -68,8 +72,8 @@ class ucie_fdi_cfg extends uvm_object;
 
   function string convert2string();
     return $sformatf({"phy=%0d beat_bytes=%0d active=%0b trdy=%s stall_pct=%0d mid=%0d ",
-                      "stall_hold=%0d..%0d trdy_free=%0b hold=%0b"}, phy, beat_bytes, is_active,
-                     trdy_policy.name(), stall_pct, stall_mid_pct, stall_hold_min,
-                     stall_hold_max, stall_trdy_free, tx_hold);
+                      "stall_hold=%0d..%0d trdy_free=%0b hold=%0b stream=%02h"}, phy, beat_bytes,
+                     is_active, trdy_policy.name(), stall_pct, stall_mid_pct, stall_hold_min,
+                     stall_hold_max, stall_trdy_free, tx_hold, stream);
   endfunction
 endclass

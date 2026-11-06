@@ -60,8 +60,27 @@ class ucie_lsm_agent extends uvm_agent;
     end
   endfunction
 
+  // What the Adapter reports must be encodable and agree with itself: a
+  // defined protocol, a speed within the negotiated maximum (above 32 GT/s
+  // needs pl_max_speedmode 1), a defined width, and a stream on every FDI that
+  // names the protocol.
+  local function void check_link_cfg();
+    if (!protocol_defined(cfg.protocol))
+      `uvm_fatal(get_type_name(), $sformatf("protocol %04b is reserved", cfg.protocol))
+    if (cfg.speedmode > 3'b101 && !cfg.max_speedmode)
+      `uvm_fatal(get_type_name(), $sformatf("speedmode %03b is above 32 GT/s with max_speedmode 0",
+                                            cfg.speedmode))
+    if (cfg.lnk_cfg == 3'b111)
+      `uvm_fatal(get_type_name(), "lnk_cfg 111b is reserved")
+    foreach (phy[p])
+      if (!stream_fits(cfg.protocol, phy[p].cfg.stream))
+        `uvm_fatal(get_type_name(), $sformatf("phy%0d stream %02h does not fit protocol %04b", p,
+                                              phy[p].cfg.stream, cfg.protocol))
+  endfunction
+
   function void connect_phase(uvm_phase phase);
     super.connect_phase(phase);
+    check_link_cfg();
     if (cfg.is_active) drv.seq_item_port.connect(sqr.seq_item_export);
   endfunction
 endclass

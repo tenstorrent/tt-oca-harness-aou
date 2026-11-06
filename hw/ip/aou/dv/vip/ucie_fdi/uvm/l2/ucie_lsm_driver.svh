@@ -23,6 +23,13 @@
 // trains again by itself, without waiting for a NOP->Active request
 // (§8.3.3.8 allows either trigger).
 //
+// The status outputs follow the state: pl_protocol_vld rises with
+// pl_inband_pres and falls on entry to LinkError or Reset (r3.0 Table 10-3),
+// pl_phyinl1 is high in L1 and, with cfg.recenter_en, pl_phyinrecenter while
+// the link trains. pl_protocol, pl_protocol_flitfmt, pl_speedmode,
+// pl_max_speedmode and pl_lnk_cfg hold the cfg's values; pl_phyinl2,
+// pl_cerror, pl_nferror and pl_trainerror stay 0 (no L2, no error reporting).
+//
 // Events can also end another way (ucie_lsm_item::to): a Retrain that ends in
 // LinkError, LinkReset or Disabled, a LinkReset or Disabled that escalates to
 // LinkError, and LSM_EV_ABORT, a bringup or a PM exit from L1 that the
@@ -98,6 +105,17 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // Everything the Adapter drives, back to its reset value; at time 0 and on
   // every reset.
   local task drive_idle();
+    lsm_vif.drv_cb.pl_protocol <= cfg.protocol;
+    lsm_vif.drv_cb.pl_protocol_flitfmt <= UCIE_FLITFMT_6;
+    lsm_vif.drv_cb.pl_speedmode <= cfg.speedmode;
+    lsm_vif.drv_cb.pl_max_speedmode <= cfg.max_speedmode;
+    lsm_vif.drv_cb.pl_lnk_cfg <= cfg.lnk_cfg;
+    lsm_vif.drv_cb.pl_phyinl2 <= 1'b0;
+    lsm_vif.drv_cb.pl_cerror <= 1'b0;
+    lsm_vif.drv_cb.pl_nferror <= 1'b0;
+    lsm_vif.drv_cb.pl_trainerror <= 1'b0;
+    lsm_vif.drv_cb.pl_protocol_vld <= 1'b0;
+    set_recenter(1'b0);
     set_state(LSM_RESET);
     set_inband(1'b0);
     set_clk_req(1'b0);
@@ -193,6 +211,13 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     if (!ok) `uvm_fatal(get_type_name(), {s.name(), " has no pl_state_sts encoding"})
     if (s != state) `uvm_info(get_type_name(), $sformatf("pl_state_sts %s -> %s (0x%0h)",
                                                          state.name(), s.name(), code), UVM_MEDIUM)
+    if (s != state && s inside {LSM_LINKERROR, LSM_RESET})
+      lsm_vif.drv_cb.pl_protocol_vld <= 1'b0;
+    lsm_vif.drv_cb.pl_phyinl1 <= s == LSM_L1;
+    // Retrain is training; Active and the link-down states are not. Reset
+    // keeps the value: a bringup raises it when training starts.
+    if (s == LSM_RETRAIN) set_recenter(1'b1);
+    else if (s != LSM_RESET) set_recenter(1'b0);
     state = s;
     if (s inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) down_reset = 1'b1;
     for (int p = 0; p < cfg.n_phy && p < 2; p++) begin
@@ -206,8 +231,15 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     return cfg.park_idle_phy && cfg.n_phy > 1 && p != cfg.active_phy;
   endfunction
 
+  // pl_protocol_vld is 1 whenever pl_inband_pres is (the values are valid
+  // before the Protocol Layer samples them, r3.0 Table 10-3).
   local task set_inband(bit v);
     lsm_vif.drv_cb.pl_inband_pres <= v;
+    if (v) lsm_vif.drv_cb.pl_protocol_vld <= 1'b1;
+  endtask
+
+  local task set_recenter(bit v);
+    lsm_vif.drv_cb.pl_phyinrecenter <= v && cfg.recenter_en;
   endtask
 
   local task set_clk_req(bit v);
@@ -335,6 +367,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     down_reset = 1'b0;
     wait_cycles(cfg.lat());
     clk_handshake(1'b1);
+    set_recenter(1'b1);
     wait_cycles(cfg.lat());
     set_inband(1'b1);
     if (!cfg.clk_req_hold_bringup) clk_handshake(1'b0);
@@ -605,6 +638,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         // Training done; pl_clk_req released with pl_inband_pres rising, so
         // the DUT waits for a trigger (the bringup test's cold start).
         clk_handshake(1'b1);
+        set_recenter(1'b1);
         wait_cycles(cfg.lat());
         set_inband(1'b1);
         clk_handshake(1'b0);

@@ -343,13 +343,28 @@ module tb_top;
   // ---------------------------------------------------------------------------
   // FDI: the mainband interfaces are BUS_W wide; the DUT uses the low WD bits.
   // ---------------------------------------------------------------------------
+  // The DUT has none of the FDI's other Protocol Layer outputs: its lp_stream
+  // is tied to Stack 0 Streaming (UCIe r3.0 10.2.1 allows the tie-off), the
+  // rest idle. The Adapter outputs it has no pins for stay open.
   logic [WD0-1:0] lp0_data;
   assign fdi_mb0.lp_data = BUS_W'(lp0_data);
   assign fdi_mb0.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
+  assign fdi_mb0.lp_stream = ucie_fdi_pkg::UCIE_STREAM_S0_STREAMING;
+  assign fdi_mb0.lp_corrupt_crc = 1'b0;
+  assign fdi_mb0.lp_dllp = '0;
+  assign fdi_mb0.lp_dllp_valid = 1'b0;
+  assign fdi_mb0.lp_dllp_ofc = 1'b0;
+  assign fdi_mb0.lp_retimer_crd = 1'b0;
 `ifdef TWO_PHY
   logic [WD1-1:0] lp1_data;
   assign fdi_mb1.lp_data = BUS_W'(lp1_data);
   assign fdi_mb1.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
+  assign fdi_mb1.lp_stream = ucie_fdi_pkg::UCIE_STREAM_S0_STREAMING;
+  assign fdi_mb1.lp_corrupt_crc = 1'b0;
+  assign fdi_mb1.lp_dllp = '0;
+  assign fdi_mb1.lp_dllp_valid = 1'b0;
+  assign fdi_mb1.lp_dllp_ofc = 1'b0;
+  assign fdi_mb1.lp_retimer_crd = 1'b0;
 `endif
 
   // Core-to-bringup triggers for the bringup reference model and the status

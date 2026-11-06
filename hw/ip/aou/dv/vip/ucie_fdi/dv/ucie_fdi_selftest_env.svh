@@ -123,6 +123,7 @@ class ucie_fdi_selftest_env extends uvm_env;
     lsm.phy.push_back(fdi);
     pl = ucie_pl_stub::type_id::create("pl", this);
     pl.beat_bytes = fdi_cfg.beat_bytes;
+    pl.stream = fdi_cfg.stream;
     if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", pl.lsm))
       `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
     sb = ucie_fdi_selftest_sb::type_id::create("sb", this);

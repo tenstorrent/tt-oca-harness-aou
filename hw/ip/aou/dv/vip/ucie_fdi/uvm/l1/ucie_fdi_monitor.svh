@@ -71,11 +71,11 @@ class ucie_fdi_monitor extends uvm_monitor;
   local bit           abandon_h_done;  // ... right after a whole 128B half: its cancel may follow
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R01, R02, R05, R07, R08, R09, R10, R12, R13, R35, R42, R43, R44, R45, R57, N_RULES
+    R01, R02, R05, R07, R08, R09, R10, R12, R13, R35, R42, R43, R44, R45, R57, R64, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
       "FDI-R01", "FDI-R02", "FDI-R05", "FDI-R07", "FDI-R08", "FDI-R09", "FDI-R10", "FDI-R12",
-      "FDI-R13", "FDI-R35", "FDI-R42", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57"};
+      "FDI-R13", "FDI-R35", "FDI-R42", "FDI-R43", "FDI-R44", "FDI-R45", "FDI-R57", "FDI-R64"};
   local int unsigned  n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
@@ -172,6 +172,12 @@ class ucie_fdi_monitor extends uvm_monitor;
     bit t = vif.mon_cb.pl_trdy === 1'b1;
     if (v) chk(R42);
     if (v && !i) err(R42, "lp_valid without lp_irdy");
+    // lp_stream is relevant with lp_valid (UCIe r3.0 Table 10-3); checked on
+    // a flit's first beat, so a wrong value is one report per flit.
+    if (v && tx_beat == 0) chk(R64);
+    if (v && tx_beat == 0 && vif.mon_cb.lp_stream !== cfg.stream)
+      err(R64, $sformatf("lp_stream %02h with lp_valid; the link carries stream %02h",
+                         vif.mon_cb.lp_stream, cfg.stream));
     if (sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace) chk(R44);
     if (i && sts == FDI_STS_RESET && since_reset_sts >= cfg.irdy_reset_grace)
       err(R44, "lp_irdy high while pl_state_sts is Reset");

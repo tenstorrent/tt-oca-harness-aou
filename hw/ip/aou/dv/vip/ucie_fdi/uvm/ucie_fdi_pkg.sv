@@ -23,6 +23,48 @@ package ucie_fdi_pkg;
   localparam logic [3:0] FDI_STS_ACTIVE = 4'h1;
   localparam logic [3:0] FDI_STS_RESET  = 4'h0;
 
+  // What the Adapter reports as negotiated (UCIe r3.0 Table 10-3). pl_protocol: bit 3 is "with Management Transport" (1001b is
+  // Management Transport alone); the low bits 000b PCIe, 011b CXL.1 (CXL.io),
+  // 100b..110b CXL.2..CXL.4 (CXL.io and CXL.cachemem), 111b Streaming.
+  localparam logic [3:0] UCIE_PROTO_PCIE      = 4'b0000;
+  localparam logic [3:0] UCIE_PROTO_CXL1      = 4'b0011;
+  localparam logic [3:0] UCIE_PROTO_CXL2      = 4'b0100;
+  localparam logic [3:0] UCIE_PROTO_CXL3      = 4'b0101;
+  localparam logic [3:0] UCIE_PROTO_CXL4      = 4'b0110;
+  localparam logic [3:0] UCIE_PROTO_STREAMING = 4'b0111;
+  localparam logic [3:0] UCIE_PROTO_MGMT      = 4'b1001;
+  // pl_protocol_flitfmt: the model carries Format 6 only.
+  localparam logic [3:0] UCIE_FLITFMT_6       = 4'b0110;
+  // pl_stream/lp_stream: [7:4] the stack (0 or 1), [3:0] the protocol: 1 PCIe,
+  // 2 CXL.io, 3 CXL.cachemem, 4 Streaming, 5 Management Transport.
+  localparam logic [7:0] UCIE_STREAM_S0_STREAMING = 8'h04;
+
+  function automatic bit protocol_defined(logic [3:0] p);
+    return p inside {4'b0000, [4'b0011:4'b1001], [4'b1011:4'b1111]};
+  endfunction
+
+  // CXL.cachemem is part of the protocol: the only case lp_corrupt_crc applies.
+  function automatic bit protocol_has_cachemem(logic [3:0] p);
+    return p[2:0] inside {3'b100, 3'b101, 3'b110};
+  endfunction
+
+  function automatic bit protocol_is_streaming(logic [3:0] p);
+    return p[2:0] == 3'b111;
+  endfunction
+
+  // A stream ID that is defined and names a protocol the link negotiated.
+  function automatic bit stream_fits(logic [3:0] p, logic [7:0] s);
+    if (!(s[7:4] inside {4'h0, 4'h1})) return 1'b0;
+    case (s[3:0])
+      4'h1:    return p == UCIE_PROTO_PCIE || p == 4'b1000;
+      4'h2:    return p[2:0] inside {3'b011, 3'b100, 3'b101, 3'b110};
+      4'h3:    return protocol_has_cachemem(p);
+      4'h4:    return protocol_is_streaming(p);
+      4'h5:    return p[3];
+      default: return 1'b0;
+    endcase
+  endfunction
+
   // TX: Protocol Layer (DUT) to Adapter. RX: Adapter to Protocol Layer (DUT).
   typedef enum bit {UCIE_FDI_TX, UCIE_FDI_RX} ucie_fdi_dir_e;
 

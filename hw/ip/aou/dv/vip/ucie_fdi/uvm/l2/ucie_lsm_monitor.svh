@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Samples the link-state signals every clock and checks the Protocol Layer
-// (DUT) side of the FDI handshakes (UCIe r1.1 8.2.3-8.2.8). A protocol layer,
+// (DUT) side of the FDI handshakes (UCIe r1.1 8.2.3-8.2.8), and the Protocol
+// Layer outputs on each FDI that the negotiated protocol rules out (DLLPs,
+// Retimer credits). A protocol layer,
 // checker or scoreboard that follows the link state implements
 // ucie_lsm_observer and registers with add_observer(); every clock, after the
 // rule checks, each observer gets this clock's sample and the previous one.
@@ -19,14 +21,17 @@ class ucie_lsm_monitor extends uvm_monitor;
   local ucie_lsm_observer observers[$];
   local int unsigned clk_ack_late;
   local int unsigned rx_sts_late;
+  local bit          prev_vld;
+  local bit          prev_dllp[2];
+  local bit          prev_crd[2];
 
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, N_RULES
+    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, R62, R63, R65, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
       "FDI-R14", "FDI-R15", "FDI-R16", "FDI-R18", "FDI-R19", "FDI-R25", "FDI-R26", "FDI-R28",
-      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47"};
+      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R62", "FDI-R63", "FDI-R65"};
   local int unsigned n_chk[N_RULES];
 
   function new(string name, uvm_component parent);
@@ -42,7 +47,15 @@ class ucie_lsm_monitor extends uvm_monitor;
     forever begin
       @(lsm_vif.mon_cb);
       capture();
-      if (cur.rst_n && prev.rst_n) check_rules();
+      if (cur.rst_n && prev.rst_n) begin
+        check_rules();
+        check_status();
+        for (int p = 0; p < cfg.n_phy && p < 2; p++) check_phy_outputs(p);
+      end else begin
+        prev_vld = 1'b0;
+        prev_dllp = '{default: 1'b0};
+        prev_crd = '{default: 1'b0};
+      end
       foreach (observers[i]) observers[i].observe(cur, prev);
       prev = cur;
     end
@@ -140,6 +153,45 @@ class ucie_lsm_monitor extends uvm_monitor;
     if (p.sts == LSM_ACTIVE && !(c.sts inside {LSM_ACTIVE, LSM_LINKERROR}) &&
         (p.rx_active_req || p.rx_active_sts))
       err(R29, $sformatf("left Active for %s with rx_active req/sts still high", c.sts.name()));
+  endfunction
+
+  // Adapter-side: pl_protocol_vld is 1 whenever pl_inband_pres is 1 in Reset
+  // (the Protocol Layer samples pl_protocol then), and falls only on entry to
+  // LinkError or Reset (r3.0 Table 10-3 pl_protocol_vld).
+  local function void check_status();
+    bit vld = lsm_vif.mon_cb.pl_protocol_vld === 1'b1;
+    if (cur.inband_pres && cur.sts == LSM_RESET) begin
+      chk(R65);
+      if (!vld) err(R65, "pl_inband_pres is 1 in Reset with pl_protocol_vld 0");
+    end
+    if (!vld && prev_vld) begin
+      chk(R65);
+      if (!(cur.sts != prev.sts && cur.sts inside {LSM_LINKERROR, LSM_RESET}))
+        err(R65, $sformatf("pl_protocol_vld fell in %s, not on entry to LinkError or Reset",
+                           cur.sts.name()));
+    end
+    prev_vld = vld;
+  endfunction
+
+  // Protocol Layer outputs the link rules out: no DLLPs when the negotiated
+  // protocol is Streaming (UCIe r3.0 Table 10-3 lp_dllp: not
+  // used for Streaming), and no Retimer credits (the model has no Retimer; on
+  // FDI they exist for Raw Format only). One report per assertion.
+  local function void check_phy_outputs(int unsigned p);
+    bit dllp = mb_vif[p].mon_cb.lp_dllp_valid !== 1'b0;
+    bit crd = mb_vif[p].mon_cb.lp_retimer_crd !== 1'b0;
+    if (protocol_is_streaming(cfg.protocol)) begin
+      chk(R62);
+      if (dllp && !prev_dllp[p])
+        err(R62, $sformatf("phy%0d lp_dllp_valid=%0b with protocol %04b (Streaming)", p,
+                           mb_vif[p].mon_cb.lp_dllp_valid, cfg.protocol));
+    end
+    chk(R63);
+    if (crd && !prev_crd[p])
+      err(R63, $sformatf("phy%0d lp_retimer_crd=%0b: no Retimer, and Format 6 is not Raw", p,
+                         mb_vif[p].mon_cb.lp_retimer_crd));
+    prev_dllp[p] = dllp;
+    prev_crd[p] = crd;
   endfunction
 
   function void check_phase(uvm_phase phase);
