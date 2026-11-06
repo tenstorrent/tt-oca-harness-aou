@@ -51,7 +51,7 @@ interface ucie_fdi_lsm_if (
 
   clocking mon_cb @(posedge clk);
     input pl_inband_pres, pl_clk_req, pl_wake_ack, pl_rx_active_req, pl_protocol_vld,
-          pl_phyinrecenter, pl_phyinl1, lp_state_req, lp_wake_req, lp_clk_ack,
+          pl_phyinrecenter, pl_phyinl1, pl_phyinl2, lp_state_req, lp_wake_req, lp_clk_ack,
           lp_rx_active_sts, lp_linkerror, rst_n;
   endclocking
 

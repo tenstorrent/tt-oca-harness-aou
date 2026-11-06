@@ -29,13 +29,21 @@ class ucie_lsm_monitor extends uvm_monitor;
   local bit          prev_dllp[2];
   local bit          prev_crd[2];
   local bit          prev_cc[2];
+  local bit [2:0]    phy_lvl;      // pl_phyinl1, pl_phyinl2, pl_phyinrecenter this clock
+  local bit [2:0]    prev_phy_lvl; // ... and the previous one
+  local int unsigned lvl_wait;     // FDI-R20: cycles a level move waits for pl_clk_req; 0: none
+  local ucie_lsm_state_e lvl_in;   // ... and the state it moved in
+  local bit          le_ack_wait;  // FDI-R21: a LinkError entered before its pl_clk_req was acked
+  local ucie_lsm_state_e le_from;  // ... and the state it left
 
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R14, R15, R16, R18, R19, R25, R26, R28, R29, R33, R46, R47, R49, R61, R62, R63, R65, N_RULES
+    R14, R15, R16, R18, R19, R20, R21, R22, R25, R26, R28, R29, R33, R46, R47, R49, R61, R62,
+    R63, R65, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
-      "FDI-R14", "FDI-R15", "FDI-R16", "FDI-R18", "FDI-R19", "FDI-R25", "FDI-R26", "FDI-R28",
+      "FDI-R14", "FDI-R15", "FDI-R16", "FDI-R18", "FDI-R19", "FDI-R20",
+      "FDI-R21", "FDI-R22", "FDI-R25", "FDI-R26", "FDI-R28",
       "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R49", "FDI-R61", "FDI-R62", "FDI-R63",
       "FDI-R65"};
   local int unsigned n_chk[N_RULES];
@@ -55,10 +63,13 @@ class ucie_lsm_monitor extends uvm_monitor;
       capture();
       if (cur.rst_n && prev.rst_n) begin
         check_rules();
+        check_clk_req(cur, prev);
         check_status();
         for (int p = 0; p < cfg.n_phy && p < 2; p++) check_phy_outputs(p);
       end else begin
         wake_wait = 0;
+        lvl_wait = 0;
+        le_ack_wait = 1'b0;
         prev_vld = 1'b0;
         prev_dllp = '{default: 1'b0};
         prev_crd = '{default: 1'b0};
@@ -66,6 +77,7 @@ class ucie_lsm_monitor extends uvm_monitor;
       end
       foreach (observers[i]) observers[i].observe(cur, prev);
       prev = cur;
+      prev_phy_lvl = phy_lvl;
     end
   endtask
 
@@ -86,6 +98,8 @@ class ucie_lsm_monitor extends uvm_monitor;
     cur.clk_ack        = lsm_vif.mon_cb.lp_clk_ack === 1'b1;
     cur.rx_active_sts  = lsm_vif.mon_cb.lp_rx_active_sts === 1'b1;
     cur.linkerror      = lsm_vif.mon_cb.lp_linkerror === 1'b1;
+    phy_lvl = {lsm_vif.mon_cb.pl_phyinl1 === 1'b1, lsm_vif.mon_cb.pl_phyinl2 === 1'b1,
+               lsm_vif.mon_cb.pl_phyinrecenter === 1'b1};
   endfunction
 
   local function void err(rule_e r, string msg);
@@ -202,6 +216,70 @@ class ucie_lsm_monitor extends uvm_monitor;
                         "status moved on"},
                        wake_from.name(), cfg.wake_req_window));
     wake_wait = 0;
+  endfunction
+
+  // Adapter-side, a self-check of the L2 driver: the pl_clk_req handshake
+  // around what a Protocol Layer may miss while its clocks are gated (UCIe r3.0
+  // §10.2.3: in Reset, LinkReset, Disabled and PM; lsm_gated).
+  //  FDI-R22, §10.2.3.2 rule 7: a status change out of such a state to anything
+  //    but LinkError has pl_clk_req high in the clock before it (raised before
+  //    the change and held until it).
+  //  FDI-R21, rule 6: a change from such a state to LinkError has pl_clk_req
+  //    high before it too, or else lp_clk_ack answers pl_clk_req before the
+  //    next status change ("Adapter must wait for lp_clk_ack before performing
+  //    another state transition").
+  //  FDI-R20, rule 5: a move of pl_inband_pres, pl_rx_active_req, pl_phyinl1,
+  //    pl_phyinl2 or pl_phyinrecenter in such a state is seen with lp_clk_ack
+  //    high (the Protocol Layer's clocks run), or a handshake follows: the
+  //    signal may move first, but pl_clk_req must then rise within
+  //    clk_req_window cycles (a liveness bound; r3.0 gives none) and stay high
+  //    until lp_clk_ack. Waiting for lp_clk_ack itself is the Protocol Layer's
+  //    part (FDI-R18 in the driver).
+  local function void check_clk_req(ucie_lsm_obs_t c, ucie_lsm_obs_t p);
+    bit moved = c.sts != p.sts;
+    if (le_ack_wait && moved) begin
+      err(R21, $sformatf({"%s -> LinkError with pl_clk_req after it, then -> %s before ",
+                          "lp_clk_ack answered it"}, le_from.name(), c.sts.name()));
+      le_ack_wait = 1'b0;
+    end
+    if (c.clk_req && c.clk_ack) le_ack_wait = 1'b0;
+    if (moved && lsm_gated(p.sts)) begin
+      if (c.sts == LSM_LINKERROR) begin
+        chk(R21);
+        if (!p.clk_req && !(c.clk_req && c.clk_ack)) begin
+          le_ack_wait = 1'b1;
+          le_from = p.sts;
+        end
+      end else begin
+        chk(R22);
+        if (!p.clk_req)
+          err(R22, $sformatf("pl_state_sts %s -> %s without pl_clk_req asserted before the change",
+                             p.sts.name(), c.sts.name()));
+      end
+    end
+    if (lvl_wait != 0) begin
+      if (c.clk_ack) begin
+        lvl_wait = 0;
+      end else if (!c.clk_req) begin
+        if (p.clk_req) lvl_late("pl_clk_req fell before lp_clk_ack answered it");
+        else if (++lvl_wait > cfg.clk_req_window)
+          lvl_late($sformatf("no pl_clk_req within %0d cycles", cfg.clk_req_window));
+      end
+    end
+    if (lsm_gated(p.sts) && {c.inband_pres, c.rx_active_req, phy_lvl} !=
+                            {p.inband_pres, p.rx_active_req, prev_phy_lvl}) begin
+      chk(R20);
+      if (!c.clk_ack && lvl_wait == 0) begin
+        lvl_wait = 1;
+        lvl_in = p.sts;
+      end
+    end
+  endfunction
+
+  local function void lvl_late(string why);
+    err(R20, {"a level signal (pl_inband_pres, pl_rx_active_req, pl_phyinl1/l2/recenter) moved ",
+              "in ", lvl_in.name(), " without a pl_clk_req handshake: ", why});
+    lvl_wait = 0;
   endfunction
 
   // Adapter-side: pl_protocol_vld is 1 whenever pl_inband_pres is 1 in Reset

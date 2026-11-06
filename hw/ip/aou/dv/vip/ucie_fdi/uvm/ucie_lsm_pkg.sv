@@ -119,6 +119,14 @@ package ucie_lsm_pkg;
     endcase
   endfunction
 
+  // States in which the Adapter and the Protocol Layer may gate their clocks
+  // (UCIe r3.0 §10.2.3): Reset, LinkReset, Disabled and the PM states. Leaving
+  // one, and moving a level signal in one, takes the pl_clk_req handshake
+  // (§10.2.3.2 rules 5 to 7).
+  function automatic bit lsm_gated(ucie_lsm_state_e s);
+    return s inside {LSM_RESET, LSM_LINKRESET, LSM_DISABLED, LSM_L1, LSM_L2};
+  endfunction
+
   `include "l2/ucie_lsm_cfg.svh"
   `include "l2/ucie_lsm_obs.svh"
   `include "l2/ucie_lsm_observer.svh"

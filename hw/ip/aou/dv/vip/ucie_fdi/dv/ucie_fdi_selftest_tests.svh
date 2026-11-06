@@ -170,13 +170,14 @@ class ucie_fdi_cov_test extends ucie_fdi_events_test;
     env.fdi_cfg.stall_hold_min = 0;
   endfunction
 
-  local task cev(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
+  protected task cev(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
     ucie_lsm_event_seq s = ucie_lsm_event_seq::of(kind);
     s.ev_to = to;
     s.start(env.lsm.sqr);
   endtask
 
-  local task abort(ucie_lsm_abort_e at, ucie_lsm_state_e to, int unsigned gap, bit in_l1 = 1'b0);
+  protected task abort(ucie_lsm_abort_e at, ucie_lsm_state_e to, int unsigned gap,
+                       bit in_l1 = 1'b0);
     ucie_lsm_event_seq s = ucie_lsm_event_seq::of(LSM_EV_ABORT);
     s.ev_to = to;
     s.ev_at = at;
@@ -187,7 +188,7 @@ class ucie_fdi_cov_test extends ucie_fdi_events_test;
   endtask
 
   // Wait (bounded) until the link is Active again with no event running.
-  local task wait_active();
+  protected task wait_active();
     int unsigned n;
     do begin
       @(env.pl.lsm.mon_cb);
@@ -265,6 +266,102 @@ class ucie_fdi_error_test extends ucie_fdi_smoke_test;
     super.check_phase(phase);
     if (env.fdi.mon.n_rx_errors == 0) `uvm_error(get_type_name(), "no pl_error was sent")
     if (env.fdi.mon.n_tx_corrupt == 0) `uvm_error(get_type_name(), "no lp_corrupt_crc was seen")
+  endfunction
+endclass
+
+// The pl_clk_req handshake on every exit from a state where the Protocol
+// Layer may be clock gated (UCIe r3.0 §10.2.3.2 rules 5 to 7), with a stub
+// that gates its clock whenever it may and acknowledges pl_clk_req only
+// `+clk_ack_delay=N` clocks later (default 3; ucie_pl_stub clk_gate): the
+// cov test's events and traffic, before them LinkReset, Disabled and
+// LinkError from Active, from Reset and from L1, ending in Reset and in a
+// bringup; LinkReset and Disabled escalated to LinkError from Reset; both
+// L1 exits; two pl_inband_pres drops in Reset (one while the stub requests
+// Active); and aborts at the points the cov test leaves out (a pl_inband_pres
+// drop sent with its pl_clk_req, LinkReset or Disabled the cycle the
+// Protocol Layer requests Active, a LinkError reported before its pl_clk_req).
+// +clk_hold=0|1 sets clk_req_hold_bringup (default 1). The model's self-checks
+// (FDI-R20, R21, R22) and the stub's must stay silent; the stub must have
+// been gated at all.
+class ucie_fdi_clk_req_test extends ucie_fdi_cov_test;
+  `uvm_component_utils(ucie_fdi_clk_req_test)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    bit hold = 1'b1;
+    super.configure();
+    void'($value$plusargs("clk_hold=%b", hold));
+    env.lsm_cfg.clk_req_hold_bringup = hold;
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.clk_gate = 1'b1;
+    env.pl.clk_ack_delay = 3;
+    void'($value$plusargs("clk_ack_delay=%d", env.pl.clk_ack_delay));
+    `uvm_info(get_type_name(), $sformatf("clk_req_hold_bringup %0b, lp_clk_ack delay %0d",
+              env.lsm_cfg.clk_req_hold_bringup, env.pl.clk_ack_delay), UVM_NONE)
+  endfunction
+
+  // A link-down that leaves the link in Reset (no bringup after it).
+  local task down(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
+    env.lsm_cfg.rebringup_after_down = 1'b0;
+    cev(kind, to);
+    env.lsm_cfg.rebringup_after_down = 1'b1;
+  endtask
+
+  task events();
+    // From Active, then from Reset, the link left down.
+    down(LSM_EV_LINK_RESET);
+    down(LSM_EV_DISABLED);
+    down(LSM_EV_LINK_RESET);
+    down(LSM_EV_LINKERROR);
+    // pl_inband_pres in Reset: low already, so it rises at the end; then a
+    // true drop while the stub requests Active.
+    cev(LSM_EV_INBAND_DROP);
+    cev(LSM_EV_INBAND_DROP);
+    down(LSM_EV_LINK_RESET, LSM_LINKERROR);
+    down(LSM_EV_DISABLED, LSM_LINKERROR);
+    cev(LSM_EV_DISABLED);
+    // From L1, each ending in a bringup, and one left down.
+    cev(LSM_EV_L1_ENTRY);
+    cev(LSM_EV_LINK_RESET);
+    cev(LSM_EV_L1_ENTRY);
+    cev(LSM_EV_DISABLED);
+    cev(LSM_EV_L1_ENTRY);
+    cev(LSM_EV_LINKERROR);
+    cev(LSM_EV_L1_ENTRY);
+    down(LSM_EV_LINK_RESET);
+    cev(LSM_EV_BRINGUP);
+    // Both L1 exits.
+    cev(LSM_EV_L1_ENTRY);
+    cev(LSM_EV_L1_EXIT);
+    cev(LSM_EV_L1_ENTRY);
+    env.pl.wake_in_l1 = 1'b1;
+    wait_active();
+    env.pl.wake_in_l1 = 1'b0;
+    // Aborts the cov test leaves out.
+    abort(LSM_AB_WAKE, LSM_RESET, 0);
+    abort(LSM_AB_REQ_ACTIVE, LSM_LINKRESET, 0);
+    abort(LSM_AB_REQ_ACTIVE, LSM_DISABLED, 0);
+    abort(LSM_AB_RESET, LSM_LINKERROR, 0);
+    abort(LSM_AB_WAKE, LSM_LINKERROR, 0);
+    abort(LSM_AB_WAKE, LSM_LINKRESET, 1);
+    super.events();
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (env.pl.n_gated == 0) `uvm_error(get_type_name(), "the stub never gated its clock")
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf("clocks the stub was clock gated: %0d", env.pl.n_gated),
+              UVM_NONE)
   endfunction
 endclass
 
@@ -355,9 +452,12 @@ class ucie_fdi_legal_test extends ucie_fdi_cov_test;
   endfunction
 endclass
 
-// Demotes the errors of one rule to infos and counts them (ucie_fdi_neg_test).
+// Demotes the errors of one rule to infos and counts them (ucie_fdi_neg_test);
+// those of `also`, a rule the same fault breaks on the way, are demoted
+// without being counted.
 class ucie_fdi_expect_catcher extends uvm_report_catcher;
   string       rule;
+  string       also;
   int unsigned n;
 
   function new(string name = "ucie_fdi_expect_catcher");
@@ -368,6 +468,9 @@ class ucie_fdi_expect_catcher extends uvm_report_catcher;
     string m = get_message();
     if (get_severity() == UVM_ERROR && rule != "" && m.substr(0, rule.len() - 1) == rule) begin
       n++;
+      set_severity(UVM_INFO);
+    end else if (get_severity() == UVM_ERROR && also != "" &&
+                 m.substr(0, also.len() - 1) == also) begin
       set_severity(UVM_INFO);
     end
     return THROW;
@@ -382,7 +485,11 @@ endclass
 // while the stub presents a flit in Retrain (needs an FDI of 256 B or more,
 // where that transfer is a whole flit), with +neg=le_exit it reports Reset
 // for a clock while the stub holds lp_linkerror in LinkError, with
-// +neg=rx_inactive it drops pl_rx_active_req in Active while flits go on. The
+// +neg=rx_inactive it drops pl_rx_active_req in Active while flits go on, and
+// with clk_exit, le_after and level it breaks the pl_clk_req handshake around
+// a LinkReset, a LinkError from Reset and a level signal in Reset (see the
+// top; FDI-R22, R21, R20). +neg=inband_active asks the model for a
+// pl_inband_pres drop in Active, a usage error the driver refuses. The
 // rule that must catch it has to fire, as often as the violation is made
 // (wake_held: the first bringup and the one after each of three LinkErrors);
 // its errors are expected and demoted. Any other error still fails the run.
@@ -423,7 +530,16 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
         catcher.rule = "FDI-R16";
         min_n = 4;
       end
-      "le_exit":     catcher.rule = "FDI-R49";
+      "le_exit": begin
+        // The Reset the top forces also re-enters LinkError from Reset with
+        // no pl_clk_req (r3.0 §10.2.3.2 rule 6).
+        catcher.rule = "FDI-R49";
+        catcher.also = "FDI-R21";
+      end
+      "clk_exit":    catcher.rule = "FDI-R22";
+      "le_after":    catcher.rule = "FDI-R21";
+      "level":       catcher.rule = "FDI-R20";
+      "inband_active": catcher.rule = "LSM_EV_INBAND_DROP";
       "rx_inactive": catcher.rule = "FDI-R35";
       "xfer": begin
         catcher.rule = "FDI-R43";
@@ -439,6 +555,8 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
     super.connect_phase(phase);
     env.pl.bad = neg;
     env.pl.early_present = neg inside {"xfer", "irdy_reset"};
+    // le_after: an acknowledge slow enough for the top to strike before it.
+    if (neg == "le_after") env.pl.clk_ack_delay = 4;
   endfunction
 
   local task nev(ucie_lsm_ev_e kind);
@@ -464,6 +582,27 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       nev(LSM_EV_LINKERROR);
       return;
     end
+    case (neg)
+      "clk_exit", "level": begin
+        nev(LSM_EV_LINK_RESET);
+        return;
+      end
+      "inband_active": begin
+        nev(LSM_EV_INBAND_DROP);
+        return;
+      end
+      "le_after": begin
+        // A LinkError from Reset reported before its pl_clk_req (rule 6's
+        // second option), which the top cuts short with a Reset.
+        ucie_lsm_event_seq s = ucie_lsm_event_seq::of(LSM_EV_ABORT);
+        s.ev_to = LSM_LINKERROR;
+        s.ev_at = LSM_AB_RESET;
+        s.ev_gap = 0;
+        s.start(env.lsm.sqr);
+        return;
+      end
+      default: ;
+    endcase
     if (!(neg inside {"xfer", "irdy_reset"})) return;
     wait_flit_queued(env);
     env.fdi_cfg.tx_hold = 1'b1;

@@ -23,7 +23,13 @@ class ucie_lsm_cfg extends uvm_object;
   int unsigned  dwell_max = 40;
 
   bit           auto_bringup = 1'b1;     // bring the link up after every reset
-  bit           clk_req_hold_bringup = 1'b1; // keep pl_clk_req until the state leaves Reset
+  // 1: the bringup holds pl_clk_req from before pl_inband_pres until the state
+  // has left Reset (UCIe r3.0 §10.2.3.2 rule 5's recommendation). 0: it
+  // releases it as pl_inband_pres rises, so a Protocol Layer may gate its
+  // clocks in Reset and must wake by itself to request Active; pl_clk_req is
+  // raised again before pl_rx_active_req and the exit from Reset (rules 5 and
+  // 7), so both settings are within r3.0.
+  bit           clk_req_hold_bringup = 1'b1;
   bit           rebringup_after_down = 1'b1; // LinkError/LinkReset events end with a bringup
   int unsigned  req_timeout = 20000;     // cycles to wait for a DUT request; 0 waits forever
   bit           react_en = 1'b1;         // answer the DUT's lp_linkerror
@@ -77,6 +83,12 @@ class ucie_lsm_cfg extends uvm_object;
   // rule 5 lets the request go first); 0 asks for it in the very cycle of the
   // request.
   int unsigned  wake_req_window = 16;
+  // FDI-R20, a self-check of the Adapter: a level signal (pl_inband_pres,
+  // pl_rx_active_req, pl_phyinl1, pl_phyinl2, pl_phyinrecenter) that moves
+  // while the Protocol Layer may be clock gated needs a pl_clk_req handshake;
+  // r3.0 §10.2.3.2 rule 5 lets the signal move first but gives no time, so
+  // pl_clk_req must rise within this many cycles (a liveness bound).
+  int unsigned  clk_req_window = 16;
   // A LinkError the Adapter must hold because lp_linkerror stays 1 (r3.0 Table
   // 10-3): report it once (an info) after this many cycles past the dwell (0:
   // never). The Adapter keeps waiting either way; holding is legal.
