@@ -60,6 +60,14 @@ package ucie_lsm_pkg;
                          // Active entry
   } ucie_lsm_abort_e;
 
+  // When the Adapter trains the link again after a link-down (LinkError,
+  // LinkReset or Disabled -> Reset; UCIe r3.0 §10.3.3.8, ucie_lsm_cfg::restart_on).
+  typedef enum bit [1:0] {
+    LSM_RESTART_SW,      // software's Start UCIe Link Training, sw_restart_delay cycles later
+    LSM_RESTART_PL,      // the Protocol Layer's NOP->Active on lp_state_req in Reset
+    LSM_RESTART_EITHER   // whichever comes first
+  } ucie_lsm_restart_e;
+
   // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts and lp_state_req.
   // States without a code return 4'hF with ok=0.
   function automatic logic [3:0] sts_code(ucie_lsm_state_e s, output bit ok);

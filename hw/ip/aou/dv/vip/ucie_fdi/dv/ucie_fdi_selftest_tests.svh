@@ -365,6 +365,113 @@ class ucie_fdi_clk_req_test extends ucie_fdi_cov_test;
   endfunction
 endclass
 
+// The exit from Reset (UCIe r3.0 §10.3.3.1 rule 1, §10.3.3.8) and the
+// rx_active handshake ahead of the request (§10.2.7 rule 1), on the cov test's
+// events and traffic, with +reset_req=:
+//  held      the stub requests Active in LinkError, LinkReset and Disabled and
+//            holds it into Reset for 40 clocks of pl_inband_pres, with a clock
+//            of LinkReset halfway; the Adapter must wait for its NOP, then
+//            Active (the stub reports otherwise);
+//  early     the stub gives NOP->Active in Reset before pl_inband_pres, and
+//            returns to NOP or holds Active; nothing may hang, and after a
+//            trigger withdrawn to NOP the Adapter must wait for the next
+//            NOP->Active (the stub reports otherwise);
+//  restart   the same, with the training-trigger policy (restart_on PL) and
+//            software's delay at 20000 clocks: after every link-down
+//            pl_inband_pres must follow the trigger within 300 clocks, and a
+//            link left down (rebringup_after_down 0) must come up on it;
+//  either    restart_on EITHER, the trigger in half the Resets;
+//  rx_first  remote_active_first_pct 100: the Adapter starts the rx_active
+//            handshake before the request, in Reset and in Retrain (both
+//            must happen).
+// +clk_hold=0|1 sets clk_req_hold_bringup (default 1). Any error fails it.
+class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
+  `uvm_component_utils(ucie_fdi_reset_req_test)
+
+  string mode = "held";
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    bit hold = 1'b1;
+    super.configure();
+    void'($value$plusargs("reset_req=%s", mode));
+    void'($value$plusargs("clk_hold=%b", hold));
+    env.lsm_cfg.clk_req_hold_bringup = hold;
+    case (mode)
+      "held", "early": ;
+      "restart": env.lsm_cfg.restart_on = LSM_RESTART_PL;
+      "either":  env.lsm_cfg.restart_on = LSM_RESTART_EITHER;
+      "rx_first": env.lsm_cfg.remote_active_first_pct = 100;
+      default: `uvm_fatal(get_type_name(), {"+reset_req: unknown mode ", mode})
+    endcase
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.held_active = mode == "held";
+    env.pl.early_trigger = mode inside {"early", "restart", "either"};
+    env.pl.remote_first = env.lsm_cfg.remote_active_first_pct != 0;
+    if (mode == "either") env.pl.early_pct = 50;
+    if (mode == "restart") begin
+      env.lsm_cfg.sw_restart_delay = 20000;
+      env.pl.restart_bound = 300;
+    end
+    `uvm_info(get_type_name(), $sformatf("reset_req %s: %s", mode, env.lsm_cfg.convert2string()),
+              UVM_NONE)
+  endfunction
+
+  task events();
+    if (mode == "restart") begin
+      // A link left down: only the stub's trigger brings it up.
+      env.lsm_cfg.rebringup_after_down = 1'b0;
+      cev(LSM_EV_LINK_RESET);
+      env.lsm_cfg.rebringup_after_down = 1'b1;
+      wait_active();
+    end
+    super.events();
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    case (mode)
+      "held": begin
+        if (env.pl.n_held == 0) `uvm_error(get_type_name(), "no Active was held into Reset")
+        if (env.pl.n_other == 0)
+          `uvm_error(get_type_name(), "no Active followed another request in Reset")
+      end
+      "early": begin
+        if (env.pl.n_early == 0) `uvm_error(get_type_name(), "no early NOP->Active was given")
+        if (env.pl.n_early_waits == 0)
+          `uvm_error(get_type_name(), "no withdrawn early trigger was checked")
+      end
+      "either":
+        if (env.pl.n_early == 0) `uvm_error(get_type_name(), "no early NOP->Active was given")
+      "restart":
+        if (env.pl.n_restarts == 0)
+          `uvm_error(get_type_name(), "no training restarted on the stub's NOP->Active")
+      "rx_first": begin
+        if (env.pl.n_rx_first == 0)
+          `uvm_error(get_type_name(), "pl_rx_active_req never rose in Reset before the request")
+        if (env.pl.n_rx_first_rt == 0)
+          `uvm_error(get_type_name(), "pl_rx_active_req never rose in Retrain before the request")
+      end
+      default: ;
+    endcase
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf({"held Active requests %0d (LinkReset then Active %0d), ",
+              "early triggers %0d (withdrawn and checked %0d), restarts on them %0d, ",
+              "rx_active handshakes before the request %0d in Reset, %0d in Retrain"},
+              env.pl.n_held, env.pl.n_other, env.pl.n_early, env.pl.n_early_waits,
+              env.pl.n_restarts, env.pl.n_rx_first, env.pl.n_rx_first_rt), UVM_NONE)
+  endfunction
+endclass
+
 // Wait (bounded) until the stub has a flit to send back.
 task automatic wait_flit_queued(ucie_fdi_selftest_env env);
   int unsigned n;
@@ -489,7 +596,13 @@ endclass
 // with clk_exit, le_after and level it breaks the pl_clk_req handshake around
 // a LinkReset, a LinkError from Reset and a level signal in Reset (see the
 // top; FDI-R22, R21, R20). +neg=inband_active asks the model for a
-// pl_inband_pres drop in Active, a usage error the driver refuses. The
+// pl_inband_pres drop in Active, a usage error the driver refuses. With
+// +neg=held_forever the stub holds an Active request from a LinkReset into
+// Reset for good, so it never asks to leave Reset (NOP, then Active; r3.0
+// §10.3.3.1 rule 1), and with +neg=no_restart the training waits for the
+// Protocol Layer's NOP->Active after the LinkReset (restart_on PL), which
+// the stub never gives: the driver's liveness bound, req_timeout (3000
+// here), reports each as FDI-R33. The
 // rule that must catch it has to fire, as often as the violation is made
 // (wake_held: the first bringup and the one after each of three LinkErrors);
 // its errors are expected and demoted. Any other error still fails the run.
@@ -540,6 +653,13 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       "le_after":    catcher.rule = "FDI-R21";
       "level":       catcher.rule = "FDI-R20";
       "inband_active": catcher.rule = "LSM_EV_INBAND_DROP";
+      "held_forever", "no_restart": begin
+        // No request to leave Reset, or no trigger to restart the training:
+        // the driver's liveness bound (shortened here) reports it.
+        catcher.rule = "FDI-R33";
+        env.lsm_cfg.req_timeout = 3000;
+        if (neg == "no_restart") env.lsm_cfg.restart_on = LSM_RESTART_PL;
+      end
       "rx_inactive": catcher.rule = "FDI-R35";
       "xfer": begin
         catcher.rule = "FDI-R43";
@@ -583,7 +703,7 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       return;
     end
     case (neg)
-      "clk_exit", "level": begin
+      "clk_exit", "level", "held_forever", "no_restart": begin
         nev(LSM_EV_LINK_RESET);
         return;
       end

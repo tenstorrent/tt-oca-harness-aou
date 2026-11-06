@@ -34,6 +34,17 @@ class ucie_lsm_agent extends uvm_agent;
     // caught at many delays.
     if (!$value$plusargs("sw_restart_delay=%d", cfg.sw_restart_delay))
       cfg.sw_restart_delay = $urandom_range(1500, 50);
+    begin
+      string r;
+      if ($value$plusargs("ucie_restart_on=%s", r))
+        case (r)
+          "sw":     cfg.restart_on = LSM_RESTART_SW;
+          "pl":     cfg.restart_on = LSM_RESTART_PL;
+          "either": cfg.restart_on = LSM_RESTART_EITHER;
+          default:  `uvm_fatal(get_type_name(), {"+ucie_restart_on: not sw, pl or either: ", r})
+        endcase
+    end
+    void'($value$plusargs("ucie_remote_active_first_pct=%d", cfg.remote_active_first_pct));
     void'($value$plusargs("le_mid_flit_pct=%d", cfg.le_mid_flit_pct));
     void'($value$plusargs("fdi_rx_early=%d", cfg.rx_early));
     void'($value$plusargs("park_idle_phy=%b", cfg.park_idle_phy));

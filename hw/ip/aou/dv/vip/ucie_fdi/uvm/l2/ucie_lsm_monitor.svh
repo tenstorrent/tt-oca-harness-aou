@@ -38,13 +38,13 @@ class ucie_lsm_monitor extends uvm_monitor;
 
   // Rule evaluations for the ledger, by index; flushed in check_phase.
   typedef enum int {
-    R14, R15, R16, R18, R19, R20, R21, R22, R25, R26, R28, R29, R33, R46, R47, R49, R61, R62,
-    R63, R65, N_RULES
+    R14, R15, R16, R18, R19, R20, R21, R22, R25, R26, R28, R29, R46, R47, R49, R61, R62, R63,
+    R65, N_RULES
   } rule_e;
   local static const string RULE[N_RULES] = '{
       "FDI-R14", "FDI-R15", "FDI-R16", "FDI-R18", "FDI-R19", "FDI-R20",
       "FDI-R21", "FDI-R22", "FDI-R25", "FDI-R26", "FDI-R28",
-      "FDI-R29", "FDI-R33", "FDI-R46", "FDI-R47", "FDI-R49", "FDI-R61", "FDI-R62", "FDI-R63",
+      "FDI-R29", "FDI-R46", "FDI-R47", "FDI-R49", "FDI-R61", "FDI-R62", "FDI-R63",
       "FDI-R65"};
   local int unsigned n_chk[N_RULES];
 
@@ -119,7 +119,6 @@ class ucie_lsm_monitor extends uvm_monitor;
       chk(R46);
       chk(R47);
     end
-    if (c.req == LSM_REQ_ACTIVE && p.req != LSM_REQ_ACTIVE && c.sts == LSM_RESET) chk(R33);
     check_wake(c, p);
     if (c.clk_ack != p.clk_ack) begin
       chk(R18);
@@ -139,9 +138,10 @@ class ucie_lsm_monitor extends uvm_monitor;
       err(R46, $sformatf("lp_state_req 0x%0h is reserved", c.lp_state_req));
     if (c.req == LSM_REQ_RETRAIN && p.req != LSM_REQ_RETRAIN)
       err(R47, "Retrain request outside Raw Format");
-    if (c.req == LSM_REQ_ACTIVE && p.req != LSM_REQ_ACTIVE && c.sts == LSM_RESET &&
-        p.req != LSM_REQ_NOP)
-      err(R33, $sformatf("Active request in Reset not preceded by NOP (was %s)", p.req.name()));
+    // An Active request in Reset that does not follow a NOP (held into Reset,
+    // or straight from another request) is no violation: UCIe r3.0 §10.3.3.1
+    // rule 1 only makes it no request, which the driver does not take
+    // (FDI-R33 there); ucie_lsm_fcov covers it.
     if (c.clk_ack && !p.clk_ack && !p.clk_req)
       err(R18, "lp_clk_ack rose without pl_clk_req in the previous cycle");
     // r3.0 §10.2.3.2 rule 3 and §10.2.7 rule 4 order the falls, with no time:

@@ -31,15 +31,38 @@ class ucie_lsm_cfg extends uvm_object;
   // 7), so both settings are within r3.0.
   bit           clk_req_hold_bringup = 1'b1;
   bit           rebringup_after_down = 1'b1; // LinkError/LinkReset events end with a bringup
-  int unsigned  req_timeout = 20000;     // cycles to wait for a DUT request; 0 waits forever
-  bit           react_en = 1'b1;         // answer the DUT's lp_linkerror
-  bit           react_linkerror_en = 1'b1; // between events (both must be set)
-  // After LinkError/LinkReset/Disabled -> Reset the link is restarted by
-  // software on the UCIe controller, never by the DUT: the Adapter stays in
-  // Reset this many cycles (software's Start UCIe Link Training) before it
-  // trains again; 0 trains at once. The agent randomises it in [50:1500]
-  // unless +sw_restart_delay=N sets it.
+  // Cycles to wait for a DUT request or acknowledge (a liveness bound: among
+  // them the NOP->Active in Reset, FDI-R33); 0 waits forever.
+  int unsigned  req_timeout = 20000;
+  // Answer the Protocol Layer between events: its lp_linkerror (with
+  // react_linkerror_en too), its PM exit, and with restart_on PL or EITHER the
+  // NOP->Active that restarts a link left in Reset.
+  bit           react_en = 1'b1;
+  bit           react_linkerror_en = 1'b1;
+  // What restarts the training after LinkError/LinkReset/Disabled -> Reset
+  // (UCIe r3.0 §10.3.3.8: the Protocol Layer's NOP->Active on lp_state_req,
+  // which the Adapter must pass on "even if pl_inband_pres = 0", or the
+  // Adapter's own decision to bring the link up). LSM_RESTART_SW: software on
+  // the UCIe controller, sw_restart_delay cycles after the entry to Reset;
+  // LSM_RESTART_PL: the Protocol Layer's NOP->Active in that Reset (a
+  // Protocol Layer that never gives it is reported after req_timeout cycles);
+  // LSM_RESTART_EITHER: whichever comes first. With PL or EITHER the Adapter
+  // also answers the trigger between events, so a link a test left down
+  // (rebringup_after_down 0) comes up on it. +ucie_restart_on=sw|pl|either.
+  ucie_lsm_restart_e restart_on = LSM_RESTART_SW;
+  // Cycles the Adapter stays in Reset after a link-down before software
+  // restarts the training (LSM_RESTART_SW, EITHER); 0 trains at once. The
+  // agent randomises it in [50:1500] unless +sw_restart_delay=N sets it.
   int unsigned  sw_restart_delay = 300;
+  // Chance (percent) an Active entry from Reset or from a Retrain entered from
+  // Active starts with the rx_active handshake before the Protocol Layer has
+  // requested Active, as when the remote die's Active request arrives first
+  // (UCIe r3.0 §10.2.7 rule 1: pl_rx_active_req may rise in Reset or Retrain;
+  // §10.2.8 step 4: the Adapter answers the remote Req.Active once the
+  // Protocol Layer's Receiver is ready). In Reset it comes after
+  // pl_inband_pres, under pl_clk_req (§10.2.3.2 rule 5). 0 (default) waits for
+  // the request. +ucie_remote_active_first_pct=N.
+  int unsigned  remote_active_first_pct = 0;
   // Chance an Adapter-initiated LinkError is entered mid-flit: without the flit
   // boundary, while a flit is in flight in either direction (UCIe r3.0
   // §10.3.3.7 needs neither a stall nor a boundary). +le_mid_flit_pct.
@@ -108,10 +131,12 @@ class ucie_lsm_cfg extends uvm_object;
 
   function string convert2string();
     return $sformatf({"n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
-                      "clk_hold=%0b sw_restart_delay=%0d protocol=%04b speedmode=%03b ",
-                      "max_speedmode=%0b lnk_cfg=%03b recenter=%0b"},
+                      "clk_hold=%0b restart_on=%s sw_restart_delay=%0d ",
+                      "remote_active_first_pct=%0d ",
+                      "protocol=%04b speedmode=%03b max_speedmode=%0b lnk_cfg=%03b recenter=%0b"},
                      n_phy, active_phy, lat_min, lat_max, auto_bringup,
-                     clk_req_hold_bringup, sw_restart_delay, protocol, speedmode, max_speedmode,
-                     lnk_cfg, recenter_en);
+                     clk_req_hold_bringup, restart_on.name(), sw_restart_delay,
+                     remote_active_first_pct, protocol, speedmode, max_speedmode, lnk_cfg,
+                     recenter_en);
   endfunction
 endclass

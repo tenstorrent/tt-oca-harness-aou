@@ -30,6 +30,26 @@
 //    Active (§8.3.3.4); L1 in L1; NOP elsewhere. With `wake_late` it requests
 //    Active in Reset without waiting for pl_wake_ack and raises lp_wake_req a
 //    clock after the request (r3.0 §10.2.3.1 rule 5 orders them no further).
+//  - Requests around Reset (UCIe r3.0 §10.3.3.1 rule 1, Table 10-4, §10.3.3.8):
+//    with `held_active` it requests Active (with lp_wake_req) in LinkError,
+//    LinkReset and Disabled, the exit request there, and holds it into Reset
+//    until pl_inband_pres has been 1 for `held_cycles` clocks; only then NOP
+//    for a clock and Active. Halfway through the hold it requests LinkReset
+//    for a clock and then Active again: with no NOP in this Reset neither is
+//    a request. An Adapter that starts the Active entry (pl_rx_active_req)
+//    while it holds is an error: a held Active is no request. With
+//    `early_trigger` it gives NOP->Active in Reset before pl_inband_pres,
+//    once per Reset and with chance `early_pct`, and returns to NOP 1 to 3
+//    clocks later (or, half the time, holds Active, which then is its
+//    request). Once it has been back at NOP for two clocks with
+//    pl_inband_pres still 0, the withdrawn trigger is no request any more: an
+//    Adapter that then raises pl_rx_active_req before the stub's next Active
+//    is an error, unless `remote_first` says the Adapter may start the
+//    handshake before the request. With `restart_bound` the Adapter must
+//    raise pl_inband_pres within that many clocks of the trigger after a
+//    link-down (the training-trigger policy). n_rx_first and n_rx_first_rt
+//    count pl_rx_active_req rising in Reset and in Retrain before the stub
+//    requested Active.
 //  - TX: a flit starts only in Active with the Receiver active and pl_trdy
 //    high, then runs to its end with no bubbles (§8.2.4). pl_stallreq is
 //    acknowledged at the next flit boundary, a clock later at the earliest
@@ -67,7 +87,9 @@
 //    never raised; "wake_held" does the same but holds lp_wake_req through
 //    LinkError (rule 3 allows that) and drops it on entry to the Reset that
 //    follows, before its request there: a handshake over before the request
-//    is not one used for it (r3.0 §10.2.3.1).
+//    is not one used for it (r3.0 §10.2.3.1); "held_forever" holds an Active
+//    request from a link-down into Reset for good, so the Adapter never sees
+//    a request to leave Reset (no `held_cycles` check then).
 class ucie_pl_stub extends uvm_component;
   `uvm_component_utils(ucie_pl_stub)
 
@@ -97,6 +119,19 @@ class ucie_pl_stub extends uvm_component;
   bit          clk_gate;
   int unsigned clk_ack_delay = 1;
   int unsigned n_gated;          // clocks the stub spent clock gated
+  bit          held_active;
+  int unsigned held_cycles = 40;
+  bit          early_trigger;
+  int unsigned early_pct = 100;
+  int unsigned restart_bound;
+  int unsigned n_held;           // held Active requests released after held_cycles
+  int unsigned n_early;          // early NOP->Active triggers given
+  int unsigned n_restarts;       // ... of them after a link-down, answered by pl_inband_pres
+  bit          remote_first;     // the Adapter may raise pl_rx_active_req before the request
+  int unsigned n_other;          // held: LinkReset, then Active, given in Reset with no NOP
+  int unsigned n_early_waits;    // Resets left after a withdrawn early trigger was checked
+  int unsigned n_rx_first;       // pl_rx_active_req rises in Reset before the stub's Active
+  int unsigned n_rx_first_rt;    // ... in Retrain
   int unsigned n_presented_down; // clocks a flit was presented outside Active
   local bit [MAX_BEATS_PER_FLIT-1:0] cc_mask;  // the transfers of cur with lp_corrupt_crc
   bit          bad_done;
@@ -119,6 +154,17 @@ class ucie_pl_stub extends uvm_component;
   local ucie_lsm_state_e gst;      // pl_state_sts last seen while gated
   local bit            le_unseen;  // LinkError entered while gated with no pl_clk_req before
   local bit            inband_seen;
+  local bit            holding;     // held_active: Active requested in a link-down state
+  local int unsigned   held_up;     // ... clocks of it in Reset with pl_inband_pres 1
+  local bit            held_err;    // ... reported the Adapter taking it
+  local bit            early_done;  // early_trigger given (or passed up) in this Reset
+  local int unsigned   early_left;  // clocks of Active left (early_trigger)
+  local bit            early_hold;  // ... held until the status leaves Reset
+  local int unsigned   trig_wait;   // clocks since an early trigger after a link-down, 0: none
+  local bit            early_given; // an early trigger given and withdrawn in this Reset
+  local int unsigned   early_quiet; // ... clocks of NOP since, pl_inband_pres 0
+  local bit            early_armed; // ... long enough that it is no request any more
+  local bit            rreq_q;      // pl_rx_active_req in the previous clock
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -196,6 +242,17 @@ class ucie_pl_stub extends uvm_component;
     frozen = 1'b0;
     le_unseen = 1'b0;
     inband_seen = 1'b0;
+    holding = 1'b0;
+    held_up = 0;
+    held_err = 1'b0;
+    early_done = 1'b0;
+    early_left = 0;
+    early_hold = 1'b0;
+    trig_wait = 0;
+    early_given = 1'b0;
+    early_quiet = 0;
+    early_armed = 1'b0;
+    rreq_q = 1'b0;
   endfunction
 
   // clk_gate: whether the stub is clock gated this clock, and the status
@@ -244,6 +301,16 @@ class ucie_pl_stub extends uvm_component;
       st_from = st;
       st = s;
       st_cycles = 0;
+      if (early_armed) n_early_waits++;
+      early_given = 1'b0;
+      early_quiet = 0;
+      early_armed = 1'b0;
+      early_done = 1'b0;
+      early_left = 0;
+      early_hold = 1'b0;
+      trig_wait = 0;
+      if (s != LSM_RESET && !(s inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}))
+        holding = 1'b0;
     end else if (st_cycles < 1000) begin
       st_cycles++;
     end
@@ -258,6 +325,16 @@ class ucie_pl_stub extends uvm_component;
     clk_low = creq ? 0 : clk_low + 1;
     clk_high = creq ? clk_high + 1 : 0;
     rx_low = rreq ? 0 : rx_low + 1;
+    if (rreq && !rreq_q && st inside {LSM_RESET, LSM_RETRAIN} &&
+        lsm.mon_cb.lp_state_req !== req_code(LSM_REQ_ACTIVE)) begin
+      if (st == LSM_RETRAIN) n_rx_first_rt++;
+      else n_rx_first++;
+      if (st == LSM_RESET && early_armed && !remote_first)
+        `uvm_error(get_type_name(), {"Protocol Layer stub: the Adapter started the Active entry ",
+                   "on an early NOP->Active the stub had withdrawn to NOP (UCIe r3.0 §10.3.3.8, ",
+                   "§10.3.3.1 rule 1: the request is the next NOP->Active)"})
+    end
+    rreq_q = rreq;
     lsm.lp_clk_ack <= creq && (clk_high >= clk_ack_delay || lsm.mon_cb.lp_clk_ack === 1'b1) ||
                       lsm.mon_cb.lp_clk_ack === 1'b1 && !creq && clk_low < hs_lag;
     lsm.lp_rx_active_sts <= rreq || lsm.mon_cb.lp_rx_active_sts === 1'b1 && rx_low < hs_lag;
@@ -291,6 +368,7 @@ class ucie_pl_stub extends uvm_component;
     case (sts_decode(sts))
       LSM_RESET: begin
         bit up = lsm.mon_cb.pl_inband_pres === 1'b1;
+        if (reset_hold(up)) return;
         if (wake_late || no_wake()) begin
           // The request first, lp_wake_req a clock after it (or never).
           lsm.lp_wake_req <= !no_wake() && up && lsm.mon_cb.lp_state_req === act;
@@ -321,8 +399,86 @@ class ucie_pl_stub extends uvm_component;
         lsm.lp_wake_req <= bad == "wake_held" && sts_decode(sts) == LSM_LINKERROR;
         lsm.lp_state_req <= nop;
         nop_seen = 1'b0;
+        // The exit request of LinkError, LinkReset and Disabled (Table 10-4),
+        // with its wake handshake (r3.0 §10.2.3.1).
+        if ((held_active || bad == "held_forever") && st_cycles >= 2 &&
+            sts_decode(sts) inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) begin
+          holding = 1'b1;
+          held_up = 0;
+          held_err = 1'b0;
+          lsm.lp_wake_req <= 1'b1;
+          lsm.lp_state_req <= act;
+        end
       end
     endcase
+  endfunction
+
+  // Requests in Reset that are not the usual NOP, then Active once
+  // pl_inband_pres is up (see the header): an Active held from the state
+  // before, and the early NOP->Active trigger. 1 when one of them drove
+  // lp_state_req this clock.
+  local function bit reset_hold(bit up);
+    logic [3:0] act = req_code(LSM_REQ_ACTIVE);
+    if (holding) begin
+      if (lsm.mon_cb.pl_rx_active_req === 1'b1 && !held_err && bad != "held_forever") begin
+        held_err = 1'b1;
+        `uvm_error(get_type_name(), {"Protocol Layer stub: the Adapter started the Active entry ",
+                   "on an Active request held into Reset (UCIe r3.0 §10.3.3.1 rule 1: NOP for a ",
+                   "clock, then Active)"})
+      end
+      if (up) held_up++;
+      if (bad == "held_forever" || held_up < held_cycles) begin
+        lsm.lp_wake_req <= 1'b1;
+        lsm.lp_state_req <= act;
+        // Halfway, LinkReset for a clock: no NOP came first, so neither it
+        // nor the Active after it is a request (Table 10-4 note a).
+        if (bad != "held_forever" && up && held_up == held_cycles / 2) begin
+          lsm.lp_state_req <= req_code(LSM_REQ_LINKRESET);
+          n_other++;
+        end
+        nop_seen = 1'b0;
+        return 1'b1;
+      end
+      holding = 1'b0;
+      n_held++;
+      return 1'b0;  // NOP now (nop_seen is 0), Active from the next clock
+    end
+    if (early_trigger && !up && !early_done && st_cycles >= 2 &&
+        lsm.mon_cb.lp_state_req === req_code(LSM_REQ_NOP)) begin
+      early_done = 1'b1;
+      if ($urandom_range(99) < early_pct) begin
+        n_early++;
+        early_hold = $urandom_range(1) != 0;
+        early_given = !early_hold;
+        early_left = $urandom_range(3, 1);
+        if (st_from inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) trig_wait = 1;
+      end
+    end
+    if (trig_wait != 0) begin
+      if (up) begin
+        n_restarts++;
+        trig_wait = 0;
+      end else if (restart_bound != 0 && trig_wait++ == restart_bound) begin
+        `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: no pl_inband_pres %0d ",
+                   "clocks after its NOP->Active in Reset restarted the training (UCIe r3.0 ",
+                   "§10.3.3.8)"}, restart_bound))
+      end
+    end
+    if (early_hold || early_left != 0) begin
+      if (early_left != 0) early_left--;
+      lsm.lp_wake_req <= 1'b1;
+      lsm.lp_state_req <= act;
+      nop_seen = 1'b0;
+      return 1'b1;
+    end
+    // Back at NOP: pl_inband_pres too close to the trigger may have let the
+    // Adapter take it as the request, so the check arms only after two quiet
+    // clocks.
+    if (early_given && !early_armed) begin
+      if (up) early_given = 1'b0;
+      else if (++early_quiet >= 2) early_armed = 1'b1;
+    end
+    return 1'b0;
   endfunction
 
   local function void linkerror(logic [3:0] sts);
