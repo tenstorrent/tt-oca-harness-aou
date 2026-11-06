@@ -375,11 +375,6 @@ import packet_def_pkg::*;
     localparam  B_FIFO_WIDTH                = AXI_ID_WD + 2 + 16;                                            // + FLEX
     localparam  R_FIFO_EXT_DATA_WIDTH       = AXI_ID_WD + 2 + 1;
 
-    //It should be configured to a value greater than the maximum burst length of the local bus.
-    localparam  RP0_AGG_WCH_FIFO_DEPTH      = 16;
-    localparam  RP1_AGG_WCH_FIFO_DEPTH      = 16; 
-    localparam  RP2_AGG_WCH_FIFO_DEPTH      = 16; 
-    localparam  RP3_AGG_WCH_FIFO_DEPTH      = 16;
 //----------------------------------------------------------------------------
     logic                                   w_aou_apb_si0_psel       ;
     logic                                   w_aou_apb_si0_penable    ;
@@ -573,11 +568,6 @@ import packet_def_pkg::*;
         .RP1_AXI_DATA_WD            ( RP1_AXI_DATA_WD           ),
         .RP2_AXI_DATA_WD            ( RP2_AXI_DATA_WD           ),
         .RP3_AXI_DATA_WD            ( RP3_AXI_DATA_WD           ),
-
-        .RP0_AGG_WCH_FIFO_DEPTH     ( RP0_AGG_WCH_FIFO_DEPTH    ), 
-        .RP1_AGG_WCH_FIFO_DEPTH     ( RP1_AGG_WCH_FIFO_DEPTH    ), 
-        .RP2_AGG_WCH_FIFO_DEPTH     ( RP2_AGG_WCH_FIFO_DEPTH    ), 
-        .RP3_AGG_WCH_FIFO_DEPTH     ( RP3_AGG_WCH_FIFO_DEPTH    ),
 
         .APB_ADDR_WD                ( APB_ADDR_WD               ),
         .APB_DATA_WD                ( APB_DATA_WD               ),

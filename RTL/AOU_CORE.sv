@@ -83,11 +83,6 @@ import packet_def_pkg::*;
     parameter   RP2_AXI_DATA_WD             = 512,
     parameter   RP3_AXI_DATA_WD             = 512,
     
-    parameter   RP0_AGG_WCH_FIFO_DEPTH      = 16,
-    parameter   RP1_AGG_WCH_FIFO_DEPTH      = 16,
-    parameter   RP2_AGG_WCH_FIFO_DEPTH      = 16,
-    parameter   RP3_AGG_WCH_FIFO_DEPTH      = 16,
-
     // The widest data message AoU defines (WriteData1024/ReadData1024). The receiver
     // cannot know the remote die's AXI width, so the RX data path is sized for the
     // maximum and this is not an integration parameter.
@@ -168,13 +163,6 @@ import packet_def_pkg::*;
         RP1_AXI_STRB_WD,
         RP2_AXI_STRB_WD,
         RP3_AXI_STRB_WD
-    },
-
-    localparam int unsigned AGG_WCH_FIFO_DEPTH[4]  = '{
-        RP0_AGG_WCH_FIFO_DEPTH,
-        RP1_AGG_WCH_FIFO_DEPTH,
-        RP2_AGG_WCH_FIFO_DEPTH,
-        RP3_AGG_WCH_FIFO_DEPTH
     },
 
     localparam int unsigned RP_S_RD_MO_CNT[4]  = '{
@@ -1791,8 +1779,7 @@ import packet_def_pkg::*;
                 .S_WR_MO_CNT                ( RP_S_WR_MO_CNT[i]             ),
 
                 .M_RD_MO_CNT                ( RP_M_RD_MO_CNT[i]             ),
-                .M_WR_MO_CNT                ( RP_M_WR_MO_CNT[i]             ),
-                .AOU_AGG_WCH_FIFO_DEPTH     ( AGG_WCH_FIFO_DEPTH[i]         )
+                .M_WR_MO_CNT                ( RP_M_WR_MO_CNT[i]             )
 
             ) u_aou_core_rp
             (

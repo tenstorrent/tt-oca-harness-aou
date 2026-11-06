@@ -33,7 +33,6 @@ module AOU_AXI4MUX_3X1_TOP #(
     parameter   LEN_WD    = 8,
     parameter   RD_MO_CNT = 64,
     parameter   WR_MO_CNT = 64,
-    parameter   AOU_AGG_WCH_FIFO_DEPTH = 16,
 
     localparam  RD_MO_IDX_WD = $clog2(RD_MO_CNT)
 )
@@ -1305,8 +1304,7 @@ AOU_AGGREGATOR # (
     .ID_WD                  ( ID_WD                     ),
     .STRB_WD                ( DATA_WD / 8               ),
     .LEN_WD                 ( LEN_WD                    ),
-    .RD_MO_CNT              ( RD_MO_CNT                 ),
-    .AOU_AGG_WCH_FIFO_DEPTH ( AOU_AGG_WCH_FIFO_DEPTH    )
+    .RD_MO_CNT              ( RD_MO_CNT                 )
 
 ) aou_aggregator 
 (
