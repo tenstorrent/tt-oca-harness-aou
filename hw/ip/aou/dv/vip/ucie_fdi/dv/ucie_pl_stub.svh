@@ -6,7 +6,17 @@
 // (the mainband monitor's ap_rx) back on its TX side.
 //  - lp_clk_ack and lp_rx_active_sts follow their requests one clock later
 //    (UCIe r3.0 §10.2.3.2, §10.2.7); with `hs_lag` they fall that many clocks
-//    after their request does (rule 3 and rule 4 give no time).
+//    after their request does (rule 3 and rule 4 give no time); lp_clk_ack
+//    rises `clk_ack_delay` clocks after pl_clk_req (at least one).
+//  - With `clk_gate` the stub gates its clock whenever r3.0 §10.2.3 lets it:
+//    in Reset, LinkReset, Disabled or L1 with pl_clk_req and lp_clk_ack low,
+//    nothing presented, no stall under way and nothing left to do (in Reset:
+//    no pl_inband_pres seen, or Active already requested; in L1: no PM exit
+//    of its own). While gated it sees nothing and changes nothing until
+//    pl_clk_req wakes it (its lp_clk_ack). A status change it would miss is an error: one to anything
+//    but LinkError without pl_clk_req in the clock before (§10.2.3.2 rule 7,
+//    reported as FDI-R22), and a second change after a LinkError entered that
+//    way, before the stub has acknowledged (rule 6, FDI-R21).
 //  - lp_wake_req is high while the link is wanted up: in Reset once
 //    pl_inband_pres is 1, and in Active and Retrain (§8.2.3.1); low in L1, so
 //    the Adapter's PM exit stays its own (the self-test's L1 events), unless
@@ -84,6 +94,9 @@ class ucie_pl_stub extends uvm_component;
   int unsigned hs_lag;
   int unsigned linkerror_hold;
   bit          wake_late;
+  bit          clk_gate;
+  int unsigned clk_ack_delay = 1;
+  int unsigned n_gated;          // clocks the stub spent clock gated
   int unsigned n_presented_down; // clocks a flit was presented outside Active
   local bit [MAX_BEATS_PER_FLIT-1:0] cc_mask;  // the transfers of cur with lp_corrupt_crc
   bit          bad_done;
@@ -100,6 +113,12 @@ class ucie_pl_stub extends uvm_component;
   local int unsigned   clk_low;    // clocks pl_clk_req has been low
   local int unsigned   rx_low;     // clocks pl_rx_active_req has been low
   local int unsigned   le_held;    // clocks lp_linkerror was held in LinkError
+  local int unsigned   clk_high;   // clocks pl_clk_req has been high
+  local bit            creq_q;     // pl_clk_req in the previous clock
+  local bit            frozen;     // clock gated (clk_gate)
+  local ucie_lsm_state_e gst;      // pl_state_sts last seen while gated
+  local bit            le_unseen;  // LinkError entered while gated with no pl_clk_req before
+  local bit            inband_seen;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -131,7 +150,12 @@ class ucie_pl_stub extends uvm_component;
         drive_reset();
         continue;
       end
+      if (clk_gate && gate_check()) begin
+        handshakes();
+        continue;
+      end
       track_state(sts_decode(mb.mon_cb.pl_state_sts));
+      inband_seen = lsm.mon_cb.pl_inband_pres === 1'b1;
       handshakes();
       state_req(mb.mon_cb.pl_state_sts);
       linkerror(mb.mon_cb.pl_state_sts);
@@ -167,6 +191,52 @@ class ucie_pl_stub extends uvm_component;
     clk_low = 0;
     rx_low = 0;
     le_held = 0;
+    clk_high = 0;
+    creq_q = 1'b0;
+    frozen = 1'b0;
+    le_unseen = 1'b0;
+    inband_seen = 1'b0;
+  endfunction
+
+  // clk_gate: whether the stub is clock gated this clock, and the status
+  // changes it would miss (see above). Gating starts only from a state the
+  // stub has seen for a few clocks, with nothing to do.
+  local function bit gate_check();
+    bit creq = lsm.mon_cb.pl_clk_req === 1'b1;
+    bit ack = lsm.mon_cb.lp_clk_ack === 1'b1;
+    ucie_lsm_state_e s = sts_decode(mb.mon_cb.pl_state_sts);
+    if (!frozen) begin
+      bit asked = lsm.mon_cb.lp_state_req === req_code(LSM_REQ_ACTIVE);
+      bit idle = st == LSM_RESET ? !inband_seen || asked : st == LSM_L1 ? !wake_in_l1 : 1'b1;
+      if (!(lsm_gated(st) && s == st && !creq && !ack && idle && st_cycles >= 2 && !presenting &&
+            mb.mon_cb.lp_valid !== 1'b1 && !stallack && mb.mon_cb.pl_stallreq !== 1'b1)) begin
+        creq_q = creq;
+        return 1'b0;
+      end
+      frozen = 1'b1;
+      gst = st;
+      le_unseen = 1'b0;
+    end
+    if (s != gst && !creq_q) begin
+      if (s == LSM_LINKERROR && !le_unseen) le_unseen = 1'b1;
+      else if (le_unseen)
+        `uvm_error(get_type_name(), $sformatf({"FDI-R21 (Protocol Layer stub, clock gated): ",
+                   "LinkError -> %s before the stub acknowledged a pl_clk_req"}, s.name()))
+      else
+        `uvm_error(get_type_name(), $sformatf({"FDI-R22 (Protocol Layer stub, clock gated): ",
+                   "pl_state_sts %s -> %s with no pl_clk_req to wake the stub"}, gst.name(),
+                   s.name()))
+    end
+    gst = s;
+    creq_q = creq;
+    if (ack || st == LSM_L1 && wake_in_l1) begin
+      // Clocks back (pl_clk_req, or the stub's own PM exit, which needs no
+      // clock: lp_wake_req): from the next clock it follows the link again.
+      frozen = 1'b0;
+      return 1'b1;
+    end
+    n_gated++;
+    return 1'b1;
   endfunction
 
   local function void track_state(ucie_lsm_state_e s);
@@ -186,8 +256,10 @@ class ucie_pl_stub extends uvm_component;
     bit creq = lsm.mon_cb.pl_clk_req === 1'b1;
     bit rreq = lsm.mon_cb.pl_rx_active_req === 1'b1;
     clk_low = creq ? 0 : clk_low + 1;
+    clk_high = creq ? clk_high + 1 : 0;
     rx_low = rreq ? 0 : rx_low + 1;
-    lsm.lp_clk_ack <= creq || lsm.mon_cb.lp_clk_ack === 1'b1 && clk_low < hs_lag;
+    lsm.lp_clk_ack <= creq && (clk_high >= clk_ack_delay || lsm.mon_cb.lp_clk_ack === 1'b1) ||
+                      lsm.mon_cb.lp_clk_ack === 1'b1 && !creq && clk_low < hs_lag;
     lsm.lp_rx_active_sts <= rreq || lsm.mon_cb.lp_rx_active_sts === 1'b1 && rx_low < hs_lag;
     if (bad == "clk_ack" && !bad_done && n_sent >= 8 && st == LSM_ACTIVE && !creq &&
         lsm.mon_cb.lp_clk_ack !== 1'b1) begin
