@@ -13,6 +13,7 @@ class ucie_fdi_agent extends uvm_agent;
   ucie_fdi_pl_driver                 drv;
   ucie_fdi_tx_responder              rsp;
   ucie_fdi_monitor                   mon;
+  ucie_fdi_fcov                      fcov;  // the model's own coverage (cfg.fcov_en)
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -33,6 +34,12 @@ class ucie_fdi_agent extends uvm_agent;
     mon = ucie_fdi_monitor::type_id::create("mon", this);
     mon.cfg = cfg;
     mon.vif = vif;
+    void'($value$plusargs("ucie_fcov=%b", cfg.fcov_en));
+    if (cfg.fcov_en) begin
+      fcov = ucie_fdi_fcov::type_id::create($sformatf("fcov%0d", cfg.phy));
+      fcov.fdi_bytes = cfg.beat_bytes;
+      mon.fcov = fcov;
+    end
     if (cfg.is_active) begin
       sqr = uvm_sequencer #(ucie_flit_item)::type_id::create("sqr", this);
       drv = ucie_fdi_pl_driver::type_id::create("drv", this);
@@ -48,4 +55,15 @@ class ucie_fdi_agent extends uvm_agent;
     super.connect_phase(phase);
     if (cfg.is_active) drv.seq_item_port.connect(sqr.seq_item_export);
   endfunction
+
+`ifndef VERILATOR
+  // The covergroups' scores (this simulator scores them; Verilator 5.052 does
+  // not, so it prints nothing).
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    if (fcov != null)
+      `uvm_info(get_type_name(), $sformatf("phy%0d coverage: %s", cfg.phy, fcov.convert2string()),
+                UVM_LOW)
+  endfunction
+`endif
 endclass

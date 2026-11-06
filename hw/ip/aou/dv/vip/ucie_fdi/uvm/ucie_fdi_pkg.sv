@@ -150,6 +150,7 @@ package ucie_fdi_pkg;
   `include "l1/ucie_fdi_cfg.svh"
   `include "l1/ucie_flit_item.svh"
   `include "l1/ucie_fdi_cov.svh"
+  `include "l1/ucie_fdi_fcov.svh"
   `include "l1/ucie_fdi_pl_driver.svh"
   `include "l1/ucie_fdi_tx_responder.svh"
   `include "l1/ucie_fdi_monitor.svh"

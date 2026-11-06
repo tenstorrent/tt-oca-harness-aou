@@ -23,6 +23,7 @@ class ucie_fdi_monitor extends uvm_monitor;
   virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) vif;
   ucie_fdi_cfg cfg;
   ucie_fdi_cov cov;   // coverage collector, set by the bench; null: none
+  ucie_fdi_fcov fcov; // the model's own covergroups, set by the agent; null: none
 
   uvm_analysis_port #(ucie_flit_item) ap_tx;
   uvm_analysis_port #(ucie_flit_item) ap_rx;
@@ -67,6 +68,9 @@ class ucie_fdi_monitor extends uvm_monitor;
   local int unsigned  sa_cycles;
   local bit           sr_mid;
   local bit           sr_trdy0;
+  local int unsigned  trdy_low;     // cycles of the current pl_trdy-low run
+  local bit           trdy_low_in;  // ... which started inside a TX flit
+  local bit           trdy_low_ok;  // ... all in Active, with no stall handshake or hold
   local bit           abandoned;  // left Active mid-flit; until the next Active
   local bit           abandon_h_done;  // ... right after a whole 128B half: its cancel may follow
   // Rule evaluations for the ledger, by index; flushed in check_phase.
@@ -86,6 +90,7 @@ class ucie_fdi_monitor extends uvm_monitor;
 
   task run_phase(uvm_phase phase);
     if (!cfg.cov_en) cov = null;
+    if (!cfg.fcov_en) fcov = null;
     forever begin
       @(vif.mon_cb);
       sample();
@@ -151,10 +156,12 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (tx_beat != 0) begin
       n_tx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b0);
+      if (fcov != null) fcov.sample_abandon(1'b0);
     end
     if (rx_cur.size() != 0) begin
       n_rx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b1);
+      if (fcov != null) fcov.sample_abandon(1'b1);
     end
     if (tx_beat != 0 || rx_cur.size() != 0)
       `uvm_info(get_type_name(), $sformatf(
@@ -200,6 +207,7 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (t && sts == FDI_STS_ACTIVE && vif.mon_cb.pl_stallreq !== 1'b1 &&
         vif.mon_cb.lp_stallack !== 1'b1)
       n_tx_ready++;
+    if (fcov != null) sample_trdy_run(sts, t);
     if (tx_beat != 0 && !t) tx_stall++;
     if (!(v && i && t)) begin
       if (tx_beat == 0 && tx_gap < 1000) tx_gap++;
@@ -238,9 +246,28 @@ class ucie_fdi_monitor extends uvm_monitor;
                          cfg.fpb() > 1 ? $sformatf("lane %0d: ", lane) : "", f.data[0],
                          f.data[1], f.data[126], f.data[127], f.data[254], f.data[255]));
     if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
+    if (fcov != null) fcov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
     n_tx_flits++;
     `uvm_info(get_type_name(), {"DUT TX ", f.convert2string()}, UVM_HIGH)
     ap_tx.write(f);
+  endfunction
+
+  // A run of pl_trdy low that the policy made: every cycle of it in Active,
+  // with no stall handshake and no tx_hold. Sampled when pl_trdy rises again.
+  local function void sample_trdy_run(logic [3:0] sts, bit t);
+    bit quiet = sts == FDI_STS_ACTIVE && vif.mon_cb.pl_stallreq !== 1'b1 &&
+                vif.mon_cb.lp_stallack !== 1'b1 && !cfg.tx_hold;
+    if (!t) begin
+      if (trdy_low == 0) begin
+        trdy_low_in = tx_beat != 0;
+        trdy_low_ok = 1'b1;
+      end
+      trdy_low++;
+      trdy_low_ok &= quiet;
+    end else if (trdy_low != 0) begin
+      if (trdy_low_ok && quiet) fcov.sample_trdy(cfg.trdy_policy, trdy_low_in, trdy_low);
+      trdy_low = 0;
+    end
   endfunction
 
   local function void sample_stall();
@@ -281,6 +308,7 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (!sa && prev_sa) begin
       n_stalls++;
       if (cov != null) cov.sample_stall(sr_cycles, sa_cycles, sr_mid, sr_trdy0);
+      if (fcov != null) fcov.sample_stall(sr_cycles, sa_cycles, sr_mid, sr_trdy0);
     end
     prev_sr = sr;
     prev_sa = sa;
@@ -312,6 +340,7 @@ class ucie_fdi_monitor extends uvm_monitor;
         count = rx_cur[0].n_cancel_h0 + rx_cur[0].n_cancel_h1;
         n_rx_cancels++;
         if (cov != null) cov.sample_cancel(half, v, count, stalled);
+        if (fcov != null) fcov.sample_cancel(half, v, count, stalled);
       end
     end else if (rx_half_done && rx_beat == cfg.bpf()) begin
       publish_rx();
@@ -368,12 +397,14 @@ class ucie_fdi_monitor extends uvm_monitor;
       if (f.n_cancel_h0 > 1 || f.n_cancel_h1 > 1) n_rx_cancel_rep++;
       f.n_stall_cycles = rx_bubbles;
       if (cov != null) cov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before);
+      if (fcov != null) fcov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before);
       n_rx_flits++;
       `uvm_info(get_type_name(), {"DUT RX ", f.convert2string()}, UVM_HIGH)
       ap_rx.write(f);
     end
     n_rx_nops += n_nop;
     if (cfg.fpb() > 1 && n_nop != 0) n_rx_part++;
+    if (fcov != null && cfg.fpb() > 1) fcov.sample_lanes(cfg.fpb() - n_nop);
     rx_cur.delete();
     rx_beat = 0;
   endfunction

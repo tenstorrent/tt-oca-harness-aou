@@ -46,6 +46,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[2];
   ucie_lsm_cfg     cfg;
   ucie_fdi_agent   phy[$];       // the link's mainband agents (ucie_lsm_agent::phy)
+  ucie_lsm_fcov    fcov;         // the model's own coverage; null: none
   ucie_lsm_state_e state = LSM_RESET;
   bit             link_active;   // Active and the gates are open
   int unsigned    n_le_react;    // LinkErrors entered on the DUT's lp_linkerror (react_loop)
@@ -129,7 +130,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
 
   local task main_loop();
     ev_busy = 1'b1;
-    if (cfg.auto_bringup) do_bringup();
+    if (cfg.auto_bringup) begin
+      if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_BRINGUP);
+      do_bringup();
+    end
     ev_busy = 1'b0;
     forever begin
       seq_item_port.get_next_item(req);
@@ -137,6 +141,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       while (reacting) @(lsm_vif.drv_cb);
       ev_busy = 1'b1;
       `uvm_info(get_type_name(), {"event ", req.convert2string()}, UVM_MEDIUM)
+      if (fcov != null) fcov.sample_event(req);
       execute(req);
       ev_busy = 1'b0;
       busy = 1'b0;
@@ -155,6 +160,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         reacting = 1'b1;
         `uvm_info(get_type_name(), "lp_linkerror: Adapter enters LinkError (Table 8-2)", UVM_LOW)
         n_le_react++;
+        if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_LINKERROR_ON_REQUEST);
         linkerror_down(cfg.dwell());
         le_absorbed = 1'b1;
         reacting = 1'b0;
@@ -174,6 +180,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         continue;
       reacting = 1'b1;
       `uvm_info(get_type_name(), "lp_wake_req in L1: Adapter exits L1 (8.2.9)", UVM_LOW)
+      if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_L1_EXIT_ON_WAKE);
       wait_cycles(cfg.lat());
       set_state(LSM_RETRAIN);
       wait_req(LSM_REQ_ACTIVE, "FDI-R41");
@@ -412,6 +419,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         `uvm_info(get_type_name(), "lp_linkerror in Retrain: Adapter enters LinkError (Table 8-2)",
                   UVM_LOW)
         n_le_react++;
+        if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_LINKERROR_ON_REQUEST);
         linkerror_down(cfg.dwell());
         if (cfg.rebringup_after_down) do_bringup();
         return;
@@ -467,6 +475,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     end
     if (tx) n_le_mid_tx++;
     if (rx) n_le_mid_rx++;
+    if (fcov != null) fcov.sample_own(ucie_lsm_fcov::EV_LINKERROR_MID_FLIT);
     `uvm_info(get_type_name(), $sformatf("LinkError mid-flit (TX %0b, RX %0b)", tx, rx), UVM_LOW)
     link_active = 1'b0;
     foreach (gate[i]) begin

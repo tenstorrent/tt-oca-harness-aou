@@ -13,6 +13,7 @@ class ucie_lsm_agent extends uvm_agent;
   uvm_sequencer #(ucie_lsm_item) sqr;
   ucie_lsm_driver                drv;
   ucie_lsm_monitor               mon;
+  ucie_lsm_fcov                  fcov;  // the model's own coverage (cfg.fcov_en)
 
   local virtual ucie_fdi_lsm_if                   lsm_vif;
   local virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[2];
@@ -36,6 +37,7 @@ class ucie_lsm_agent extends uvm_agent;
     void'($value$plusargs("le_mid_flit_pct=%d", cfg.le_mid_flit_pct));
     void'($value$plusargs("fdi_rx_early=%d", cfg.rx_early));
     void'($value$plusargs("park_idle_phy=%b", cfg.park_idle_phy));
+    void'($value$plusargs("ucie_fcov=%b", cfg.fcov_en));
     if (cfg.n_phy < 1 || cfg.n_phy > 2)
       `uvm_fatal(get_type_name(), $sformatf("n_phy %0d not 1 or 2", cfg.n_phy))
     if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
@@ -50,6 +52,7 @@ class ucie_lsm_agent extends uvm_agent;
     mon.cfg = cfg;
     mon.lsm_vif = lsm_vif;
     mon.mb_vif = mb_vif;
+    if (cfg.fcov_en) fcov = ucie_lsm_fcov::type_id::create("fcov");
     if (cfg.is_active) begin
       sqr = uvm_sequencer #(ucie_lsm_item)::type_id::create("sqr", this);
       drv = ucie_lsm_driver::type_id::create("drv", this);
@@ -57,6 +60,7 @@ class ucie_lsm_agent extends uvm_agent;
       drv.phy = phy;
       drv.lsm_vif = lsm_vif;
       drv.mb_vif = mb_vif;
+      drv.fcov = fcov;
     end
   endfunction
 
@@ -82,5 +86,16 @@ class ucie_lsm_agent extends uvm_agent;
     super.connect_phase(phase);
     check_link_cfg();
     if (cfg.is_active) drv.seq_item_port.connect(sqr.seq_item_export);
+    if (fcov != null) mon.add_observer(fcov);
   endfunction
+
+`ifndef VERILATOR
+  // The covergroups' scores (this simulator scores them; Verilator 5.052 does
+  // not, so it prints nothing).
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    if (fcov != null)
+      `uvm_info(get_type_name(), {"link-state coverage: ", fcov.convert2string()}, UVM_LOW)
+  endfunction
+`endif
 endclass
