@@ -60,6 +60,9 @@ class aou_perf_test extends aou_dp_base_test;
       if (mode == "l2r") min_r2l = 0;
       if (mode == "r2l") min_l2r = 0;
     end
+    // The bandwidth model has one arbitration stage and one lane per port: no
+    // asymmetric RP mapping that merges ports.
+    cfg.rp_map_pct = 0;
     // Steady state only: no L1 cancels, bubbles or gaps on the flits to the DUT.
     cfg.l1_cancel_pct = 0;
     cfg.l1_bubble_pct = 0;
@@ -72,6 +75,7 @@ class aou_perf_test extends aou_dp_base_test;
     // traffic watchdog.
     cfg.drain_timeout = 2000000;
     cfg.l3_cfg.pol.wdata_first_pct = 0;
+    cfg.l3_cfg.pol.wresp_batch = 0;
     if ($value$plusargs("perf_l3_one_msg=%s", mode) && mode == "1") begin
       cfg.l3_cfg.pol.set_min_density();   // one message per flit, at G0
       cfg.l3_cfg.pol.wreq_wdata_pair = 1'b1; // a WriteReq's WriteData shares its flit

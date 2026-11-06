@@ -116,12 +116,25 @@ class aou_axi_monitor extends uvm_monitor;
       p = fc_txn.cp("cp_align"); `AOU_AXI_FC_ALIGN(AOU_FC_REG)
       p = fc_txn.add_cross("x_txn", "cp_dir cp_size cp_len cp_align");
       `AOU_AXI_FC_X_TXN(AOU_FC_REG)
+      fc_txn.plan("4.1 5.1", "cp_size");
+      fc_txn.plan("11.13", "cp_len", "one");
+      fc_txn.plan("4.9 5.9", "cp_len", "upto4|upto16|over16");
+      fc_txn.plan("7.10", "cp_align", "aligned");
+      fc_txn.plan("7.11", "cp_align", "unaligned");
+      fc_txn.plan("4.1", "x_txn", "wr,*,one,*");
+      fc_txn.plan("5.1", "x_txn", "rd,*,one,*");
+      fc_txn.plan("4.9", "x_txn", "wr,*,upto4|upto16|over16,*");
+      fc_txn.plan("5.9", "x_txn", "rd,*,upto4|upto16|over16,*");
+      fc_txn.plan("11.13", "x_txn", "*,*,one,*");
+      fc_txn.plan("7.10", "x_txn", "*,*,*,aligned");
+      fc_txn.plan("7.11", "x_txn", "*,*,*,unaligned");
     end
     fc_zero = db.group("axi.zero_cg", fresh);
     if (fresh) begin
       p = fc_zero.cp("cp_dir"); `AOU_AXI_FC_DIR(AOU_FC_REG)
       p = fc_zero.cp("cp_zero"); `AOU_AXI_FC_ZERO(AOU_FC_REG)
       void'(fc_zero.add_cross("x_zero", "cp_dir cp_zero"));
+      fc_zero.plan("16.16", "x_zero", "wr,zero_cycle");
     end
   endfunction
 

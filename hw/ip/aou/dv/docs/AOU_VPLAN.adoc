@@ -18,7 +18,8 @@ Interface (FDI), and back. The plan has 13 feature areas
 * Credits and flow control; flit packing and the message format.
 * AXI reads and writes: sizes, bursts, responses, ordering, outstanding limits,
   exclusives and data integrity.
-* Several RPs at once: DEST_RP routing and QoS arbitration.
+* Several RPs at once: DEST_RP routing, the asymmetric RP mapping that merges
+  ports onto shared lanes, and QoS arbitration.
 * Width conversion between dies of different RP widths (all nine pairings of
   256, 512 and 1024 bits), transaction splitting and aggregation.
 * Early write response and the write watchdog.
@@ -55,7 +56,8 @@ regression writes the plan's status page and its coverage report
 scenario that lists it exists, and "covered, with known failures" when some of
 its runs fail on a filed DUT issue, naming the configurations.
 
-*Main open items* (each a filed issue or an open pull request):
+*Main open items* (each a filed issue, an open pull request or a finding being
+drafted):
 
 . *TX throughput* (tenstorrent/tt-oca-harness-aou#131). With several RPs, or
   narrow RPs on a wide FDI, the DUT's TX link reaches 58-87% of the packing
@@ -70,8 +72,14 @@ its runs fail on a filed DUT issue, naming the configurations.
   held low for more than 500 cycles.
 . *Outstanding counters* (tenstorrent/tt-oca-harness-aou#136). The DUT's
   outstanding write and read counters wrap at 1024.
+. *Asymmetric RP mapping* (pull request #124, merged). Every T1 test now runs a
+  random mapping per seed. Reads of a port that the mapping places on the lane
+  of a narrower port lose ReadData (early or late RLAST, shifted data): the
+  lane's ReadData credit is still sized for its own port's width (MAS 3.9),
+  while MAS 3.10.4 allows the wider port there (#146).
 . *Dies with different RP counts.* The mapping between them is
-  implementation-defined; pull request #124 proposes one.
+  implementation-defined in AoU v0.8; the larger die still advertises credit for
+  the RPs the other die lacks.
 
 [[aou-vplan-roadmap]]
 === Road-map
@@ -87,6 +95,14 @@ handful of bench additions, and coverage closure.
 * Always-on checkers for the FDI, the AoU messages, the AXI and APB ports, the
   DUT's status and interrupts, and the features that span layers (activation,
   credits, debug FIFOs, early-response back-pressure, software reset).
+* An always-on check (T1-C45) holding the DUT to the MAS 7.3.1 credit windows
+  during deactivation: request credits end with the flit carrying its
+  DeactivateAck, response credits with its DeactivateReq (header credits in
+  that flit allowed), and no WriteData follows its DeactivateReq; item 2.11 can
+  fail again.
+* Coverage bins tied to the plan items they evidence (`plan_ids` in `fc.json`);
+  `scripts/plan_status.py --fc` lists each stimulus-shape item's bins, hits and
+  holes.
 * Functional coverage of the FDI, link states, activation, packing, credits,
   AXI request shapes and attributes, width pairings, outstanding limits, early
   response and the watchdog (<<aou-dv-functional-coverage>>).
@@ -94,6 +110,10 @@ handful of bench additions, and coverage closure.
   windows on the configurations that name them.
 * The AoU v0.8 rule set running between two models on the L3 unit bench
   (group `v0p8`), reported apart from the headline coverage figure.
+* The asymmetric RP mapping (pull request #124): a random legal mapping per seed
+  in every T1 test, an always-on checker of each request's route and IDs
+  (FEAT-R29, FEAT-R30), coverage of routes and mappings, and scenarios against
+  a remote die with fewer RPs (plan item 12.22).
 
 *Next.*
 
@@ -102,12 +122,12 @@ handful of bench additions, and coverage closure.
 | Item | What it takes | Depends on
 | TX throughput | Rerun the throughput windows and the full regression on the chosen fix; remove the expected-fail entries it closes | The fix for #131
 | *TODO:* burst-length sweep in the regression | The sweep scenarios exist (`aou_perf_test.perf_scn-S4` on `1x512-sp64` and on both PHYs of `2xmix-tp64_128`) and are tagged `blocked`. Land them in the regression (drop the tag, add them to the groups) once #131's fix is merged; no expected-fail entries. A smoke run of all three also shows remote-to-local read-data errors on 256-beat bursts, not yet triaged | The fix for #131; triage of the read-data errors
-| Deactivation credit windows | A check that holds the DUT to the MAS 7.3.1 credit windows during deactivation; since the combined credit mode was removed, item 2.11 passes because nothing can fail it | none
 | Requests in an ActivateAck's flit | Rerun `aou_act_flit_test` on the fix | The fix for #127
 | WLAST-generator assertions | Rerun the assertion builds | The owners' approach to #132
 | Outstanding counters | Scenarios that reach 1024 outstanding writes and reads, then rerun | The fix for #136
 | Dies with different RP counts | Scenarios for the mapping the pull request implements | Pull request #124
-| Coverage tied to plan items | Fill the `plan_ids` field of each bin, so the status page shows the bins behind each stimulus-shape item | none
+| Asymmetric RP mapping, wide port on a narrower lane | Rerun the regression on the granule-based ReadData credit | #146
+| Asymmetric RP mapping, arbitration inside a merge group | Extend the QoS-order checker to the two-stage arbitration of MAS 3.10.4; today `aou_qos_order_test` keeps the mapping disabled | none
 |===
 
 [[aou-vplan-deferred]]
@@ -127,22 +147,12 @@ handful of bench additions, and coverage closure.
 *Coverage closure (deferred, to follow up).* Spec behaviours with no bin, or
 holes that point at a real gap (<<aou-fcov-gaps>> has the detail):
 
-. *DUT-initiated L1 entry* is never exercised: every L1 entry in the bench is
-  the Adapter model's.
 . *ReadData size against its ReadReq.* Nothing crosses a ReadReq's size with
   the DLENGTH of the ReadData that answers it (an AoU v0.8 rule).
 . *Traffic in DEACTIVATE.* No bins for responses sent after a side's own
   DeactivateReq, for who deactivated first, or for activation order.
 . *ERROR entered from DISABLED* (an inconsistent request or acknowledge) has no
   bin.
-. *M-port B stall at the write limit* is never seen: the DUT buffers write
-  responses, so its BREADY drops only below the limit. Possibly unreachable;
-  decide whether it is a target.
-. *FDI stall latency.* Six stall-handshake timing holes that random `pl_trdy`
-  policies and stalls didn't move; two can't occur as defined. Exclusion
-  candidates.
-. *Dense WriteResp flits.* Flits with 16 or more WriteResps from the DUT never
-  occur; that is the DUT packer's choice.
 . *Link events with traffic in flight.* No bin combines a link event (Retrain,
   LinkError, L1, reset) with traffic in flight or the activation state; only
   directed tests cover it.
@@ -303,7 +313,10 @@ The status page counts items per feature area. Each item is:
 Each row's evidence names the scenarios, configurations and issues behind its
 status, and the regression summary has every failing run; that is the
 drill-down. Merged items report through their surviving ID; dropped items are
-listed with their reason and not counted.
+listed with their reason and not counted. Given the functional coverage
+(`--fc`, the union's `fc_merged.json` in a coverage regression), the page
+also lists each stimulus-shape item with the bins that name it, hit over
+total, and its holes; the bins don't change an item's status.
 
 [[aou-vplan-areas]]
 === Feature Areas
@@ -385,11 +398,20 @@ include::gen/vplan_matrix.adoc[tag=axi]
 ==== Resource Planes, DEST_RP and QoS Arbitration
 
 MAS 3.2 and 3.10: several RPs at once, independent of each other, DEST_RP
-remapping, and the arbitration modes and QoS thresholds. Traffic runs on every
-RP of every multi-RP configuration; the credit-flow checker shows no RP is held
-back by another, and the QoS checks judge arbitration order under a TX
-backlog. No functional group covers arbitration outcomes or DEST_RP remapping
-(<<aou-fcov-not-covered>>). Lists: `matrix`, `features`, `stress`.
+remapping, the asymmetric RP mapping, and the arbitration modes and QoS
+thresholds. Traffic runs on every RP of every multi-RP configuration; the
+credit-flow checker shows no RP is held back by another on a different lane,
+and the QoS checks judge arbitration order under a TX backlog. Every T1 seed
+programs a random legal `ASYMMETRIC_RP_PROC_CON` before activation (about half
+enabled: identity, moved ports, merge groups, lanes below the remote die's RP
+count), and `aou_t1_rp_map_chk` checks in every test that each request leaves
+on its lane's DEST_RP with the source tag and ID rules of MAS 3.10.5. Ports on
+a merged lane issue no exclusives (MAS overview 2.2). The throughput tests and
+`aou_qos_order_test` keep the mapping disabled, as do the subordinate
+ID-mismatch injections, whose outcome on a merged lane the documents leave
+open. `cg_rp_map_req` and `cg_rp_map_cfg` cover the mapping; no group covers
+arbitration outcomes or DEST_RP permutations (<<aou-fcov-not-covered>>).
+Lists: `matrix`, `features`, `stress`, and every other T1 list for the mapping.
 
 include::gen/vplan_matrix.adoc[tag=rp]
 

@@ -31,6 +31,11 @@ class aou_fdi_monitor extends uvm_monitor;
   int unsigned n_tx_abandoned;   // partial flits abandoned on a mid-flit LinkError
   int unsigned n_rx_abandoned;
   int unsigned n_rx_beats_reset; // RX beats in Reset with the Receiver Active (+fdi_rx_early)
+  // Cycles in Active in which the Adapter would take a DUT TX beat: pl_trdy
+  // high and no stall handshake under way. A test judging how much the DUT
+  // sends compares against this, not wall-clock cycles, so the pl_trdy policy
+  // the seed drew doesn't decide the result.
+  int unsigned n_tx_ready;
 
   local aou_flit_item tx_cur;
   local int unsigned  tx_beat;
@@ -174,6 +179,9 @@ class aou_fdi_monitor extends uvm_monitor;
     if (tx_beat == 0 && v && sts != FDI_STS_ACTIVE && !abandoned)
       err("FDI-R43", $sformatf("TX flit starts while pl_state_sts=0x%0h", sts));
 
+    if (t && sts == FDI_STS_ACTIVE && vif.mon_cb.pl_stallreq !== 1'b1 &&
+        vif.mon_cb.lp_stallack !== 1'b1)
+      n_tx_ready++;
     if (tx_beat != 0 && !t) tx_stall++;
     if (!(v && i && t)) begin
       if (tx_beat == 0 && tx_gap < 1000) tx_gap++;

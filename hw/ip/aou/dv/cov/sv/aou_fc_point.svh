@@ -12,7 +12,8 @@
 // itself the check and reports a hit under that rule; one without a rule is
 // checked elsewhere. A cross cell over an ignored or illegal coverpoint bin is
 // ignored. spec tags a bin with the spec revision it needs ("v0.8"); tagged
-// bins stay targets, and reports show them separately.
+// bins stay targets, and reports show them separately. plan holds the
+// test-plan items a bin is evidence for, as space-separated IDs ("4.1 5.1").
 class aou_fc_point;
   localparam byte KIND_BIN     = 0;
   localparam byte KIND_IGNORE  = 1;
@@ -27,6 +28,7 @@ class aou_fc_point;
   byte             kind[$];
   string           spec[$];
   string           rule[$];
+  string           plan[$];
   int unsigned     comp[$];       // cross: coverpoint indices in the group
   int unsigned     hits[$];
   longint unsigned outside;
@@ -49,6 +51,7 @@ class aou_fc_point;
     kind.push_back(k);
     spec.push_back("");
     rule.push_back(r);
+    plan.push_back("");
     hits.push_back(0);
   endfunction
 
@@ -82,6 +85,20 @@ class aou_fc_point;
     foreach (bin_name[b]) begin
       if (match_bin(pat, bin_name[b])) begin
         spec[b] = s;
+        n++;
+      end
+    end
+    if (n == 0)
+      `uvm_fatal("aou_fc_point", $sformatf("%s.%s: no bin matches %s", group_name, name, pat))
+  endfunction
+
+  // Adds plan-item IDs to every target or illegal bin matching pat ("" matches
+  // every bin); fatal when none does.
+  function void add_plan(string pat, string ids);
+    int unsigned n = 0;
+    foreach (bin_name[b]) begin
+      if (kind[b] != KIND_IGNORE && (pat == "" || match_bin(pat, bin_name[b]))) begin
+        plan[b] = (plan[b] == "") ? ids : {plan[b], " ", ids};
         n++;
       end
     end
@@ -172,6 +189,7 @@ class aou_fc_point;
       kind.push_back(cross_excluded(cps, b) ? KIND_IGNORE : KIND_BIN);
       spec.push_back("");
       rule.push_back("");
+      plan.push_back("");
       hits.push_back(0);
     end
   endfunction

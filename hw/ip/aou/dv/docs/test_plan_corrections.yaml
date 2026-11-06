@@ -266,8 +266,8 @@
 - id: '2.11'
   added: 'AoU 8.2/8.4'
   priority: P2
-  title: 'No credit message in DISABLED; credits of every class are permitted after the sender''s DeactivateAck (v0.8 8.4, MAS 7.3.1), including in the flit whose Ack completes the teardown'
-  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26).
+  title: 'No credit message in DISABLED; the DUT keeps to the MAS 7.3.1 deactivation windows, narrower than v0.8 8.4: its request credits (WriteReq, ReadReq, WriteData) stop with the flit carrying its DeactivateAck, its response credits (ReadData, WriteResp) with the flit carrying its DeactivateReq, and no WriteData follows its DeactivateReq; the remote die''s credits of every class are permitted after its DeactivateAck (v0.8 8.4), including in the flit whose Ack completes the teardown'
+  note: Added by the coverage-closure review (2026-10-14); priority to be reviewed. Response credits after the DeactivateAck became permitted when AOU_CON0.CREDIT_MANAGE was removed (2026-10-26). The DUT's MAS 7.3.1 windows became an always-on check (T1-C45) on 2026-11-05; until then nothing could fail this item.
 - id: '2.12'
   added: 'MAS 7.1'
   priority: P2
@@ -399,6 +399,11 @@
   priority: P1
   title: 'A write burst the DUT has committed is not held open by back-to-back single-beat writes on another RP (both managers saturating, AWLEN 0 against AWLEN 31-63)'
   note: 'Found missing by the PR #98 review: a stream of short writes starved an open burst in an early version of the TX aligner. T1-C43 checks in every test that a committed write keeps making progress while it is next in write-data order; it does not bound how long the short writes delay a burst that still trickles.'
+- id: '12.22'
+  added: 'MAS 3.10.1, 3.10.4, 3.10.5; RDL ASYMMETRIC_RP_PROC_CON; PR #124'
+  priority: P1
+  title: 'Asymmetric RP mapping: with ASYMMETRIC_RP_PROC_CON programmed before activation to a random legal mapping (disabled, identity, moved ports, merge groups of 2, 3 or 4, two pairs; lanes below the remote die''s RP count), every request leaves on its lane''s DEST_RP with the source tag and ID rules of 3.10.5, and every response returns to the port that issued it'
+  note: 'Added with the bench support for PR #124: the base sequence programs a random mapping per seed (about half enabled), aou_t1_rp_map_chk checks FEAT-R29/R30 in every test and cg_rp_map_req/cg_rp_map_cfg measure it. The arbitration inside a merge group (3.10.4) is exercised by the QoS tests but not checked: aou_qos_order_test keeps the mapping disabled.'
 - id: '13.19'
   added: 'RDL ARB_MODE; MAS 3.2.1'
   priority: P2

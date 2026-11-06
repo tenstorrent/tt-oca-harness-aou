@@ -34,6 +34,7 @@ class aou_t1_env extends uvm_env;
   aou_t1_lp_cfg_chk    lp_cfg_chk;
   aou_t1_force_deact_chk force_chk;
   aou_t1_dbg_fifo_chk  dbg_chk;
+  aou_t1_rp_map_chk    rp_map;
   aou_t1_crd_flow_chk  crd_chk;
   aou_t1_crd_rr_chk    crd_rr;
   aou_t1_crd_block_chk crd_blk;
@@ -117,6 +118,10 @@ class aou_t1_env extends uvm_env;
     force_chk = aou_t1_force_deact_chk::type_id::create("force_chk", this);
     dbg_chk = aou_t1_dbg_fifo_chk::type_id::create("dbg_chk", this);
     dbg_chk.cfg = cfg;
+    rp_map = aou_t1_rp_map_chk::type_id::create("rp_map", this);
+    rp_map.n_rp = cfg.n_rp;
+    rp_map.peer_rp = cfg.l3_cfg.rp_count;
+    for (int unsigned r = 0; r < cfg.n_rp && r < 4; r++) rp_map.rp_bytes[r] = cfg.rp_bytes[r];
     crd_chk = aou_t1_crd_flow_chk::type_id::create("crd_chk", this);
     crd_chk.cfg = cfg;
     crd_rr = aou_t1_crd_rr_chk::type_id::create("crd_rr", this);
@@ -185,6 +190,15 @@ class aou_t1_env extends uvm_env;
     rmgr.req_ap.connect(dbg_chk.remote_req_imp);
     dbg_chk.rm = regs.model;
     dbg_chk.clk_vif = m_sub[0].cfg.vif;
+    l3.ap_rx_msg.connect(rp_map.dut_msg_imp);
+    l3.ap_tx_msg.connect(rp_map.rem_msg_imp);
+    rp_map.rm = regs.model;
+    rp_map.model = l3.model;
+    rp_map.s_vif = new[cfg.n_rp];
+    foreach (s_mgr[r]) rp_map.s_vif[r] = s_mgr[r].cfg.vif;
+    crd_chk.rp_map = rp_map;
+    early_tbl.rp_map = rp_map;
+    if (attr_chk != null) attr_chk.rp_map = rp_map;
     l3.ap_rx_msg.connect(crd_chk.rx_msg_imp);
     crd_chk.model = l3.model;
     crd_chk.rm = regs.model;
@@ -295,6 +309,30 @@ class aou_t1_env extends uvm_env;
         reset_flush(rst.last_which);
       end
     join_none
+    if (cfg.l3_cfg.pol.wresp_batch != 0) begin
+      fork
+        wresp_batch_loop();
+      join_none
+    end
+  endtask
+
+  // The remote die returns its WriteResps in batches (aou_packer_policy::
+  // wresp_batch): after a random gap, L3 holds them back until wresp_batch are
+  // queued or wresp_batch_wait cycles have passed, then lets them go together.
+  // The hold is bounded, so no response waits for long, and AXI puts no bound
+  // on when a write response comes.
+  task wresp_batch_loop();
+    aou_packer_policy pol = cfg.l3_cfg.pol;
+    forever begin
+      repeat ($urandom_range(2000, 200)) @(lsm_vif.mon_cb);
+      if (pol.wresp_batch == 0) return;
+      pol.hold_wresp = 1'b1;
+      for (int unsigned c = 0;
+           c < pol.wresp_batch_wait && l3.model.pk.queued_wresps() < pol.wresp_batch; c++)
+        @(lsm_vif.mon_cb);
+      pol.hold_wresp = 1'b0;
+      l3.model.kick();
+    end
   endtask
 
   // Reset contract (docs/AOU_TB_ARCH.adoc): called on every reset the reset
@@ -322,6 +360,7 @@ class aou_t1_env extends uvm_env;
     force_chk.reset_flush();
     dbg_chk.reset_flush();
     crd_chk.reset_flush();
+    rp_map.reset_flush();
     crd_blk.reset_flush();
     wr_order.reset_flush();
     early_tbl.reset_flush();

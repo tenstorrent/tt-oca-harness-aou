@@ -29,7 +29,10 @@ module aou_axi4_coverage_mod #(
   parameter int    ADDR_WIDTH      = 64,
   parameter int    DATA_WIDTH      = 512,
   parameter int    ID_WIDTH        = 10,
-  parameter int    MAX_OUTSTANDING = 32
+  parameter int    MAX_OUTSTANDING = 32,
+  // 0 makes "a B stall ended at the write limit" no target on this port
+  // (aou_axi4_cov_bind.sv says why for the DUT's M ports).
+  parameter bit    B_AT_MAX_TARGET = 1'b1
 ) (
   input logic                    clk,
   input logic                    rst_n,
@@ -740,9 +743,15 @@ module aou_axi4_coverage_mod #(
       bins below_max = {1'b0};
       bins at_max    = {1'b1};
     }
-    cp_b_stall_at_max_os: coverpoint b_stall_at_max_r iff (stall_done[CH_B]) {
-      bins below_max = {1'b0};
-      bins at_max    = {1'b1};
+    // Where B_AT_MAX_TARGET is 0 (the M ports) the at-limit case is not a
+    // target, so at_max is ignored there and drops out of the group's score.
+    // The two-bit sample lets the S ports ignore a value that never occurs
+    // (2) instead, leaving both bins in place.
+    cp_b_stall_at_max_os: coverpoint 2'(b_stall_at_max_r) iff (stall_done[CH_B] &&
+                                                         (B_AT_MAX_TARGET || !b_stall_at_max_r)) {
+      bins below_max = {2'd0};
+      bins at_max    = {2'd1};
+      ignore_bins at_max_not_target = {B_AT_MAX_TARGET ? 2'd2 : 2'd1};
     }
   endgroup
 

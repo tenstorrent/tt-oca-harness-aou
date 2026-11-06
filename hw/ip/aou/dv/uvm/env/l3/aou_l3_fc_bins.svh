@@ -19,13 +19,13 @@
   `B``_BIN(enabled_disabled_lr, 64 + 2 * 8 + 0, 64 + 2 * 8 + 0) \
   `B``_BIN(deactivate_disabled_lr, 64 + 3 * 8 + 0, 64 + 3 * 8 + 0) \
   `B``_TAG("*_error|error_disabled", "v0.8")
-`define AOU_L3_FC_ACT_OP(B) `B``_VALS(op, 0, 3) `B``_BIN(reserved, 4, 15)
+// A reserved op (AoU v0.8 Table 27: ops 4-15) is no target: no compliant die
+// sends one, so seeing one takes out-of-protocol stimulus.
+`define AOU_L3_FC_ACT_OP(B) `B``_VALS(op, 0, 3) `B``_IGN(reserved, 4, 15)
 `define AOU_L3_FC_LEGAL(B) `B``_BIN(illegal, 0, 0) `B``_BIN(legal, 1, 1)
-// A reserved op is never legal. The DUT sending an illegal op is AOU-R40's
-// check, so it can't happen in a passing run; ours come from the inject path.
-`define AOU_L3_FC_X_ACT_OP(B) \
-  `B``_XIGN("reserved,*,legal") \
-  `B``_XIGN("*,rx,illegal")
+// The DUT sending an illegal op is AOU-R40's check, so it can't happen in a
+// passing run; ours come from the inject path.
+`define AOU_L3_FC_X_ACT_OP(B) `B``_XIGN("*,rx,illegal")
 // Message kinds as msg_kind() numbers them.
 `define AOU_L3_FC_MSG_KIND(B) \
   `B``_BIN(wreq, 0, 0) `B``_BIN(rreq, 1, 1) \
@@ -72,6 +72,13 @@
 `define AOU_L3_FC_NWRESP(B) \
   `B``_BIN(one, 1, 1) `B``_BIN(two, 2, 2) `B``_BIN(few, 3, 4) `B``_BIN(many, 5, 15) \
   `B``_BIN(dense, 16, 47) `B``_BIN(full, 48, 48)
+// The DUT's TX packer adds at most one WriteResp to its ring per FDI chunk it
+// sends and the ring holds about 105 granules, so a flit the DUT sends (rx)
+// carries at most about 12 (the most measured is 11): dense and full rx are
+// beyond this RTL (taken from the RTL; the MAS doesn't say). Tagged rather
+// than ignored, so they stay recorded and reported apart; if the packer
+// changes and they are hit, drop this line.
+`define AOU_L3_FC_X_NWRESP(B) `B``_TAG("dense|full,rx", "rtl-limit")
 // Misc messages other than Activation in one half-flit. AoU v0.8 4.4 allows at
 // most two, so three or more is a violation, not a target: the unpacker's
 // half-flit Misc check (AOU-R7) reports it.

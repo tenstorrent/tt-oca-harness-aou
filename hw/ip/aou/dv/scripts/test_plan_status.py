@@ -11,6 +11,7 @@ import contextlib
 import csv
 import io
 import itertools
+import json
 import os
 import sys
 import tempfile
@@ -346,6 +347,27 @@ class PlanStatus(unittest.TestCase):
         self.assertIn("0 unjudged", out)
         self.assertIn("2 incomplete", out)  # no run.sh, and a log still being written
         self.assertEqual(self.statuses("--judge")["1.10"], "covered")
+
+    def test_fc_bins(self):
+        # Two fc_merged.json files (two configurations) are unioned; a merged ID reports
+        # through its surviving one; illegal bins don't count, revision-tagged ones apart.
+        def fc(path, hits):
+            bins = {"a": {"hits": hits[0], "spec": "", "plan_ids": ["1.1"]},
+                    "b": {"hits": hits[1], "spec": "", "plan_ids": ["1.1", "1.5"]},
+                    "c": {"hits": 0, "spec": "v0.8", "plan_ids": ["1.1"]},
+                    "d": {"hits": 3, "spec": "", "illegal": True, "plan_ids": ["1.1"]},
+                    "e": {"hits": 0, "spec": "", "plan_ids": ["8.8"]}}
+            with open(path, "w") as fh:
+                json.dump({"groups": {"axi4.axi_tx_rp0.cg_w": {"points": {"cp": {"bins": bins}}}}}, fh)
+        f1, f2 = os.path.join(self.tmp.name, "f1.json"), os.path.join(self.tmp.name, "f2.json")
+        fc(f1, [1, 0])
+        fc(f2, [0, 0])
+        out, _ = self.run_ps("--fc", f1, "--fc", f2)
+        row = next(line for line in out.splitlines() if line.startswith("| 1.1 | covered item"))
+        self.assertIn("| 1/2 (+0/1 v0.8) | axi4.*.cg_w.cp 1/2 | axi4.axi_tx_rp0.cg_w.cp b |", row)
+        self.assertIn("- 8.8 (coverage bins)", out)
+        out, _ = self.run_ps()
+        self.assertNotIn("Coverage behind", out)
 
 
 class BuildKey(unittest.TestCase):

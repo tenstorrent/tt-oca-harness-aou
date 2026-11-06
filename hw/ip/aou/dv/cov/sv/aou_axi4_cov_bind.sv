@@ -207,7 +207,13 @@ module aou_axi4_cov_bind #(
       .ADDR_WIDTH      (AXI_ADDR_WD),
       .DATA_WIDTH      (WD),
       .ID_WIDTH        (AXI_ID_WD),
-      .MAX_OUTSTANDING (M_MAX_OS)
+      .MAX_OUTSTANDING (M_MAX_OS),
+      // A B stall at an M port never ends with the port at its write limit, so
+      // that bin is no target here: the DUT accepts write responses into its own
+      // buffering and drops BREADY only once the port is already below its write
+      // limit. The passing runs reach the write limit and B stalls of every
+      // length on every M port, never both at once.
+      .B_AT_MAX_TARGET (1'b0)
     ) u_cov_rx (
       .clk      (I_CLK),
       .rst_n    (I_RESETN),

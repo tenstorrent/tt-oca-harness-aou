@@ -32,6 +32,7 @@ package aou_reg_pkg;
   `include "aou_reg_early_resp_seq.svh"
   `include "aou_reg_qos_seq.svh"
   `include "aou_reg_dest_rp_seq.svh"
+  `include "aou_reg_rp_map_seq.svh"
   `include "aou_reg_lp_mode_seq.svh"
   `include "aou_reg_int_mask_seq.svh"
   `include "aou_reg_error_info_seq.svh"

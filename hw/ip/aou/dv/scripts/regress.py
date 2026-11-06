@@ -31,11 +31,11 @@ on PATH every build and run_list.py is started at once and each job is submitted
 through LSF; with LSF=0 they run one after another on this host. Whatever else is
 given to make regress (LSF_QUEUE, AXI4PC=0, LSF_EXTRA_OPTS, ...) reaches those makes.
 
-RTL assertions (the -assert builds) are VCS-only: on Verilator they are skipped with a
-note. The unit benches have no DUT, so they build without coverage under COV=1.
+The unit benches have no DUT, so they build without coverage under COV=1.
 
 Logs, the exact commands, the state, summary.md and plan_status.md (the test-plan
-status of this RID's runs, scripts/plan_status.py --rid) go to out/regress/<RID>/; the run
+status of this RID's runs, scripts/plan_status.py --rid, with the bins behind each
+stimulus-shape item when there is a coverage union) go to out/regress/<RID>/; the run
 directories and results CSVs are where make run and run_list.py put them,
 out/<build>/. The exit status is 1 when any run is FAIL or XPASS, when a build
 produced no results or when a step failed, else 0.
@@ -196,10 +196,6 @@ def plan(args):
     bad = [b for b in benches if b not in BENCHES]
     if bad:
         die(f"unknown BENCHES {' '.join(bad)}; use some of {' '.join(BENCHES)}")
-    if "assert" in benches and args.sim != "vcs":
-        notes.append(f"assert: skipped; the RTL assertions use SVA ranges, so the -assert builds "
-                     f"are VCS-only (SIM={args.sim})")
-        benches = [b for b in benches if b != "assert"]
     if args.cov == "1":
         for b in ("l3_unit", "axi_selftest"):
             if b in benches:
@@ -577,12 +573,15 @@ def summary(args, units, notes, state, regdir):
                                      f"the configurations: {os.path.join(regdir, 'union')}", ""]
     # The plan's status page for this regression (the plan carries no hand-kept status).
     ps = os.path.join(regdir, "plan_status.md")
+    # With the coverage union, the page also lists the bins behind each stimulus-shape item.
+    fc = os.path.join(regdir, "union", "fc", "fc_merged.json")
     try:
         if not counted:
             # No --build at all would mean every build, stale runs included.
             raise OSError("no build's results counted")
         subprocess.run([sys.executable, os.path.join(UVM_ROOT, "scripts", "plan_status.py"),
                         "--out-dir", args.out_root, "--rid", args.rid, "-o", ps]
+                       + (["--fc", fc] if os.path.exists(fc) else [])
                        # The builds the summary counts, so both reports use the same runs.
                        + [x for b in counted for x in ("--build", b)],
                        check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)

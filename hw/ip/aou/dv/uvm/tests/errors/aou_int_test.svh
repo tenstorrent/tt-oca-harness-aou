@@ -11,7 +11,12 @@ class aou_int_test extends aou_base_test;
     num_txns = 10;
   endfunction
 
+  // An unsolicited remote response on a lane the asymmetric RP mapping merges
+  // reaches the port its ID's low bits name, through a remap table with no
+  // entry for it; MAS 3.10.5 does not define the outcome, so these
+  // injections keep the mapping off merged routes.
   function void configure();
     aou_int_vseq::add_regions(cfg);
+    cfg.rp_map_pct = 0;
   endfunction
 endclass

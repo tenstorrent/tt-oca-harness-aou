@@ -13,7 +13,7 @@ class aou_err_base_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_err_base_vseq)
 
   static const bit [63:0] DBG_BASE = 64'h0000_0071_0000_0000;
-  int unsigned dbg_wait = 5000;   // cycles a debug-window access may take
+  int unsigned dbg_wait = 5000;   // cycles a debug-window access may take (see run_dbg)
   int unsigned dbg_len = 0;       // AxLEN of a debug-window read or pop, before dbg_len_of()
   bit [3:0] dbg_cache = 4'd0;     // AxCACHE of a debug-window read or pop (bit 1: modifiable)
 
@@ -124,18 +124,32 @@ class aou_err_base_vseq extends aou_link_base_vseq;
   // Runs one debug-window access. The window must answer it however the RP
   // converts or splits it (MAS 7.2.4); a stuck access ends the test with its
   // own ID instead of the phase timeout.
+  //
+  // The wait counts only the cycles in which the DUT could send the answer
+  // (ReadData for a read, WriteResp for a pop): link open, the Adapter taking
+  // a beat, and the remote die holding enough of that credit class out to the
+  // DUT on rp's response wire RP. A remote die that returns its credit
+  // slowly (wresp_crd, rdata_crd, crd_delay) is backpressure: the answer may
+  // queue behind every earlier response of the RP, one per returned credit,
+  // and that time is not the DUT's. A DUT that never answers is still caught:
+  // once the remote die's credit is back and nothing else is in the way,
+  // every cycle counts.
   task run_dbg(aou_txn_list_seq s, int unsigned rp, string what);
     bit done = 1'b0;
+    aou_cred_class_e cc = (s.items[0].dir == AOU_AXI_RD) ? AOU_CC_RDATA : AOU_CC_WRESP;
     fork
       begin
         run(s, 1'b1, rp);
         done = 1'b1;
       end
     join_none
-    for (int unsigned n = 0; !done && n < dbg_wait; n++) wait_cycles(1);
+    for (int unsigned n = 0; !done && n < dbg_wait;) begin
+      wait_cycles(1);
+      if (env.crd_chk.can_send(rp, cc)) n++;
+    end
     if (!done) begin
       `uvm_fatal(get_type_name(), $sformatf(
-          {"T1-E14: RP%0d debug FIFO %s not answered in %0d cycles ",
+          {"T1-E14: RP%0d debug FIFO %s not answered in %0d cycles with credit to answer ",
            "(%0d-byte remote beat, %0d-byte RP)"},
           rp, what, dbg_wait, cfg.remote_bytes_of(rp), cfg.rp_bytes[rp]))
       // Simulators that finish the time step after $finish would go on to

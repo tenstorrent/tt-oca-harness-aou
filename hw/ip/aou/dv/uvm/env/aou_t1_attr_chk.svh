@@ -72,6 +72,7 @@ class aou_t1_attr_chk extends uvm_component;
   aou_t1_xfer_cov      cov;
   aou_l3_cfg           l3_cfg;   // dest_rp: the remote die's plane -> the DUT's RP
   aou_t1_early_tbl_chk early;    // EARLY_BRESP_EN/EARLY_ALWAYS_EN mirror; null: never early
+  aou_t1_rp_map_chk    rp_map;   // a DUT request's port and own ID; null: the RP and ID it carries
 
   protected aou_axi_txn far_q[2][string][$];    // [path 0 L2R, 1 R2L][rp/dir/id]
   protected aou_axi_txn near_q[2][string][$];   // completed, nothing matched yet
@@ -101,8 +102,17 @@ class aou_t1_attr_chk extends uvm_component;
   endfunction
 
   // t's key; remote-side txns (L2R far: wire RP; R2L near: remote plane) map
-  // back to the DUT's RP.
-  function string key(aou_axi_txn t, bit remote_side);
+  // back to the DUT's RP. A DUT request (l2r_far) maps to the S port it came
+  // from and that port's own ID, which differ from its lane and wire ID on a
+  // route the asymmetric RP mapping merges (MAS 3.10.5).
+  function string key(aou_axi_txn t, bit remote_side, bit l2r_far = 1'b0);
+    int x;
+    if (l2r_far && rp_map != null) begin
+      x = rp_map.req_port(t.rp, t.id);
+      if (x >= 0)
+        return $sformatf("%0d/%0d/%0h", x, t.dir,
+                         rp_map.orig_id(x, t.dir == AOU_AXI_RD, t.id));
+    end
     return $sformatf("%0d/%0d/%0h", remote_side ? local_rp(t.rp) : t.rp, t.dir, t.id);
   endfunction
 
@@ -162,7 +172,9 @@ class aou_t1_attr_chk extends uvm_component;
   endfunction
 
   function void take_wreq(aou_msg_wreq w);
-    string k = wkey(local_rp(int'(w.rp)), w.id);
+    int x = (rp_map == null) ? -1 : rp_map.req_port(int'(w.rp), w.id);
+    string k = (x < 0) ? wkey(local_rp(int'(w.rp)), w.id) :
+                         wkey(x, rp_map.orig_id(x, 1'b0, w.id));
     if (aw_q.exists(k)) begin
       foreach (aw_q[k][i]) begin
         if (inside_of(aw_q[k][i], w.addr)) begin
@@ -176,7 +188,7 @@ class aou_t1_attr_chk extends uvm_component;
   endfunction
 
   function void take_far(int p, aou_axi_txn f);
-    string k = key(f, p == 0);
+    string k = key(f, p == 0, p == 0);
     if (f.aborted) return;
     if (near_q[p].exists(k)) begin
       foreach (near_q[p][k][i]) begin
