@@ -14,6 +14,10 @@
 //   least min_share_pct of its own (round-robin, MAS 3.2.1: no RP starves).
 // T1-M03: in an independence window, every busy RP other than slow_rp
 //   completes all of its transactions while slow_rp still has some to finish.
+//   An S port that shares slow_rp's TX lane under the RP mapping shares its
+//   credit and its one-at-a-time writes (MAS 3.10.4), so it may legally be
+//   held up with slow_rp: only its remote-die transactions, which the mapping
+//   does not move, are held to the rule.
 class aou_mrp_chk extends uvm_component;
   `uvm_component_utils(aou_mrp_chk)
 
@@ -37,7 +41,8 @@ class aou_mrp_chk extends uvm_component;
   protected bit          arb_open;
   protected bit          ind_open;
   protected int unsigned arb_seq[$];         // wire RP of each DUT request in the window
-  protected time         ind_last[4];        // last completion per RP in the window
+  // Last completion per RP in the window, [rp][1: S port, 0: remote die].
+  protected time         ind_last[4][2];
   protected int unsigned ind_n[4];
   protected int unsigned n_arb_windows;
   protected int unsigned n_ind_windows;
@@ -55,7 +60,7 @@ class aou_mrp_chk extends uvm_component;
     else n_rem[t.rp]++;
     if (ind_open) begin
       ind_n[t.rp]++;
-      if (t.t_done > ind_last[t.rp]) ind_last[t.rp] = t.t_done;
+      if (t.t_done > ind_last[t.rp][loc]) ind_last[t.rp][loc] = t.t_done;
     end
   endfunction
 
@@ -142,14 +147,20 @@ class aou_mrp_chk extends uvm_component;
   function void ind_start(int unsigned slow);
     flush();
     slow_rp = int'(slow);
-    foreach (ind_last[r]) begin
-      ind_last[r] = 0;
+    foreach (ind_n[r]) begin
+      ind_last[r] = '{0, 0};
       ind_n[r] = 0;
     end
     ind_open = 1'b1;
   endfunction
 
+  // Port r shares slow_rp's TX lane under the RP mapping.
+  protected function bit on_slow_lane(int unsigned r);
+    return rp_map != null && rp_map.merged(slow_rp) && rp_map.lane(r) == rp_map.lane(slow_rp);
+  endfunction
+
   function void ind_stop();
+    time slow_last;
     flush();
     ind_open = 1'b0;
     n_ind_windows++;
@@ -160,12 +171,23 @@ class aou_mrp_chk extends uvm_component;
       `uvm_error(get_type_name(), $sformatf("T1-M03: slow RP%0d completed nothing", slow_rp))
       return;
     end
+    slow_last = (ind_last[slow_rp][1] > ind_last[slow_rp][0]) ? ind_last[slow_rp][1] :
+                                                                  ind_last[slow_rp][0];
     for (int r = 0; r < 4; r++) begin
+      bit mate;
+      time last;
       if (r == slow_rp || ind_n[r] == 0) continue;
-      if (ind_last[r] >= ind_last[slow_rp])
+      mate = on_slow_lane(r);
+      last = (!mate && ind_last[r][1] > ind_last[r][0]) ? ind_last[r][1] : ind_last[r][0];
+      if (last >= slow_last) begin
         `uvm_error(get_type_name(), $sformatf(
                    "T1-M03: RP%0d finished at %0t, not before slowed RP%0d (%0t)", r,
-                   ind_last[r], slow_rp, ind_last[slow_rp]))
+                   last, slow_rp, slow_last))
+      end else if (mate) begin
+        `uvm_info(get_type_name(), $sformatf(
+                  "RP%0d shares slowed RP%0d's lane: only its remote-die transactions checked",
+                  r, slow_rp), UVM_LOW)
+      end
     end
   endfunction
 
