@@ -44,8 +44,8 @@ Nothing the model does every clock allocates an object.
 | Done | Extension API: link-state observers and a mainband coverage collector (interface classes), flit analysis ports; own rule ledger, self-test | - |
 | Done | FDI widths of 32, 64, 128 and 256 bytes; at 256 B a flit is one transfer and its cancel covers the whole flit | - |
 | Done | FDI widths of 512 and 1024 bytes: 2 or 4 flits per transfer, NOP lanes on RX, a cancel covers every flit of the transfer (see "Flit widths 512 and 1024 B") | - |
+| Done | Covergroups of the model's own: a mainband collector per FDI (`ucie_fdi_fcov`) and a link-state observer (`ucie_lsm_fcov`), plain SystemVerilog, on by default (`fcov_en`); see "Coverage" | - |
 | Done | Every FDI signal but `pl_cfg`/`lp_cfg` on the interfaces: the negotiated protocol, format, speed and width from the config objects, the Physical Layer's training and L1 indications, stream IDs; DLLP, Retimer credit and error outputs tied idle; the Protocol Layer's DLLP, Retimer credit and stream outputs checked (see "Signals") | - |
-| Next | Covergroups of the model's own as a `ucie_fdi_cov` collector and a link-state observer (the AoU bench's are an example) | - |
 | Next | Protocol-Layer-initiated PM entry (`lp_state_req` = L1/L2), today not modelled | - |
 | Deferred | Other flit formats (68B, Standard 256B), RDI, the sideband (`pl_cfg`/`lp_cfg`, not on the interfaces), DLLPs, `pl_cerror`/`pl_nferror`/`pl_trainerror`, `pl_error` | a user who needs them |
 | Deferred | A home outside the AoU bench: tt-oca-harness's shared VIP or a repository of its own (see "Moving it out of the AoU bench") | a second consumer |
@@ -132,8 +132,8 @@ not name the protocol.
 The layout is tt-oca-harness's for shared verification IP
 (`hw/common/dv/vip/<name>/`, `ocah_axi_vip` for example): the interfaces, the UVM
 packages with their compile list, and the self-test each in a directory of its own.
-The model has no assertion modules and no coverage of its own yet, so it has no
-`sva/` or `cov/`.
+The model has no assertion modules, and its covergroups are classes in its packages
+(`uvm/l1/ucie_fdi_fcov.svh`, `uvm/l2/ucie_lsm_fcov.svh`), so it has no `sva/` or `cov/`.
 
 | Path | Contents |
 |---|---|
@@ -327,6 +327,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `partial_beat_pct` | 0 | 512 and 1024 B: chance an RX transfer carries fewer flits than it could, the empty lanes zero (NOPs) |
 | `stream` | 04h | `pl_stream`, and what `lp_stream` must carry (FDI-R64); must name `ucie_lsm_cfg.protocol` |
 | `checks_en`, `cov_en` | 1, 1 | monitor checks; coverage calls to `mon.cov` |
+| `fcov_en` | 1 | the model's own covergroups (`ucie_fdi_fcov`); `+ucie_fcov` overrides it |
 | `check_tx_adapter_bytes` | 1 | FDI-R45 |
 | `irdy_reset_grace` | 4 | cycles `lp_irdy` may stay high after entering Reset (FDI-R44) |
 | `gate` | | `ucie_fdi_gate`, shared with L2: `open`, `rx_early`, `abort`, `epoch`, `quiet()` (true from the edge after a TX flit's last transfer, so the state never changes on that edge) |
@@ -335,13 +336,14 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 
 | Class | Role | Public |
 |---|---|---|
-| `ucie_fdi_agent` | one FDI | `cfg`, `vif`, `sqr`, `drv`, `rsp`, `mon` |
+| `ucie_fdi_agent` | one FDI | `cfg`, `vif`, `sqr`, `drv`, `rsp`, `mon`, `fcov` (null with `fcov_en` 0) |
 | `ucie_flit_item` | one 256B flit (several share a transfer at 512 and 1024 B) | `data[256]`, `phy`, `dir`; drive plan `cancel_h0`, `cancel_h1`, `h1_replay_resend_h0`, `cancel_repeat`, `pre_gap`, `beat_gap_pct`, `max_beat_gap`; observed `n_cancel_h0/h1` (a whole-flit cancel at 256 B counts in `n_cancel_h0`), `n_cancel_valid`, `n_stall_cycles`, `gap_before`, `t_start`, `t_end`, `t_beat[]` (when each beat was collected); `get_beat`, `put_beat` (with a `lane` argument: the flit's 256 B lane of a 512 or 1024 B transfer), `is_nop` (Flit Header 0000h), `randomize_payload`, `clear_adapter_bytes`, `same_payload`, `copy_data`, `mix_cancel_plan` |
 | `ucie_flit_seq` | RX traffic | `n_flits`, `payloads[$]`, `cancel_pct`, `cancel_mix`, `gap_pct`, `bubble_pct`, `random_payload`, `pid` |
 | `ucie_fdi_pl_driver` | drives RX flits with their cancel plan; at 512 and 1024 B packs the flits the sequence has ready into one transfer, the first one's plan applying to all | |
 | `ucie_fdi_tx_responder` | `pl_trdy`, `pl_stallreq` | `stall_begin()`, `stall_end()`, `stalled()` |
 | `ucie_fdi_monitor` | both directions, checks | `ap_tx`, `ap_rx`, `cov`, counters `n_tx_flits`, `n_rx_flits`, `n_rx_cancels`, `n_stalls`, `n_rx_nops` (RX NOP flits discarded), ... |
 | `ucie_fdi_cov` | interface class: a mainband coverage collector | `sample_xfer`, `sample_cancel`, `sample_stall`, `sample_abandon` (Extension API) |
+| `ucie_fdi_fcov` | the model's mainband covergroups, a `ucie_fdi_cov` | `fdi_bytes` (the FDI width); `sample_lanes()`, `sample_trdy()` besides the interface's; `convert2string()` (each group's score) |
 | `ucie_rule_log` | rule ledger | `check()`, `fire()`, `lines()`, `clear()` (static) |
 
 ### L2: `ucie_lsm_cfg`
@@ -366,14 +368,15 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `lnk_cfg` | 010b (x16) | `pl_lnk_cfg` |
 | `recenter_en` | 0 | raise `pl_phyinrecenter` while the link trains (bringup and Retrain) |
 | `checks_en` | 1 | monitor checks |
-| `cov_en` | 1 | for observers that collect link-state coverage (the model collects none itself) |
+| `cov_en` | 1 | for observers that collect link-state coverage |
+| `fcov_en` | 1 | the model's own link-state covergroups (`ucie_lsm_fcov`); `+ucie_fcov` overrides it |
 | `ref_slack` | 3 | cycles a Protocol Layer output may lag its cause |
 
 ### L2: classes
 
 | Class | Role | Public |
 |---|---|---|
-| `ucie_lsm_agent` | the link | `cfg`, `phy[$]` (the mainband agents, set before build), `sqr`, `drv`, `mon` |
+| `ucie_lsm_agent` | the link | `cfg`, `phy[$]` (the mainband agents, set before build), `sqr`, `drv`, `mon`, `fcov` (null with `fcov_en` 0) |
 | `ucie_lsm_item` | one event | `kind`, `cycles`; `to` (how it ends), `at`, `in_l1`, `gap`, `hold_wake_ack` (aborts) |
 | `ucie_lsm_event_seq` | one event | `of(kind)`; `ev_kind`, `ev_cycles`, `ev_to`, `ev_at`, `ev_in_l1`, `ev_gap`, `ev_hold_wake_ack` |
 | `ucie_lsm_l1_seq` | L1 entry, `ev_cycles` in L1, remote exit | as `ucie_lsm_event_seq` |
@@ -381,6 +384,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `ucie_lsm_monitor` | checks | `add_observer()`, `cur`, `prev` |
 | `ucie_lsm_obs_t` | struct: one clock | `rst_n`, `pl_state_sts`, `sts`, `inband_pres`, `clk_req`, `wake_ack`, `rx_active_req`, `lp_state_req`, `req`, `wake_req`, `clk_ack`, `rx_active_sts`, `linkerror`; `obs_reset()`, `obs2string()` |
 | `ucie_lsm_observer` | interface class: follows the link state | `observe(cur, prev)` (Extension API) |
+| `ucie_lsm_fcov` | the model's link-state covergroups, a `ucie_lsm_observer` | `sample_event()` (the driver's events), `sample_own()`; `convert2string()` |
 
 ### Plusargs
 
@@ -391,8 +395,10 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `+le_mid_flit_pct=N` | `ucie_lsm_cfg.le_mid_flit_pct` |
 | `+fdi_rx_early=N` | `ucie_lsm_cfg.rx_early` |
 | `+park_idle_phy=0\|1` | `ucie_lsm_cfg.park_idle_phy` |
+| `+ucie_fcov=0\|1` | `fcov_en` of `ucie_lsm_cfg` and of every `ucie_fdi_cfg` |
 
-The link-state agent reads them in its `build_phase`. Everything else is set in the
+The link-state agent reads them in its `build_phase` (the mainband agents read
+`+ucie_fcov` in theirs). Everything else is set in the
 config objects.
 
 ## Checks
@@ -468,7 +474,34 @@ a stall, no flits with the Receiver inactive) are in the driver's comments.
 
 ## Coverage
 
-*The model samples, the bench counts.* A mainband monitor with a collector set
+*The model has covergroups of its own, and a bench may add its collectors beside them.*
+Both are plain SystemVerilog covergroups and need nothing from a bench; `fcov_en` (on by
+default) or `+ucie_fcov=0` turns them off. VCS scores them (each agent prints its groups'
+scores at the end of the test, and URG merges runs); Verilator 5.052 compiles and samples
+them but scores them as 0, so the number comes from VCS. Bins that only some FDI widths
+can reach count over the widths the self-test runs: the merged score is the one that
+means anything.
+
+| Group | Class | Sampled | Bins |
+|---|---|---|---|
+| `cg_xfer` | `ucie_fdi_fcov` | every completed flit | direction × FDI width (32 to 1024 B); direction × stall cycles inside the flit (`pl_trdy` low on TX, bubbles on RX: 0, 1, 2-7, 8+); direction × idle cycles before it |
+| `cg_cancel` | `ucie_fdi_fcov` | every RX cancel | the unit (half 0, half 1, the flit at 256 B, every flit of a 512 or 1024 B transfer) × kind (idle, or with the replay's first beat); the cancels so far on the flit (1, 2, 3+); whether the TX side was stalled |
+| `cg_stall` | `ucie_fdi_fcov` | every stall handshake | where `pl_stallreq` rose (a flit boundary, inside a flit with `pl_trdy` high, inside one with `pl_trdy` low); cycles to `lp_stallack`; cycles `lp_stallack` held |
+| `cg_abandon` | `ucie_fdi_fcov` | a partial flit dropped on a mid-flit LinkError | TX, RX |
+| `cg_lanes` | `ucie_fdi_fcov` | every RX transfer at 512 and 1024 B | flits carried, the rest NOP lanes: 1 or 2 at 512 B, 1 to 4 at 1024 B |
+| `cg_trdy` | `ucie_fdi_fcov` | the end of a run of `pl_trdy` low the policy made (all in Active, no stall handshake, no `tx_hold`) | policy × where the run started (random and bursty: at a flit boundary or inside a flit; holes: inside only); its length |
+| `cg_state` | `ucie_lsm_fcov` | every `pl_state_sts` change | each (previous, current) transition the model makes: 22 bins, from Reset to Active through every exit and abort |
+| `cg_clk` | `ucie_lsm_fcov` | `lp_clk_ack` rising | the state: Reset, Active, L1, LinkReset, LinkError, Disabled |
+| `cg_wake` | `ucie_lsm_fcov` | `pl_wake_ack` rising | the state: Reset, L1 (an exit the Protocol Layer starts), Retrain |
+| `cg_rx_active` | `ucie_lsm_fcov` | `pl_rx_active_req` changing | entry in Reset or Retrain, exit in Active or LinkError |
+| `cg_event` | `ucie_lsm_fcov` | every link event the driver runs, and what it does on its own | the bringup, Retrain (ending in Active, LinkError, LinkReset or Disabled), LinkError (at a boundary, mid-flit, on `lp_linkerror`), L1 entry and exit (by the Adapter or on `lp_wake_req`), LinkReset and Disabled (each also escalated to LinkError), the clock wake, an abort (`LSM_EV_INBAND_DROP` has none: it is for a link a test keeps in Reset) |
+| `cg_abort` | `ucie_lsm_fcov` | every abort | where (Reset, after the wake, after the Active request, in L1) and what it ends in (LinkError, LinkReset, Disabled, Reset) |
+
+The mainband collector is an `ucie_fdi_cov` like a bench's and takes the rest through
+methods of its own (`sample_lanes`, `sample_trdy`); the link-state one is an observer
+like any other, and the driver also reports its events to it.
+
+*A bench's collectors.* A mainband monitor with a collector set
 (`mon.cov`, a `ucie_fdi_cov`) and `cov_en` calls it at every flit, cancel, stall and
 abandoned flit. Link-state coverage is an observer's: it sees every clock and samples
 what it needs. `sample_xfer` gets the FDI width, so a collector bins per width (32,
@@ -498,6 +531,7 @@ make test UVM_HOME=<uvm-core checkout> SIM=verilator TEST=ucie_fdi_events_test P
 |---|---|
 | `ucie_fdi_smoke_test` | traffic both ways: cancels of every shape (whole-transfer cancels from 256 B up), short RX transfers with NOP lanes at 512 and 1024 B, bubbles, gaps, `pl_trdy` policy, stand-alone and mid-flit stalls, random Adapter bytes; fails if no RX flit was cancelled |
 | `ucie_fdi_events_test` | the same under Retrain, L1 entry and exit, a clock wake, LinkError entered mid-flit, LinkReset, Disabled and a Retrain ending in LinkError, with `pl_phyinrecenter` reporting the training |
+| `ucie_fdi_cov_test` | the events test's traffic under every link event and ending the model has, for its coverage: Retrains ending in each state, LinkReset and Disabled escalated to LinkError, L1 exits by both sides, a LinkError the stub requests, and aborts at every point into every state; stalls keep their `pl_trdy` policy, and some are as short as the model makes them |
 | `ucie_fdi_neg_test` | the model's checks against one deliberate violation by the stub (`+neg=dllp\|retimer\|stream`): the rule that must catch it (FDI-R62, R63, R64) has to fire, and its errors are expected |
 
 Knobs: `+beat_bytes=32|64|128|256|512|1024`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus

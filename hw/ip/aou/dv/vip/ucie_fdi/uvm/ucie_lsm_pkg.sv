@@ -123,6 +123,7 @@ package ucie_lsm_pkg;
   `include "l2/ucie_lsm_obs.svh"
   `include "l2/ucie_lsm_observer.svh"
   `include "l2/ucie_lsm_item.svh"
+  `include "l2/ucie_lsm_fcov.svh"
   `include "l2/ucie_lsm_monitor.svh"
   `include "l2/ucie_lsm_driver.svh"
   `include "l2/ucie_lsm_agent.svh"

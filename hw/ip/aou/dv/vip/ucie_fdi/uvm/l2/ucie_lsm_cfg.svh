@@ -65,6 +65,8 @@ class ucie_lsm_cfg extends uvm_object;
   // Monitor
   bit           checks_en = 1'b1;
   bit           cov_en = 1'b1;          // for observers that collect link-state coverage
+  // The model's own covergroups (ucie_lsm_fcov); +ucie_fcov=0|1 overrides it.
+  bit           fcov_en = 1'b1;
   int unsigned  ref_slack = 3;           // cycles a Protocol Layer output may lag its cause
 
   function new(string name = "ucie_lsm_cfg");

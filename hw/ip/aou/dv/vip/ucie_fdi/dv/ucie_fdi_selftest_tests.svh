@@ -148,6 +148,97 @@ class ucie_fdi_events_test extends ucie_fdi_smoke_test;
   endtask
 endclass
 
+// Every link event and ending the model has, for its own coverage
+// (ucie_fdi_fcov, ucie_lsm_fcov): the events test's traffic under Retrains
+// that end in each state, LinkReset and Disabled escalated to LinkError, the
+// L1 exits by both sides, a LinkError the Protocol Layer requests (and the
+// test's LinkError event that then brings the link up), and
+// bringups and L1 exits aborted at every point into every state. Stalls keep
+// their pl_trdy policy so that some start mid-flit with pl_trdy low, and
+// some drop pl_stallreq as soon as lp_stallack is seen.
+class ucie_fdi_cov_test extends ucie_fdi_events_test;
+  `uvm_component_utils(ucie_fdi_cov_test)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    super.configure();
+    n_flits = 900;
+    env.fdi_cfg.stall_trdy_free = 1'b1;
+    env.fdi_cfg.stall_hold_min = 0;
+  endfunction
+
+  local task cev(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::of(kind);
+    s.ev_to = to;
+    s.start(env.lsm.sqr);
+  endtask
+
+  local task abort(ucie_lsm_abort_e at, ucie_lsm_state_e to, int unsigned gap, bit in_l1 = 1'b0);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::of(LSM_EV_ABORT);
+    s.ev_to = to;
+    s.ev_at = at;
+    s.ev_gap = gap;
+    s.ev_in_l1 = in_l1;
+    s.start(env.lsm.sqr);
+    cev(LSM_EV_IDLE);
+  endtask
+
+  // Wait (bounded) until the link is Active again with no event running.
+  local task wait_active();
+    int unsigned n;
+    do begin
+      @(env.pl.lsm.mon_cb);
+      n++;
+    end while (!(env.lsm.drv.state == LSM_ACTIVE && env.lsm.drv.link_active) && n < 50000);
+    if (n == 50000) `uvm_error(get_type_name(), "the link did not come back to Active")
+  endtask
+
+  task events();
+    ucie_lsm_l1_seq l1 = ucie_lsm_l1_seq::type_id::create("l1");
+    int unsigned n_react = env.lsm.drv.n_le_react;
+    cev(LSM_EV_IDLE);
+    cev(LSM_EV_RETRAIN);
+    cev(LSM_EV_RETRAIN, LSM_LINKERROR);
+    cev(LSM_EV_RETRAIN, LSM_LINKRESET);
+    cev(LSM_EV_RETRAIN, LSM_DISABLED);
+    cev(LSM_EV_LINKERROR);
+    cev(LSM_EV_LINK_RESET, LSM_LINKERROR);
+    cev(LSM_EV_DISABLED, LSM_LINKERROR);
+    cev(LSM_EV_CLK_WAKE);
+    l1.start(env.lsm.sqr);
+    // An L1 exit the Protocol Layer starts.
+    cev(LSM_EV_L1_ENTRY);
+    env.pl.wake_in_l1 = 1'b1;
+    wait_active();
+    env.pl.wake_in_l1 = 1'b0;
+    // A LinkError the Protocol Layer requests.
+    env.pl.linkerror_req = 1'b1;
+    repeat (20000) begin
+      @(env.pl.lsm.mon_cb);
+      if (env.lsm.drv.n_le_react != n_react) break;
+    end
+    if (env.lsm.drv.n_le_react == n_react)
+      `uvm_error(get_type_name(), "the Adapter did not answer lp_linkerror")
+    // The test's own answer to the request: the Adapter, already down, only
+    // brings the link up again (ucie_lsm_driver react_loop).
+    cev(LSM_EV_LINKERROR);
+    wait_active();
+    // Bringups and L1 exits abandoned part-way.
+    abort(LSM_AB_RESET, LSM_LINKERROR, 2);
+    abort(LSM_AB_RESET, LSM_LINKRESET, 2);
+    abort(LSM_AB_WAKE, LSM_DISABLED, 3);
+    abort(LSM_AB_WAKE, LSM_RESET, 2);
+    abort(LSM_AB_REQ_ACTIVE, LSM_LINKERROR, 1);
+    abort(LSM_AB_REQ_ACTIVE, LSM_RESET, 1);
+    abort(LSM_AB_WAKE, LSM_LINKERROR, 0, 1'b1);
+    abort(LSM_AB_WAKE, LSM_LINKRESET, 2, 1'b1);
+    abort(LSM_AB_WAKE, LSM_DISABLED, 2, 1'b1);
+  endtask
+endclass
+
 // Demotes the errors of one rule to infos and counts them (ucie_fdi_neg_test).
 class ucie_fdi_expect_catcher extends uvm_report_catcher;
   string       rule;

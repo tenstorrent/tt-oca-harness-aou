@@ -8,7 +8,10 @@
 //    (UCIe r1.1 §8.2.3.2, §8.2.7).
 //  - lp_wake_req is high while the link is wanted up: in Reset once
 //    pl_inband_pres is 1, and in Active and Retrain (§8.2.3.1); low in L1, so
-//    the Adapter's PM exit stays its own (the self-test's L1 events).
+//    the Adapter's PM exit stays its own (the self-test's L1 events), unless
+//    `wake_in_l1` asks the stub to start the exit itself (r3.0 §10.2.9).
+//  - `linkerror_req` raises lp_linkerror in Active and holds it until the
+//    Adapter reports LinkError (r3.0 Table 10-3), then clears itself.
 //  - lp_state_req: in Reset NOP, then Active once pl_wake_ack is high
 //    (§8.2.8, §8.3.3.1); Active in Active; in Retrain NOP for a clock, then
 //    Active (§8.3.3.4); L1 in L1; NOP elsewhere.
@@ -41,6 +44,8 @@ class ucie_pl_stub extends uvm_component;
   int unsigned n_restarted;  // flits cut off mid-flit and sent again
   int unsigned n_fill;       // empty flits sent to fill a wide transfer
   string       bad;          // a deliberate violation (see above); "" for none
+  bit          wake_in_l1;   // start a PM exit in L1 (lp_wake_req)
+  bit          linkerror_req; // request a LinkError (lp_linkerror) once
   bit          bad_done;
 
   local ucie_flit_item txq[$];
@@ -83,6 +88,7 @@ class ucie_pl_stub extends uvm_component;
       lsm.lp_clk_ack <= lsm.mon_cb.pl_clk_req;
       lsm.lp_rx_active_sts <= lsm.mon_cb.pl_rx_active_req;
       state_req(mb.mon_cb.pl_state_sts);
+      linkerror(mb.mon_cb.pl_state_sts);
       tx(mb.mon_cb.pl_state_sts);
     end
   endtask
@@ -132,7 +138,7 @@ class ucie_pl_stub extends uvm_component;
         nop_seen = 1'b1;
       end
       LSM_L1: begin
-        lsm.lp_wake_req <= 1'b0;
+        lsm.lp_wake_req <= wake_in_l1;
         lsm.lp_state_req <= req_code(LSM_REQ_L1);
         nop_seen = 1'b0;
       end
@@ -142,6 +148,12 @@ class ucie_pl_stub extends uvm_component;
         nop_seen = 1'b0;
       end
     endcase
+  endfunction
+
+  local function void linkerror(logic [3:0] sts);
+    if (sts_decode(sts) == LSM_LINKERROR) linkerror_req = 1'b0;
+    lsm.lp_linkerror <= linkerror_req && sts_decode(sts) == LSM_ACTIVE ||
+                        lsm.mon_cb.lp_linkerror === 1'b1 && sts_decode(sts) != LSM_LINKERROR;
   endfunction
 
   local function void tx(logic [3:0] sts);

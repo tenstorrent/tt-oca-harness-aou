@@ -48,6 +48,9 @@ class ucie_fdi_cfg extends uvm_object;
   // Monitor
   bit            checks_en = 1'b1;
   bit            cov_en = 1'b1;
+  // The model's own covergroups (ucie_fdi_fcov), apart from a bench's
+  // collector; +ucie_fcov=0|1 overrides it.
+  bit            fcov_en = 1'b1;
   bit            check_tx_adapter_bytes = 1'b1;
   int unsigned   irdy_reset_grace = 4; // cycles lp_irdy may stay high after entering Reset
 
