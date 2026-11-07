@@ -117,7 +117,12 @@ L2 and Active.PMNAK are never reported, so their columns do not arise.
 - A request answered while an Adapter event runs abandons the event, as a reset does,
   except an Adapter LinkError already on its way (the highest-priority link-down state,
   §10.3.3.8) and the stall of a PM entry, which finish first. A later request may stop an
-  answer in turn (`lp_linkerror` while a LinkReset is answered). A handshake the stopped
+  answer in turn (`lp_linkerror` while a LinkReset is answered), but nothing stops the
+  answer to `lp_linkerror`: a Protocol Layer that drops it before LinkError is reported
+  and requests LinkReset or Disabled still gets LinkError. The Adapter has seen the
+  assertion, which is what the move to LinkError rests on ("based on observing ...
+  lp_linkerror assertion", §10.3.3.8), LinkError is the highest-priority link-down state
+  there, and Table 10-3 `lp_linkerror` asks for "immediate action". A handshake the stopped
   job left half done is completed before its request moves again: `pl_rx_active_req`
   falls only once `lp_rx_active_sts` has answered it (§10.2.7 rule 4), and `pl_clk_req`
   falls only once `lp_clk_ack` has answered it and rises again only once `lp_clk_ack` has
@@ -668,6 +673,11 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
   entering this state"; Table 10-3 `lp_linkerror`: "immediate action"): the model enters
   LinkError at the next flit boundary, or at once mid-flit, `pl_stallreq` stays up until
   `lp_stallack` (rule 3), and the status leaves LinkError only once the handshake is done.
+  From the decision to enter LinkError to the status change (two clocks plus the end of a
+  started flit) the link is still Active with `pl_stallreq` up, and a flit presented then
+  gets no `pl_trdy`: the model reads §10.3.3.7 as ending rule 7's "must be accepted ...
+  until the rising edge of lp_stallack" once it has decided on LinkError, as a mid-flit
+  LinkError abandons a flit.
   `pl_trdy` stays low in that LinkError, although §10.3.3.7 says a lower layer that
   "decides to perform a pl_stallreq/lp_stallack handshake ... must provide pl_trdy to the
   upper layer to drain the packets": the model did not decide on the handshake in

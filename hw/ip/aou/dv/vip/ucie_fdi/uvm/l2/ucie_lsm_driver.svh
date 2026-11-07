@@ -36,7 +36,11 @@
 // The responder does not wait for pl_wake_ack (§10.2.3.1 rule 5 lets the
 // request come first). A request answered while an event runs abandons the
 // event (run_job), except an Adapter LinkError already on its way and the
-// stall of a PM entry, which finish first. A handshake the abandoned event
+// stall of a PM entry, which finish first. Nor does a LinkReset or Disabled
+// request stop the answer to lp_linkerror, even when lp_linkerror falls
+// before LinkError is reported: the Adapter has seen the assertion, which is
+// what the move to LinkError rests on (§10.3.3.8), and LinkError is the
+// highest-priority link-down state there. A handshake the abandoned event
 // left half done is completed by whatever moves its request next: rx_active
 // (§10.2.7 rule 4) and pl_clk_req (§10.2.3.2 rule 3: it falls only once
 // lp_clk_ack has answered it). A LinkError on lp_linkerror that
@@ -286,13 +290,18 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       @(lsm_vif.drv_cb);
       track_reset_req();
       if (!cfg.react_en || taking || no_cut) continue;
-      // An Adapter LinkError already on its way is not stopped for a request
-      // (LinkError is the highest priority link-down state, §10.3.3.8).
-      if (le_on_way) continue;
+      // A LinkError on its way, the Adapter's own or the answer to
+      // lp_linkerror (ans_le, until the status is LinkError), is not stopped
+      // for a request. LinkError is the highest priority link-down state
+      // (r3.0 §10.3.3.8), entered "based on observing ... lp_linkerror
+      // assertion" there, and Table 10-3 lp_linkerror asks for "immediate
+      // action": a Protocol Layer that drops lp_linkerror before LinkError is
+      // reported and requests LinkReset or Disabled still gets LinkError.
+      if (le_on_way || ans_le) continue;
       le = cfg.react_linkerror_en && lsm_vif.drv_cb.lp_linkerror === 1'b1 &&
            state != LSM_LINKERROR;
       r = le ? LSM_REQ_NOP : down_request();
-      if (le ? ans_le : (r == LSM_REQ_NOP || r == ans_req)) continue;
+      if (!le && (r == LSM_REQ_NOP || r == ans_req)) continue;
       take(le, r);
     end
   endtask
@@ -831,7 +840,9 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // close_gates waits for it again. Without stall_wait (LinkError, which
   // §10.3.3.7 lets enter with the handshake incomplete) pl_trdy only
   // finishes a started flit from now on (gate.stall_cut), and the handshake
-  // runs on in LinkError (leave_linkerror waits for its end).
+  // runs on in LinkError (leave_linkerror waits for its end). No request
+  // stops the way to LinkError once this has run (req_loop), so stall_cut
+  // holds only on that way and in LinkError; active_entry clears it.
   local task close_gates(bit stall_wait = 1'b1);
     int unsigned n;
     link_active = 1'b0;
