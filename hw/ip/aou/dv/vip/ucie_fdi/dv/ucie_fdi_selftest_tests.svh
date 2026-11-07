@@ -849,6 +849,13 @@ endclass
 //  req       Protocol Layer requests during a stall: LinkReset stopping an
 //            Adapter Retrain, lp_linkerror stopping an Adapter LinkReset, and
 //            a Disabled request with no event running;
+//  le_drop   lp_linkerror raised during a stall and dropped a clock later,
+//            before LinkError is reported, with a LinkReset or Disabled
+//            request in its place (the stub's le_drop), with no event
+//            running and while an Adapter Retrain waits for the stall: the
+//            link must still leave Active for LinkError and come back up
+//            (the Adapter has seen the assertion; LinkError has priority,
+//            r3.0 §10.3.3.8);
 //  random    nothing of its own.
 // Each mode then runs the cov test's events. Besides the monitor's FDI-R43
 // (pl_trdy outside Active) the test checks that the status leaves Active for
@@ -869,6 +876,7 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
   bit              hold;
   int unsigned     n_hit;       // events and requests started while a stall waited for its ack
   int unsigned     n_le_stall;  // LinkErrors entered with pl_stallreq high
+  int unsigned     n_le_drop_held;  // le_drop cases started with a flit held at pl_trdy low
   int unsigned     n_exits;     // exits from Active checked
   int unsigned     n_after;     // ... to Retrain, LinkReset, Disabled or LinkError within 10
                                 // clocks of a stall handshake's end (it likely waited for it)
@@ -883,7 +891,7 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     super.configure();
     void'($value$plusargs("stall_exit=%s", mode));
     void'($value$plusargs("stall_ack=%d", stall_ack));
-    if (!(mode inside {"directed", "req", "random"}))
+    if (!(mode inside {"directed", "req", "le_drop", "random"}))
       `uvm_fatal(get_type_name(), {"+stall_exit: unknown mode ", mode})
     void'($value$plusargs("trdy_le_stall=%b", trdy_forced));
     void'($value$plusargs("hold_present=%b", hold));
@@ -944,12 +952,37 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
   // is waiting for lp_stallack.
   local task wait_stall();
     int unsigned n;
-    while (!(env.lsm.drv.idle() && env.lsm.drv.state == LSM_ACTIVE && env.lsm.drv.link_active &&
-             env.pl.mb.mon_cb.pl_stallreq === 1'b1 && env.pl.mb.mon_cb.lp_stallack !== 1'b1) &&
-           n++ < 50000)
-      @(env.pl.mb.mon_cb);
+    while (!stall_waiting() && n++ < 50000) @(env.pl.mb.mon_cb);
     if (n >= 50000) `uvm_error(get_type_name(), "no stall waited for lp_stallack in Active")
     else n_hit++;
+  endtask
+
+  local function bit stall_waiting();
+    return env.lsm.drv.idle() && env.lsm.drv.state == LSM_ACTIVE && env.lsm.drv.link_active &&
+           env.pl.mb.mon_cb.pl_stallreq === 1'b1 && env.pl.mb.mon_cb.lp_stallack !== 1'b1;
+  endfunction
+
+  // As wait_stall, preferring (for up to 5000 clocks) a stall with a flit
+  // presented and pl_trdy low, a flit the stub keeps up until it transfers
+  // (hold_present), so lp_stallack cannot come yet. Returns whether it found
+  // one; otherwise it waits for the start of a stall, so the whole of
+  // stall_ack is still ahead.
+  local task wait_stall_held(output bit held);
+    int unsigned n;
+    held = 1'b0;
+    while (n++ < 5000) begin
+      held = stall_waiting() && env.pl.mb.mon_cb.lp_valid === 1'b1 &&
+             env.pl.mb.mon_cb.pl_trdy !== 1'b1;
+      if (held) break;
+      @(env.pl.mb.mon_cb);
+    end
+    if (held) begin
+      n_hit++;
+      return;
+    end
+    n = 0;
+    while (env.pl.mb.mon_cb.pl_stallreq === 1'b1 && n++ < 50000) @(env.pl.mb.mon_cb);
+    wait_stall();
   endtask
 
   // Wait (bounded) until nothing is under way and the link is Active again.
@@ -1056,6 +1089,44 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     expect_exit(LSM_DISABLED, "Disabled request during a stall");
   endtask
 
+  // lp_linkerror dropped before LinkError for a LinkReset or Disabled
+  // request (see the header). Between events the LinkError leaves the link in
+  // Reset; the test's own LSM_EV_LINKERROR then brings it up.
+  local task le_drop_cases();
+    ucie_lsm_req_e rs[2] = '{LSM_REQ_LINKRESET, LSM_REQ_DISABLED};
+    foreach (rs[i]) for (int ev = 0; ev < 2; ev++) begin
+      int unsigned d0 = env.pl.n_le_dropped;
+      int unsigned le0 = n_le_stall;
+      int unsigned n;
+      bit held;
+      string what = {"lp_linkerror dropped for ", rs[i].name()};
+      if (ev) what = {what, " during a Retrain's wait"};
+      wait_active();
+      wait_stall_held(held);
+      if (held) n_le_drop_held++;
+      env.pl.le_drop = 1;
+      env.pl.le_drop_req = rs[i];
+      fork
+        if (ev) cev(LSM_EV_RETRAIN);
+        begin
+          if (ev) repeat (4) @(env.pl.mb.mon_cb);
+          env.pl.linkerror_req = 1'b1;
+          while (env.pl.linkerror_req) @(env.pl.mb.mon_cb);
+        end
+      join
+      while (!(env.lsm.drv.idle() && env.pl.plan.size() == 0) && n++ < 100000)
+        @(env.pl.lsm.mon_cb);
+      if (n >= 100000) `uvm_error(get_type_name(), {what, ": the request never finished"})
+      env.pl.le_drop = 0;
+      if (env.pl.n_le_dropped == d0)
+        `uvm_error(get_type_name(), {what, ": the stub's lp_linkerror reached LinkError undropped"})
+      expect_exit(LSM_LINKERROR, what);
+      expect_le_early(le0, what);
+      if (env.lsm.drv.state != LSM_ACTIVE) cev(LSM_EV_LINKERROR);
+      wait_active();
+    end
+  endtask
+
   task events();
     fork
       watch();
@@ -1063,6 +1134,7 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     case (mode)
       "directed": directed();
       "req":      req_cases();
+      "le_drop":  le_drop_cases();
       default: ;
     endcase
     super.events();
@@ -1080,8 +1152,10 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     super.report_phase(phase);
     `uvm_info(get_type_name(), $sformatf({"exits from Active %0d, started during a stall %0d, ",
               "within 10 clocks of a stall's end %0d, LinkErrors entered during one %0d, ",
-              "stalls %0d, flits kept up through pl_stallreq and accepted %0d"}, n_exits, n_hit,
-              n_after, n_le_stall, env.fdi.mon.n_stalls, env.pl.n_kept), UVM_NONE)
+              "stalls %0d, flits kept up through pl_stallreq and accepted %0d, lp_linkerror ",
+              "dropped before LinkError %0d (%0d with a flit held)"}, n_exits, n_hit, n_after,
+              n_le_stall, env.fdi.mon.n_stalls, env.pl.n_kept, env.pl.n_le_dropped,
+              n_le_drop_held), UVM_NONE)
   endfunction
 endclass
 

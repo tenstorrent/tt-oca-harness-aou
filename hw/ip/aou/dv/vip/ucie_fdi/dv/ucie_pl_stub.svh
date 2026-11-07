@@ -33,7 +33,12 @@
 //    into LinkError, which the Adapter must sit out ("It must stay there as
 //    long as lp_linkerror=1"). Raised in Reset, LinkReset, Disabled or L1 it
 //    comes with lp_wake_req (§10.2.3.1), kept until LinkError. No LinkError
-//    within `req_bound` clocks is an error.
+//    within `req_bound` clocks is an error. With `le_drop` it drops
+//    lp_linkerror after that many clocks if LinkError is not reported yet and
+//    requests `le_drop_req` (LinkReset or Disabled) in its place, as a plan
+//    entry that LinkError also ends (r3.0 does not require lp_linkerror held
+//    until LinkError, and the Adapter has seen the assertion); n_le_dropped
+//    counts them.
 //  - `plan` lists LinkReset and Disabled requests to make on lp_state_req,
 //    in order, each in a given state (in Reset after a NOP of at least a
 //    clock, before or after pl_inband_pres as the entry says; Table 10-4 note
@@ -203,6 +208,9 @@ class ucie_pl_stub extends uvm_component;
   int unsigned     n_le_gated;   // ... raised after waking itself from clock gating
   int unsigned     n_req_gated;  // plan requests made after waking itself
   int unsigned     n_exits;      // link-down states left on its Active request (exit_pl)
+  int unsigned     le_drop;       // drop lp_linkerror after this many clocks (0: hold it)
+  ucie_lsm_req_e   le_drop_req = LSM_REQ_LINKRESET;  // ... and request this instead
+  int unsigned     n_le_dropped;  // lp_linkerror dropped before LinkError (le_drop)
   local bit [MAX_BEATS_PER_FLIT-1:0] cc_mask;  // the transfers of cur with lp_corrupt_crc
   bit          bad_done;
 
@@ -647,6 +655,22 @@ class ucie_pl_stub extends uvm_component;
       return;
     end
     le_held = 0;
+    if (le_drop != 0 && cur_le && le_wait >= le_drop) begin
+      plan_t p;
+      p.in = st;
+      p.req = le_drop_req;
+      p.up = -1;
+      p.ignore = 1'b0;
+      plan.push_front(p);
+      n_le_dropped++;
+      le_wait = 0;
+      linkerror_req = 1'b0;
+      lsm.lp_linkerror <= 1'b0;
+      `uvm_info(get_type_name(), $sformatf({"Protocol Layer stub: drops lp_linkerror in %s ",
+                "before LinkError and requests %s instead"}, st.name(), le_drop_req.name()),
+                UVM_MEDIUM)
+      return;
+    end
     raise = !cur_le && le_due(st);
     if (raise) begin
       le_wait = 1;
