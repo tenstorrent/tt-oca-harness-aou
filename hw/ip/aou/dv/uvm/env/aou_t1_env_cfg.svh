@@ -359,7 +359,7 @@ class aou_t1_env_cfg extends uvm_object;
     fdi_knobs();
   endfunction
 
-  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r1.1 8.3.2), per
+  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r3.0 §10.3.2), per
   // seed on every PHY. HOLES without stalls stays the common case; a fifth of
   // the seeds take RANDOM or BURSTY pl_trdy (so pl_trdy can also be low at a
   // flit boundary), and a fifth add stand-alone stalls at a boundary or

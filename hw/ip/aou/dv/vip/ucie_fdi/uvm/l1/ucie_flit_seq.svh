@@ -14,7 +14,10 @@ class ucie_flit_seq extends uvm_sequence #(ucie_flit_item);
   int unsigned  bubble_pct;       // chance of a bubble before a beat
   bit           cancel_mix = 1'b0;  // cancel plans over every shape (mix_cancel_plan)
   bit           random_payload = 1'b0;
-  bit [1:0]     pid = 2'b11;      // Flit Header Protocol ID when a payload leaves it 0
+  // Flit Header Protocol ID (Byte 0 [7:6]) for a payload that leaves it 00b.
+  // For Streaming any value but 00b is the Protocol Layer's to choose (r3.0
+  // Table 3-5); 11b is only a default, which a protocol layer sets to its own.
+  bit [1:0]     pid = 2'b11;
   ucie_flit_item payloads[$];
 
   function new(string name = "ucie_flit_seq");

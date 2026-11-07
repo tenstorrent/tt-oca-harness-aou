@@ -92,13 +92,16 @@ class ucie_flit_item extends uvm_sequence_item;
   endfunction
 
   // A D2D Adapter NOP flit as an Adapter may forward it: Protocol ID and Flit
-  // Type (Byte 1 [7:6]) 00b, random sequence number and Ack/Nak bits (Byte 0
-  // [3:0], Byte 1 [5:0]; r3.0 Table 3-5) and CRC, and a body of all zeros
-  // (r3.0 §3.1: "the body of the Flit is filled with all 0 data").
+  // Type (Byte 1 [7:6]) 00b, a random sequence number (Byte 0 [3:0], Byte 1
+  // [3:0]), Ack/Nak field (Byte 1 [5:4]: 00b, 01b or 10b, as 11b is
+  // reserved; r3.0 Table 3-5) and CRC, and a body of all zeros (r3.0 §3.1:
+  // "the body of the Flit is filled with all 0 data").
   function void make_nop();
     clear();
     data[0] = {4'h0, 4'($urandom)};
     data[1] = {2'b00, 6'($urandom)};
+    // Ack/Nak 11b is reserved: make it Ack or Nak, with no extra random draw.
+    if (data[1][5:4] == 2'b11) data[1][5:4] = {data[1][0], ~data[1][0]};
     data[126] = 8'($urandom); data[127] = 8'($urandom);
     data[254] = 8'($urandom); data[255] = 8'($urandom);
   endfunction

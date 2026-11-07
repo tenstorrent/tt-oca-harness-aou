@@ -48,12 +48,12 @@ AXI-S02,aou_scoreboard,,DUT,After B the target memory holds the written bytes,AO
 AXI-S03,aou_scoreboard,,DUT,Each RRESP equals the target memory's response for that beat (EXOKAY only where the memory has an exclusive monitor); SLVERR allowed if outstanding at AOU_SW_RESET,AOU_TB_ARCH.adoc scoreboard rule
 AXI-S04,aou_scoreboard,,DUT,Read data equals golden memory on every active lane of OKAY/EXOKAY beats (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule
 AXI-S05,aou_scoreboard,,DUT,At end of test the real memories equal golden on every written byte (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule
-FDI-R01,ucie_fdi_monitor,,DUT,A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both),UCIe r1.1 8.2.4
-FDI-R02,ucie_fdi_monitor,,DUT,"No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes; a flit cut off when pl_state_sts goes from Active to LinkError is dropped, not a bubble, judged from the interface alone, so a passive monitor judges it too (L1; checks the DUT)",UCIe r1.1 8.2.4 / r3.0 §10.3.3.7
-FDI-R03,by construction (ucie_fdi_pl_driver),,MODEL,RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes),UCIe r1.1 8.2.4
-FDI-R04,via AOU-R3,,DUT,Flit byte k is FDI byte k mod N of transfer floor(k/N) both ways (a mis-mapped DUT flit decodes to undefined granules),UCIe r1.1 8.3.1
-FDI-R05,ucie_fdi_monitor,,MODEL,"pl_flit_cancel only in the cycle after the last beat of a 128B half; on a 256 B FDI after the flit's one beat, cancelling the whole flit (L1; checks the Adapter)",UCIe r1.1 Table 8-2 pl_flit_cancel
-FDI-R06,ucie_fdi_monitor,,MODEL,"A 128B half (from 256 B up, the transfer) on which pl_error is asserted is finished and cancelled, and no RX data follows until the link has left Active to retrain (L1; checks the Adapter; the DUT has no pl_error input)",UCIe r3.0 Table 10-3 pl_error / 10.3.1
+FDI-R01,ucie_fdi_monitor,,DUT,A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both),UCIe r3.0 §10.2.4
+FDI-R02,ucie_fdi_monitor,,DUT,"No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes; a flit cut off when pl_state_sts goes from Active to LinkError is dropped, not a bubble, judged from the interface alone, so a passive monitor judges it too (L1; checks the DUT)",UCIe r3.0 §10.2.4 / §10.3.3.7
+FDI-R03,by construction (ucie_fdi_pl_driver),,MODEL,RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes),UCIe r3.0 §10.2.4
+FDI-R04,via AOU-R3,,DUT,Flit byte k is FDI byte k mod N of transfer floor(k/N) both ways (a mis-mapped DUT flit decodes to undefined granules),UCIe r3.0 §10.3.1
+FDI-R05,ucie_fdi_monitor,,MODEL,"pl_flit_cancel only in the cycle after the last beat of a 128B half; on a 256 B FDI after the flit's one beat, cancelling the whole flit (L1; checks the Adapter)",UCIe r3.0 Table 10-3 pl_flit_cancel / §10.2.5 / §10.3.1
+FDI-R06,ucie_fdi_monitor,,MODEL,"A 128B half (from 256 B up, the transfer) on which pl_error is asserted is finished and cancelled, and no RX data follows until the link has left Active to retrain (L1; checks the Adapter; the DUT has no pl_error input)",UCIe r3.0 Table 10-3 pl_error / §10.3.1
 FDI-R07,ucie_fdi_monitor,,DUT,pl_stallreq and lp_stallack both low at reset exit (L1; checks the both),UCIe r3.0 §10.3.2 rule 1
 FDI-R08,ucie_fdi_monitor,by construction (ucie_fdi_tx_responder),MODEL,pl_stallreq rises only with lp_stallack low and falls only with lp_stallack high (L1; checks the Adapter),UCIe r3.0 §10.3.2 rules 2 and 3
 FDI-R09,ucie_fdi_monitor,,DUT,lp_stallack rises only with pl_stallreq high and falls only with pl_stallreq low (L1; checks the DUT),UCIe r3.0 §10.3.2 rules 4 and 5
@@ -61,42 +61,42 @@ FDI-R10,ucie_fdi_monitor,,DUT,lp_valid and lp_irdy low while lp_stallack is high
 FDI-R11,by construction (ucie_fdi_tx_responder),,MODEL,"While pl_stallreq is high the Adapter accepts presented data until lp_stallack, gate open or closed (TX responder holds pl_trdy high, or with stall_trdy_free follows its policy, which always raises it again); LinkError does not wait for the handshake: pl_trdy then only finishes a started flit (none after a mid-flit LinkError, whose partial flit is abandoned), the handshake runs on in LinkError and ends before Reset (L1; checks the Adapter)",UCIe r3.0 §10.3.2 rule 7 / §10.3.3.7
 FDI-R12,ucie_fdi_monitor,,DUT,At least one flop between pl_stallreq and lp_stallack (L1; checks the DUT),UCIe r3.0 §10.3.2 rule 8
 FDI-R13,ucie_fdi_monitor,,DUT,lp_stallack rises only at a flit boundary (L1; checks the DUT),UCIe r3.0 §10.3.2 rule 4
-FDI-R14,ucie_lsm_monitor,,MODEL,pl_wake_ack rises at least one clock after lp_wake_req (L2; checks the Adapter),UCIe r1.1 8.2.3.1
-FDI-R15,ucie_lsm_monitor,,MODEL,pl_wake_ack falls only after lp_wake_req fell (L2; checks the Adapter),UCIe r1.1 8.2.3.1
+FDI-R14,ucie_lsm_monitor,,MODEL,pl_wake_ack rises at least one clock after lp_wake_req (L2; checks the Adapter),UCIe r3.0 §10.2.3.1 rule 2
+FDI-R15,ucie_lsm_monitor,,MODEL,pl_wake_ack falls only after lp_wake_req fell (L2; checks the Adapter),UCIe r3.0 §10.2.3.1 rule 3
 FDI-R16,ucie_lsm_monitor,aou_bringup_model (FDI-M02),DUT,"A request that leaves a clock-gated state (lp_state_req to Active/LinkReset/Disabled, or lp_linkerror rising, from Reset/PM/LinkReset/Disabled) uses the wake handshake: lp_wake_req is high in the request's cycle, or rises within wake_req_window cycles after it (a liveness bound) and before the status leaves the gated state; one that fell before the request does not count (L2; checks the DUT)",UCIe r3.0 §10.2.3 / §10.2.3.1 (rule 5)
-FDI-R17,n/a,,N/A,The PL waits for pl_wake_ack before driving lp_cfg (the DUT has no sideband config interface),UCIe r1.1 8.2.3.1
-FDI-R18,ucie_lsm_monitor,ucie_lsm_driver,DUT,lp_clk_ack rises at least one clock after pl_clk_req and answers it (L2; checks the DUT),UCIe r1.1 8.2.3.2
+FDI-R17,n/a,,N/A,The PL waits for pl_wake_ack before driving lp_cfg (the DUT has no sideband config interface),UCIe r3.0 §10.2.3.1 rule 6
+FDI-R18,ucie_lsm_monitor,ucie_lsm_driver,DUT,lp_clk_ack rises at least one clock after pl_clk_req and answers it (L2; checks the DUT),UCIe r3.0 §10.2.3.2 rule 2
 FDI-R19,ucie_lsm_monitor,ucie_lsm_driver,DUT,"lp_clk_ack falls after pl_clk_req falls, within hs_fall_timeout cycles, a liveness bound (L2; checks the DUT)",UCIe r3.0 Table 10-3 lp_clk_ack / §10.2.3.2 rule 3
 FDI-R20,ucie_lsm_monitor,ucie_lsm_driver,MODEL,"A move of pl_inband_pres, pl_rx_active_req, pl_phyinl1, pl_phyinl2 or pl_phyinrecenter in Reset/LinkReset/Disabled/PM is covered by a pl_clk_req handshake: seen with lp_clk_ack high, or pl_clk_req rises within clk_req_window cycles after it (a liveness bound; the signal may move first) and stays high until lp_clk_ack (L2; checks the Adapter)",UCIe r3.0 §10.2.3 / §10.2.3.2 rule 5
 FDI-R21,ucie_lsm_monitor,ucie_lsm_driver,MODEL,"pl_clk_req handshake for a LinkError entered from Reset/LinkReset/Disabled/PM: pl_clk_req high before the status change and held until it, or raised after it with lp_clk_ack seen before the next status change (L2; checks the Adapter)",UCIe r3.0 §10.2.3.2 rule 6
 FDI-R22,ucie_lsm_monitor,ucie_lsm_driver,MODEL,"pl_clk_req asserted before any status change out of Reset/LinkReset/Disabled/PM to a state other than LinkError, and held until the status has changed; with clk_req_hold_bringup 0 the bringup releases it with pl_inband_pres and raises it again before pl_rx_active_req and Active (L2; checks the Adapter)",UCIe r3.0 §10.2.3.2 rule 7
-FDI-R23,n/a,,N/A,The Adapter waits for lp_clk_ack before driving pl_cfg (no sideband config interface),UCIe r1.1 8.2.3.2
-FDI-R24,via FDI-M01,,DUT,No clock gating in LinkError; a gated PL in Reset requests Active only after pl_inband_pres (the bringup model predicts lp_state_req from inband_pres),UCIe r1.1 8.2.3 / 8.2.3.2
+FDI-R23,n/a,,N/A,The Adapter waits for lp_clk_ack before driving pl_cfg (no sideband config interface),UCIe r3.0 §10.2.3.2 rule 8
+FDI-R24,via FDI-M01,,DUT,No clock gating in LinkError; a gated PL in Reset requests Active only after pl_inband_pres (the bringup model predicts lp_state_req from inband_pres),UCIe r3.0 §10.2.3 / §10.2.3.2
 FDI-R25,ucie_lsm_monitor,,MODEL,"pl_rx_active_req rises only with lp_rx_active_sts low in Reset/Retrain/Active, before the Protocol Layer's Active request too (L2; checks the Adapter)",UCIe r3.0 §10.2.7 rule 1
-FDI-R26,ucie_lsm_monitor,ucie_lsm_driver,DUT,lp_rx_active_sts rises at least one clock after pl_rx_active_req (L2; checks the DUT),UCIe r1.1 8.2.7
-FDI-R27,n/a,,N/A,pl_rx_active_req=1 and lp_rx_active_sts=1 means RX is Active (a definition),UCIe r1.1 8.2.7
+FDI-R26,ucie_lsm_monitor,ucie_lsm_driver,DUT,lp_rx_active_sts rises at least one clock after pl_rx_active_req (L2; checks the DUT),UCIe r3.0 §10.2.7 rule 2
+FDI-R27,n/a,,N/A,pl_rx_active_req=1 and lp_rx_active_sts=1 means RX is Active (a definition),UCIe r3.0 §10.2.7 rule 3
 FDI-R28,ucie_lsm_monitor,ucie_lsm_driver,DUT,"lp_rx_active_sts falls after pl_rx_active_req falls, within hs_fall_timeout cycles, a liveness bound (L2; checks the DUT)",UCIe r3.0 §10.2.7 rule 4
-FDI-R29,ucie_lsm_monitor,,MODEL,rx_active req and sts both low before pl_state_sts leaves Active (except to LinkError) (L2; checks the Adapter),UCIe r1.1 8.2.7
-FDI-R30,by construction (ucie_fdi_pl_driver),,MODEL,With pl_rx_active_req low in Active the Adapter sends no flits (the PL driver runs only while L2 has the gate open),UCIe r1.1 8.2.7
-FDI-R31,by construction (ucie_lsm_driver),,MODEL,Active to LinkError: rx_active req and sts both low before leaving LinkError,UCIe r1.1 8.2.7
-FDI-R32,by construction (ucie_lsm_driver),,MODEL,"Bring-up order: clk_req handshake, then pl_inband_pres=1",UCIe r1.1 8.2.8
+FDI-R29,ucie_lsm_monitor,,MODEL,rx_active req and sts both low before pl_state_sts leaves Active (except to LinkError) (L2; checks the Adapter),UCIe r3.0 §10.2.7 rule 5
+FDI-R30,by construction (ucie_fdi_pl_driver),,MODEL,With pl_rx_active_req low in Active the Adapter sends no flits (the PL driver runs only while L2 has the gate open),UCIe r3.0 §10.2.7 rule 6
+FDI-R31,by construction (ucie_lsm_driver),,MODEL,Active to LinkError: rx_active req and sts both low before leaving LinkError,UCIe r3.0 §10.2.7 rule 7
+FDI-R32,by construction (ucie_lsm_driver),,MODEL,"Bring-up order: clk_req handshake, then pl_inband_pres=1",UCIe r3.0 §10.2.8 step 1
 FDI-R33,ucie_lsm_driver,,DUT,"The Protocol Layer requests to leave Reset (lp_state_req NOP for at least one clock in Reset, then Active) within req_timeout cycles of pl_inband_pres, or of a link-down when the training waits for that trigger; an Active held into Reset is no request and no error (L2; checks the DUT)",UCIe r3.0 §10.3.3.1 rule 1 / Table 10-4 / §10.3.3.8
-FDI-R34,by construction (ucie_lsm_driver),,MODEL,"Active only after rx_active req and sts are both 1, on every entry to Active (Rsp.Active itself is sideband)",UCIe r1.1 8.2.8
+FDI-R34,by construction (ucie_lsm_driver),,MODEL,"Active only after rx_active req and sts are both 1, on every entry to Active (Rsp.Active itself is sideband)",UCIe r3.0 §10.2.8 steps 4 and 5
 FDI-R35,ucie_fdi_monitor,,MODEL,"Flits go to the Protocol Layer only while its Receiver is Active: pl_rx_active_req and lp_rx_active_sts both 1 with pl_state_sts Reset, Retrain or Active (L1; checks the Adapter)",UCIe r3.0 §10.2.7 rules 3 and 6
-FDI-R36,n/a,,N/A,Streaming PM is requested symmetrically over sideband,UCIe r1.1 8.2.9
-FDI-R37,via FDI-M01,,DUT,The PL requests L1/L2 only after blocking new flits and holds the request (the DUT never requests PM; any L1/L2 request diverges from the bringup model),UCIe r1.1 8.2.9
+FDI-R36,n/a,,N/A,Streaming PM is requested symmetrically over sideband,UCIe r3.0 §10.2.9
+FDI-R37,via FDI-M01,,DUT,The PL requests L1/L2 only after blocking new flits and holds the request (the DUT never requests PM; any L1/L2 request diverges from the bringup model),UCIe r3.0 §10.2.9
 FDI-R38,by construction (ucie_lsm_driver),,MODEL,The Adapter enters PM only after the stallreq/ack handshake (L2 stalls the DUT TX first),UCIe r3.0 §10.3.2
-FDI-R39,n/a,,N/A,"PM response timing and PMNAK (sideband, Adapter-internal)",UCIe r1.1 8.2.9
-FDI-R40,n/a,,N/A,From Active.PMNAK the PL requests Active (unreachable: the DUT never requests PM),UCIe r1.1 8.2.9
-FDI-R41,ucie_lsm_driver,,DUT,"After a PM exit (remote-initiated, or started by the DUT's lp_wake_req on an activation request in L1) the Protocol Layer requests Active (L2; checks the DUT)",UCIe r1.1 8.2.9
+FDI-R39,n/a,,N/A,"PM response timing and PMNAK (sideband, Adapter-internal)",UCIe r3.0 §10.2.9
+FDI-R40,n/a,,N/A,From Active.PMNAK the PL requests Active (unreachable: the DUT never requests PM),UCIe r3.0 §10.2.9
+FDI-R41,ucie_lsm_driver,,DUT,"After a PM exit (remote-initiated, or started by the DUT's lp_wake_req on an activation request in L1) the Protocol Layer requests Active (L2; checks the DUT)",UCIe r3.0 §10.2.9 / §10.3.3.4 rule 1
 FDI-R43,ucie_fdi_monitor,,MODEL,"pl_trdy is high only in Active, or in LinkError while pl_stallreq or lp_stallack is high (the Adapter drains the Protocol Layer under a stall handshake, which lasts until lp_stallack falls), so no TX transfer happens outside them; the model finishes a stand-alone stall under way before it leaves Active for Retrain, LinkReset or Disabled. Presenting a flit and waiting outside Active is legal (L1; checks the Adapter)",UCIe r3.0 Table 10-3 pl_trdy / §10.2.4 / §10.3.2 rules 6 and 9 / §10.3.3.7
 FDI-R44,ucie_fdi_monitor,,DUT,"lp_irdy low while pl_state_sts is Reset, except for irdy_reset_grace cycles after LinkError -> Reset, a liveness bound (L1; checks the DUT)",UCIe r3.0 Table 10-3 lp_irdy
 FDI-R45,ucie_fdi_monitor,,DUT,"TX flit in the Format 6 layout of Streaming or CXL.cachemem: Flit Header bits other than the Protocol ID (Byte 0 [7:6]) and the CRC bytes zero, Byte 1 [7:6] (Flit Type) 00b for a protocol flit; on a Streaming stream the Protocol ID is not 00b, a NOP the Protocol Layer never sends, which on CXL.cachemem is accepted (L1; checks the DUT)",UCIe r3.0 §3.3.4 / Table 3-5 / Figures 3-24 and 3-25
-FDI-R46,ucie_lsm_monitor,,DUT,lp_state_req never takes a reserved value (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_state_req
-FDI-R47,ucie_lsm_monitor,,DUT,No Retrain request outside Raw Format (L2; checks the DUT),UCIe r1.1 8.3.3.4
+FDI-R46,ucie_lsm_monitor,,DUT,lp_state_req never takes a reserved value (L2; checks the DUT),UCIe r3.0 Table 10-3 lp_state_req
+FDI-R47,ucie_lsm_monitor,,DUT,No Retrain request outside Raw Format (L2; checks the DUT),UCIe r3.0 §10.3.3.4
 FDI-R48,ucie_lsm_driver,,DUT,Retrain entered from Active ends with a NOP->Active request at any time in Retrain (L2; checks the DUT),UCIe r3.0 §10.3.3.4 rule 1
 FDI-R49,ucie_lsm_monitor,ucie_lsm_driver,MODEL,"The Adapter stays in LinkError while lp_linkerror is 1, however long the Protocol Layer holds it, whether its internal request or the Protocol Layer's Active request ends it (L2; checks the Adapter)",UCIe r3.0 Table 10-3 lp_linkerror / §10.3.3.7 / Table 10-4
-FDI-R56,aou_fdi_layer,aou_bringup_model (FDI-M01),DUT,"The DUT never requests L2 on lp_state_req (L2 is not implemented, integration guide 6.6.6 GAP-3; without that request the Adapter cannot enter L2, UCIe r1.1 8.2.9) (L2; checks the DUT)",integration guide 6.6.6 GAP-3; UCIe r1.1 8.2.9
+FDI-R56,aou_fdi_layer,aou_bringup_model (FDI-M01),DUT,"The DUT never requests L2 on lp_state_req (L2 is not implemented, integration guide 6.6.6 GAP-3; without that request the Adapter cannot enter L2, UCIe r3.0 §10.2.9 and §10.3.3.2 rule 3) (L2; checks the DUT)",integration guide 6.6.6 GAP-3; UCIe r3.0 §10.2.9 / §10.3.3.2 rule 3
 FDI-R57,ucie_fdi_monitor,,DUT,lp_stallack answers pl_stallreq within stall_timeout cycles (the Protocol Layer stalls at the next flit boundary; liveness bound of the testbench) (L1; checks the DUT),UCIe r3.0 §10.3.2 rule 4
 FDI-R58,ucie_fdi_monitor,,MODEL,pl_error only while the Receiver is active (pl_rx_active_req and lp_rx_active_sts both 1) (L1; checks the Adapter),UCIe r3.0 Table 10-3 pl_error
 FDI-R59,ucie_fdi_monitor,,DUT,"lp_corrupt_crc only with lp_valid, on the last transfer of a 128B half (from 256 B up, any transfer) (L1; checks the DUT)",UCIe r3.0 Table 10-3 lp_corrupt_crc / 10.3.1
@@ -106,12 +106,12 @@ FDI-R62,ucie_lsm_monitor,,DUT,No DLLP transfer (lp_dllp_valid) while the negotia
 FDI-R63,ucie_lsm_monitor,,DUT,lp_retimer_crd never asserts: no Retimer is present and FDI exposes Retimer credits for Raw Format only (L2; checks the DUT),UCIe r3.0 Table 10-3 lp_retimer_crd
 FDI-R64,ucie_fdi_monitor,,DUT,lp_stream with lp_valid names the link's stream (ucie_fdi_cfg::stream) (L1; checks the DUT),UCIe r3.0 Table 10-3 lp_stream
 FDI-R65,ucie_lsm_monitor,,MODEL,"pl_protocol_vld is 1 whenever pl_inband_pres is 1 in Reset, and falls only on entry to LinkError or Reset (L2; checks the Adapter)",UCIe r3.0 Table 10-3 pl_protocol_vld
-FDI-M01,aou_bringup_model,,DUT,"lp_state_req matches the bringup model; in Retrain NOP or Active after NOP; NOP in LinkError, LinkReset, Disabled and Reset (the DUT never takes the link down except on an error and never restarts it: software does, on the UCIe controller); Active held across an AoU deactivation (L2; checks the DUT)",integrator guide 3.14 / 6.6 / UCIe r1.1 8.3.3.1 / 8.3.3.4-8.3.3.8 / Table 8-3
-FDI-M02,aou_bringup_model,,DUT,"lp_wake_req matches the bringup model; low in LinkError, LinkReset, Disabled and Reset (L2; checks the DUT)",integrator guide 6.6.2 / UCIe r1.1 8.2.3.1
-FDI-M03,aou_bringup_model,,DUT,lp_clk_ack follows pl_clk_req (L2; checks the DUT),UCIe r1.1 8.2.3.2
-FDI-M04,aou_bringup_model,,DUT,lp_rx_active_sts rises on pl_rx_active_req outside Reset/LinkError and falls only after the request has; a drop with the request still high is an error in that cycle (L2; checks the DUT),integrator guide 6.6.2 / UCIe r1.1 8.2.7
+FDI-M01,aou_bringup_model,,DUT,"lp_state_req matches the bringup model; in Retrain NOP or Active after NOP; NOP in LinkError, LinkReset, Disabled and Reset (the DUT never takes the link down except on an error and never restarts it: software does, on the UCIe controller); Active held across an AoU deactivation (L2; checks the DUT)",integrator guide 3.14 / 6.6 / UCIe r3.0 §10.3.3.1 / §10.3.3.4-§10.3.3.8 / Table 10-4
+FDI-M02,aou_bringup_model,,DUT,"lp_wake_req matches the bringup model; low in LinkError, LinkReset, Disabled and Reset (L2; checks the DUT)",integrator guide 6.6.2 / UCIe r3.0 §10.2.3.1
+FDI-M03,aou_bringup_model,,DUT,lp_clk_ack follows pl_clk_req (L2; checks the DUT),UCIe r3.0 §10.2.3.2
+FDI-M04,aou_bringup_model,,DUT,lp_rx_active_sts rises on pl_rx_active_req outside Reset/LinkError and falls only after the request has; a drop with the request still high is an error in that cycle (L2; checks the DUT),integrator guide 6.6.2 / UCIe r3.0 §10.2.7
 FDI-M05,aou_bringup_model,,DUT,O_FDI_FSM_STATE matches the bringup model (L2; checks the DUT),integrator guide 3.16
-FDI-M06,aou_bringup_model,,DUT,O_FDI_LINK_UP matches the bringup model; low in LinkReset/Disabled; high across an AoU deactivation (L2; checks the DUT),integrator guide 3.16 / 6.6 / UCIe r1.1 Table 8-2 pl_state_sts
+FDI-M06,aou_bringup_model,,DUT,O_FDI_LINK_UP matches the bringup model; low in LinkReset/Disabled; high across an AoU deactivation (L2; checks the DUT),integrator guide 3.16 / 6.6 / UCIe r3.0 Table 10-3 pl_state_sts
 AOU-R1,aou_unpacker,,DUT,Every flit carries the 10-byte protocol header; its RsvdZero bits are 0,AoU 7.2; 4.3 Fig 5
 AOU-R2,via AOU-R11,by construction (L3 packer),DUT,Every message is a whole number of 5-byte granules with RsvdZero padding (lengths come from MSGTYPE/DLENGTH; the padding is checked as RsvdZero),AoU 4.2/4.4
 AOU-R3,aou_unpacker,aou_fdi_chk_adapter,DUT,A MsgStart granule decodes to a defined MSGTYPE/MISCOP/ACTIVATIONOP/DLENGTH,AoU 4.3.2 Table 1/15/27 5.4
@@ -207,7 +207,7 @@ T1-L25,aou_invalid_actmsg_vseq,,DUT,An invalid ActivateReq raises no INT_ACTIVAT
 T1-E16,aou_slv_id_mismatch_vseq,,DUT,An unsolicited B/R sets AXI_SLV_ID_MISMATCH_ERR_RPn of that kind with the ID in INFO; W1C clears it,MAS software-operation 7.2.2
 T1-E17,aou_slv_id_mismatch_vseq,,DUT,INT_SI0_ID_MISMATCH rises on a subordinate ID mismatch and falls after the W1C,MAS software-operation 7.2.2
 T1-E18,aou_slv_id_mismatch_vseq,,DUT,White-box: AOU_CORE's RID/BID subordinate mismatch aggregate of that kind only (main #76),main b8b9060 commit message
-FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_linkerror; 8.3.3.7
+FDI-M07,aou_bringup_model,,DUT,A protocol-layer LinkError raises lp_linkerror within ref_slack and holds it until the Adapter reports LinkError or the FSM leaves LINKERROR; low outside LINKERROR (L2; checks the DUT),UCIe r3.0 Table 10-3 lp_linkerror; §10.3.3.7
 FEAT-R12,aou_qos_order_chk,,DUT,Port/AXI QoS: a lower-tier request waiting longer than TIMER_THRESHOLD x TIMER_RESOLUTION is promoted to high,MAS 3.2.1; RDL PRIOR_TIMER
 FEAT-R13,aou_qos_order_chk,,DUT,QoS scenario: both tiers were waiting at the arbiter after release (else the order check proves nothing),MAS 3.2.1
 FEAT-R14,aou_qos_order_chk,,DUT,Round-robin (ARB_MODE 0 or equal priority): no RP granted twice in a row while another has a request waiting,MAS 3.2.1 Figure 5

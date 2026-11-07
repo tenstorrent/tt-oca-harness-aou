@@ -347,14 +347,14 @@ mostly, sometimes RANDOM or BURSTY, and sometimes random stalls, see
 `aou_t1_env_cfg::fdi_knobs`): `+fdi_trdy=always|random|holes|bursty`,
 `+fdi_stall_pct=N` stand-alone stalls, `+fdi_stall_mid_pct=N` the share raised
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between
-`pl_stallreq` and `lp_stallack` (UCIe r1.1 8.3.2 rule 7), `+fdi_stall_hold_min=N` and
+`pl_stallreq` and `lp_stallack` (UCIe r3.0 §10.3.2 rule 7), `+fdi_stall_hold_min=N` and
 `+fdi_stall_hold_max=N` the cycles `pl_stallreq` stays high after `lp_stallack` (default
 1..8; 0 drops it as soon as the ack is seen), `+l1_cancel_pct=N` and
 `+l1_cancel_mix=1` (second-half, both-halves and repeated flit cancels),
-`+le_mid_flit_pct=N` (Adapter LinkErrors entered mid-flit, 8.3.3.7),
+`+le_mid_flit_pct=N` (Adapter LinkErrors entered mid-flit, UCIe r3.0 §10.3.3.7),
 `+fdi_rx_early=N` (on every Active entry from Reset the Adapter forwards RX flits for N
-cycles after the rx_active handshake while `pl_state_sts` is still Reset, as UCIe r1.1
-8.2.7 allows when the remote die went Active first; off by default) and, in
+cycles after the rx_active handshake while `pl_state_sts` is still Reset, as UCIe r3.0
+§10.2.7 rule 3 allows when the remote die went Active first; off by default) and, in
 two-PHY builds, `+active_phy=1 +park_idle_phy=1` (the unselected PHY stays in Reset,
 so state and stalls must come from the selected one). The `l1.cg_fdi_stall`,
 `cg_fdi_cancel` and `cg_fdi_abandon` bins show the corners were reached.

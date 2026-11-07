@@ -4,17 +4,17 @@
 // Mainband monitor of one PHY, both directions, with the FDI mainband rule
 // checks (FDI-Rnn, listed in ../../README.md).
 // Each completed flit is a new ucie_flit_item, which subscribers may keep.
-// - ap_tx: flits the DUT sent; a beat transfers on lp_valid & lp_irdy &
+// - ap_tx: flits the Protocol Layer sent; a beat transfers on lp_valid & lp_irdy &
 //   pl_trdy (FDI-R01).
-// - ap_rx: flits delivered to the DUT, after cancel rollback: a cancel in the
+// - ap_rx: flits delivered to the Protocol Layer, after cancel rollback: a cancel in the
 //   cycle after a 128B half drops that half (FDI-R05); from 256 B up, where
 //   the flit is one beat, a cancel after it drops every flit of that beat.
 //   NOP flits (Protocol ID 00b, r3.0 Table 3-5; the Flit Header 0000h of an
 //   empty lane, §10.3.1, is one) are not delivered: the Protocol Layer
 //   discards them (UCIe r3.0 Table 10-3 pl_flit_cancel).
 // On a 512 or 1024 B FDI a beat carries 2 or 4 flits, one per 256 B lane
-// (UCIe r3.0 10.3.1): a TX beat is that many flits, each checked (FDI-R45, so
-// a lane the DUT leaves empty is an error), and an RX beat is that many
+// (UCIe r3.0 §10.3.1): a TX beat is that many flits, each checked (FDI-R45, so
+// a lane the Protocol Layer leaves empty is an error), and an RX beat is that many
 // flits, of which the zero-padded lanes are NOPs.
 // Reset flushes both directions, and so does a LinkError entered mid-flit
 // (UCIe r3.0 §10.3.3.7): the partial flits are abandoned. That is seen on
@@ -23,11 +23,11 @@
 // same way as the model's own.
 // The checks on the stall handshake follow r3.0 §10.3.2 (rules 1 to 8).
 // The Protocol Layer may present a flit (lp_valid, lp_irdy) in any state but
-// Reset and wait for pl_trdy (r3.0 10.2.4, Table 10-3 lp_irdy); pl_trdy, and
+// Reset and wait for pl_trdy (r3.0 §10.2.4, Table 10-3 lp_irdy); pl_trdy, and
 // with it every transfer, needs Active or a stall handshake in LinkError
 // (FDI-R43), and lp_valid alone
 // transfers nothing.
-// Errors (UCIe r3.0 Table 10-3, 10.3.1): a cancel unit that carried pl_error
+// Errors (UCIe r3.0 Table 10-3, §10.3.1): a cancel unit that carried pl_error
 // must be cancelled and no RX data may follow until the link has left Active
 // (FDI-R06), and pl_error needs the Receiver active (FDI-R58); lp_corrupt_crc
 // comes with lp_valid on the last transfer of a 128B half (FDI-R59), on both
@@ -48,7 +48,7 @@ class ucie_fdi_monitor extends uvm_monitor;
   int unsigned n_rx_flits;
   int unsigned n_rx_cancels;
   int unsigned n_stalls;
-  int unsigned n_stalls_mid;     // pl_stallreq rose inside a DUT TX flit
+  int unsigned n_stalls_mid;     // pl_stallreq rose inside a TX flit
   int unsigned n_stalls_trdy0;   // ... in a cycle with pl_trdy low
   int unsigned n_cancels_stalled; // RX cancels while the TX side was stalled
   int unsigned n_rx_cancel_h1;   // RX flits with a second-half cancel (none at 256 B)
@@ -56,9 +56,9 @@ class ucie_fdi_monitor extends uvm_monitor;
   int unsigned n_tx_abandoned;   // partial flits abandoned on a mid-flit LinkError
   int unsigned n_rx_abandoned;
   int unsigned n_rx_beats_reset; // RX beats in Reset with the Receiver Active (+ucie_rx_early)
-  // Cycles in Active in which the Adapter would take a DUT TX beat: pl_trdy
-  // high and no stall handshake under way. A test judging how much the DUT
-  // sends compares against this, not wall-clock cycles, so the pl_trdy policy
+  // Cycles in Active in which the Adapter would take a TX beat: pl_trdy
+  // high and no stall handshake under way. A test judging how much the
+  // Protocol Layer sends compares against this, not wall-clock cycles, so the pl_trdy policy
   // the seed drew doesn't decide the result.
   int unsigned n_tx_ready;
   int unsigned n_rx_nops;        // uncancelled RX NOP flits, discarded
@@ -181,12 +181,12 @@ class ucie_fdi_monitor extends uvm_monitor;
     prev_rst_n = 1'b1;
   endfunction
 
-  // The link left Active for LinkError: the DUT must drop its partial TX flit
+  // The link left Active for LinkError: the Protocol Layer must drop its partial TX flit
   // and the partial RX flit it got (UCIe r3.0 §10.3.3.7: "It is required for
   // the upper layer to internally clean up the data path, even if pl_trdy is
   // not asserted"). A whole RX flit whose cancel cycle is this first clock of
   // LinkError is not partial: with no cancel (c 0) it is delivered as usual.
-  // The DUT may keep presenting a flit in LinkError (pl_trdy stays low, so
+  // The Protocol Layer may keep presenting a flit in LinkError (pl_trdy stays low, so
   // nothing transfers, unless the Adapter drains it under a stall handshake,
   // FDI-R43); FDI-R44 still requires lp_irdy low in Reset once the grace
   // after LinkError has run out.
@@ -204,8 +204,11 @@ class ucie_fdi_monitor extends uvm_monitor;
     end
     if (tx_beat != 0 || rx)
       `uvm_info(get_type_name(), $sformatf(
-                "left Active mid-flit: TX beat %0d, RX beat %0d abandoned", tx_beat,
-                rx ? rx_beat : 0), UVM_MEDIUM)
+                "left Active for LinkError mid-flit:%s%s",
+                tx_beat != 0 ? $sformatf(" TX flit abandoned after %0d of its %0d transfers;",
+                                         tx_beat, cfg.bpf()) : "",
+                rx ? $sformatf(" RX flit abandoned with %0d of its %0d transfers kept",
+                               rx_beat, cfg.bpf()) : ""), UVM_MEDIUM)
     tx_cur.delete(); tx_beat = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
     if (!rx) return;
     abandon_h_done = rx_half_done;
@@ -321,7 +324,7 @@ class ucie_fdi_monitor extends uvm_monitor;
     end
   endfunction
 
-  // A complete DUT TX flit (in lane `lane` of a wide beat): its Adapter-owned
+  // A complete TX flit (in lane `lane` of a wide beat): its Adapter-owned
   // bytes checked, then published. A NOP (Protocol ID 00b) is an error on a
   // Streaming stream (r3.0 Table 3-5), and so is a lane left empty, since the
   // Protocol Layer sends valid data on the full width (§10.3.1); on a
@@ -344,7 +347,7 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (fcov != null)
       fcov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before, f, lane);
     n_tx_flits++;
-    `uvm_info(get_type_name(), {"DUT TX ", f.convert2string()}, UVM_HIGH)
+    `uvm_info(get_type_name(), {"TX ", f.convert2string()}, UVM_HIGH)
     ap_tx.write(f);
   endfunction
 
@@ -540,7 +543,7 @@ class ucie_fdi_monitor extends uvm_monitor;
       if (fcov != null)
         fcov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before, f, l);
       n_rx_flits++;
-      `uvm_info(get_type_name(), {"DUT RX ", f.convert2string()}, UVM_HIGH)
+      `uvm_info(get_type_name(), {"RX ", f.convert2string()}, UVM_HIGH)
       ap_rx.write(f);
     end
     n_rx_nops += n_nop;

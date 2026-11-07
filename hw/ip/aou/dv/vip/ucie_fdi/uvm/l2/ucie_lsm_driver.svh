@@ -5,7 +5,7 @@
 // drives pl_state_sts on every PHY, pl_inband_pres, pl_clk_req,
 // pl_wake_ack and pl_rx_active_req, and runs Adapter-initiated events from
 // ucie_lsm_item. pl_wake_ack follows lp_wake_req in the background. Before
-// leaving Active it closes the L1 gates (flit boundary in both directions,
+// leaving Active it closes the mainband (L1) gates (flit boundary in both directions,
 // and, except for LinkError, a stand-alone stall handshake under way
 // finished: pl_trdy is high only in Active, r3.0 Table 10-3) and lowers
 // rx_active (FDI-R29); every entry to Active repeats the rx_active handshake
@@ -38,9 +38,10 @@
 // event (run_job), except an Adapter LinkError already on its way and the
 // stall of a PM entry, which finish first. Nor does a LinkReset or Disabled
 // request stop the answer to lp_linkerror, even when lp_linkerror falls
-// before LinkError is reported: the Adapter has seen the assertion, which is
-// what the move to LinkError rests on (§10.3.3.8), and LinkError is the
-// highest-priority link-down state there. A handshake the abandoned event
+// before LinkError is reported: the Adapter has seen the assertion, which
+// Table 10-3 lp_linkerror has it "propagate ... to RDI" and which the move to
+// LinkError rests on ("based on observing ... lp_linkerror assertion",
+// §10.3.3.8). A handshake the abandoned event
 // left half done is completed by whatever moves its request next: rx_active
 // (§10.2.7 rule 4) and pl_clk_req (§10.2.3.2 rule 3: it falls only once
 // lp_clk_ack has answered it). A LinkError on lp_linkerror that
@@ -48,13 +49,17 @@
 // and with cfg.rebringup_after_down the bringup; one between events leaves
 // the link in Reset, and a later LSM_EV_LINKERROR, the test's own answer to
 // the same request, then only runs the bringup. LinkReset and Disabled
-// answered end as the Adapter's own LinkReset and Disabled events do. PM
-// entry the Protocol Layer requests (lp_state_req L1/L2) is not modelled.
+// answered end as the Adapter's own LinkReset and Disabled events do.
+// Power management is the Adapter's alone for now (README "Known limits"):
+// it enters L1 on its own event, without lp_state_req L1 (§10.2.9,
+// §10.3.3.2 rule 2 have it wait for that request), a Protocol Layer's L1 or
+// L2 request is not answered, and lp_wake_req in L1 starts the exit
+// (pm_exit_loop) where §10.2.9 has the Active request start it.
 // After LinkError/LinkReset/Disabled -> Reset the training restarts on
-// cfg.restart_on (UCIe r3.0 §10.3.3.8 allows either trigger): by default
-// software on the UCIe controller restarts it (cfg.sw_restart_delay cycles,
-// its Start UCIe Link Training), or the Protocol Layer's NOP->Active on
-// lp_state_req does, even before pl_inband_pres, or whichever comes first.
+// cfg.restart_on (UCIe r3.0 §10.3.3.8 allows either trigger): by default on
+// the Adapter's own decision (software, say; cfg.sw_restart_delay cycles),
+// or on the Protocol Layer's NOP->Active on lp_state_req, even before
+// pl_inband_pres, or on whichever comes first.
 //
 // In Reset the Adapter starts the Active entry only on a request: lp_state_req
 // NOP for at least one clock while pl_state_sts is Reset, then Active (r3.0
@@ -101,18 +106,18 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   uvm_analysis_port #(ucie_lsm_item) ap_event;
   ucie_lsm_state_e state = LSM_RESET;
   bit             link_active;   // Active and the gates are open
-  int unsigned    n_le_react;    // LinkErrors entered on the DUT's lp_linkerror (req_loop)
-  int unsigned    n_down_req;    // LinkReset and Disabled entered on the DUT's lp_state_req
+  int unsigned    n_le_react;    // LinkErrors entered on lp_linkerror (req_loop)
+  int unsigned    n_down_req;    // LinkReset and Disabled entered on lp_state_req
   int unsigned    n_via_active;  // ... of them through Active
   int unsigned    n_exit_req;    // LinkReset, Disabled and LinkError left on its Active request
   int unsigned    n_le;          // Adapter-initiated LinkErrors (events)
-  int unsigned    n_le_mid_tx;   // ... entered inside a DUT TX flit
-  int unsigned    n_le_mid_rx;   // ... entered inside an RX flit to the DUT
+  int unsigned    n_le_mid_tx;   // ... entered inside a TX flit
+  int unsigned    n_le_mid_rx;   // ... entered inside an RX flit
 
   local bit       busy;
   local bit       ev_busy;       // an event or the reset bringup is running
-  local bit       reacting;      // answering a DUT request (the loops below)
-  local bit       le_absorbed;   // req_loop took a DUT LinkError down to Reset between events
+  local bit       reacting;      // answering a Protocol Layer request (the loops below)
+  local bit       le_absorbed;   // req_loop took a requested LinkError down to Reset between events
   // req_loop stopping the running job (run_job) to answer a request: taking
   // keeps the other loops and the next event off meanwhile, job_abort stops
   // the job, no_cut marks a part the job finishes first (a PM entry's stall).
@@ -297,11 +302,12 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       if (!cfg.react_en || taking || no_cut) continue;
       // A LinkError on its way, the Adapter's own or the answer to
       // lp_linkerror (ans_le, until the status is LinkError), is not stopped
-      // for a request. LinkError is the highest priority link-down state
-      // (r3.0 §10.3.3.8), entered "based on observing ... lp_linkerror
-      // assertion" there, and Table 10-3 lp_linkerror asks for "immediate
-      // action": a Protocol Layer that drops lp_linkerror before LinkError is
-      // reported and requests LinkReset or Disabled still gets LinkError.
+      // for a request. The Adapter "must propagate this request to RDI"
+      // (r3.0 Table 10-3 lp_linkerror, which asks for "immediate action"),
+      // and enters LinkError "based on observing ... lp_linkerror assertion"
+      // (§10.3.3.8), not on the signal still being high: a Protocol Layer
+      // that drops lp_linkerror before LinkError is reported and requests
+      // LinkReset or Disabled still gets LinkError.
       if (le_on_way || ans_le) continue;
       le = cfg.react_linkerror_en && lsm_vif.drv_cb.lp_linkerror === 1'b1 &&
            state != LSM_LINKERROR;
@@ -471,10 +477,11 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     endcase
   endfunction
 
-  // The Adapter's answer to a PM exit the Protocol Layer starts in L1
-  // (lp_wake_req; UCIe r3.0 §10.2.9): pl_wake_ack (wake_responder), the
-  // pl_clk_req handshake before the status leaves L1 (§10.2.3.2 rule 7),
-  // Retrain, and Active once the DUT requests it. A Protocol Layer does this
+  // The Adapter's answer to a PM exit the Protocol Layer starts in L1 with
+  // lp_wake_req (UCIe r3.0 §10.2.9 has its Active request start the exit;
+  // README "Known limits"): pl_wake_ack (wake_responder), the pl_clk_req
+  // handshake before the status leaves L1 (§10.2.3.2 rule 7), Retrain, and
+  // Active once the Protocol Layer requests it. A Protocol Layer does this
   // when it has traffic to send while the link is in L1.
   local task pm_exit_loop();
     forever begin
@@ -659,7 +666,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // pl_clk_req next completes it first, as rx_active does for its handshake.
   local task set_clk_req(bit v);
     if (v != clk_req_q && lsm_vif.drv_cb.lp_clk_ack !== !v)
-      wait_dut("lp_clk_ack", {3'b0, !v}, v ? "FDI-R19" : "FDI-R18");
+      wait_pl_out("lp_clk_ack", {3'b0, !v}, v ? "FDI-R19" : "FDI-R18");
     if (v && !clk_req_q) clk_req_t = $time;
     clk_req_q = v;
     lsm_vif.drv_cb.pl_clk_req <= v;
@@ -698,8 +705,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     clk_handshake(1'b0);
   endtask
 
-  // Wait until a DUT output reaches `v`; an error after req_timeout cycles.
-  local task wait_dut(string sig, logic [3:0] v, string rule);
+  // Wait until a Protocol Layer output reaches `v`; an error after req_timeout cycles.
+  local task wait_pl_out(string sig, logic [3:0] v, string rule);
     int unsigned n;
     ucie_rule_log::check(rule, this);
     forever begin
@@ -722,7 +729,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endtask
 
   local task wait_req(ucie_lsm_req_e r, string rule);
-    wait_dut("lp_state_req", req_code(r), rule);
+    wait_pl_out("lp_state_req", req_code(r), rule);
   endtask
 
   // In Reset: wait for the Protocol Layer's request to leave it, NOP for a
@@ -756,7 +763,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       LSM_RESTART_SW: begin
         if (cfg.sw_restart_delay != 0)
           `uvm_info(get_type_name(), $sformatf(
-                    "link-down: software restarts the link in %0d cycles", cfg.sw_restart_delay),
+                    "link-down: the Adapter restarts the training in %0d cycles",
+                    cfg.sw_restart_delay),
                     UVM_MEDIUM)
         wait_cycles(cfg.sw_restart_delay);
       end
@@ -815,16 +823,16 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
 
   local task clk_handshake(bit v);
     set_clk_req(v);
-    wait_dut("lp_clk_ack", {3'b0, v}, v ? "FDI-R18" : "FDI-R19");
+    wait_pl_out("lp_clk_ack", {3'b0, v}, v ? "FDI-R18" : "FDI-R19");
   endtask
 
   // A request still waiting for lp_rx_active_sts (an Active entry abandoned
   // part-way) is completed before it falls (r3.0 §10.2.7 rule 4).
   local task rx_active(bit v);
-    if (v) wait_dut("lp_rx_active_sts", 4'h0, "FDI-R28");
-    else if (rx_req_q) wait_dut("lp_rx_active_sts", 4'h1, "FDI-R26");
+    if (v) wait_pl_out("lp_rx_active_sts", 4'h0, "FDI-R28");
+    else if (rx_req_q) wait_pl_out("lp_rx_active_sts", 4'h1, "FDI-R26");
     set_rx_req(v);
-    wait_dut("lp_rx_active_sts", {3'b0, v}, v ? "FDI-R26" : "FDI-R28");
+    wait_pl_out("lp_rx_active_sts", {3'b0, v}, v ? "FDI-R26" : "FDI-R28");
   endtask
 
   // Stop the mainband at a flit boundary in both directions. With
@@ -838,9 +846,12 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // close_gates waits for it again. Without stall_wait (LinkError, which
   // §10.3.3.7 lets enter with the handshake incomplete) pl_trdy only
   // finishes a started flit from now on (gate.stall_cut), and the handshake
-  // runs on in LinkError (leave_linkerror waits for its end). No request
-  // stops the way to LinkError once this has run (req_loop), so stall_cut
-  // holds only on that way and in LinkError; active_entry clears it.
+  // runs on in LinkError (leave_linkerror waits for its end). On the way to
+  // an Adapter LinkError, or to the answer to lp_linkerror, no request stops
+  // the job once this has run (req_loop), so stall_cut then holds only on
+  // that way and in LinkError. A Retrain that ends in LinkError may still be
+  // stopped, but its gates closed with stall_wait on entry to Retrain, so no
+  // stall handshake is left for stall_cut to cut. active_entry clears it.
   local task close_gates(bit stall_wait = 1'b1);
     int unsigned n;
     link_active = 1'b0;
@@ -884,7 +895,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // rx_active handshake already started (remote_first) is only completed.
   local task active_entry();
     wait_cycles(cfg.lat());
-    if (rx_req_q) wait_dut("lp_rx_active_sts", 4'h1, "FDI-R26");
+    if (rx_req_q) wait_pl_out("lp_rx_active_sts", 4'h1, "FDI-R26");
     else rx_active(1'b1);
     if (cfg.rx_early > 0 && state == LSM_RESET) begin
       foreach (gate[i]) gate[i].abort = 1'b0;
@@ -905,7 +916,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // -------------------------------------------------------------------------
 
   // UCIe r3.0 §10.2.8: clk_req handshake, inband_pres, then wait for the
-  // DUT's request to leave Reset (NOP for a clock, then Active; §10.3.3.1
+  // Protocol Layer's request to leave Reset (NOP for a clock, then Active; §10.3.3.1
   // rule 1, FDI-R33) and run the Active entry. pl_clk_req is high from before
   // pl_inband_pres until the status has left Reset (§10.2.3.2 rules 5 and 7);
   // with cfg.clk_req_hold_bringup 0 it is released as pl_inband_pres rises
@@ -1005,8 +1016,8 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endtask
 
   // LinkError mid-flit (r3.0 §10.3.3.7): wait (bounded) until a flit is in
-  // flight in either direction, then leave Active at once. L1 abandons both
-  // flits, and the Protocol Layer must drop its partial ones. LinkError needs
+  // flight in either direction, then leave Active at once. The mainband (L1)
+  // abandons both flits, and the Protocol Layer must drop its partial ones. LinkError needs
   // no completed stall handshake (§10.3.3.7), so a stand-alone stall may be
   // under way: pl_stallreq stays high until lp_stallack (§10.3.2 rule 3) with
   // pl_trdy low (the abort), and the status leaves LinkError only once the
@@ -1038,7 +1049,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       gate[i].open = 1'b0;
       gate[i].rx_early = 1'b0;
     end
-    // L1 drops pl_valid and pl_trdy at the next edge; the state changes with them,
+    // The mainband drops pl_valid and pl_trdy at the next edge; the state changes with them,
     // so no beat is offered outside Active (FDI-R35).
     @(lsm_vif.drv_cb);
     set_state(LSM_LINKERROR);
@@ -1068,7 +1079,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endtask
 
   // In LinkError until its exit to Reset (r3.0 §10.3.3.7, cfg.down_exit_on):
-  // the Adapter's internal request (software clearing the error) after the
+  // the Adapter's internal request (software clearing the error, say) after the
   // dwell, or the Protocol Layer's Active request with lp_linkerror 0 once
   // cfg.linkerror_min_res clocks have passed (the scaled stand-in for the 16
   // ms minimum residency), seen from the second clock of the stay on. Either
@@ -1139,7 +1150,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     set_state(LSM_RESET);
   endtask
 
-  // PM entry: stall the DUT TX at a flit boundary first (r3.0 §10.3.2,
+  // PM entry: stall the Protocol Layer's TX at a flit boundary first (r3.0 §10.3.2,
   // FDI-R38). A request the Protocol Layer makes meanwhile waits until the
   // stall handshake is complete (no_cut): LinkError need not wait for it
   // (§10.3.3.7) but may.
@@ -1159,7 +1170,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endtask
 
   // PM exit requested by the remote side: clk_req before leaving L1, then
-  // Retrain, and Active once the DUT requests it (UCIe r3.0 §10.2.9,
+  // Retrain, and Active once the Protocol Layer requests it (UCIe r3.0 §10.2.9,
   // §10.2.3.2 rule 7; FDI-R41).
   task do_l1_exit();
     if (state != LSM_L1) begin
@@ -1224,17 +1235,19 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // (it.at):
   //   LSM_AB_RESET       Reset, before pl_inband_pres (from Active the link
   //                      first goes down through LinkReset);
-  //   LSM_AB_WAKE        it.gap cycles after the pl_clk_req that wakes the DUT:
+  //   LSM_AB_WAKE        it.gap cycles after the pl_clk_req that wakes the
+  //                      Protocol Layer:
   //                      in Reset once pl_inband_pres is 1 and pl_clk_req was
-  //                      released (the DUT waits for a trigger), or in L1;
+  //                      released (the Protocol Layer waits for a trigger),
+  //                      or in L1;
   //                      it.gap 0 sends the status first and the clk_req after;
-  //   LSM_AB_REQ_ACTIVE  it.gap cycles after the DUT, woken by pl_clk_req,
+  //   LSM_AB_REQ_ACTIVE  it.gap cycles after the Protocol Layer, woken by pl_clk_req,
   //                      requests Active, before the Active entry starts.
   // it.hold_wake_ack keeps pl_wake_ack low until then. pl_clk_req follows UCIe
   // r3.0 §10.2.3.2: for a LinkError (rule 6) before the status change and held
   // until it, or after it with the ack awaited; for LinkReset and Disabled
   // (rule 7) strictly before, so those need it.gap of at least 1 at
-  // LSM_AB_WAKE (at LSM_AB_REQ_ACTIVE a request raised in the cycle the DUT is
+  // LSM_AB_WAKE (at LSM_AB_REQ_ACTIVE a request raised in the cycle the Protocol Layer is
   // found requesting Active is held a clock before the change). The request
   // is held through the dwell and until the status has left LinkReset or
   // Disabled for Reset; a pl_inband_pres drop (it.to Reset) is covered by it
@@ -1265,7 +1278,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       wait_cycles(cfg.lat());
       if (it.at != LSM_AB_RESET) begin
         // Training done; pl_clk_req released with pl_inband_pres rising, so
-        // the DUT waits for a trigger (the bringup test's cold start).
+        // the Protocol Layer waits for a trigger (a cold start).
         clk_handshake(1'b1);
         set_recenter(1'b1);
         wait_cycles(cfg.lat());
@@ -1287,14 +1300,15 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       wait_cycles(it.gap);
     end
     if (it.to == LSM_RESET) begin
-      // The DUT goes back to Reset and requests NOP; it sees the drop through
+      // The Protocol Layer goes back to Reset and requests NOP; it sees the drop through
       // the pl_clk_req handshake (rule 5).
       if (!clk_req_q) set_clk_req(1'b1);
       set_inband(1'b0);
-      wait_dut("lp_clk_ack", 4'h1, "FDI-R18");
+      wait_pl_out("lp_clk_ack", 4'h1, "FDI-R18");
       wait_cycles(dwell);
       wake_ack_hold = 1'b0;
-      // Presence again with pl_clk_req held (rule 20), which wakes the DUT.
+      // Presence again with pl_clk_req held (§10.2.3.2 rule 5), which wakes
+      // the Protocol Layer.
       if (!clk_req_q) clk_handshake(1'b1);
       set_inband(1'b1);
       wait_reset_active();
@@ -1308,7 +1322,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     // A LinkError reported first: the clk_req handshake follows, and the
     // Adapter waits for the ack before its next transition (rule 6).
     if (!clk_req_q) set_clk_req(1'b1);
-    wait_dut("lp_clk_ack", 4'h1, "FDI-R18");
+    wait_pl_out("lp_clk_ack", 4'h1, "FDI-R18");
     wake_ack_hold = 1'b0;
     if (it.to == LSM_LINKERROR) begin
       linkerror_stay(dwell);
@@ -1337,7 +1351,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     end
     if (!clk_req_q) set_clk_req(1'b1);
     set_inband(1'b0);
-    wait_dut("lp_clk_ack", 4'h1, "FDI-R18");
+    wait_pl_out("lp_clk_ack", 4'h1, "FDI-R18");
     if (!held) clk_handshake(1'b0);
     wait_cycles(dwell);
     if (!clk_req_q) clk_handshake(1'b1);

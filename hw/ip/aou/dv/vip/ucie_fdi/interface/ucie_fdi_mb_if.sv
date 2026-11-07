@@ -16,7 +16,7 @@ interface ucie_fdi_mb_if #(
     input logic rst_n
 );
 
-  // Adapter to Protocol Layer (DUT RX)
+  // Adapter to Protocol Layer (RX)
   logic              pl_valid;
   logic [DATA_W-1:0] pl_data;
   logic              pl_flit_cancel;
@@ -27,7 +27,7 @@ interface ucie_fdi_mb_if #(
   logic              pl_dllp_ofc;
   logic              pl_retimer_crd;  // Retimer credit return; no Retimer, tied 0
 
-  // Protocol Layer to Adapter (DUT TX)
+  // Protocol Layer to Adapter (TX)
   logic              pl_trdy;
   logic [DATA_W-1:0] lp_data;
   logic              lp_valid;

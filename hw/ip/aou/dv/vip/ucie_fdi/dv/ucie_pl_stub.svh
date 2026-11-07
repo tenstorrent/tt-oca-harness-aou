@@ -16,12 +16,13 @@
 //    nothing presented, no stall under way and nothing left to do (in Reset:
 //    no pl_inband_pres seen, or Active already requested; in L1: no PM exit
 //    of its own). While gated it sees nothing and changes nothing until
-//    pl_clk_req wakes it (its lp_clk_ack). A status change it would miss is an error: one to anything
-//    but LinkError without pl_clk_req in the clock before (§10.2.3.2 rule 7,
-//    reported as FDI-R22), and a second change after a LinkError entered that
-//    way, before the stub has acknowledged (rule 6, FDI-R21).
+//    pl_clk_req wakes it (its lp_clk_ack). A status change it would miss is
+//    an error: one to anything but LinkError without pl_clk_req in the clock
+//    before (§10.2.3.2 rule 7, reported as FDI-R22), and a second change
+//    after a LinkError entered that way, before the stub has acknowledged
+//    (rule 6, FDI-R21).
 //  - lp_wake_req is high while the link is wanted up: in Reset once
-//    pl_inband_pres is 1, and in Active and Retrain (§8.2.3.1); low in L1, so
+//    pl_inband_pres is 1, and in Active and Retrain (§10.2.3.1); low in L1, so
 //    the Adapter's PM exit stays its own (the self-test's L1 events), unless
 //    `wake_in_l1` asks the stub to start the exit itself (r3.0 §10.2.9).
 //  - `linkerror_req` raises lp_linkerror in `linkerror_in` (Active by
@@ -63,8 +64,8 @@
 //    `le_min_res` clocks there (r3.0 §10.3.3.5 rule 1, §10.3.3.6,
 //    §10.3.3.7).
 //  - lp_state_req: in Reset NOP, then Active once pl_wake_ack is high
-//    (§8.2.8, §8.3.3.1); Active in Active; in Retrain NOP for a clock, then
-//    Active (§8.3.3.4); L1 in L1; NOP elsewhere. With `wake_late` it requests
+//    (§10.2.8 step 2, §10.3.3.1 rule 1); Active in Active; in Retrain NOP for
+//    a clock, then Active (§10.3.3.4 rule 1); L1 in L1; NOP elsewhere. With `wake_late` it requests
 //    Active in Reset without waiting for pl_wake_ack and raises lp_wake_req a
 //    clock after the request (r3.0 §10.2.3.1 rule 5 orders them no further).
 //  - Requests around Reset (UCIe r3.0 §10.3.3.1 rule 1, Table 10-4, §10.3.3.8):
@@ -89,7 +90,7 @@
 //    count pl_rx_active_req rising in Reset and in Retrain before the stub
 //    requested Active.
 //  - TX: a flit starts only in Active with the Receiver active and pl_trdy
-//    high, then runs to its end with no bubbles (§8.2.4). pl_stallreq is
+//    high, then runs to its end with no bubbles (§10.2.4). pl_stallreq is
 //    acknowledged at the next flit boundary, a clock later at the earliest
 //    (r3.0 §10.3.2 rules 4 and 8), or `stall_ack_delay` clocks after that
 //    boundary (with `stall_ack_rand`, a random 0 to `stall_ack_delay` per
@@ -115,7 +116,7 @@
 //    transfers nothing (Table 10-3 lp_irdy).
 //  - On a 512 or 1024 B FDI a TX transfer carries 2 or 4 flits; one sent
 //    with fewer flits queued fills the other lanes with a Protocol Flit with
-//    empty slots (UCIe r3.0 10.3.1: valid data on the full width), here a
+//    empty slots (UCIe r3.0 §10.3.1: valid data on the full width), here a
 //    flit with a non-zero Protocol ID and an all-zero payload, which the
 //    scoreboard skips.
 //  - lp_stream is tied to `stream`; no DLLPs or Retimer credits. pl_stream,

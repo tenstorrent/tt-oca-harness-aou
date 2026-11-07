@@ -6,8 +6,8 @@
 // error and power-state indications. UCIe has one FDI, and so one of these,
 // per protocol stack; in the model's mirrored mode (ucie_lsm_cfg::n_phy 2)
 // two FDIs share it. pl_state_sts lives on ucie_fdi_mb_if. Signals of the
-// Protocol Layer under test that are not FDI (software pins, status outputs)
-// belong on an interface of the bench's own. The sideband configuration
+// Protocol Layer that are not FDI (its own control and status pins) belong
+// on an interface of the bench's own. The sideband configuration
 // channel (pl_cfg, lp_cfg) is not on it.
 
 interface ucie_fdi_lsm_if (

@@ -13,7 +13,7 @@ class ucie_fdi_gate extends uvm_object;
   // after the rx_active handshake, UCIe r3.0 §10.2.7 rule 3; +ucie_rx_early).
   bit rx_early = 1'b0;
   bit rx_busy = 1'b0;  // PL driver is inside a flit (including its replays)
-  bit tx_busy = 1'b0;  // TX responder has seen part of a DUT flit (set_tx_busy)
+  bit tx_busy = 1'b0;  // TX responder has seen part of a Protocol Layer flit (set_tx_busy)
   // TX responder: a stall handshake is under way, from pl_stallreq rising
   // until lp_stallack has fallen again (all four phases, UCIe r3.0 §10.3.2
   // rule 9).
