@@ -35,8 +35,8 @@ class ucie_lsm_agent extends uvm_agent;
     string r;
     if (plusarg_int("ucie_react_linkerror", me, n, "react_linkerror"))
       cfg.react_linkerror_en = n != 0;
-    // Cycles the Adapter stays in Reset after a link-down before software
-    // restarts the training; a value set in the cfg stands unless this is given.
+    // Cycles the Adapter stays in Reset after a link-down before it restarts
+    // the training on its own; a value set in the cfg stands unless this is given.
     if (plusarg_int("ucie_sw_restart_delay", me, n, "sw_restart_delay")) cfg.sw_restart_delay = n;
     if (plusarg_str("ucie_restart_on", me, r))
       case (r)
@@ -89,15 +89,16 @@ class ucie_lsm_agent extends uvm_agent;
   endfunction
 
   // What the Adapter reports must be encodable and agree with itself: a
-  // defined protocol, a speed within the negotiated maximum (above 32 GT/s
-  // needs pl_max_speedmode 1), a defined width, and a stream on every FDI that
-  // names the protocol.
+  // defined protocol, a pl_speedmode within pl_max_speedmode (an encoding
+  // above the one for 32 GT/s needs pl_max_speedmode 1), a defined width,
+  // and a stream on every FDI that names the protocol.
   local function void check_link_cfg();
     if (!protocol_defined(cfg.protocol))
       `uvm_fatal(get_type_name(), $sformatf("protocol %04b is reserved", cfg.protocol))
     if (cfg.speedmode > 3'b101 && !cfg.max_speedmode)
-      `uvm_fatal(get_type_name(), $sformatf("speedmode %03b is above 32 GT/s with max_speedmode 0",
-                                            cfg.speedmode))
+      `uvm_fatal(get_type_name(), $sformatf(
+                 "speedmode %03b encodes a PHY rate above 32 GT/s, with max_speedmode 0",
+                 cfg.speedmode))
     if (cfg.lnk_cfg == 3'b111)
       `uvm_fatal(get_type_name(), "lnk_cfg 111b is reserved")
     foreach (phy[p])

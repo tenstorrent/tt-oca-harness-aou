@@ -3,7 +3,7 @@
 //
 // L2: FDI link state. The Adapter-side link-state agent (pl_state_sts per
 // FDI, inband_pres, wake/clk/rx_active handshakes, Adapter-initiated events)
-// and its monitor with the handshake checks (UCIe r1.1 §8.2-8.3).
+// and its monitor with the handshake checks (UCIe r3.0 §10.2, §10.3).
 
 package ucie_lsm_pkg;
   import uvm_pkg::*;
@@ -63,7 +63,7 @@ package ucie_lsm_pkg;
   // When the Adapter trains the link again after a link-down (LinkError,
   // LinkReset or Disabled -> Reset; UCIe r3.0 §10.3.3.8, ucie_lsm_cfg::restart_on).
   typedef enum bit [1:0] {
-    LSM_RESTART_SW,      // software's Start UCIe Link Training, sw_restart_delay cycles later
+    LSM_RESTART_SW,      // the Adapter's own decision (software, say), sw_restart_delay later
     LSM_RESTART_PL,      // the Protocol Layer's NOP->Active on lp_state_req in Reset
     LSM_RESTART_EITHER   // whichever comes first
   } ucie_lsm_restart_e;
@@ -76,7 +76,7 @@ package ucie_lsm_pkg;
     LSM_EXIT_EITHER      // whichever comes first
   } ucie_lsm_exit_e;
 
-  // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts and lp_state_req.
+  // UCIe state codes on pl_state_sts and lp_state_req (r3.0 Table 10-3).
   // States without a code return 4'hF with ok=0.
   function automatic logic [3:0] sts_code(ucie_lsm_state_e s, output bit ok);
     ok = 1'b1;

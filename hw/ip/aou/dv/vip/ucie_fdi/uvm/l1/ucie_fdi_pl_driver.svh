@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Drives flits into the DUT RX (pl_valid/pl_data/pl_flit_cancel). A flit
+// Drives flits into the Protocol Layer's RX (pl_valid/pl_data/pl_flit_cancel). A flit
 // starts only while the gate is open for RX (L2 reports Active, or the
 // Receiver is Active in Reset with +ucie_rx_early) and out of reset;
 // once started it runs to completion, cancels and replays included. A

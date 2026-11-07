@@ -6,8 +6,8 @@
 // Figure 3-25; CXL.cachemem's layout, Figure 3-24, has the same Adapter-owned
 // bytes), on FDIs of 32 to 1024 bytes. PCIe, CXL.io and Management Transport
 // flits are not modelled (see stream_layout_modelled). Flit item, Format 6
-// codec, PL driver (to the DUT RX), TX responder (pl_trdy and stallreq towards
-// the DUT TX), monitor with protocol checks and a coverage hook. Rule IDs are
+// codec, PL driver (to the Protocol Layer's RX), TX responder (pl_trdy and
+// stallreq towards its TX), monitor with protocol checks and a coverage hook. Rule IDs are
 // listed in ../README.md.
 
 package ucie_fdi_pkg;
@@ -23,14 +23,14 @@ package ucie_fdi_pkg;
   // The most transfers one flit can take (at the narrowest FDI).
   localparam int MAX_BEATS_PER_FLIT = FLIT_BYTES / MIN_BEAT_BYTES;
 
-  // UCIe pl_state_sts values the mainband checks need (r3.0 Table 10-3); the
-  // same in the UCIe and RTL encodings.
+  // UCIe pl_state_sts values the mainband checks need (r3.0 Table 10-3).
   localparam logic [3:0] FDI_STS_ACTIVE    = 4'h1;
   localparam logic [3:0] FDI_STS_RESET     = 4'h0;
   localparam logic [3:0] FDI_STS_LINKERROR = 4'hA;
   localparam logic [3:0] FDI_STS_RETRAIN   = 4'hB;
 
-  // What the Adapter reports as negotiated (UCIe r3.0 Table 10-3). pl_protocol: bit 3 is "with Management Transport" (1001b is
+  // What the Adapter reports as negotiated (UCIe r3.0 Table 10-3).
+  // pl_protocol: bit 3 is "with Management Transport" (1001b is
   // Management Transport alone); the low bits 000b PCIe, 011b CXL.1 (CXL.io),
   // 100b..110b CXL.2..CXL.4 (CXL.io and CXL.cachemem), 111b Streaming.
   localparam logic [3:0] UCIE_PROTO_PCIE      = 4'b0000;
@@ -97,7 +97,7 @@ package ucie_fdi_pkg;
     return s[3:0] != 4'h4;
   endfunction
 
-  // TX: Protocol Layer (DUT) to Adapter. RX: Adapter to Protocol Layer (DUT).
+  // TX: Protocol Layer to Adapter. RX: Adapter to Protocol Layer.
   typedef enum bit {UCIE_FDI_TX, UCIE_FDI_RX} ucie_fdi_dir_e;
 
   // How the PL driver cancels a 128B half (from 256 B up, every flit of the

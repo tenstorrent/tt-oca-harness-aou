@@ -25,7 +25,8 @@ class ucie_fdi_cfg extends uvm_object;
   int unsigned   stall_pct = 0;
   // Cycles a stand-alone stall holds pl_stallreq high after lp_stallack, from
   // stall_hold_min to stall_hold_max. 0 drops it as soon as the ack is seen
-  // (r3.0 §10.3.2 sets no minimum), the shortest stall the DUT can see.
+  // (r3.0 §10.3.2 sets no minimum), the shortest stall the Protocol Layer
+  // can see.
   int unsigned   stall_hold_min = 1;
   int unsigned   stall_hold_max = 8;
   // Stall corners (r3.0 §10.3.2): the share of stand-alone stalls raised

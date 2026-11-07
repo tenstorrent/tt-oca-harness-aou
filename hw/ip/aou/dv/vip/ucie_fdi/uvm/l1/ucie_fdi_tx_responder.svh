@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// Adapter side of the DUT TX: pl_trdy by policy, and pl_stallreq (UCIe r3.0
+// Adapter side of the Protocol Layer's TX: pl_trdy by policy, and pl_stallreq (UCIe r3.0
 // §10.3.2).
 // - pl_trdy is low at flit boundaries while the gate is closed or
 //   cfg.tx_hold is set; a started flit is always allowed to finish (Flit
@@ -81,7 +81,7 @@ class ucie_fdi_tx_responder extends uvm_component;
     end
     if (trdy_q && vif.drv_cb.lp_valid === 1'b1 && vif.drv_cb.lp_irdy === 1'b1)
       tx_beat = (tx_beat + 1) % cfg.bpf();
-    // LinkError mid-flit: the partial DUT flit is abandoned, never accepted.
+    // LinkError mid-flit: the partial TX flit is abandoned, never accepted.
     if (cfg.gate.abort) tx_beat = 0;
     cfg.gate.set_tx_busy(tx_beat != 0);
 

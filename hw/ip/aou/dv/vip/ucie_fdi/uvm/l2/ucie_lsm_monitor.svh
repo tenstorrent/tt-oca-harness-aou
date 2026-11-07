@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
 // Samples the link-state signals every clock and checks the Protocol Layer
-// (DUT) side of the FDI handshakes (UCIe r3.0 §10.2.3-10.2.8), and the Protocol
+// side of the FDI handshakes (UCIe r3.0 §10.2.3-10.2.8), and the Protocol
 // Layer outputs on each FDI that the negotiated protocol rules out (DLLPs,
 // Retimer credits). Where r3.0 orders two events but gives no time between
 // them (a request and a wake handshake that follows it, a request falling and
@@ -241,8 +241,9 @@ class ucie_lsm_monitor extends uvm_monitor;
   local function void check_clk_req(ucie_lsm_obs_t c, ucie_lsm_obs_t p);
     bit moved = c.sts != p.sts;
     if (le_ack_wait && moved) begin
-      err(R21, $sformatf({"%s -> LinkError with pl_clk_req after it, then -> %s before ",
-                          "lp_clk_ack answered it"}, le_from.name(), c.sts.name()));
+      err(R21, $sformatf({"%s -> LinkError without pl_clk_req before it, then -> %s with no ",
+                          "lp_clk_ack answering pl_clk_req in between"}, le_from.name(),
+                         c.sts.name()));
       le_ack_wait = 1'b0;
     end
     if (c.clk_req && c.clk_ack) le_ack_wait = 1'b0;

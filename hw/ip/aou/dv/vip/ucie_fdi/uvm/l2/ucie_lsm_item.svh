@@ -17,7 +17,7 @@ class ucie_lsm_item extends uvm_sequence_item;
   // LSM_EV_ABORT only: where the bringup (or, with in_l1, the PM exit from L1)
   // is abandoned; `gap` cycles after the waking pl_clk_req (LSM_AB_WAKE; 0 sends
   // the status first and the clk_req after, which only a LinkError may do) or
-  // after the DUT's Active request (LSM_AB_REQ_ACTIVE); hold_wake_ack keeps
+  // after the Protocol Layer's Active request (LSM_AB_REQ_ACTIVE); hold_wake_ack keeps
   // pl_wake_ack low until the abort.
   ucie_lsm_abort_e at = LSM_AB_RESET;
   bit             in_l1 = 1'b0;
