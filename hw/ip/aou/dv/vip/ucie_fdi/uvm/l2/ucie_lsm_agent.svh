@@ -44,6 +44,17 @@ class ucie_lsm_agent extends uvm_agent;
           default:  `uvm_fatal(get_type_name(), {"+ucie_restart_on: not sw, pl or either: ", r})
         endcase
     end
+    begin
+      string r;
+      if ($value$plusargs("ucie_down_exit=%s", r))
+        case (r)
+          "internal": cfg.down_exit_on = LSM_EXIT_INTERNAL;
+          "pl":       cfg.down_exit_on = LSM_EXIT_PL;
+          "either":   cfg.down_exit_on = LSM_EXIT_EITHER;
+          default:
+            `uvm_fatal(get_type_name(), {"+ucie_down_exit: not internal, pl or either: ", r})
+        endcase
+    end
     void'($value$plusargs("ucie_remote_active_first_pct=%d", cfg.remote_active_first_pct));
     void'($value$plusargs("le_mid_flit_pct=%d", cfg.le_mid_flit_pct));
     void'($value$plusargs("fdi_rx_early=%d", cfg.rx_early));

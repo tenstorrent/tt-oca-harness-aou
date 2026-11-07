@@ -95,7 +95,7 @@ FDI-R45,ucie_fdi_monitor,,DUT,TX flit: Byte0[7:6] (Protocol ID) non-zero; other 
 FDI-R46,ucie_lsm_monitor,,DUT,lp_state_req never takes a reserved value (L2; checks the DUT),UCIe r1.1 Table 8-2 lp_state_req
 FDI-R47,ucie_lsm_monitor,,DUT,No Retrain request outside Raw Format (L2; checks the DUT),UCIe r1.1 8.3.3.4
 FDI-R48,ucie_lsm_driver,,DUT,Retrain entered from Active ends with a NOP->Active request at any time in Retrain (L2; checks the DUT),UCIe r3.0 §10.3.3.4 rule 1
-FDI-R49,ucie_lsm_monitor,ucie_lsm_driver,MODEL,"The Adapter stays in LinkError while lp_linkerror is 1, however long the Protocol Layer holds it (L2; checks the Adapter)",UCIe r3.0 Table 10-3 lp_linkerror / §10.3.3.7
+FDI-R49,ucie_lsm_monitor,ucie_lsm_driver,MODEL,"The Adapter stays in LinkError while lp_linkerror is 1, however long the Protocol Layer holds it, whether its internal request or the Protocol Layer's Active request ends it (L2; checks the Adapter)",UCIe r3.0 Table 10-3 lp_linkerror / §10.3.3.7 / Table 10-4
 FDI-R56,aou_fdi_layer,aou_bringup_model (FDI-M01),DUT,"The DUT never requests L2 on lp_state_req (L2 is not implemented, integration guide 6.6.6 GAP-3; without that request the Adapter cannot enter L2, UCIe r1.1 8.2.9) (L2; checks the DUT)",integration guide 6.6.6 GAP-3; UCIe r1.1 8.2.9
 FDI-R57,ucie_fdi_monitor,,DUT,lp_stallack answers pl_stallreq within stall_timeout cycles (the Protocol Layer stalls at the next flit boundary; liveness bound of the testbench) (L1; checks the DUT),UCIe r1.1 8.3.2
 FDI-R58,ucie_fdi_monitor,,MODEL,pl_error only while the Receiver is active (pl_rx_active_req and lp_rx_active_sts both 1) (L1; checks the Adapter),UCIe r3.0 Table 10-3 pl_error

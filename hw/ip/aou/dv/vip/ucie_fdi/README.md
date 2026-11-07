@@ -47,6 +47,7 @@ Nothing the model does every clock allocates an object.
 | Done | `pl_error` (framing errors the Adapter flags, cancels and retrains after) and checks of `lp_corrupt_crc`, both applying to every flit of a transfer at 512 B and up | - |
 | Done | Covergroups of the model's own: a mainband collector per FDI (`ucie_fdi_fcov`) and a link-state observer (`ucie_lsm_fcov`), plain SystemVerilog, on by default (`fcov_en`); see "Coverage" | - |
 | Done | Every FDI signal but `pl_cfg`/`lp_cfg` on the interfaces: the negotiated protocol, format, speed and width from the config objects, the Physical Layer's training and L1 indications, stream IDs; DLLP, Retimer credit and error outputs tied idle; the Protocol Layer's DLLP, Retimer credit and stream outputs checked (see "Signals") | - |
+| Done | The Protocol Layer's requests answered as UCIe r3.0 Table 10-4 lists them: LinkReset and Disabled on `lp_state_req` (in Active, Retrain, L1, Reset after a NOP, and Disabled in LinkReset), `lp_linkerror` in every state, and optionally the Active request that ends LinkReset, Disabled and LinkError (`down_exit_on`); a request answered during an Adapter event abandons the event | - |
 | Next | Protocol-Layer-initiated PM entry (`lp_state_req` = L1/L2), today not modelled | - |
 | Deferred | Other flit formats (68B, Standard 256B), RDI, the sideband (`pl_cfg`/`lp_cfg`, not on the interfaces), DLLPs, `pl_cerror`/`pl_nferror`/`pl_trainerror` | a user who needs them |
 | Deferred | A home outside the AoU bench: tt-oca-harness's shared VIP or a repository of its own (see "Moving it out of the AoU bench") | a second consumer |
@@ -82,9 +83,52 @@ r3.0 (r1.1 §8.2.x is r3.0 §10.2.x, §8.3.x is §10.3.x).
 | Clock gating | §8.2.3.1, §8.2.3.2 | `lp_wake_req` / `pl_wake_ack` responder, `pl_clk_req` / `lp_clk_ack` handshakes: before every status change out of Reset, LinkReset, Disabled or L1 and around every move of a level signal there (r3.0 §10.2.3.2 rules 5 to 7) |
 | rx_active | §8.2.7 (r3.0 §10.2.7) | `pl_rx_active_req` / `lp_rx_active_sts` on every Active entry and exit, optionally before the Protocol Layer's Active request in Reset and Retrain, as when the remote die asks first (`remote_active_first_pct`); optionally RX flits in Reset once the Receiver is active |
 | Bring-up | §8.2.8, §8.3.3.1 (r3.0 §10.2.8, §10.3.3.1) | clock handshake, `pl_inband_pres`, the Protocol Layer's request to leave Reset (r3.0 §10.3.3.1 rule 1: `lp_state_req` NOP for at least one clock in Reset, then Active; an Active held into Reset is no request), Active |
-| State machine | §8.3.3 | Retrain (§8.3.3.4), L1 entry and remote exit (§8.2.9), LinkReset (§8.3.3.5), Disabled (§8.3.3.6), LinkError incl. mid-flit and on `lp_linkerror` (§8.3.3.7), the restart after a link-down (r3.0 §10.3.3.8: software's, the Protocol Layer's NOP->Active even before `pl_inband_pres`, or either; `restart_on`) |
+| State machine | §8.3.3 | Retrain (§8.3.3.4), L1 entry and remote exit (§8.2.9), LinkReset (§8.3.3.5), Disabled (§8.3.3.6), LinkError incl. mid-flit (§8.3.3.7), the restart after a link-down (r3.0 §10.3.3.8: software's, the Protocol Layer's NOP->Active even before `pl_inband_pres`, or either; `restart_on`) |
+| Protocol Layer requests | r3.0 Table 10-4, §10.3.3 | see "Requests the Adapter answers" below |
 | Negotiated link | r3.0 Table 10-3 | `pl_protocol`, `pl_protocol_flitfmt` (Format 6) and `pl_protocol_vld` with the bringup; `pl_speedmode`, `pl_max_speedmode`, `pl_lnk_cfg` and the stream ID from the config objects; `pl_phyinl1` in L1, `pl_phyinrecenter` while training (optional) |
 | Errors | r3.0 Table 10-3, §10.3.1 | RX: `pl_error` with `pl_valid` on one transfer of a 128B half (from 256 B up, of the transfer), the half finished and cancelled, a Retrain, then the replay (`error_pct`); TX: `lp_corrupt_crc` checked for placement and protocol |
+
+### Requests the Adapter answers
+
+With `react_en` (default 1) the link-state driver answers the Protocol Layer as UCIe r3.0
+Table 10-4 lists ("Yes"), alongside its own events; a request it ignores changes nothing.
+L2 and Active.PMNAK are never reported, so their columns do not arise.
+
+| Request | Reset | Active | L1 | LinkReset | Retrain | Disabled | LinkError |
+|---|---|---|---|---|---|---|---|
+| NOP then Active (`lp_state_req`) | Active entry (§10.3.3.1 rule 1) | - | PM exit on `lp_wake_req` (Known limits) | -> Reset with `down_exit_on` PL or EITHER (§10.3.3.5 rule 1) | Active entry (§10.3.3.4 rule 1) | -> Reset with `down_exit_on` PL or EITHER (§10.3.3.6) | -> Reset with `down_exit_on` PL or EITHER, `lp_linkerror` 0 and `linkerror_min_res` clocks there (§10.3.3.7) |
+| LinkReset | -> LinkReset after a NOP of at least a clock (note a; §10.3.3.1 rule 2) | -> LinkReset (§10.3.3.8) | -> LinkReset | ignored | -> LinkReset, optionally through Active (§10.3.3.4 rule 2) | ignored | ignored |
+| Disabled | -> Disabled after a NOP (note a; §10.3.3.1 rule 3) | -> Disabled | -> Disabled | -> Disabled (§10.3.3.5 rule 2) | -> Disabled, optionally through Active | ignored | ignored |
+| `lp_linkerror` (with `react_linkerror_en`) | -> LinkError (§10.3.3.1 rule 4) | -> LinkError | -> LinkError | -> LinkError (§10.3.3.5 rule 4) | -> LinkError | -> LinkError (§10.3.3.6) | held while 1 (Table 10-3) |
+
+- Out of Active the gates close at a flit boundary with no stall (Flit mode, r3.0
+  §10.3.2) and rx_active falls before the status changes (§10.2.7 rule 5); out of Reset,
+  LinkReset, Disabled or L1 `pl_clk_req` comes first (§10.2.3.2 rules 6 and 7). The
+  responder does not wait for `pl_wake_ack` (§10.2.3.1 rule 5).
+- LinkReset and Disabled come `lat_min`..`lat_max` clocks after the request, plus up to
+  `remote_rsp_max` for the remote die's sideband answer while the link is up or
+  training; down and not training (Reset before `pl_inband_pres`, LinkReset) the Adapter
+  completes them locally (§10.3.3.8 Implementation Note). `lp_linkerror` is answered at
+  once. In Reset a request held from the state before, or reached from another request,
+  is no request (Table 10-4 note a).
+- A request answered while an Adapter event runs abandons the event, as a reset does,
+  except an Adapter LinkError already on its way (the highest-priority link-down state,
+  §10.3.3.8) and the stall of a PM entry, which finish first. A later request may stop an
+  answer in turn (`lp_linkerror` while a LinkReset is answered). A handshake the stopped
+  job left half done is completed before its request moves again: `pl_rx_active_req`
+  falls only once `lp_rx_active_sts` has answered it (§10.2.7 rule 4), and `pl_clk_req`
+  falls only once `lp_clk_ack` has answered it and rises again only once `lp_clk_ack` has
+  fallen (§10.2.3.2 rules 2, 3 and 5), however slowly the Protocol Layer acknowledges.
+- Afterwards: LinkReset and Disabled answered end as the Adapter's own events do (Reset,
+  then with `rebringup_after_down` the bringup, which waits for `restart_on`). A
+  LinkError on `lp_linkerror` that abandoned an event ends the same way; one answered
+  between events leaves the link in Reset, and a later `LSM_EV_LINKERROR` (the test's own
+  answer to the same request) only runs the bringup.
+- The Adapter leaves LinkReset, Disabled and LinkError on its internal request after the
+  dwell (`down_exit_on` INTERNAL, the default), on the Protocol Layer's Active request
+  only (PL), or on whichever comes first (EITHER). The request is taken from the second
+  clock of the state on; out of LinkError never while `lp_linkerror` is 1, and only after
+  `linkerror_min_res` clocks there, a scaled stand-in for r3.0 §10.3.3.7's 16 ms.
 
 ## Signals
 
@@ -363,7 +407,11 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `clk_req_hold_bringup` | 1 | 1: the bringup holds `pl_clk_req` from before `pl_inband_pres` until the state has left Reset (r3.0 §10.2.3.2 rule 5's recommendation); 0: it releases it as `pl_inband_pres` rises, so the Protocol Layer may gate in Reset and must wake by itself, and raises it again before `pl_rx_active_req` and Active (rules 5 and 7) |
 | `rebringup_after_down` | 1 | link-down events end with a bringup |
 | `req_timeout` | 20000 | cycles to wait for a Protocol Layer request or acknowledge (0: forever); a liveness bound, among others on the request to leave Reset and on the NOP->Active that restarts the training with `restart_on` PL (FDI-R33) |
-| `react_en`, `react_linkerror_en` | 1, 1 | answer `lp_linkerror` and the Protocol Layer's PM exit, and, with `restart_on` PL or EITHER, the NOP->Active restart trigger of a link left in Reset between events |
+| `react_en`, `react_linkerror_en` | 1, 1 | answer the Protocol Layer's requests ("Requests the Adapter answers"): LinkReset, Disabled, `lp_linkerror` (with `react_linkerror_en` too), the Active request that ends a link-down state (with `down_exit_on` PL or EITHER), the PM exit, and with `restart_on` PL or EITHER the NOP->Active restart trigger of a link left in Reset between events; 0: only the Adapter's own events |
+| `down_exit_on` | `LSM_EXIT_INTERNAL` | what ends LinkReset, Disabled and LinkError (r3.0 §10.3.3.5 rule 1, §10.3.3.6, §10.3.3.7): `LSM_EXIT_INTERNAL` the Adapter's internal request after the dwell; `LSM_EXIT_PL` only the Protocol Layer's Active request (no bound: a Protocol Layer may keep the link down); `LSM_EXIT_EITHER` whichever comes first |
+| `linkerror_min_res` | 200 | clocks in LinkError before the Protocol Layer's Active request may end it; a scaled stand-in for r3.0 §10.3.3.7's 16 ms minimum residency |
+| `remote_rsp_max` | 0 | extra clocks, drawn in [0:N], for the remote die's sideband answer to a LinkReset or Disabled request while the link is up or training (r3.0 §10.3.3.8 Implementation Note); 0 answers at once |
+| `linkdown_via_active_pct` | 0 | chance a LinkReset or Disabled answered in Retrain, or in Reset after `pl_inband_pres`, first goes through Active (r3.0 §10.3.3.4 rule 2, §10.3.3.1 rules 2 and 3) |
 | `restart_on` | `LSM_RESTART_SW` | what restarts the training after a link-down (LinkError, LinkReset or Disabled -> Reset; r3.0 §10.3.3.8): `LSM_RESTART_SW` software, `sw_restart_delay` cycles later; `LSM_RESTART_PL` the Protocol Layer's NOP->Active on `lp_state_req` in that Reset, which may come before `pl_inband_pres` and return to NOP; `LSM_RESTART_EITHER` whichever comes first. With PL or EITHER the Adapter also answers the trigger between events, so a link left down (`rebringup_after_down` 0) comes up on it |
 | `sw_restart_delay` | random 50..1500 | cycles in Reset after a link-down before software restarts the training (`restart_on` SW or EITHER) |
 | `remote_active_first_pct` | 0 | chance an Active entry from Reset (after `pl_inband_pres`, under `pl_clk_req`) or from a Retrain entered from Active starts the rx_active handshake before the Protocol Layer's Active request, as when the remote die's Active request arrives first (r3.0 §10.2.7 rule 1, §10.2.8 step 4) |
@@ -389,7 +437,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `ucie_lsm_item` | one event | `kind`, `cycles`; `to` (how it ends), `at`, `in_l1`, `gap`, `hold_wake_ack` (aborts) |
 | `ucie_lsm_event_seq` | one event | `of(kind)`; `ev_kind`, `ev_cycles`, `ev_to`, `ev_at`, `ev_in_l1`, `ev_gap`, `ev_hold_wake_ack` |
 | `ucie_lsm_l1_seq` | L1 entry, `ev_cycles` in L1, remote exit | as `ucie_lsm_event_seq` |
-| `ucie_lsm_driver` | Adapter state machine | `state`, `link_active`, `execute(item)`, `set_state()`, `wait_cycles()`, `parked()`; counters `n_le`, `n_le_react`, `n_le_mid_tx`, `n_le_mid_rx` |
+| `ucie_lsm_driver` | Adapter state machine | `state`, `link_active`, `execute(item)`, `set_state()`, `wait_cycles()`, `parked()`, `idle()` (no event and no answer under way); counters `n_le`, `n_le_react` (LinkErrors on `lp_linkerror`), `n_down_req` (LinkReset and Disabled on `lp_state_req`), `n_via_active`, `n_exit_req` (link-down states left on the Active request), `n_le_mid_tx`, `n_le_mid_rx` |
 | `ucie_lsm_monitor` | checks | `add_observer()`, `cur`, `prev` |
 | `ucie_lsm_obs_t` | struct: one clock | `rst_n`, `pl_state_sts`, `sts`, `inband_pres`, `clk_req`, `wake_ack`, `rx_active_req`, `lp_state_req`, `req`, `wake_req`, `clk_ack`, `rx_active_sts`, `linkerror`; `obs_reset()`, `obs2string()` |
 | `ucie_lsm_observer` | interface class: follows the link state | `observe(cur, prev)` (Extension API) |
@@ -402,6 +450,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `+react_linkerror=0\|1` | `ucie_lsm_cfg.react_linkerror_en` |
 | `+sw_restart_delay=N` | `ucie_lsm_cfg.sw_restart_delay` (else random 50..1500) |
 | `+ucie_restart_on=sw\|pl\|either` | `ucie_lsm_cfg.restart_on` |
+| `+ucie_down_exit=internal\|pl\|either` | `ucie_lsm_cfg.down_exit_on` |
 | `+ucie_remote_active_first_pct=N` | `ucie_lsm_cfg.remote_active_first_pct` |
 | `+le_mid_flit_pct=N` | `ucie_lsm_cfg.le_mid_flit_pct` |
 | `+fdi_rx_early=N` | `ucie_lsm_cfg.rx_early` |
@@ -448,7 +497,7 @@ check the Protocol Layer, "model" rules check the Adapter model itself.
 | FDI-R46 | design: no reserved `lp_state_req` value | `ucie_lsm_monitor` | Table 8-2 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R47 | design: no Retrain request outside Raw Format | `ucie_lsm_monitor` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R48 | design: a Retrain from Active ends with NOP->Active | `ucie_lsm_driver` | §8.3.3.4 | unchanged (no mainband) | unchanged (no mainband) |
-| FDI-R49 | model: the Adapter stays in LinkError while `lp_linkerror` is 1, however long the Protocol Layer holds it (the driver waits with no bound) | `ucie_lsm_monitor` | r3.0 Table 10-3 `lp_linkerror`, §10.3.3.7 | unchanged (no mainband) | unchanged (no mainband) |
+| FDI-R49 | model: the Adapter stays in LinkError while `lp_linkerror` is 1, however long the Protocol Layer holds it (the driver waits with no bound), whatever ends it: its internal request or the Protocol Layer's Active request | `ucie_lsm_monitor` | r3.0 Table 10-3 `lp_linkerror`, §10.3.3.7 | unchanged (no mainband) | unchanged (no mainband) |
 | FDI-R57 | design: `lp_stallack` within `stall_timeout` cycles of `pl_stallreq` (liveness bound) | `ucie_fdi_monitor` | §8.3.2 | unchanged | unchanged |
 | FDI-R58 | model: `pl_error` only while the Receiver is active | `ucie_fdi_monitor` | r3.0 Table 10-3 | unchanged | unchanged |
 | FDI-R59 | design: `lp_corrupt_crc` only with `lp_valid`, on the last transfer of a 128B half | `ucie_fdi_monitor` | r3.0 Table 10-3 | any transfer: each ends both halves | any transfer; it applies to every flit of it (§10.3.1) |
@@ -507,12 +556,13 @@ means anything.
 | `cg_abandon` | `ucie_fdi_fcov` | a partial flit dropped on a mid-flit LinkError | TX, RX |
 | `cg_lanes` | `ucie_fdi_fcov` | every RX transfer at 512 and 1024 B | flits carried, the rest NOP lanes: 1 or 2 at 512 B, 1 to 4 at 1024 B |
 | `cg_trdy` | `ucie_fdi_fcov` | the end of a run of `pl_trdy` low the policy made (all in Active, no stall handshake, no `tx_hold`) | policy × where the run started (random and bursty: at a flit boundary or inside a flit; holes: inside only); its length |
-| `cg_state` | `ucie_lsm_fcov` | every `pl_state_sts` change | each (previous, current) transition the model makes: 22 bins, from Reset to Active through every exit and abort |
+| `cg_state` | `ucie_lsm_fcov` | every `pl_state_sts` change | each (previous, current) transition the model makes: 23 bins, from Reset to Active through every exit and abort, and LinkReset to Disabled on the request |
 | `cg_clk` | `ucie_lsm_fcov` | `lp_clk_ack` rising | the state: Reset, Active, L1, LinkReset, LinkError, Disabled |
 | `cg_wake` | `ucie_lsm_fcov` | `pl_wake_ack` rising | the state: Reset, L1 (an exit the Protocol Layer starts), Retrain |
 | `cg_rx_active` | `ucie_lsm_fcov` | `pl_rx_active_req` changing | entry in Reset or Retrain, exit in Active or LinkError |
 | `cg_event` | `ucie_lsm_fcov` | every link event the driver runs, and what it does on its own | the bringup, Retrain (ending in Active, LinkError, LinkReset or Disabled), LinkError (at a boundary, mid-flit, on `lp_linkerror`), a Retrain after `pl_error`, L1 entry and exit (by the Adapter or on `lp_wake_req`), LinkReset and Disabled (each also escalated to LinkError), the clock wake, an abort (`LSM_EV_INBAND_DROP` has none: it is for a link a test keeps in Reset) |
 | `cg_reset_req` | `ucie_lsm_fcov` | an Active request in Reset; `pl_rx_active_req` rising before it | NOP then Active with `pl_inband_pres` 1 (the request) or 0 (the early training trigger), Active held into Reset, Active straight from another request, the rx_active handshake before the request in Reset and in Retrain ("before" judged by the NOP->Active progress since the entry to that state, so an Active held into it does not count as the request) |
+| `cg_request` | `ucie_lsm_fcov` | every Protocol Layer request the driver answers (r3.0 Table 10-4) | LinkReset in Active, Retrain, L1 and Reset; Disabled in those and in LinkReset; `lp_linkerror` in Reset, Active, Retrain, L1, LinkReset and Disabled, and abandoning an event; an answer through Active; LinkReset, Disabled and LinkError left on the Active request |
 | `cg_abort` | `ucie_lsm_fcov` | every abort | where (Reset, after the wake, after the Active request, in L1) and what it ends in (LinkError, LinkReset, Disabled, Reset) |
 | `cg_error` | `ucie_fdi_fcov` | every `pl_error` | the unit (half 0 or 1, the flit at 256 B, every flit of a wider transfer) × the transfer it rode on (first, inside, last of a half; the only one from 256 B up) |
 | `cg_corrupt` | `ucie_fdi_fcov` | every TX transfer with `lp_corrupt_crc` | the second half only, both halves, the flit (256 B), every flit of a wider transfer |
@@ -556,7 +606,8 @@ make test UVM_HOME=<uvm-core checkout> SIM=verilator TEST=ucie_fdi_events_test P
 | `ucie_fdi_legal_test` | the cov test with a Protocol Layer doing what UCIe r3.0 allows (`+legal=all`, or a comma-separated list): `early` presents flits without waiting for `pl_trdy` and through Retrain, LinkError, the start of LinkReset and Disabled, and a few clocks into Reset after LinkError; `valid` drives `lp_valid` without `lp_irdy` between flits; `hs_lag` drops `lp_clk_ack` and `lp_rx_active_sts` 30 clocks after their requests; `le_hold` holds `lp_linkerror` 25000 clocks into LinkError; `wake_late` raises `lp_wake_req` a clock after its Active request. Any error fails it |
 | `ucie_fdi_clk_req_test` | the `pl_clk_req` handshake on every exit from a state where the Protocol Layer may be clock gated, with a stub that gates its clock whenever r3.0 §10.2.3 lets it and acknowledges late (`+clk_ack_delay=N`, default 3): LinkReset, Disabled and LinkError from Active, Reset and L1, ending in Reset and in a bringup; LinkReset and Disabled escalated to LinkError; both L1 exits; `pl_inband_pres` drops in Reset; aborts that send a drop with its request, LinkReset or Disabled as the Protocol Layer requests Active, and LinkErrors reported before their request; then the cov test's events. `+clk_hold=0\|1` sets `clk_req_hold_bringup`. The stub reports a status change it would miss while gated (as FDI-R22 or R21); any error fails it |
 | `ucie_fdi_reset_req_test` | the exit from Reset and the restart after a link-down (r3.0 §10.3.3.1 rule 1, §10.3.3.8) on the cov test's events and traffic, `+reset_req=`: `held` the stub requests Active in LinkError, LinkReset and Disabled and holds it into Reset for 40 clocks of `pl_inband_pres`, with a clock of LinkReset halfway (neither is a request with no NOP first), and reports an Adapter that starts the Active entry meanwhile; `early` the stub gives NOP->Active before `pl_inband_pres` and returns to NOP or holds Active, and reports an Adapter that starts the Active entry on a trigger withdrawn to NOP before the next NOP->Active; `restart` the same with `restart_on` PL and software's delay at 20000 clocks, where `pl_inband_pres` must follow every trigger after a link-down within 300 clocks and a link left down must come up on it; `either` `restart_on` EITHER with the trigger in half the Resets; `rx_first` `remote_active_first_pct` 100 (the rx_active handshake before the request; both Reset and Retrain must see it). `+clk_hold=0\|1` sets `clk_req_hold_bringup`. Any error fails it |
-| `ucie_fdi_neg_test` | the model's checks against one deliberate violation (`+neg=dllp\|retimer\|stream\|corrupt_mid\|corrupt_h0\|corrupt_proto\|clk_ack\|irdy_reset\|wake\|wake_held\|xfer\|le_exit\|rx_inactive\|clk_exit\|le_after\|level\|inband_active\|held_forever\|no_restart`): the rule that must catch it (FDI-R62, R63, R64, R59, R60, R61, R18, R44, R16, R16, R43, R49, R35, R22, R21, R20, the driver's refusal, R33, R33) has to fire, as often as the violation is made, and its errors are expected; `corrupt_mid` and `corrupt_h0` need an FDI of 128 B or less. `clk_ack` is an `lp_clk_ack` pulse without `pl_clk_req`, `irdy_reset` a flit presented through LinkReset and Disabled into Reset, `wake` an Active request in Reset with `lp_wake_req` never raised, `wake_held` the same with `lp_wake_req` held through LinkError and dropped on entry to Reset, over a bringup and three LinkErrors (four reports). Adapter faults the top forces: with `xfer` `pl_trdy` high for a clock while a flit waits in Retrain (256 B or more), with `le_exit` Reset for a clock while the stub holds `lp_linkerror` in LinkError (the LinkError re-entered from that Reset without `pl_clk_req` also draws FDI-R21, expected too), with `rx_inactive` `pl_rx_active_req` low in Active while flits go on, with `clk_exit` `pl_clk_req` low through LinkReset -> Reset, with `le_after` Reset for a clock after a LinkError from Reset reported before its `pl_clk_req` was acknowledged, with `level` `pl_phyinrecenter` high for 40 clocks in Reset with no `pl_clk_req`. `inband_active` asks for `LSM_EV_INBAND_DROP` in Active, which the driver refuses with an error (`pl_inband_pres` falls only in Reset). `held_forever` holds an Active request from a LinkReset into Reset for good, so the stub never asks to leave Reset; `no_restart` waits, with `restart_on` PL, for a NOP->Active the stub never gives; both with `req_timeout` 3000 |
+| `ucie_fdi_state_req_test` | the Protocol Layer's requests (r3.0 Table 10-4), before the cov test's events and with its traffic: LinkReset and Disabled requested in Active, Retrain (abandoning an Adapter Retrain), L1 and Reset (after a NOP; link left down, and during a bringup), Disabled in LinkReset; requests the table ignores (LinkReset in Disabled, LinkReset and Disabled in LinkError); `lp_linkerror` in Reset (before and after `pl_inband_pres`), Active (between events and abandoning an idle event), Retrain (held 2000 clocks), L1, LinkReset, Disabled and as an L1 entry starts; requests that stop a job while its `pl_clk_req` waits for a slow `lp_clk_ack` (`+slow_ack=N`, default 50): LinkReset and Disabled as the Adapter's L1 exit raises it, `lp_linkerror` as a bringup raises it and as the answer to a LinkReset request in Reset raises it. The stub reports a request not answered within `req_bound`, an ignored one answered, a LinkReset or Disabled request that leads to a LinkError it did not request, and a `pl_clk_req` that falls before `lp_clk_ack` answered it. `+state_req=`: `basic`; `gated` with the clock-gating stub, which wakes itself with `lp_wake_req` for its own requests in Reset, LinkReset, Disabled and L1, and `remote_rsp_max` 30; `exit_pl` (`down_exit_on` PL, the stub reports an exit it did not ask for or one before `linkerror_min_res`), `exit_either`, `via_active` (`linkdown_via_active_pct` 100). `+clk_hold=0\|1` sets `clk_req_hold_bringup`. Any error fails it |
+| `ucie_fdi_neg_test` | the model's checks against one deliberate violation (`+neg=dllp\|retimer\|stream\|corrupt_mid\|corrupt_h0\|corrupt_proto\|clk_ack\|irdy_reset\|wake\|wake_held\|xfer\|le_exit\|rx_inactive\|clk_exit\|le_after\|level\|inband_active\|held_forever\|no_restart\|wake_down\|wake_le\|unanswered`): the rule that must catch it (FDI-R62, R63, R64, R59, R60, R61, R18, R44, R16, R16, R43, R49, R35, R22, R21, R20, the driver's refusal, R33, R33, R16, R16, the stub's answer checks) has to fire, as often as the violation is made, and its errors are expected; `corrupt_mid` and `corrupt_h0` need an FDI of 128 B or less. `clk_ack` is an `lp_clk_ack` pulse without `pl_clk_req`, `irdy_reset` a flit presented through LinkReset and Disabled into Reset, `wake` an Active request in Reset with `lp_wake_req` never raised, `wake_held` the same with `lp_wake_req` held through LinkError and dropped on entry to Reset, over a bringup and three LinkErrors (four reports). Adapter faults the top forces: with `xfer` `pl_trdy` high for a clock while a flit waits in Retrain (256 B or more), with `le_exit` Reset for a clock while the stub holds `lp_linkerror` in LinkError (the LinkError re-entered from that Reset without `pl_clk_req` also draws FDI-R21, expected too), with `rx_inactive` `pl_rx_active_req` low in Active while flits go on, with `clk_exit` `pl_clk_req` low through LinkReset -> Reset, with `le_after` Reset for a clock after a LinkError from Reset reported before its `pl_clk_req` was acknowledged, with `level` `pl_phyinrecenter` high for 40 clocks in Reset with no `pl_clk_req`. `inband_active` asks for `LSM_EV_INBAND_DROP` in Active, which the driver refuses with an error (`pl_inband_pres` falls only in Reset). `held_forever` holds an Active request from a LinkReset into Reset for good, so the stub never asks to leave Reset; `no_restart` waits, with `restart_on` PL, for a NOP->Active the stub never gives; both with `req_timeout` 3000. `wake_down` requests LinkReset after a NOP in Reset (link left down) with no `lp_wake_req`, `wake_le` raises `lp_linkerror` there with none (r3.0 §10.2.3.1); `unanswered` sets `react_en` 0, so the stub's own checks must report its LinkReset request in Active and its `lp_linkerror` as unanswered (two reports, `req_bound` 300) |
 
 Knobs: `+beat_bytes=32|64|128|256|512|1024`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus
 the model's plusargs. A run passes with no `UVM_ERROR` and no `UVM_FATAL`. Verilator
@@ -586,11 +637,18 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
 - The negotiated protocol, speed and width are static for the test; one stream ID per
   FDI, so two protocol stacks multiplexed on one FDI are not modelled.
 - PM entry is the Adapter's (remote-initiated) only; a Protocol Layer request for L1
-  or L2 is not answered. The Protocol Layer may start a PM exit with `lp_wake_req`.
-- The Protocol Layer's Active request in LinkError, LinkReset or Disabled (their exit
-  request, r3.0 Table 10-4) is not answered: the Adapter leaves those states for Reset
-  on its own after the dwell. In the Reset that follows, a request held on from there
-  is no request to leave Reset (§10.3.3.1 rule 1); the model waits for NOP, then Active.
+  or L2 is not answered. The Protocol Layer may start a PM exit with `lp_wake_req` (one
+  that comes with `lp_linkerror` or a LinkReset or Disabled request is that request's
+  wake handshake instead). No L2 and no Active.PMNAK, so Table 10-4's L2 column never
+  applies.
+- The Active request that ends LinkError, LinkReset or Disabled is answered only with
+  `down_exit_on` PL or EITHER; by default the Adapter leaves those states for Reset on
+  its own after the dwell. In the Reset that follows, a request held on from there is no
+  request to leave Reset (§10.3.3.1 rule 1); the model waits for NOP, then Active. The
+  16 ms minimum LinkError residency is scaled down (`linkerror_min_res`).
+- One Protocol Layer per Adapter: the LinkReset and Disabled handshakes of several
+  Protocol Layers sharing an Adapter, and the RDI state they resolve to (§10.3.3.8), are
+  not modelled.
 - With two FDIs both report the same state, or the one not followed stays in Reset
   (`park_idle_phy`); they do not train independently.
 - The model does not check what is in a flit beyond the Adapter-owned bytes; that is

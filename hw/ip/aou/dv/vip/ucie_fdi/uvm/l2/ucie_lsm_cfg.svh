@@ -34,11 +34,41 @@ class ucie_lsm_cfg extends uvm_object;
   // Cycles to wait for a DUT request or acknowledge (a liveness bound: among
   // them the NOP->Active in Reset, FDI-R33); 0 waits forever.
   int unsigned  req_timeout = 20000;
-  // Answer the Protocol Layer between events: its lp_linkerror (with
-  // react_linkerror_en too), its PM exit, and with restart_on PL or EITHER the
-  // NOP->Active that restarts a link left in Reset.
+  // Answer the Protocol Layer's requests (UCIe r3.0 Table 10-4): lp_state_req
+  // LinkReset and Disabled wherever the table says "Yes", lp_linkerror in
+  // every state (with react_linkerror_en too), the Active request that ends
+  // LinkReset, Disabled or LinkError (with down_exit_on PL or EITHER), its PM
+  // exit, and with restart_on PL or EITHER the NOP->Active that restarts a
+  // link left in Reset. A request answered while an Adapter event runs
+  // abandons the event. 0: the Adapter only runs its own events.
   bit           react_en = 1'b1;
   bit           react_linkerror_en = 1'b1;
+  // What ends LinkReset, Disabled and LinkError (-> Reset). LSM_EXIT_INTERNAL:
+  // the Adapter's internal request after the dwell (software clearing the
+  // error, a reset pin; r3.0 §10.3.3.5 rule 1, §10.3.3.6, §10.3.3.7);
+  // LSM_EXIT_PL: only the Protocol Layer's lp_state_req Active (Table 10-4:
+  // Active is considered in those states), taken from the second clock of the
+  // state on, out of LinkError only with lp_linkerror 0 and after
+  // linkerror_min_res clocks there; a Protocol Layer that never asks keeps the
+  // link down (legal, so no bound). LSM_EXIT_EITHER: whichever comes first.
+  // +ucie_down_exit=internal|pl|either.
+  ucie_lsm_exit_e down_exit_on = LSM_EXIT_INTERNAL;
+  // Minimum residency in LinkError before a request-driven exit (r3.0
+  // §10.3.3.7: "a minimum residency time in LinkError of 16 ms"). A scaled
+  // stand-in for simulation: 16 ms would be millions of clocks.
+  int unsigned  linkerror_min_res = 200;
+  // The remote die's answer to a LinkReset or Disabled request the Adapter
+  // passes on over the sideband (r3.0 §10.3.3.8 Implementation Note): 0
+  // answers at once (after the Adapter's own latency), N an extra delay drawn
+  // in [0:N] clocks for the sideband response. No delay when the link is
+  // already down and not training (Reset without pl_inband_pres, LinkReset),
+  // which the same note lets the Adapter complete locally.
+  int unsigned  remote_rsp_max = 0;
+  // Chance a LinkReset or Disabled request answered in Retrain, or in Reset
+  // once pl_inband_pres is 1, first goes through Active (r3.0 §10.3.3.4 rule
+  // 2, §10.3.3.1 rules 2 and 3: "permitted to transition through Active
+  // State"); 0 goes straight to the requested state (§10.3.3.8).
+  int unsigned  linkdown_via_active_pct = 0;
   // What restarts the training after LinkError/LinkReset/Disabled -> Reset
   // (UCIe r3.0 §10.3.3.8: the Protocol Layer's NOP->Active on lp_state_req,
   // which the Adapter must pass on "even if pl_inband_pres = 0", or the
@@ -132,11 +162,13 @@ class ucie_lsm_cfg extends uvm_object;
   function string convert2string();
     return $sformatf({"n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
                       "clk_hold=%0b restart_on=%s sw_restart_delay=%0d ",
-                      "remote_active_first_pct=%0d ",
+                      "remote_active_first_pct=%0d down_exit_on=%s linkerror_min_res=%0d ",
+                      "remote_rsp_max=%0d linkdown_via_active_pct=%0d ",
                       "protocol=%04b speedmode=%03b max_speedmode=%0b lnk_cfg=%03b recenter=%0b"},
                      n_phy, active_phy, lat_min, lat_max, auto_bringup,
                      clk_req_hold_bringup, restart_on.name(), sw_restart_delay,
-                     remote_active_first_pct, protocol, speedmode, max_speedmode, lnk_cfg,
-                     recenter_en);
+                     remote_active_first_pct, down_exit_on.name(), linkerror_min_res,
+                     remote_rsp_max, linkdown_via_active_pct, protocol, speedmode,
+                     max_speedmode, lnk_cfg, recenter_en);
   endfunction
 endclass

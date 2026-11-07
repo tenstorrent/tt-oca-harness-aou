@@ -20,6 +20,21 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     EV_RETRAIN_ON_ERROR
   } ev_e;
 
+  // The Protocol Layer's requests the driver answers (UCIe r3.0 Table 10-4),
+  // as cg_request bins: LinkReset and Disabled on lp_state_req and LinkError on
+  // lp_linkerror, by the state they were answered in; a LinkError that cut an
+  // Adapter event short; a LinkReset or Disabled answered through Active; and
+  // the exit from LinkReset, Disabled and LinkError on the Active request.
+  typedef enum int {
+    RQ_LINKRESET_IN_ACTIVE, RQ_LINKRESET_IN_RETRAIN, RQ_LINKRESET_IN_L1, RQ_LINKRESET_IN_RESET,
+    RQ_DISABLED_IN_ACTIVE, RQ_DISABLED_IN_RETRAIN, RQ_DISABLED_IN_L1, RQ_DISABLED_IN_RESET,
+    RQ_DISABLED_IN_LINKRESET,
+    RQ_LINKERROR_IN_RESET, RQ_LINKERROR_IN_ACTIVE, RQ_LINKERROR_IN_RETRAIN, RQ_LINKERROR_IN_L1,
+    RQ_LINKERROR_IN_LINKRESET, RQ_LINKERROR_IN_DISABLED,
+    RQ_LINKERROR_CUTS_EVENT, RQ_VIA_ACTIVE,
+    RQ_EXIT_LINKRESET_ON_ACTIVE, RQ_EXIT_DISABLED_ON_ACTIVE, RQ_EXIT_LINKERROR_ON_ACTIVE
+  } rq_ans_e;
+
   bit [7:0]    tr;        // {previous, current} pl_state_sts
   logic [3:0]  hs_sts;    // pl_state_sts when a handshake completed
   int unsigned rx_code;   // 0/1 entry in Reset/Retrain, 2/3 exit in Active/LinkError
@@ -31,6 +46,7 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
   // Retrain, as the driver judges it: 0 none, 1 NOP seen, 2 requested.
   int unsigned rq_prog;
   bit          rq_level;  // Retrain entered from L1: Active is a level
+  rq_ans_e     rq_ans;    // cg_request: the Protocol Layer request the driver answered
 
   covergroup cg_state;
     cp_tr: coverpoint tr {
@@ -56,6 +72,7 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
       bins l1_linkerror = {8'h4A};
       bins l1_linkreset = {8'h49};
       bins l1_disabled = {8'h4C};
+      bins linkreset_disabled = {8'h9C};
     }
   endgroup
 
@@ -110,6 +127,31 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     }
   endgroup
 
+  covergroup cg_request;
+    cp_ans: coverpoint rq_ans {
+      bins linkreset_in_active = {RQ_LINKRESET_IN_ACTIVE};
+      bins linkreset_in_retrain = {RQ_LINKRESET_IN_RETRAIN};
+      bins linkreset_in_l1 = {RQ_LINKRESET_IN_L1};
+      bins linkreset_in_reset = {RQ_LINKRESET_IN_RESET};
+      bins disabled_in_active = {RQ_DISABLED_IN_ACTIVE};
+      bins disabled_in_retrain = {RQ_DISABLED_IN_RETRAIN};
+      bins disabled_in_l1 = {RQ_DISABLED_IN_L1};
+      bins disabled_in_reset = {RQ_DISABLED_IN_RESET};
+      bins disabled_in_linkreset = {RQ_DISABLED_IN_LINKRESET};
+      bins linkerror_in_reset = {RQ_LINKERROR_IN_RESET};
+      bins linkerror_in_active = {RQ_LINKERROR_IN_ACTIVE};
+      bins linkerror_in_retrain = {RQ_LINKERROR_IN_RETRAIN};
+      bins linkerror_in_l1 = {RQ_LINKERROR_IN_L1};
+      bins linkerror_in_linkreset = {RQ_LINKERROR_IN_LINKRESET};
+      bins linkerror_in_disabled = {RQ_LINKERROR_IN_DISABLED};
+      bins linkerror_cuts_event = {RQ_LINKERROR_CUTS_EVENT};
+      bins via_active = {RQ_VIA_ACTIVE};
+      bins exit_linkreset_on_active = {RQ_EXIT_LINKRESET_ON_ACTIVE};
+      bins exit_disabled_on_active = {RQ_EXIT_DISABLED_ON_ACTIVE};
+      bins exit_linkerror_on_active = {RQ_EXIT_LINKERROR_ON_ACTIVE};
+    }
+  endgroup
+
   // LSM_EV_INBAND_DROP has no bin: it is meant for a link left in Reset
   // (auto_bringup 0), where a test drives the bringup itself.
   covergroup cg_event;
@@ -159,6 +201,7 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     cg_event = new();
     cg_abort = new();
     cg_reset_req = new();
+    cg_request = new();
   endfunction
 
   virtual function void observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
@@ -260,6 +303,12 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     cg_event.sample();
   endfunction
 
+  // A Protocol Layer request the driver answered (rq_ans_e).
+  function void sample_request(rq_ans_e a);
+    rq_ans = a;
+    cg_request.sample();
+  endfunction
+
   // Each covergroup's coverage (type scores); not asked of Verilator, as in
   // ucie_fdi_fcov.
   function string convert2string();
@@ -267,10 +316,10 @@ class ucie_lsm_fcov extends uvm_object implements ucie_lsm_observer;
     return "not scored by this simulator";
 `else
     return $sformatf({"state %0.1f%% clk %0.1f%% wake %0.1f%% rx_active %0.1f%% event %0.1f%% ",
-                      "abort %0.1f%% reset_req %0.1f%%"}, cg_state.get_coverage(),
+                      "abort %0.1f%% reset_req %0.1f%% request %0.1f%%"}, cg_state.get_coverage(),
                      cg_clk.get_coverage(), cg_wake.get_coverage(), cg_rx_active.get_coverage(),
                      cg_event.get_coverage(), cg_abort.get_coverage(),
-                     cg_reset_req.get_coverage());
+                     cg_reset_req.get_coverage(), cg_request.get_coverage());
 `endif
   endfunction
 endclass
