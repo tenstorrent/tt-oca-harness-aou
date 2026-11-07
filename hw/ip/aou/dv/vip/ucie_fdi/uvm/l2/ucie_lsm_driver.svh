@@ -5,9 +5,11 @@
 // drives pl_state_sts on every PHY, pl_inband_pres, pl_clk_req,
 // pl_wake_ack and pl_rx_active_req, and runs Adapter-initiated events from
 // ucie_lsm_item. pl_wake_ack follows lp_wake_req in the background. Before
-// leaving Active it closes the L1 gates (flit boundary in both directions)
-// and lowers rx_active (FDI-R29); every entry to Active repeats the
-// rx_active handshake (FDI-R34). Reset aborts the current event.
+// leaving Active it closes the L1 gates (flit boundary in both directions,
+// and, except for LinkError, a stand-alone stall handshake under way
+// finished: pl_trdy is high only in Active, r3.0 Table 10-3) and lowers
+// rx_active (FDI-R29); every entry to Active repeats the rx_active handshake
+// (FDI-R34). Reset aborts the current event.
 //
 // With cfg.react_en the Adapter answers the Protocol Layer's requests as
 // r3.0 Table 10-4 lists them (req_loop), alongside its own events:
@@ -368,9 +370,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endfunction
 
   // The answer to lp_linkerror: LinkError at once (r3.0 Table 10-3: "to allow
-  // immediate action"), held while lp_linkerror is 1. Having abandoned a job
-  // (`cut`) it ends as an event that ends in LinkError does; otherwise the
-  // link stays in Reset (le_absorbed).
+  // immediate action"), at the next flit boundary and without waiting for a
+  // stall handshake under way (linkerror_down), held while lp_linkerror is 1.
+  // Having abandoned a job (`cut`) it ends as an event that ends in LinkError
+  // does; otherwise the link stays in Reset (le_absorbed).
   local task answer_linkerror(bit cut);
     `uvm_info(get_type_name(), $sformatf(
               "lp_linkerror in %s: Adapter enters LinkError (r3.0 Table 10-3, Table 10-4)",
@@ -817,18 +820,50 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     wait_dut("lp_rx_active_sts", {3'b0, v}, v ? "FDI-R26" : "FDI-R28");
   endtask
 
-  // Stop the mainband at a flit boundary in both directions.
-  local task close_gates();
+  // Stop the mainband at a flit boundary in both directions. With
+  // stall_wait, a stand-alone stall handshake under way is let finish, all
+  // four phases (gate.quiet()): it raises pl_trdy, which r3.0 Table 10-3
+  // allows only in Active, and pl_stallreq may not fall before lp_stallack
+  // (§10.3.2 rule 3). Flit mode itself uses no stall here (§10.3.2: only PM
+  // entry does), and none starts once the gate is closed. The wait is bounded
+  // by the Protocol Layer's acknowledge (FDI-R57). A job stopped meanwhile
+  // (run_job) leaves the handshake to the TX responder, and the answer's own
+  // close_gates waits for it again. Without stall_wait (LinkError, which
+  // §10.3.3.7 lets enter with the handshake incomplete) pl_trdy only
+  // finishes a started flit from now on (gate.stall_cut), and the handshake
+  // runs on in LinkError (leave_linkerror waits for its end).
+  local task close_gates(bit stall_wait = 1'b1);
     int unsigned n;
     link_active = 1'b0;
-    foreach (gate[i]) gate[i].open = 1'b0;
-    foreach (gate[i]) gate[i].rx_early = 1'b0;
+    foreach (gate[i]) begin
+      gate[i].open = 1'b0;
+      gate[i].rx_early = 1'b0;
+      if (!stall_wait) gate[i].stall_cut = 1'b1;
+    end
     wait_cycles(2);
     foreach (gate[i]) begin
-      while (!gate[i].quiet()) begin
+      while (!(stall_wait ? gate[i].quiet() : gate[i].at_boundary())) begin
         @(lsm_vif.drv_cb);
         if (++n == 100000) begin
-          `uvm_error(get_type_name(), $sformatf("phy%0d mainband never reached a flit boundary", i))
+          `uvm_error(get_type_name(), $sformatf("phy%0d mainband never reached a flit boundary%s",
+                     i, stall_wait ? " with no stall handshake under way" : ""))
+          return;
+        end
+      end
+    end
+  endtask
+
+  // A stall handshake carried into LinkError (close_gates without stall_wait)
+  // ends before the status leaves LinkError: pl_stallreq falls only after
+  // lp_stallack (r3.0 §10.3.2 rule 3), and both are low again before Reset.
+  local task wait_stall_done();
+    int unsigned n;
+    foreach (gate[i]) begin
+      while (gate[i].stall_busy) begin
+        @(lsm_vif.drv_cb);
+        if (++n == 100000) begin
+          `uvm_error(get_type_name(), $sformatf(
+                     "phy%0d stall handshake never ended in LinkError", i))
           return;
         end
       end
@@ -850,6 +885,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     wait_cycles(cfg.lat());
     set_state(LSM_ACTIVE);
     foreach (gate[i]) gate[i].abort = 1'b0;
+    foreach (gate[i]) gate[i].stall_cut = 1'b0;
     foreach (gate[i]) gate[i].open = !parked(i);
     foreach (gate[i]) gate[i].rx_early = 1'b0;
     link_active = 1'b1;
@@ -961,7 +997,11 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
 
   // LinkError mid-flit (r3.0 §10.3.3.7): wait (bounded) until a flit is in
   // flight in either direction, then leave Active at once. L1 abandons both
-  // flits, and the Protocol Layer must drop its partial ones.
+  // flits, and the Protocol Layer must drop its partial ones. LinkError needs
+  // no completed stall handshake (§10.3.3.7), so a stand-alone stall may be
+  // under way: pl_stallreq stays high until lp_stallack (§10.3.2 rule 3) with
+  // pl_trdy low (the abort), and the status leaves LinkError only once the
+  // handshake has ended (leave_linkerror).
   local task abort_mid_flit();
     int unsigned n;
     bit tx;
@@ -1006,9 +1046,12 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // LinkError, then its exit (linkerror_stay). From Reset, LinkReset,
   // Disabled or L1 the pl_clk_req handshake comes first and is held through
   // the stay (UCIe r3.0 §10.2.3.2 rule 6; it also covers pl_inband_pres,
-  // pl_phyinl1 and pl_phyinrecenter falling, rule 5).
+  // pl_phyinl1 and pl_phyinrecenter falling, rule 5). From Active it is
+  // entered at the next flit boundary without waiting for a stall handshake
+  // under way: §10.3.3.7 needs none completed, and Table 10-3 lp_linkerror
+  // asks for "immediate action ... the quickest path for error containment".
   local task linkerror_down(int unsigned dwell);
-    close_gates();
+    close_gates(1'b0);
     move_to(LSM_LINKERROR);
     set_inband(1'b0);
     rx_active(1'b0);
@@ -1083,6 +1126,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     end
     if (n != 0)
       `uvm_info(get_type_name(), $sformatf("lp_linkerror released (+%0d cycles)", n), UVM_MEDIUM)
+    wait_stall_done();
     set_state(LSM_RESET);
   endtask
 
