@@ -68,6 +68,14 @@ package ucie_lsm_pkg;
     LSM_RESTART_EITHER   // whichever comes first
   } ucie_lsm_restart_e;
 
+  // What takes the link out of LinkReset, Disabled or LinkError to Reset
+  // (UCIe r3.0 §10.3.3.5 rule 1, §10.3.3.6, §10.3.3.7; ucie_lsm_cfg::down_exit_on).
+  typedef enum bit [1:0] {
+    LSM_EXIT_INTERNAL,   // the Adapter's internal request, after the dwell
+    LSM_EXIT_PL,         // the Protocol Layer's Active request on lp_state_req
+    LSM_EXIT_EITHER      // whichever comes first
+  } ucie_lsm_exit_e;
+
   // UCIe state codes (UCIe r1.1 Table 8-2) on pl_state_sts and lp_state_req.
   // States without a code return 4'hF with ok=0.
   function automatic logic [3:0] sts_code(ucie_lsm_state_e s, output bit ok);

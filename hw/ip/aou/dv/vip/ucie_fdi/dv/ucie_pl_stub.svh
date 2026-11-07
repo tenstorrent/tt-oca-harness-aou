@@ -7,7 +7,10 @@
 //  - lp_clk_ack and lp_rx_active_sts follow their requests one clock later
 //    (UCIe r3.0 §10.2.3.2, §10.2.7); with `hs_lag` they fall that many clocks
 //    after their request does (rule 3 and rule 4 give no time); lp_clk_ack
-//    rises `clk_ack_delay` clocks after pl_clk_req (at least one).
+//    rises `clk_ack_delay` clocks after pl_clk_req (at least one). A
+//    pl_clk_req that falls before lp_clk_ack has answered it is an error: the
+//    handshake is a full one, and only the acknowledge shows the Protocol
+//    Layer saw what the request covers (§10.2.3.2 rules 3 and 5).
 //  - With `clk_gate` the stub gates its clock whenever r3.0 §10.2.3 lets it:
 //    in Reset, LinkReset, Disabled or L1 with pl_clk_req and lp_clk_ack low,
 //    nothing presented, no stall under way and nothing left to do (in Reset:
@@ -21,10 +24,39 @@
 //    pl_inband_pres is 1, and in Active and Retrain (§8.2.3.1); low in L1, so
 //    the Adapter's PM exit stays its own (the self-test's L1 events), unless
 //    `wake_in_l1` asks the stub to start the exit itself (r3.0 §10.2.9).
-//  - `linkerror_req` raises lp_linkerror in Active and holds it until the
-//    Adapter reports LinkError (r3.0 Table 10-3), then clears itself; with
-//    `linkerror_hold` it keeps it high that many clocks into LinkError, which
-//    the Adapter must sit out ("It must stay there as long as lp_linkerror=1").
+//  - `linkerror_req` raises lp_linkerror in `linkerror_in` (Active by
+//    default; LSM_UNKNOWN: any state but LinkError; out of Active from the
+//    state's second clock, in Reset with `linkerror_up` 0 or 1 only before
+//    or after pl_inband_pres) and holds it until the Adapter reports
+//    LinkError (r3.0 Table 10-3, Table 10-4: answered in every state), then
+//    clears itself; with `linkerror_hold` it keeps it high that many clocks
+//    into LinkError, which the Adapter must sit out ("It must stay there as
+//    long as lp_linkerror=1"). Raised in Reset, LinkReset, Disabled or L1 it
+//    comes with lp_wake_req (§10.2.3.1), kept until LinkError. No LinkError
+//    within `req_bound` clocks is an error.
+//  - `plan` lists LinkReset and Disabled requests to make on lp_state_req,
+//    in order, each in a given state (in Reset after a NOP of at least a
+//    clock, before or after pl_inband_pres as the entry says; Table 10-4 note
+//    a), with lp_wake_req (§10.2.3.1). One Table 10-4 answers ("Yes") must
+//    reach its state within `req_bound` clocks, through Active or not; the
+//    stub then stops requesting. LinkError ends it too, but only after the
+//    stub raised lp_linkerror meanwhile: r3.0 lets an Adapter enter LinkError
+//    from any state on an internal request (§10.3.3.5 rule 4, §10.3.3.6,
+//    §10.3.3.8, which also sends a LinkReset or Disabled the remote die never
+//    answers to LinkError), so a general Protocol Layer must accept it, but
+//    the self-test starts no Adapter LinkError while a request is on, and
+//    one here would mean the request was answered wrongly. One Table 10-4 ignores
+//    (`ignore`) is made for 20 clocks, and the status must not become the
+//    requested state then or in the 20 clocks after.
+//  - With `clk_gate`, a request of its own (lp_linkerror, a plan entry) due
+//    in a state where it is clock gated wakes the stub after `gated_wait`
+//    gated clocks, as lp_wake_req needs no clock (r3.0 §10.2.3.1);
+//    n_le_gated and n_req_gated count them.
+//  - With `exit_pl` (the Adapter's cfg.down_exit_on PL) the Adapter must
+//    leave LinkReset, Disabled and LinkError for Reset only after the stub
+//    asked with Active (`held_active`), and LinkError not before
+//    `le_min_res` clocks there (r3.0 §10.3.3.5 rule 1, §10.3.3.6,
+//    §10.3.3.7).
 //  - lp_state_req: in Reset NOP, then Active once pl_wake_ack is high
 //    (§8.2.8, §8.3.3.1); Active in Active; in Retrain NOP for a clock, then
 //    Active (§8.3.3.4); L1 in L1; NOP elsewhere. With `wake_late` it requests
@@ -36,7 +68,8 @@
 //    until pl_inband_pres has been 1 for `held_cycles` clocks; only then NOP
 //    for a clock and Active. Halfway through the hold it requests LinkReset
 //    for a clock and then Active again: with no NOP in this Reset neither is
-//    a request. An Adapter that starts the Active entry (pl_rx_active_req)
+//    a request, and an Adapter that then enters LinkReset (within 20 clocks)
+//    is an error. An Adapter that starts the Active entry (pl_rx_active_req)
 //    while it holds is an error: a held Active is no request. With
 //    `early_trigger` it gives NOP->Active in Reset before pl_inband_pres,
 //    once per Reset and with chance `early_pct`, and returns to NOP 1 to 3
@@ -89,7 +122,9 @@
 //    follows, before its request there: a handshake over before the request
 //    is not one used for it (r3.0 §10.2.3.1); "held_forever" holds an Active
 //    request from a link-down into Reset for good, so the Adapter never sees
-//    a request to leave Reset (no `held_cycles` check then).
+//    a request to leave Reset (no `held_cycles` check then); "wake_down" makes
+//    the plan's requests in a clock-gated state without lp_wake_req, and
+//    "wake_le" raises lp_linkerror there without it (r3.0 §10.2.3.1).
 class ucie_pl_stub extends uvm_component;
   `uvm_component_utils(ucie_pl_stub)
 
@@ -133,6 +168,26 @@ class ucie_pl_stub extends uvm_component;
   int unsigned n_rx_first;       // pl_rx_active_req rises in Reset before the stub's Active
   int unsigned n_rx_first_rt;    // ... in Retrain
   int unsigned n_presented_down; // clocks a flit was presented outside Active
+  // Requests of its own (see the header).
+  typedef struct {
+    ucie_lsm_state_e in;      // the state to make it in
+    ucie_lsm_req_e   req;     // LinkReset or Disabled
+    int              up;      // in Reset: -1 any, 0 before pl_inband_pres, 1 after
+    bit              ignore;  // Table 10-4 ignores it there
+  } plan_t;
+  plan_t           plan[$];
+  ucie_lsm_state_e linkerror_in = LSM_ACTIVE;
+  int              linkerror_up = -1;
+  int unsigned     req_bound = 5000;
+  int unsigned     gated_wait = 3;
+  bit              exit_pl;
+  int unsigned     le_min_res;
+  int unsigned     n_down;       // plan requests answered ("Yes")
+  int unsigned     n_ignored;    // plan requests ignored as Table 10-4 says
+  int unsigned     n_le_answered; // lp_linkerror raised and answered
+  int unsigned     n_le_gated;   // ... raised after waking itself from clock gating
+  int unsigned     n_req_gated;  // plan requests made after waking itself
+  int unsigned     n_exits;      // link-down states left on its Active request (exit_pl)
   local bit [MAX_BEATS_PER_FLIT-1:0] cc_mask;  // the transfers of cur with lp_corrupt_crc
   bit          bad_done;
 
@@ -150,6 +205,8 @@ class ucie_pl_stub extends uvm_component;
   local int unsigned   le_held;    // clocks lp_linkerror was held in LinkError
   local int unsigned   clk_high;   // clocks pl_clk_req has been high
   local bit            creq_q;     // pl_clk_req in the previous clock
+  local bit            creq_h;     // ... as handshakes() last saw it
+  local bit            clk_acked;  // lp_clk_ack has answered the pl_clk_req that is up
   local bit            frozen;     // clock gated (clk_gate)
   local ucie_lsm_state_e gst;      // pl_state_sts last seen while gated
   local bit            le_unseen;  // LinkError entered while gated with no pl_clk_req before
@@ -165,6 +222,15 @@ class ucie_pl_stub extends uvm_component;
   local int unsigned   early_quiet; // ... clocks of NOP since, pl_inband_pres 0
   local bit            early_armed; // ... long enough that it is no request any more
   local bit            rreq_q;      // pl_rx_active_req in the previous clock
+  local bit            req_on;      // making plan[0]
+  local bit            req_le;      // ... and lp_linkerror was raised meanwhile
+  local int unsigned   req_wait;    // ... clocks since it started
+  local int unsigned   ign_watch;   // clocks left to watch after an ignored request
+  local ucie_lsm_state_e ign_st;    // ... the state it must not lead to
+  local int unsigned   le_wait;     // clocks lp_linkerror has waited for LinkError; 0: none
+  local bit            own_woke;    // woke itself for a request of its own
+  local int unsigned   frozen_n;    // clocks gated with a request of its own due
+  local bit            exit_asked;  // requested Active in this link-down state
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -205,6 +271,7 @@ class ucie_pl_stub extends uvm_component;
       handshakes();
       state_req(mb.mon_cb.pl_state_sts);
       linkerror(mb.mon_cb.pl_state_sts);
+      requests();
       tx(mb.mon_cb.pl_state_sts);
     end
   endtask
@@ -239,6 +306,8 @@ class ucie_pl_stub extends uvm_component;
     le_held = 0;
     clk_high = 0;
     creq_q = 1'b0;
+    creq_h = 1'b0;
+    clk_acked = 1'b0;
     frozen = 1'b0;
     le_unseen = 1'b0;
     inband_seen = 1'b0;
@@ -253,6 +322,13 @@ class ucie_pl_stub extends uvm_component;
     early_quiet = 0;
     early_armed = 1'b0;
     rreq_q = 1'b0;
+    req_on = 1'b0;
+    req_wait = 0;
+    ign_watch = 0;
+    le_wait = 0;
+    own_woke = 1'b0;
+    frozen_n = 0;
+    exit_asked = 1'b0;
   endfunction
 
   // clk_gate: whether the stub is clock gated this clock, and the status
@@ -265,6 +341,11 @@ class ucie_pl_stub extends uvm_component;
     if (!frozen) begin
       bit asked = lsm.mon_cb.lp_state_req === req_code(LSM_REQ_ACTIVE);
       bit idle = st == LSM_RESET ? !inband_seen || asked : st == LSM_L1 ? !wake_in_l1 : 1'b1;
+      // Awake for a request of its own: stays awake until it is made.
+      if (own_woke) begin
+        creq_q = creq;
+        return 1'b0;
+      end
       if (!(lsm_gated(st) && s == st && !creq && !ack && idle && st_cycles >= 2 && !presenting &&
             mb.mon_cb.lp_valid !== 1'b1 && !stallack && mb.mon_cb.pl_stallreq !== 1'b1)) begin
         creq_q = creq;
@@ -273,6 +354,7 @@ class ucie_pl_stub extends uvm_component;
       frozen = 1'b1;
       gst = st;
       le_unseen = 1'b0;
+      frozen_n = 0;
     end
     if (s != gst && !creq_q) begin
       if (s == LSM_LINKERROR && !le_unseen) le_unseen = 1'b1;
@@ -292,11 +374,41 @@ class ucie_pl_stub extends uvm_component;
       frozen = 1'b0;
       return 1'b1;
     end
+    // A request of its own due here wakes it the same way (lp_wake_req).
+    if (s == gst && own_due(s) && ++frozen_n >= gated_wait) begin
+      frozen = 1'b0;
+      own_woke = 1'b1;
+      return 1'b1;
+    end
     n_gated++;
     return 1'b1;
   endfunction
 
   local function void track_state(ucie_lsm_state_e s);
+    if (s != st && exit_pl && s == LSM_RESET &&
+        st inside {LSM_LINKRESET, LSM_DISABLED, LSM_LINKERROR}) begin
+      if (!exit_asked)
+        `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: the Adapter left %s for ",
+                   "Reset without its Active request (down_exit_on PL; UCIe r3.0 Table 10-4, ",
+                   "§10.3.3.5 rule 1, §10.3.3.6, §10.3.3.7)"}, st.name()))
+      // st_cycles counts from 0 on the first clock that showed LinkError.
+      else if (st == LSM_LINKERROR && st_cycles + 1 < le_min_res)
+        `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: the Adapter left LinkError ",
+                   "after %0d clocks, before the minimum residency of %0d (UCIe r3.0 ",
+                   "§10.3.3.7)"}, st_cycles + 1, le_min_res))
+      else
+        n_exits++;
+    end
+    if (s != st) begin
+      exit_asked = 1'b0;
+      own_woke = 1'b0;
+    end
+    if (ign_watch != 0) begin
+      if (s != st && s == ign_st)
+        `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: the status became %s on a ",
+                   "request UCIe r3.0 Table 10-4 ignores (or that was no request)"}, s.name()))
+      ign_watch--;
+    end
     if (s != st) begin
       st_from = st;
       st = s;
@@ -325,6 +437,12 @@ class ucie_pl_stub extends uvm_component;
     clk_low = creq ? 0 : clk_low + 1;
     clk_high = creq ? clk_high + 1 : 0;
     rx_low = rreq ? 0 : rx_low + 1;
+    if (creq && lsm.mon_cb.lp_clk_ack === 1'b1) clk_acked = 1'b1;
+    if (!creq && creq_h && !clk_acked)
+      `uvm_error(get_type_name(), {"Protocol Layer stub: pl_clk_req fell before lp_clk_ack ",
+                 "answered it (UCIe r3.0 §10.2.3.2 rules 3 and 5)"})
+    if (!creq) clk_acked = 1'b0;
+    creq_h = creq;
     if (rreq && !rreq_q && st inside {LSM_RESET, LSM_RETRAIN} &&
         lsm.mon_cb.lp_state_req !== req_code(LSM_REQ_ACTIVE)) begin
       if (st == LSM_RETRAIN) n_rx_first_rt++;
@@ -401,9 +519,10 @@ class ucie_pl_stub extends uvm_component;
         nop_seen = 1'b0;
         // The exit request of LinkError, LinkReset and Disabled (Table 10-4),
         // with its wake handshake (r3.0 §10.2.3.1).
-        if ((held_active || bad == "held_forever") && st_cycles >= 2 &&
+        if ((held_active || bad == "held_forever") && st_cycles >= 2 && !plan_due(st) &&
             sts_decode(sts) inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}) begin
           holding = 1'b1;
+          exit_asked = 1'b1;
           held_up = 0;
           held_err = 1'b0;
           lsm.lp_wake_req <= 1'b1;
@@ -427,6 +546,13 @@ class ucie_pl_stub extends uvm_component;
                    "clock, then Active)"})
       end
       if (up) held_up++;
+      // A planned request due in this Reset ends the hold: NOP for a clock,
+      // then the request (requests()).
+      if (bad != "held_forever" && plan_due(LSM_RESET)) begin
+        holding = 1'b0;
+        nop_seen = 1'b0;
+        return 1'b0;
+      end
       if (bad == "held_forever" || held_up < held_cycles) begin
         lsm.lp_wake_req <= 1'b1;
         lsm.lp_state_req <= act;
@@ -435,6 +561,8 @@ class ucie_pl_stub extends uvm_component;
         if (bad != "held_forever" && up && held_up == held_cycles / 2) begin
           lsm.lp_state_req <= req_code(LSM_REQ_LINKRESET);
           n_other++;
+          ign_st = LSM_LINKRESET;
+          ign_watch = 20;
         end
         nop_seen = 1'b0;
         return 1'b1;
@@ -481,17 +609,112 @@ class ucie_pl_stub extends uvm_component;
     return 1'b0;
   endfunction
 
+  // lp_linkerror (see the header): raised on linkerror_req where it is due,
+  // held until LinkError and then for linkerror_hold clocks.
   local function void linkerror(logic [3:0] sts);
-    bit in_le = sts_decode(sts) == LSM_LINKERROR;
+    bit in_le = st == LSM_LINKERROR;
     bit cur_le = lsm.mon_cb.lp_linkerror === 1'b1;
-    if (in_le) linkerror_req = 1'b0;
-    if (!in_le) begin
-      le_held = 0;
-    end else if (cur_le && le_held < linkerror_hold) begin
-      le_held++;
-      return;  // lp_linkerror stays 1
+    bit raise;
+    if (in_le) begin
+      if (le_wait != 0) n_le_answered++;
+      le_wait = 0;
+      linkerror_req = 1'b0;
+      if (cur_le && le_held < linkerror_hold) begin
+        le_held++;
+        return;  // lp_linkerror stays 1
+      end
+      lsm.lp_linkerror <= 1'b0;
+      return;
     end
-    lsm.lp_linkerror <= linkerror_req && sts_decode(sts) == LSM_ACTIVE || cur_le && !in_le;
+    le_held = 0;
+    raise = !cur_le && le_due(st);
+    if (raise) begin
+      le_wait = 1;
+      if (own_woke) n_le_gated++;
+      own_woke = 1'b0;
+    end else if (le_wait != 0 && ++le_wait > req_bound) begin
+      `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: no answer to lp_linkerror, ",
+                 "still %s %0d clocks after it rose (UCIe r3.0 Table 10-3, Table 10-4)"},
+                 st.name(), req_bound))
+      le_wait = 0;
+      linkerror_req = 1'b0;
+      lsm.lp_linkerror <= 1'b0;
+      return;
+    end
+    lsm.lp_linkerror <= raise || cur_le;
+    // The wake handshake for a request leaving a clock-gated state (r3.0
+    // §10.2.3.1), kept until LinkError (rule 3).
+    if ((raise || cur_le) && lsm_gated(st) && bad != "wake_le") lsm.lp_wake_req <= 1'b1;
+  endfunction
+
+  // linkerror_req is due in state `s` (see the header).
+  local function bit le_due(ucie_lsm_state_e s);
+    if (!linkerror_req || s == LSM_LINKERROR) return 1'b0;
+    if (linkerror_in == LSM_ACTIVE) return s == LSM_ACTIVE;
+    if (linkerror_in != LSM_UNKNOWN && s != linkerror_in) return 1'b0;
+    if (s == LSM_RESET && linkerror_up >= 0 && inband_seen != (linkerror_up != 0)) return 1'b0;
+    return st_cycles >= 2;
+  endfunction
+
+  // plan[0] is due in state `s` (before the Reset NOP check).
+  local function bit plan_due(ucie_lsm_state_e s);
+    if (plan.size() == 0 || req_on) return req_on && plan.size() != 0 && plan[0].in == s;
+    if (plan[0].in != s || st_cycles < 2) return 1'b0;
+    if (s == LSM_RESET && plan[0].up >= 0 && inband_seen != (plan[0].up != 0)) return 1'b0;
+    return 1'b1;
+  endfunction
+
+  // A request of its own is due in `s` (gate_check wakes for it).
+  local function bit own_due(ucie_lsm_state_e s);
+    return le_due(s) || plan_due(s);
+  endfunction
+
+  // The plan's LinkReset and Disabled requests (see the header); last word on
+  // lp_state_req and lp_wake_req this clock.
+  local function void requests();
+    ucie_lsm_state_e to;
+    if (!req_on) begin
+      if (!plan_due(st) || holding && st == LSM_RESET) return;
+      // In Reset only after a NOP of at least one clock (Table 10-4 note a).
+      if (st == LSM_RESET && lsm.mon_cb.lp_state_req !== req_code(LSM_REQ_NOP)) return;
+      req_on = 1'b1;
+      req_le = 1'b0;
+      req_wait = 0;
+      if (own_woke) n_req_gated++;
+      own_woke = 1'b0;
+      if (plan[0].ignore) begin
+        ign_st = plan[0].req == LSM_REQ_LINKRESET ? LSM_LINKRESET : LSM_DISABLED;
+        ign_watch = 40;
+      end
+      `uvm_info(get_type_name(), $sformatf("Protocol Layer stub: requests %s in %s%s",
+                plan[0].req.name(), st.name(), plan[0].ignore ? " (ignored there)" : ""),
+                UVM_MEDIUM)
+    end
+    to = plan[0].req == LSM_REQ_LINKRESET ? LSM_LINKRESET : LSM_DISABLED;
+    req_wait++;
+    if (lsm.mon_cb.lp_linkerror === 1'b1) req_le = 1'b1;
+    if (!plan[0].ignore && st == LSM_LINKERROR && !req_le)
+      `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: lp_state_req %s made in %s ",
+                 "led to LinkError, which the stub did not request (UCIe r3.0 Table 10-4)"},
+                 plan[0].req.name(), plan[0].in.name()))
+    if (plan[0].ignore ? req_wait > 20 || st != plan[0].in : st == to || st == LSM_LINKERROR) begin
+      if (plan[0].ignore) n_ignored++;
+      else n_down++;
+      void'(plan.pop_front());
+      req_on = 1'b0;
+      return;
+    end
+    if (!plan[0].ignore && req_wait > req_bound) begin
+      `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: no answer to lp_state_req %s ",
+                 "made in %s, still %s %0d clocks later (UCIe r3.0 Table 10-4)"},
+                 plan[0].req.name(), plan[0].in.name(), st.name(), req_bound))
+      void'(plan.pop_front());
+      req_on = 1'b0;
+      return;
+    end
+    lsm.lp_state_req <= req_code(plan[0].req);
+    if (bad != "wake_down" || !lsm_gated(st)) lsm.lp_wake_req <= 1'b1;
+    else lsm.lp_wake_req <= 1'b0;
   endfunction
 
   local function void tx(logic [3:0] sts);

@@ -224,7 +224,7 @@ class ucie_fdi_cov_test extends ucie_fdi_events_test;
     if (env.lsm.drv.n_le_react == n_react)
       `uvm_error(get_type_name(), "the Adapter did not answer lp_linkerror")
     // The test's own answer to the request: the Adapter, already down, only
-    // brings the link up again (ucie_lsm_driver react_loop).
+    // brings the link up again (ucie_lsm_driver answer_linkerror).
     cev(LSM_EV_LINKERROR);
     wait_active();
     // Bringups and L1 exits abandoned part-way.
@@ -472,6 +472,362 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
   endfunction
 endclass
 
+// The Protocol Layer's requests the Adapter answers (UCIe r3.0 Table 10-4,
+// §10.3.3), before the cov test's events and with its traffic:
+//  - LinkReset and Disabled requested in Active, in Retrain (an Adapter
+//    Retrain, abandoned), in L1, and in Reset after a NOP, both with the link
+//    left down (before pl_inband_pres) and during a bringup (after it, which
+//    abandons the bringup); Disabled requested in LinkReset;
+//  - requests Table 10-4 ignores: LinkReset in Disabled, LinkReset and
+//    Disabled in LinkError (held there by lp_linkerror);
+//  - lp_linkerror raised in Reset (link left down, and during a bringup), in
+//    Active (between events, and during an idle event, abandoned), in
+//    Retrain (held 2000 clocks into LinkError), in L1, in LinkReset and in
+//    Disabled (Adapter events, abandoned), and as an L1 entry starts (taken
+//    once the entry's stall is done);
+//  - requests that stop a job while its pl_clk_req waits for a slow
+//    lp_clk_ack (+slow_ack=N clocks, default 50, for these cases only):
+//    LinkReset and Disabled in L1 as the Adapter's own L1 exit raises it,
+//    lp_linkerror in Reset as a bringup raises it, and lp_linkerror in Reset
+//    as the answer to a LinkReset request raises it (one answer stopping
+//    another). The status may leave the gated state before the acknowledge
+//    (r3.0 §10.2.3.2 rules 6 and 7 only need pl_clk_req up first), but
+//    pl_clk_req must stay up until it (rules 3 and 5; the stub and FDI-R20
+//    check that). With slow_ack longer than the slowest answer (lat_max +
+//    remote_rsp_max + 10) every one of the four must leave the gated state
+//    before the acknowledge, so the stop really comes mid-handshake.
+// The stub reports a request not answered within its bound, an ignored one
+// answered, and with +state_req=exit_pl an exit from LinkReset, Disabled or
+// LinkError it did not ask for (ucie_pl_stub). +state_req= picks the
+// Adapter's options:
+//  basic       requests answered at once, exits on the Adapter's internal request;
+//  gated       the stub gates its clock whenever it may (as in the clk_req test)
+//              and wakes itself with lp_wake_req for its own requests in Reset,
+//              LinkReset, Disabled and L1; the remote die answers up to 30 clocks
+//              late (remote_rsp_max);
+//  exit_pl     LinkReset, Disabled and LinkError left only on the stub's Active
+//              request (down_exit_on PL), LinkError after 200 clocks at least;
+//  exit_either either exit, whichever comes first;
+//  via_active  a LinkReset or Disabled answered in Retrain or in Reset after
+//              pl_inband_pres goes through Active first.
+// +clk_hold=0|1 sets clk_req_hold_bringup (default 1). Any error fails it.
+class ucie_fdi_state_req_test extends ucie_fdi_cov_test;
+  `uvm_component_utils(ucie_fdi_state_req_test)
+
+  string       mode = "basic";
+  int unsigned n_plan;  // "Yes" requests the test planned
+  int unsigned slow_ack = 50;  // lp_clk_ack delay for the mid-handshake cases
+  int unsigned n_mid;   // ... gated states left before lp_clk_ack answered
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    bit hold = 1'b1;
+    super.configure();
+    void'($value$plusargs("state_req=%s", mode));
+    void'($value$plusargs("clk_hold=%b", hold));
+    void'($value$plusargs("slow_ack=%d", slow_ack));
+    env.lsm_cfg.clk_req_hold_bringup = hold;
+    case (mode)
+      "basic", "gated": ;
+      "exit_pl":     env.lsm_cfg.down_exit_on = LSM_EXIT_PL;
+      "exit_either": env.lsm_cfg.down_exit_on = LSM_EXIT_EITHER;
+      "via_active":  env.lsm_cfg.linkdown_via_active_pct = 100;
+      default: `uvm_fatal(get_type_name(), {"+state_req: unknown mode ", mode})
+    endcase
+    if (mode == "gated") env.lsm_cfg.remote_rsp_max = 30;
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.clk_gate = mode == "gated";
+    if (mode == "gated") env.pl.clk_ack_delay = 3;
+    env.pl.held_active = mode inside {"exit_pl", "exit_either"};
+    env.pl.exit_pl = mode == "exit_pl";
+    env.pl.le_min_res = env.lsm_cfg.linkerror_min_res;
+    `uvm_info(get_type_name(), $sformatf("state_req %s: %s", mode, env.lsm_cfg.convert2string()),
+              UVM_NONE)
+  endfunction
+
+  // Wait (bounded) until nothing is under way, then bring a link left down
+  // back up: an Adapter LinkError event, which after a LinkError on
+  // lp_linkerror only runs the bringup.
+  local task settle();
+    int unsigned n;
+    while (!env.lsm.drv.idle() && n++ < 50000) @(env.pl.lsm.mon_cb);
+    repeat (5) @(env.pl.lsm.mon_cb);
+    if (env.lsm.drv.state != LSM_ACTIVE && env.lsm.drv.idle()) cev(LSM_EV_LINKERROR);
+    wait_active();
+  endtask
+
+  local task ask(ucie_lsm_state_e in, ucie_lsm_req_e r, int up = -1, bit ignore = 1'b0);
+    ucie_pl_stub::plan_t p;
+    p.in = in;
+    p.req = r;
+    p.up = up;
+    p.ignore = ignore;
+    env.pl.plan.push_back(p);
+    if (!ignore) n_plan++;
+  endtask
+
+  // Wait (bounded) until the stub has made every planned request.
+  local task plan_done();
+    int unsigned n;
+    while (env.pl.plan.size() != 0 && n++ < 100000) @(env.pl.lsm.mon_cb);
+    if (env.pl.plan.size() != 0)
+      `uvm_error(get_type_name(), $sformatf("%0d planned requests never made", env.pl.plan.size()))
+  endtask
+
+  // lp_linkerror in `in`; waits (bounded) for the answer.
+  local task le_req(ucie_lsm_state_e in, int up = -1);
+    int unsigned n;
+    int unsigned n0 = env.pl.n_le_answered;
+    env.pl.linkerror_in = in;
+    env.pl.linkerror_up = up;
+    env.pl.linkerror_req = 1'b1;
+    while (env.pl.n_le_answered == n0 && n++ < 100000) @(env.pl.lsm.mon_cb);
+    if (env.pl.n_le_answered == n0)
+      `uvm_error(get_type_name(), {"lp_linkerror in ", in.name(), " was never raised"})
+    env.pl.linkerror_req = 1'b0;
+    env.pl.linkerror_in = LSM_ACTIVE;
+    env.pl.linkerror_up = -1;
+  endtask
+
+  // A link-down that leaves the link in Reset (no bringup after it).
+  local task down(ucie_lsm_ev_e kind);
+    env.lsm_cfg.rebringup_after_down = 1'b0;
+    cev(kind);
+    env.lsm_cfg.rebringup_after_down = 1'b1;
+  endtask
+
+  // An Adapter event of `cycles` running while `body` does its part.
+  local task long_event(ucie_lsm_ev_e kind, int unsigned cycles);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::of(kind);
+    s.ev_cycles = cycles;
+    s.start(env.lsm.sqr);
+  endtask
+
+  // Count, while `mid_on`, status changes out of a gated state made while
+  // pl_clk_req is up and lp_clk_ack has not yet answered it.
+  local bit mid_on;
+  local task count_mid();
+    bit acked;
+    ucie_lsm_state_e s = env.lsm.drv.state;
+    while (mid_on) begin
+      @(env.pl.lsm.mon_cb);
+      if (env.pl.lsm.mon_cb.pl_clk_req !== 1'b1) acked = 1'b0;
+      else if (env.pl.lsm.mon_cb.lp_clk_ack === 1'b1) acked = 1'b1;
+      if (env.lsm.drv.state != s && lsm_gated(s) && env.pl.lsm.mon_cb.pl_clk_req === 1'b1 &&
+          !acked) begin
+        n_mid++;
+        `uvm_info(get_type_name(), $sformatf("%s -> %s before lp_clk_ack answered pl_clk_req",
+                  s.name(), env.lsm.drv.state.name()), UVM_LOW)
+      end
+      s = env.lsm.drv.state;
+    end
+  endtask
+
+  // Wait (bounded) for pl_clk_req to rise.
+  local task wait_clk_req();
+    int unsigned n;
+    while (env.pl.lsm.mon_cb.pl_clk_req !== 1'b1 && n++ < 50000) @(env.pl.lsm.mon_cb);
+  endtask
+
+  // Requests that stop a job mid-handshake (see the header).
+  local task mid_raise();
+    int unsigned ack0 = env.pl.clk_ack_delay;
+    int unsigned n;
+    env.pl.clk_ack_delay = slow_ack;
+    mid_on = 1'b1;
+    fork
+      count_mid();
+    join_none
+    // LinkReset and Disabled in L1 as the Adapter's L1 exit raises pl_clk_req.
+    for (int i = 0; i < 2; i++) begin
+      cev(LSM_EV_L1_ENTRY);
+      fork
+        cev(LSM_EV_L1_EXIT);
+        begin
+          wait_clk_req();
+          ask(LSM_L1, i == 0 ? LSM_REQ_LINKRESET : LSM_REQ_DISABLED);
+        end
+      join
+      // With a quick acknowledge the exit may leave L1 before the stub
+      // could ask; a request made in L1 is answered before the link is up.
+      n = 0;
+      while (!env.lsm.drv.idle() && n++ < 50000) @(env.pl.lsm.mon_cb);
+      if (env.lsm.drv.state == LSM_ACTIVE && env.pl.plan.size() != 0) begin
+        `uvm_info(get_type_name(), "the L1 exit was done before the stub could ask", UVM_LOW)
+        void'(env.pl.plan.pop_front());
+        n_plan--;
+      end
+      plan_done();
+      settle();
+    end
+    // lp_linkerror in Reset as a bringup raises pl_clk_req.
+    down(LSM_EV_LINK_RESET);
+    fork
+      cev(LSM_EV_BRINGUP);
+      begin
+        wait_clk_req();
+        le_req(LSM_RESET);
+      end
+    join
+    settle();
+    // lp_linkerror in Reset as the answer to a LinkReset request raises it.
+    down(LSM_EV_LINK_RESET);
+    ask(LSM_RESET, LSM_REQ_LINKRESET, 0);
+    wait_clk_req();
+    le_req(LSM_RESET);
+    plan_done();
+    settle();
+    mid_on = 1'b0;
+    env.pl.clk_ack_delay = ack0;
+  endtask
+
+  task events();
+    // Dwells long enough for the stub's requests in LinkReset, Disabled and
+    // LinkError, even after waking from clock gating; the cov test's events
+    // after these run with the usual ones.
+    env.lsm_cfg.dwell_min = 60;
+    env.lsm_cfg.dwell_max = 100;
+    // LinkReset and Disabled from Active.
+    ask(LSM_ACTIVE, LSM_REQ_LINKRESET);
+    plan_done();
+    settle();
+    ask(LSM_ACTIVE, LSM_REQ_DISABLED);
+    plan_done();
+    settle();
+    // From Retrain: an Adapter Retrain, long enough for the request.
+    for (int i = 0; i < 2; i++) begin
+      ask(LSM_RETRAIN, i == 0 ? LSM_REQ_LINKRESET : LSM_REQ_DISABLED);
+      fork
+        long_event(LSM_EV_RETRAIN, 400);
+        plan_done();
+      join
+      settle();
+    end
+    // From L1.
+    for (int i = 0; i < 2; i++) begin
+      cev(LSM_EV_L1_ENTRY);
+      ask(LSM_L1, i == 0 ? LSM_REQ_LINKRESET : LSM_REQ_DISABLED);
+      plan_done();
+      settle();
+    end
+    // From Reset after a NOP: the link left down, then during a bringup.
+    for (int i = 0; i < 2; i++) begin
+      down(LSM_EV_LINK_RESET);
+      ask(LSM_RESET, i == 0 ? LSM_REQ_LINKRESET : LSM_REQ_DISABLED, 0);
+      plan_done();
+      settle();
+      ask(LSM_RESET, i == 0 ? LSM_REQ_LINKRESET : LSM_REQ_DISABLED, 1);
+      cev(LSM_EV_LINK_RESET);
+      plan_done();
+      settle();
+    end
+    // Disabled from LinkReset.
+    ask(LSM_ACTIVE, LSM_REQ_LINKRESET);
+    ask(LSM_LINKRESET, LSM_REQ_DISABLED);
+    plan_done();
+    settle();
+    // Ignored: LinkReset in Disabled; LinkReset and Disabled in LinkError.
+    ask(LSM_ACTIVE, LSM_REQ_DISABLED);
+    ask(LSM_DISABLED, LSM_REQ_LINKRESET, -1, 1'b1);
+    plan_done();
+    settle();
+    env.pl.linkerror_hold = 100;
+    ask(LSM_LINKERROR, LSM_REQ_LINKRESET, -1, 1'b1);
+    ask(LSM_LINKERROR, LSM_REQ_DISABLED, -1, 1'b1);
+    le_req(LSM_ACTIVE);
+    plan_done();
+    env.pl.linkerror_hold = 0;
+    settle();
+    // lp_linkerror in every state.
+    down(LSM_EV_LINK_RESET);
+    le_req(LSM_RESET, 0);
+    settle();
+    fork
+      cev(LSM_EV_LINK_RESET);
+      le_req(LSM_RESET, 1);
+    join
+    settle();
+    fork
+      long_event(LSM_EV_IDLE, 400);
+      le_req(LSM_ACTIVE);
+    join
+    settle();
+    env.pl.linkerror_hold = 2000;
+    fork
+      long_event(LSM_EV_RETRAIN, 400);
+      le_req(LSM_RETRAIN);
+    join
+    env.pl.linkerror_hold = 0;
+    settle();
+    cev(LSM_EV_L1_ENTRY);
+    le_req(LSM_L1);
+    settle();
+    fork
+      long_event(LSM_EV_LINK_RESET, 400);
+      le_req(LSM_LINKRESET);
+    join
+    settle();
+    fork
+      long_event(LSM_EV_DISABLED, 400);
+      le_req(LSM_DISABLED);
+    join
+    settle();
+    // During an L1 entry: raised as the entry starts, while the status is
+    // still Active.
+    fork
+      cev(LSM_EV_L1_ENTRY);
+      begin
+        while (env.lsm.drv.idle()) @(env.pl.lsm.mon_cb);
+        le_req(LSM_UNKNOWN);
+      end
+    join
+    settle();
+    mid_raise();
+    env.lsm_cfg.dwell_min = 8;
+    env.lsm_cfg.dwell_max = 40;
+    super.events();
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (env.pl.n_down < n_plan)
+      `uvm_error(get_type_name(), $sformatf("%0d of %0d LinkReset and Disabled requests answered",
+                                            env.pl.n_down, n_plan))
+    if (env.pl.n_ignored < 3)
+      `uvm_error(get_type_name(), $sformatf("%0d of 3 ignored requests made", env.pl.n_ignored))
+    if (mode == "gated" && (env.pl.n_le_gated == 0 || env.pl.n_req_gated == 0))
+      `uvm_error(get_type_name(), $sformatf({"requests made after waking from clock gating: ",
+                 "%0d lp_linkerror, %0d lp_state_req"}, env.pl.n_le_gated, env.pl.n_req_gated))
+    if (mode == "exit_pl" && env.pl.n_exits == 0)
+      `uvm_error(get_type_name(), "no link-down state left on the stub's Active request")
+    if (mode inside {"exit_pl", "exit_either"} && env.lsm.drv.n_exit_req == 0)
+      `uvm_error(get_type_name(), "the Adapter never left a link-down state on the Active request")
+    if (mode == "via_active" && env.lsm.drv.n_via_active == 0)
+      `uvm_error(get_type_name(), "no request was answered through Active")
+    if (slow_ack > env.lsm_cfg.lat_max + env.lsm_cfg.remote_rsp_max + 10 && n_mid < 4)
+      `uvm_error(get_type_name(), $sformatf({"%0d of 4 mid-handshake requests left the gated ",
+                 "state before lp_clk_ack answered"}, n_mid))
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf({"requests answered: LinkReset/Disabled %0d (driver %0d, ",
+              "%0d through Active), ignored %0d, lp_linkerror %0d (driver %0d; %0d and %0d ",
+              "requests after waking from clock gating), exits on Active %0d (stub-checked %0d), ",
+              "%0d gated states left mid-handshake (lp_clk_ack after %0d clocks)"},
+              env.pl.n_down, env.lsm.drv.n_down_req, env.lsm.drv.n_via_active, env.pl.n_ignored,
+              env.pl.n_le_answered, env.lsm.drv.n_le_react, env.pl.n_le_gated,
+              env.pl.n_req_gated, env.lsm.drv.n_exit_req, env.pl.n_exits, n_mid, slow_ack),
+              UVM_NONE)
+  endfunction
+endclass
+
 // Wait (bounded) until the stub has a flit to send back.
 task automatic wait_flit_queued(ucie_fdi_selftest_env env);
   int unsigned n;
@@ -602,7 +958,12 @@ endclass
 // §10.3.3.1 rule 1), and with +neg=no_restart the training waits for the
 // Protocol Layer's NOP->Active after the LinkReset (restart_on PL), which
 // the stub never gives: the driver's liveness bound, req_timeout (3000
-// here), reports each as FDI-R33. The
+// here), reports each as FDI-R33. With +neg=wake_down the stub, the link
+// left in Reset, requests LinkReset after a NOP with no lp_wake_req, and
+// with +neg=wake_le raises lp_linkerror there with no lp_wake_req (FDI-R16,
+// r3.0 §10.2.3.1); with +neg=unanswered the Adapter answers nothing
+// (react_en 0), so the stub's own checks must report its LinkReset request
+// in Active and its lp_linkerror unanswered (req_bound 300 here). The
 // rule that must catch it has to fire, as often as the violation is made
 // (wake_held: the first bringup and the one after each of three LinkErrors);
 // its errors are expected and demoted. Any other error still fails the run.
@@ -649,7 +1010,12 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
         catcher.rule = "FDI-R49";
         catcher.also = "FDI-R21";
       end
-      "clk_exit":    catcher.rule = "FDI-R22";
+      "clk_exit": begin
+        // The forced drop also withdraws pl_clk_req before the stub's own
+        // lp_clk_ack answered it, which the stub reports as well.
+        catcher.rule = "FDI-R22";
+        catcher.also = "Protocol Layer stub: pl_clk_req fell";
+      end
       "le_after":    catcher.rule = "FDI-R21";
       "level":       catcher.rule = "FDI-R20";
       "inband_active": catcher.rule = "LSM_EV_INBAND_DROP";
@@ -661,6 +1027,12 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
         if (neg == "no_restart") env.lsm_cfg.restart_on = LSM_RESTART_PL;
       end
       "rx_inactive": catcher.rule = "FDI-R35";
+      "wake_down", "wake_le": catcher.rule = "FDI-R16";
+      "unanswered": begin
+        catcher.rule = "Protocol Layer stub: no answer";
+        min_n = 2;
+        env.lsm_cfg.react_en = 1'b0;
+      end
       "xfer": begin
         catcher.rule = "FDI-R43";
         if (env.fdi_cfg.bpf() != 1)
@@ -677,6 +1049,7 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
     env.pl.early_present = neg inside {"xfer", "irdy_reset"};
     // le_after: an acknowledge slow enough for the top to strike before it.
     if (neg == "le_after") env.pl.clk_ack_delay = 4;
+    if (neg == "unanswered") env.pl.req_bound = 300;
   endfunction
 
   local task nev(ucie_lsm_ev_e kind);
@@ -709,6 +1082,44 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       end
       "inband_active": begin
         nev(LSM_EV_INBAND_DROP);
+        return;
+      end
+      "wake_down", "wake_le": begin
+        // The link left in Reset, before pl_inband_pres.
+        env.lsm_cfg.rebringup_after_down = 1'b0;
+        nev(LSM_EV_LINK_RESET);
+        env.lsm_cfg.rebringup_after_down = 1'b1;
+        if (neg == "wake_down") begin
+          ucie_pl_stub::plan_t p;
+          p.in = LSM_RESET;
+          p.req = LSM_REQ_LINKRESET;
+          p.up = 0;
+          p.ignore = 1'b0;
+          env.pl.plan.push_back(p);
+          // The stub drops the request if it is not answered (req_bound).
+          while (env.pl.plan.size() != 0) @(env.pl.lsm.mon_cb);
+        end else begin
+          env.pl.linkerror_in = LSM_RESET;
+          env.pl.linkerror_req = 1'b1;
+          // Cleared on the answer, or by the stub when there is none.
+          while (env.pl.linkerror_req) @(env.pl.lsm.mon_cb);
+        end
+        // Left in Reset (after a LinkError, or with no answer): bring it up.
+        while (!env.lsm.drv.idle()) @(env.pl.lsm.mon_cb);
+        if (env.lsm.drv.state == LSM_RESET) nev(LSM_EV_LINKERROR);
+        return;
+      end
+      "unanswered": begin
+        ucie_pl_stub::plan_t p;
+        int unsigned n0 = catcher.n;
+        p.in = LSM_ACTIVE;
+        p.req = LSM_REQ_LINKRESET;
+        p.up = -1;
+        p.ignore = 1'b0;
+        env.pl.plan.push_back(p);
+        while (env.pl.plan.size() != 0) @(env.pl.lsm.mon_cb);
+        env.pl.linkerror_req = 1'b1;
+        while (catcher.n == n0 + 1 && env.pl.linkerror_req) @(env.pl.lsm.mon_cb);
         return;
       end
       "le_after": begin
