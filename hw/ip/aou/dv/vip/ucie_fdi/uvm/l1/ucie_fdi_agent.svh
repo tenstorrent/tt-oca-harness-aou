@@ -20,6 +20,7 @@ class ucie_fdi_agent extends uvm_agent;
   endfunction
 
   function void build_phase(uvm_phase phase);
+    int unsigned n;
     super.build_phase(phase);
     if (cfg == null && !uvm_config_db #(ucie_fdi_cfg)::get(this, "", "cfg", cfg))
       cfg = ucie_fdi_cfg::type_id::create("cfg");
@@ -36,11 +37,13 @@ class ucie_fdi_agent extends uvm_agent;
       `uvm_fatal(get_type_name(), $sformatf({"stream %02h: the model carries the Format 6 ",
                  "layout of Streaming and CXL.cachemem only (r3.0 Figures 3-24, 3-25), not ",
                  "that of PCIe, CXL.io or Management Transport"}, cfg.stream))
-    void'($value$plusargs("ucie_nop_pct=%d", cfg.nop_pct));
+    // The model's plusargs (README "Plusargs"; plusarg_int: also
+    // +<name>@<this agent's full name>=<v>).
+    if (plusarg_int("ucie_nop_pct", get_full_name(), n)) cfg.nop_pct = n;
+    if (plusarg_int("ucie_fcov", get_full_name(), n)) cfg.fcov_en = n != 0;
     mon = ucie_fdi_monitor::type_id::create("mon", this);
     mon.cfg = cfg;
     mon.vif = vif;
-    void'($value$plusargs("ucie_fcov=%b", cfg.fcov_en));
     if (cfg.fcov_en) begin
       fcov = ucie_fdi_fcov::type_id::create($sformatf("fcov%0d", cfg.phy));
       fcov.fdi_bytes = cfg.beat_bytes;

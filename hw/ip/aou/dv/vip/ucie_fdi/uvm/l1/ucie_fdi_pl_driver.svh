@@ -3,7 +3,7 @@
 
 // Drives flits into the DUT RX (pl_valid/pl_data/pl_flit_cancel). A flit
 // starts only while the gate is open for RX (L2 reports Active, or the
-// Receiver is Active in Reset with +fdi_rx_early) and out of reset;
+// Receiver is Active in Reset with +ucie_rx_early) and out of reset;
 // once started it runs to completion, cancels and replays included. A
 // cancel comes in the cycle after the last beat of its 128B half
 // (FDI-R05), either with pl_valid low or with the replay's first beat. On a

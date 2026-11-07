@@ -124,6 +124,10 @@ class aou_t1_env_cfg extends uvm_object;
     super.new(name);
     lsm_cfg = ucie_lsm_cfg::type_id::create("lsm_cfg");
     lsm_cfg.n_phy = AOU_T1_N_PHY;
+    // Software restarts the link this many cycles after a link-down, drawn
+    // per run so a DUT that asks anything of the link meanwhile is caught at
+    // many delays; +ucie_sw_restart_delay=N (or +sw_restart_delay=N) fixes it.
+    lsm_cfg.sw_restart_delay = $urandom_range(1500, 50);
     // The Adapter answers the DUT's lp_linkerror by itself, as a UCIe Adapter
     // does (react_linkerror_en, on by default in ucie_lsm_cfg); +react_linkerror=0
     // leaves it to the test's recover().

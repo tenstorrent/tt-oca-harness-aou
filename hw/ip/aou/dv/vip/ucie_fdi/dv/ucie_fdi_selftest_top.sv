@@ -1,9 +1,15 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //
-// Top of the UCIe FDI model's self-test: one FDI and the link-state
+// Top of the UCIe FDI model's self-test: one FDI and its link-state
 // interface, driven by the model on the Adapter side and by the Protocol
-// Layer stub (ucie_pl_stub) on the other.
+// Layer stub (ucie_pl_stub) on the other. A second FDI (fdi_mb1) serves
+// ucie_fdi_reuse_test: with its own link-state interface (fdi_lsm1) as a
+// second link, or, with +reuse=mirror or park, under the first link state
+// (the model's mirrored mode), where no Protocol Layer sends on it: its lp_*
+// inputs sit idle, but lp_stallack answers pl_stallreq a clock later (r3.0
+// §10.3.2 rules 4, 5 and 8; with nothing presented every clock is a flit
+// boundary), since the Adapter stalls every FDI before a PM entry.
 
 module ucie_fdi_selftest_top;
   import uvm_pkg::*;
@@ -22,9 +28,36 @@ module ucie_fdi_selftest_top;
 
   ucie_fdi_mb_if #(.DATA_W(BUS_W)) fdi_mb0 (.clk(clk), .rst_n(rst_n));
   ucie_fdi_lsm_if                   fdi_lsm (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_mb_if #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_lsm_if                   fdi_lsm1 (.clk(clk), .rst_n(rst_n));
+  bit mirror;
 
   // The Receiver is Active when both rx_active signals are 1 (UCIe r3.0 §10.2.7).
   assign fdi_mb0.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
+  assign fdi_mb1.rx_active = mirror ? fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts :
+                                      fdi_lsm1.pl_rx_active_req && fdi_lsm1.lp_rx_active_sts;
+
+  initial begin
+    string reuse;
+    void'($value$plusargs("reuse=%s", reuse));
+    mirror = reuse inside {"mirror", "park"};
+    if (mirror) begin
+      fdi_mb1.lp_valid = 1'b0;
+      fdi_mb1.lp_irdy = 1'b0;
+      fdi_mb1.lp_data = '0;
+      fdi_mb1.lp_stallack = 1'b0;
+      fdi_mb1.lp_corrupt_crc = 1'b0;
+      fdi_mb1.lp_stream = UCIE_STREAM_S0_STREAMING;
+      fdi_mb1.lp_dllp = '0;
+      fdi_mb1.lp_dllp_valid = 1'b0;
+      fdi_mb1.lp_dllp_ofc = 1'b0;
+      fdi_mb1.lp_retimer_crd = 1'b0;
+      forever begin
+        @(posedge clk);
+        fdi_mb1.lp_stallack <= rst_n && fdi_mb1.pl_stallreq === 1'b1;
+      end
+    end
+  end
 
   // ucie_fdi_neg_test: Adapter faults the model never makes. The model drives
   // pl_state_sts and pl_rx_active_req only when they change, so each force
@@ -154,6 +187,8 @@ module ucie_fdi_selftest_top;
   initial begin
     uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb0", fdi_mb0);
     uvm_config_db #(virtual ucie_fdi_lsm_if)::set(null, "*", "fdi_lsm", fdi_lsm);
+    uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb1", fdi_mb1);
+    uvm_config_db #(virtual ucie_fdi_lsm_if)::set(null, "*", "fdi_lsm1", fdi_lsm1);
     run_test();
   end
 endmodule

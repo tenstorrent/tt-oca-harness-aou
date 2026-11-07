@@ -10,7 +10,7 @@ class ucie_fdi_gate extends uvm_object;
 
   bit open = 1'b0;     // L2: mainband may run
   // L2: only the RX mainband may run, before Active (pl_state_sts still Reset
-  // after the rx_active handshake, UCIe r3.0 §10.2.7 rule 3; +fdi_rx_early).
+  // after the rx_active handshake, UCIe r3.0 §10.2.7 rule 3; +ucie_rx_early).
   bit rx_early = 1'b0;
   bit rx_busy = 1'b0;  // PL driver is inside a flit (including its replays)
   bit tx_busy = 1'b0;  // TX responder has seen part of a DUT flit (set_tx_busy)

@@ -118,7 +118,14 @@
 //    empty slots (UCIe r3.0 10.3.1: valid data on the full width), here a
 //    flit with a non-zero Protocol ID and an all-zero payload, which the
 //    scoreboard skips.
-//  - lp_stream is tied to `stream`; no DLLPs or Retimer credits.
+//  - lp_stream is tied to `stream`; no DLLPs or Retimer credits. pl_stream,
+//    relevant with pl_valid (r3.0 Table 10-3), must carry `stream` then.
+//  - The negotiated protocol (r3.0 Table 10-3 pl_protocol_vld): pl_protocol
+//    and pl_protocol_flitfmt are sampled and stored in Reset with
+//    pl_protocol_vld and pl_inband_pres 1, kept until Reset with
+//    pl_inband_pres 0, and must be `protocol` and Format 6. The stub requests
+//    Active in Reset only once it holds them (§10.2.8 step 2: "permitted
+//    ... to wait until pl_protocol_vld = 1 before requesting Active").
 //  - With `tx_nop_pct` a TX transfer starts with a NOP flit (Protocol ID 00b,
 //    the rest zero), which a CXL Protocol Layer may send (r3.0 Table 3-5; a
 //    Streaming one never does), and which the scoreboard skips as an empty
@@ -154,6 +161,9 @@ class ucie_pl_stub extends uvm_component;
   virtual ucie_fdi_lsm_if lsm;
   int unsigned beat_bytes = 64;
   bit [7:0]    stream = UCIE_STREAM_S0_STREAMING;  // lp_stream, tied as an integration would
+  bit [3:0]    protocol = UCIE_PROTO_STREAMING;    // the pl_protocol to expect
+  int unsigned n_proto;      // pl_protocol samples taken (one per Reset with pl_inband_pres)
+  int unsigned n_stream;     // RX beats whose pl_stream was checked
 
   uvm_analysis_imp #(ucie_flit_item, ucie_pl_stub) rx_imp;
 
@@ -265,6 +275,7 @@ class ucie_pl_stub extends uvm_component;
   local bit            own_woke;    // woke itself for a request of its own
   local int unsigned   frozen_n;    // clocks gated with a request of its own due
   local bit            exit_asked;  // requested Active in this link-down state
+  local bit            proto_held;  // pl_protocol and pl_protocol_flitfmt sampled and stored
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -302,6 +313,7 @@ class ucie_pl_stub extends uvm_component;
       end
       track_state(sts_decode(mb.mon_cb.pl_state_sts));
       inband_seen = lsm.mon_cb.pl_inband_pres === 1'b1;
+      negotiated();
       handshakes();
       state_req(mb.mon_cb.pl_state_sts);
       linkerror(mb.mon_cb.pl_state_sts);
@@ -365,6 +377,7 @@ class ucie_pl_stub extends uvm_component;
     own_woke = 1'b0;
     frozen_n = 0;
     exit_asked = 1'b0;
+    proto_held = 1'b0;
   endfunction
 
   // clk_gate: whether the stub is clock gated this clock, and the status
@@ -464,6 +477,28 @@ class ucie_pl_stub extends uvm_component;
     end
   endfunction
 
+  // What the Adapter reports as negotiated, and the stream of the RX data
+  // (see the header).
+  local function void negotiated();
+    if (st == LSM_RESET && !inband_seen) proto_held = 1'b0;
+    if (st == LSM_RESET && inband_seen && lsm.mon_cb.pl_protocol_vld === 1'b1 && !proto_held) begin
+      proto_held = 1'b1;
+      n_proto++;
+      if (lsm.mon_cb.pl_protocol !== protocol || lsm.mon_cb.pl_protocol_flitfmt !== UCIE_FLITFMT_6)
+        `uvm_error(get_type_name(), $sformatf({"Protocol Layer stub: pl_protocol %04b, ",
+                   "pl_protocol_flitfmt %04b sampled in Reset; expected %04b and 0110b ",
+                   "(Format 6)"}, lsm.mon_cb.pl_protocol, lsm.mon_cb.pl_protocol_flitfmt,
+                   protocol))
+    end
+    if (mb.mon_cb.pl_valid === 1'b1) begin
+      n_stream++;
+      if (mb.mon_cb.pl_stream !== stream)
+        `uvm_error(get_type_name(), $sformatf(
+                   "Protocol Layer stub: pl_stream %02h with pl_valid; expected %02h",
+                   mb.mon_cb.pl_stream, stream))
+    end
+  endfunction
+
   // lp_clk_ack and lp_rx_active_sts: up a clock after their request, down
   // hs_lag clocks after it falls (one clock with hs_lag 0); "clk_ack" pulses
   // lp_clk_ack once without pl_clk_req.
@@ -526,10 +561,11 @@ class ucie_pl_stub extends uvm_component;
         if (wake_late || no_wake()) begin
           // The request first, lp_wake_req a clock after it (or never).
           lsm.lp_wake_req <= !no_wake() && up && lsm.mon_cb.lp_state_req === act;
-          lsm.lp_state_req <= up && nop_seen ? act : nop;
+          lsm.lp_state_req <= up && nop_seen && proto_held ? act : nop;
         end else begin
           lsm.lp_wake_req <= up;
-          if (up && nop_seen && lsm.mon_cb.pl_wake_ack === 1'b1) lsm.lp_state_req <= act;
+          if (up && nop_seen && proto_held && lsm.mon_cb.pl_wake_ack === 1'b1)
+            lsm.lp_state_req <= act;
           else lsm.lp_state_req <= nop;
         end
         nop_seen = up;

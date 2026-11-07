@@ -95,6 +95,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   ucie_lsm_cfg     cfg;
   ucie_fdi_agent   phy[$];       // the link's mainband agents (ucie_lsm_agent::phy)
   ucie_lsm_fcov    fcov;         // the model's own coverage; null: none
+  // Each link event (ucie_lsm_item) from the sequencer, written once the
+  // driver has run it, the bringup that ends a link-down included. Not an
+  // answer to a Protocol Layer request: observers see those as state changes.
+  uvm_analysis_port #(ucie_lsm_item) ap_event;
   ucie_lsm_state_e state = LSM_RESET;
   bit             link_active;   // Active and the gates are open
   int unsigned    n_le_react;    // LinkErrors entered on the DUT's lp_linkerror (req_loop)
@@ -146,6 +150,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
+    ap_event = new("ap_event", this);
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -166,7 +171,6 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
             req_loop();
             pm_exit_loop();
             error_loop();
-            reset_req_loop();
             restart_loop();
             while (lsm_vif.drv_cb.rst_n === 1'b1) @(lsm_vif.drv_cb);
           join_any
@@ -241,6 +245,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       run_job(JOB_EVENT, req);
       ev_busy = 1'b0;
       busy = 1'b0;
+      ap_event.write(req);
       seq_item_port.item_done();
     end
   endtask
@@ -497,22 +502,15 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     active_entry();
   endtask
 
-  // Follows lp_state_req in Reset on every clock, so a NOP given while no
-  // event waits for the request (before pl_inband_pres, say) still counts.
-  local task reset_req_loop();
-    forever begin
-      @(lsm_vif.drv_cb);
-      track_reset_req();
-    end
-  endtask
-
   // lp_state_req while pl_state_sts is Reset (UCIe r3.0 §10.3.3.1 rules 1 to
   // 3, Table 10-4 note a): NOP seen for a clock, then Active, LinkReset or
   // Disabled, is a request (LinkReset and Disabled are latched in rst_down
   // for req_loop); a held request, or one that follows any other request, is
   // not. Samples from the clock after the
-  // status entered Reset (set_state restarts it). Every process that decides
-  // on rst_req or pl_restart calls this first, on a clock edge, so it decides
+  // status entered Reset (set_state restarts it). req_loop calls it on every
+  // clock, so a NOP given while no event waits for the request (before
+  // pl_inband_pres, say) still counts. Every other process that decides on
+  // rst_req or pl_restart calls it too, first, on a clock edge, so it decides
   // on that clock's sample whichever process the simulator runs first; a
   // second call on the same sample changes nothing.
   local function void track_reset_req();
@@ -703,7 +701,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // Wait until a DUT output reaches `v`; an error after req_timeout cycles.
   local task wait_dut(string sig, logic [3:0] v, string rule);
     int unsigned n;
-    ucie_rule_log::check(rule, get_type_name());
+    ucie_rule_log::check(rule, this);
     forever begin
       logic [3:0] cur;
       case (sig)
@@ -715,7 +713,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       @(lsm_vif.drv_cb);
       n++;
       if (cfg.req_timeout != 0 && n == cfg.req_timeout) begin
-        ucie_rule_log::fire(rule, get_type_name());
+        ucie_rule_log::fire(rule, this);
         `uvm_error(get_type_name(), $sformatf("%s: %s stayed 0x%0h, waited %0d cycles for 0x%0h",
                                               rule, sig, cur, n, v))
         return;
@@ -733,14 +731,14 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // clock edge; a trigger withdrawn to NOP by this clock is no request.
   local task wait_reset_active();
     int unsigned n;
-    ucie_rule_log::check("FDI-R33", get_type_name());
+    ucie_rule_log::check("FDI-R33", this);
     track_reset_req();
     while (rst_req != 2) begin
       @(lsm_vif.drv_cb);
       track_reset_req();
       n++;
       if (cfg.req_timeout != 0 && n == cfg.req_timeout) begin
-        ucie_rule_log::fire("FDI-R33", get_type_name());
+        ucie_rule_log::fire("FDI-R33", this);
         `uvm_error(get_type_name(), $sformatf({"FDI-R33: no request to leave Reset (lp_state_req ",
                    "NOP for a clock, then Active) in %0d cycles; lp_state_req is 0x%0h"}, n,
                    lsm_vif.drv_cb.lp_state_req))
@@ -763,13 +761,13 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         wait_cycles(cfg.sw_restart_delay);
       end
       LSM_RESTART_PL: begin
-        ucie_rule_log::check("FDI-R33", get_type_name());
+        ucie_rule_log::check("FDI-R33", this);
         track_reset_req();
         while (!pl_restart) begin
           @(lsm_vif.drv_cb);
           track_reset_req();
           if (cfg.req_timeout != 0 && ++n == cfg.req_timeout) begin
-            ucie_rule_log::fire("FDI-R33", get_type_name());
+            ucie_rule_log::fire("FDI-R33", this);
             `uvm_error(get_type_name(), $sformatf({"FDI-R33: link-down, and no NOP->Active on ",
                        "lp_state_req to restart the training in %0d cycles"}, n))
             break;
@@ -968,7 +966,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       if (cfg.rebringup_after_down) do_bringup();
       return;
     end
-    ucie_rule_log::check("FDI-R48", get_type_name());
+    ucie_rule_log::check("FDI-R48", this);
     rx_first = remote_first();
     while (n < dwell || trig < 2) begin
       @(lsm_vif.drv_cb);
@@ -977,7 +975,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
         set_rx_req(1'b1);
       trig = retrain_trigger(trig);
       if (n >= dwell && cfg.req_timeout != 0 && n - dwell == cfg.req_timeout) begin
-        ucie_rule_log::fire("FDI-R48", get_type_name());
+        ucie_rule_log::fire("FDI-R48", this);
         `uvm_error(get_type_name(), $sformatf({"FDI-R48: no NOP->Active request on lp_state_req ",
                    "%0d cycles after the Retrain dwell"}, cfg.req_timeout))
         break;

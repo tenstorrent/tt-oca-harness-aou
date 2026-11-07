@@ -2,14 +2,15 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //
 // FDI mainband of one PHY, seen from the Adapter (PL) side: every signal of
-// UCIe r3.0 Table 10-3 that travels with the data. The bus is
-// always DATA_W wide so every PHY shares one virtual-interface type; the
-// agent config holds the real beat width and the top slices the bus. A
+// UCIe r3.0 Table 10-3 that travels with the data. The bus is always DATA_W
+// wide, by default ucie_fdi_pkg::BUS_W (the widest FDI the model supports), so
+// every PHY shares one virtual-interface type; the agent config holds the
+// real beat width and the top slices the bus. Compile ucie_fdi_pkg first. A
 // Protocol Layer without some of these pins leaves the pl_* ones open and
 // ties its lp_* ones to their idle values (README "Top").
 
 interface ucie_fdi_mb_if #(
-    parameter int DATA_W = 1024
+    parameter int DATA_W = ucie_fdi_pkg::BUS_W
 ) (
     input logic clk,
     input logic rst_n
@@ -41,8 +42,9 @@ interface ucie_fdi_mb_if #(
   logic              pl_stallreq;
   logic              lp_stallack;
   logic [3:0]        pl_state_sts;
-  // pl_rx_active_req and lp_rx_active_sts both 1 (UCIe r1.1 8.2.7: the
-  // Receiver is Active). One handshake serves every PHY; the top drives it.
+  // pl_rx_active_req and lp_rx_active_sts both 1 (UCIe r3.0 §10.2.7 rule 3:
+  // the Receiver is Active), from the FDI's link-state interface; the top
+  // drives it.
   logic              rx_active;
 
   // L1: mainband stimulus and TX responder.

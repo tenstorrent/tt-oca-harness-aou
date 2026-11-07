@@ -192,7 +192,8 @@ class ucie_fdi_fcov extends uvm_object implements ucie_fdi_cov;
   endfunction
 
   virtual function void sample_xfer(ucie_fdi_dir_e dir, int unsigned beat_bytes,
-                                    int unsigned stall, int unsigned gap);
+                                    int unsigned stall, int unsigned gap, ucie_flit_item f,
+                                    int unsigned lane);
     x_rx = dir == UCIE_FDI_RX;
     x_width = beat_bytes;
     x_stall = stall;

@@ -102,14 +102,21 @@ endclass
 
 // One FDI (UCIe model mainband agent), the link-state agent, the Protocol
 // Layer stub and the scoreboard. This is the wiring every user of the model
-// repeats: the link-state agent takes the mainband agents at build, and
-// observers register with its monitor at connect.
+// repeats: the link-state agent takes the mainband agents and its interface
+// at build, and observers register with its monitor at connect. A second
+// link (ucie_fdi_reuse_test) is a second env with its own FDI (fdi_cfg.phy)
+// and link-state interface (lsm_key). With lsm_cfg.n_phy 2 (the mirrored
+// mode) a second mainband agent, fdi1, shares the link state; the stub and
+// the traffic stay on the first FDI.
 class ucie_fdi_selftest_env extends uvm_env;
   `uvm_component_utils(ucie_fdi_selftest_env)
 
   ucie_fdi_cfg         fdi_cfg;
+  ucie_fdi_cfg         fdi1_cfg;   // mirrored mode: the second FDI
   ucie_lsm_cfg         lsm_cfg;
+  string               lsm_key = "fdi_lsm";  // config_db key of the link-state interface
   ucie_fdi_agent       fdi;
+  ucie_fdi_agent       fdi1;
   ucie_lsm_agent       lsm;
   ucie_pl_stub         pl;
   ucie_fdi_selftest_sb sb;
@@ -117,21 +124,35 @@ class ucie_fdi_selftest_env extends uvm_env;
   function new(string name, uvm_component parent);
     super.new(name, parent);
     fdi_cfg = ucie_fdi_cfg::type_id::create("fdi_cfg");
+    fdi1_cfg = ucie_fdi_cfg::type_id::create("fdi1_cfg");
+    fdi1_cfg.phy = 1;
     lsm_cfg = ucie_lsm_cfg::type_id::create("lsm_cfg");
+    // Software's restart delay after a link-down, drawn per run (tests may
+    // set their own in configure()).
+    lsm_cfg.sw_restart_delay = $urandom_range(1500, 50);
   endfunction
 
   function void build_phase(uvm_phase phase);
+    virtual ucie_fdi_lsm_if lsm_vif;
     super.build_phase(phase);
+    if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", lsm_key, lsm_vif))
+      `uvm_fatal(get_type_name(), {"no ", lsm_key, " in config_db"})
     fdi = ucie_fdi_agent::type_id::create($sformatf("fdi%0d", fdi_cfg.phy), this);
     fdi.cfg = fdi_cfg;
     lsm = ucie_lsm_agent::type_id::create("lsm", this);
     lsm.cfg = lsm_cfg;
+    lsm.lsm_vif = lsm_vif;
     lsm.phy.push_back(fdi);
+    if (lsm_cfg.n_phy > 1) begin
+      fdi1 = ucie_fdi_agent::type_id::create("fdi1", this);
+      fdi1.cfg = fdi1_cfg;
+      lsm.phy.push_back(fdi1);
+    end
     pl = ucie_pl_stub::type_id::create("pl", this);
     pl.beat_bytes = fdi_cfg.beat_bytes;
     pl.stream = fdi_cfg.stream;
-    if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", pl.lsm))
-      `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
+    pl.protocol = lsm_cfg.protocol;
+    pl.lsm = lsm_vif;
     sb = ucie_fdi_selftest_sb::type_id::create("sb", this);
   endfunction
 

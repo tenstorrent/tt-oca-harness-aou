@@ -4,14 +4,21 @@
 class ucie_lsm_cfg extends uvm_object;
   `uvm_object_utils(ucie_lsm_cfg)
 
-  // FDIs (PHYs) of the link, 1 or 2. Every FDI reports the same pl_state_sts;
-  // the Protocol Layer follows active_phy's, and the monitor samples that one.
+  // FDIs (PHYs) under this link state, 1 or 2. UCIe defines one FDI per
+  // Protocol Layer to Adapter connection, each with its own link state (r3.0
+  // §10.2, §10.2.8: "the same sequence happens independently for each
+  // Protocol Layer stack"): for several stacks, build one link-state agent per
+  // FDI, each with n_phy 1. n_phy 2 is a mirrored mode beyond UCIe, for a
+  // Protocol Layer that follows one of two FDIs through one set of handshakes
+  // (one lp_state_req, wake, clock and rx_active handshake): both FDIs report
+  // the same pl_state_sts, the Protocol Layer follows active_phy's, and the
+  // monitor samples that one.
   int unsigned  n_phy = 1;
   int unsigned  active_phy = 0;
-  // Two FDIs: the one the Protocol Layer does not follow stays in Reset with
-  // its mainband closed and no stalls, instead of mirroring the followed
+  // Mirrored mode: the FDI the Protocol Layer does not follow stays in Reset
+  // with its mainband closed and no stalls, instead of mirroring the followed
   // FDI's state, so the Protocol Layer must take state and stalls from the
-  // followed one (+park_idle_phy).
+  // followed one (+ucie_park_idle_phy).
   bit           park_idle_phy = 1'b0;
   bit           is_active = 1'b1;
 
@@ -82,7 +89,8 @@ class ucie_lsm_cfg extends uvm_object;
   ucie_lsm_restart_e restart_on = LSM_RESTART_SW;
   // Cycles the Adapter stays in Reset after a link-down before software
   // restarts the training (LSM_RESTART_SW, EITHER); 0 trains at once. The
-  // agent randomises it in [50:1500] unless +sw_restart_delay=N sets it.
+  // agent keeps the value set here; +ucie_sw_restart_delay=N overrides it.
+  // A bench that wants many delays draws one per run itself.
   int unsigned  sw_restart_delay = 300;
   // Chance (percent) an Active entry from Reset or from a Retrain entered from
   // Active starts with the rx_active handshake before the Protocol Layer has
@@ -95,16 +103,16 @@ class ucie_lsm_cfg extends uvm_object;
   int unsigned  remote_active_first_pct = 0;
   // Chance an Adapter-initiated LinkError is entered mid-flit: without the flit
   // boundary, while a flit is in flight in either direction (UCIe r3.0
-  // §10.3.3.7 needs neither a stall nor a boundary). +le_mid_flit_pct.
+  // §10.3.3.7 needs neither a stall nor a boundary). +ucie_le_mid_flit_pct.
   int unsigned  le_mid_flit_pct = 0;
-  // Cycles the Adapter forwards RX flits in Reset before Active. UCIe r1.1
-  // 8.2.7: once pl_rx_active_req and lp_rx_active_sts are both 1 the
-  // Receiver is Active "even though pl_state_sts might not have moved to
-  // Active yet" (rule 3: Reset, Retrain or Active), as when the remote die
-  // went Active first and its Rsp.Active is still on the sideband. On every
-  // Active entry from Reset, after the rx_active handshake, the RX mainband
-  // opens for rx_early cycles before pl_state_sts moves to Active; TX still
-  // waits for Active. 0 (off) keeps RX flits to Active. +fdi_rx_early=N.
+  // Cycles the Adapter forwards RX flits in Reset before Active. UCIe r3.0
+  // §10.2.7 rule 3: with pl_rx_active_req and lp_rx_active_sts both 1 the
+  // Receiver is in Active state if pl_state_sts is Reset, Retrain or Active,
+  // as when the remote die went Active first and its Rsp.Active is still on
+  // the sideband. On every Active entry from Reset, after the rx_active
+  // handshake, the RX mainband opens for rx_early cycles before pl_state_sts
+  // moves to Active; TX still waits for Active. 0 (off) keeps RX flits to
+  // Active. +ucie_rx_early=N.
   int unsigned  rx_early = 0;
 
   // What the Adapter reports as negotiated and how the link runs (UCIe r3.0
