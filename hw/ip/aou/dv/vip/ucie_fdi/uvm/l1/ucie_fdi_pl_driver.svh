@@ -20,6 +20,12 @@
 // pl_valid low: no replay can follow at once), the driver asks L2 for a
 // Retrain (gate.retrain_req) and replays the unit once the gate has closed and
 // opened again.
+//
+// With cfg.nop_pct the driver forwards NOP flits of its own (Protocol ID 00b,
+// r3.0 Table 3-5) among the sequence's: a NOP transfer before a flit, and from
+// 512 B up NOPs in further lanes of a transfer. A stand-alone NOP goes through
+// uncancelled, or is cancelled and replayed, or is cancelled and never
+// replayed (Table 10-3 pl_flit_cancel); the Protocol Layer must deliver none.
 class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
   `uvm_component_utils(ucie_fdi_pl_driver)
 
@@ -32,10 +38,16 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
   // refilled for every flit that has a cancel.
   local ucie_flit_item poison;
   local ucie_flit_item lanes[$];  // the flits of the transfer being driven
+  local bit nop_drop;  // the transfer is a NOP the driver cancels and never replays
+
+  int unsigned n_nops;          // NOP flits forwarded (cfg.nop_pct), lanes included
+  int unsigned n_nops_dropped;  // ... of them cancelled and never replayed
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
     poison = new("poison");
+    // A cancelled copy is never a NOP, so a monitor does not take it for one.
+    poison.data[0][7:6] = 2'b11;
   endfunction
 
   task run_phase(uvm_phase phase);
@@ -56,7 +68,11 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
         continue;
       end
       epoch = cfg.gate.epoch;
-      while (!(cfg.gate.rx_open() && vif.drv_cb.rst_n === 1'b1)) idle_cycle(1'b0);
+      wait_open();
+      if (cfg.nop_pct != 0 && epoch == cfg.gate.epoch && $urandom_range(99) < cfg.nop_pct) begin
+        send_nop();
+        wait_open();
+      end
       if (epoch != cfg.gate.epoch) begin
         `uvm_info(get_type_name(), "flit fetched before a link reset dropped", UVM_MEDIUM)
         seq_item_port.item_done();
@@ -77,13 +93,49 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     end
   endtask
 
+  // The lanes of the transfer that are not NOPs: the flits an abandon loses.
+  local function int unsigned n_lane_flits();
+    int unsigned n = 0;
+    foreach (lanes[l]) if (!lanes[l].is_nop()) n++;
+    return n;
+  endfunction
+
+  local task wait_open();
+    while (!(cfg.gate.rx_open() && vif.drv_cb.rst_n === 1'b1)) idle_cycle(1'b0);
+  endtask
+
+  // A NOP transfer of its own (cfg.nop_pct): through uncancelled, cancelled
+  // and replayed, or cancelled and dropped, a third each.
+  local task send_nop();
+    ucie_flit_item n = new("nop");
+    int unsigned kind = $urandom_range(2);
+    n.make_nop();
+    if (kind == 1) n.mix_cancel_plan();
+    nop_drop = kind == 2;
+    n_nops++;
+    if (nop_drop) n_nops_dropped++;
+    lanes.delete();
+    lanes.push_back(n);
+    cfg.gate.rx_busy = 1'b1;
+    drive_flit();
+    cfg.gate.rx_busy = 1'b0;
+    nop_drop = 1'b0;
+  endtask
+
   // The other lanes of a wide transfer: the flits the sequence has ready now,
-  // fewer with partial_beat_pct.
+  // fewer with partial_beat_pct; with nop_pct a lane may be a NOP instead.
   local task fill_lanes();
     int unsigned n = cfg.fpb();
     if ($urandom_range(99) < cfg.partial_beat_pct) n = $urandom_range(n - 1, 1);
     while (lanes.size() < n) begin
       ucie_flit_item it;
+      if (cfg.nop_pct != 0 && $urandom_range(99) < cfg.nop_pct) begin
+        it = new("nop");
+        it.make_nop();
+        lanes.push_back(it);
+        n_nops++;
+        continue;
+      end
       seq_item_port.try_next_item(it);
       if (it == null) break;
       lanes.push_back(it);
@@ -119,7 +171,7 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     cfg.gate.rx_busy = 1'b0;
     while (!(closed && cfg.gate.open)) begin
       if (vif.drv_cb.rst_n !== 1'b1 || cfg.gate.abort || epoch != cfg.gate.epoch) begin
-        if (cfg.gate.abort) cfg.gate.n_abandoned += lanes.size();
+        if (cfg.gate.abort) cfg.gate.n_abandoned += n_lane_flits();
         `uvm_info(get_type_name(), "link down while waiting to replay after pl_error; flit dropped",
                   UVM_MEDIUM)
         ok = 1'b0;
@@ -152,7 +204,10 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
       poison.randomize_adapter_bytes();
     end
 
-    if (halves_per_flit(cfg.beat_bytes) == 1) begin
+    if (nop_drop) begin
+      // A NOP cancelled and not replayed: its first unit, and nothing after.
+      seg_half.push_back(0); seg_cancel.push_back(UCIE_CANCEL_IDLE);
+    end else if (halves_per_flit(cfg.beat_bytes) == 1) begin
       // 256 B and up: one cancel unit, the transfer. A plan that cancels either half
       // cancels the whole flit, cancel_repeat times, in the kind of its first
       // cancelled half; then the flit goes through.
@@ -193,7 +248,8 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     // A framing error replaces the plan: one unit is flagged and cancelled, then
     // the flit goes through. Only while the link is Active (pl_error needs the
     // Receiver active, r3.0 Table 10-3).
-    if (cfg.error_pct != 0 && cfg.gate.open && $urandom_range(99) < cfg.error_pct) begin
+    if (cfg.error_pct != 0 && !nop_drop && cfg.gate.open &&
+        $urandom_range(99) < cfg.error_pct) begin
       int unsigned u = halves_per_flit(cfg.beat_bytes) == 1 ? 0 : $urandom_range(1);
       seg_half.delete();
       seg_cancel.delete();
@@ -225,18 +281,18 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
             $urandom_range(99) < it.beat_gap_pct)
           repeat ($urandom_range(it.max_beat_gap, 1)) idle_cycle(1'b0);
         if (vif.drv_cb.rst_n !== 1'b1 || cfg.gate.abort) begin
-          if (cfg.gate.abort) cfg.gate.n_abandoned += lanes.size();
+          if (cfg.gate.abort) cfg.gate.n_abandoned += n_lane_flits();
           `uvm_info(get_type_name(), cfg.gate.abort ? "LinkError during a flit; flit abandoned" :
                                      "reset during a flit; flit dropped", UVM_MEDIUM)
           // A half that failed CRC is still cancelled in the cycle after its last
-          // chunk (Table 8-2): without it the Protocol Layer may consume the half.
+          // chunk (r3.0 Table 10-3): without it the Protocol Layer may consume the half.
           idle_cycle(cancel_next && cfg.gate.abort);
           cancel_next = 1'b0;
           return;
         end
         vif.drv_cb.pl_valid <= 1'b1;
         vif.drv_cb.pl_flit_cancel <= cancel_next;
-        vif.drv_cb.pl_data <= beat(idx, cancelled && cfg.poison_cancelled);
+        vif.drv_cb.pl_data <= beat(idx, cancelled && cfg.poison_cancelled && !nop_drop);
         vif.drv_cb.pl_error <= s == err_seg && b == err_beat;
         cancel_next = 1'b0;
         @(vif.drv_cb);

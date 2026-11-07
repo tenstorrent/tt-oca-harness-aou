@@ -9,8 +9,9 @@
 // - ap_rx: flits delivered to the DUT, after cancel rollback: a cancel in the
 //   cycle after a 128B half drops that half (FDI-R05); from 256 B up, where
 //   the flit is one beat, a cancel after it drops every flit of that beat.
-//   NOP flits (Flit Header 0000h) are not delivered: the Protocol Layer
-//   discards them (UCIe r3.0 Table 10-3 pl_flit_cancel, 10.3.1).
+//   NOP flits (Protocol ID 00b, r3.0 Table 3-5; the Flit Header 0000h of an
+//   empty lane, §10.3.1, is one) are not delivered: the Protocol Layer
+//   discards them (UCIe r3.0 Table 10-3 pl_flit_cancel).
 // On a 512 or 1024 B FDI a beat carries 2 or 4 flits, one per 256 B lane
 // (UCIe r3.0 10.3.1): a TX beat is that many flits, each checked (FDI-R45, so
 // a lane the DUT leaves empty is an error), and an RX beat is that many
@@ -58,6 +59,8 @@ class ucie_fdi_monitor extends uvm_monitor;
   // the seed drew doesn't decide the result.
   int unsigned n_tx_ready;
   int unsigned n_rx_nops;        // uncancelled RX NOP flits, discarded
+  int unsigned n_rx_nop_cancels; // cancels of a first half (or transfer) of NOPs only
+  int unsigned n_tx_nops;        // TX NOP flits (Protocol ID 00b) where the stream allows them
   int unsigned n_rx_part;        // 512/1024 B: RX beats with fewer flits than lanes
   int unsigned n_rx_errors;      // RX cancel units flagged on pl_error
   int unsigned n_tx_corrupt;     // TX transfers of flits with lp_corrupt_crc
@@ -308,16 +311,24 @@ class ucie_fdi_monitor extends uvm_monitor;
     end
   endfunction
 
-  // A complete DUT TX flit (in lane `lane` of a 512 or 1024 B beat): its
-  // Adapter-owned bytes checked, then published.
+  // A complete DUT TX flit (in lane `lane` of a wide beat): its Adapter-owned
+  // bytes checked, then published. A NOP (Protocol ID 00b) is an error on a
+  // Streaming stream (r3.0 Table 3-5), and so is a lane left empty, since the
+  // Protocol Layer sends valid data on the full width (§10.3.1); on a
+  // CXL.cachemem stream it is a NOP flit, accepted and still published.
   local function void publish_tx(ucie_flit_item f, int unsigned lane);
+    bit nop_ok = stream_tx_nop_legal(cfg.stream);
     f.t_end = $time;
     f.n_stall_cycles = tx_stall;
     if (cfg.check_tx_adapter_bytes) chk(R45);
-    if (cfg.check_tx_adapter_bytes && !f.tx_adapter_bytes_legal())
-      err(R45, $sformatf("%sAdapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h",
+    if (cfg.check_tx_adapter_bytes && !f.tx_adapter_bytes_legal(nop_ok))
+      err(R45, $sformatf("%sAdapter-owned bytes: FH=%02h%02h CRC0=%02h%02h CRC1=%02h%02h%s",
                          cfg.fpb() > 1 ? $sformatf("lane %0d: ", lane) : "", f.data[0],
-                         f.data[1], f.data[126], f.data[127], f.data[254], f.data[255]));
+                         f.data[1], f.data[126], f.data[127], f.data[254], f.data[255],
+                         !nop_ok && f.is_nop() ?
+                         " (Protocol ID 00b, a NOP, which a Streaming Protocol Layer never sends)"
+                         : ""));
+    if (nop_ok && f.is_nop()) n_tx_nops++;
     if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
     if (fcov != null) fcov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
     n_tx_flits++;
@@ -431,6 +442,16 @@ class ucie_fdi_monitor extends uvm_monitor;
         n_rx_cancels++;
         if (cov != null) cov.sample_cancel(half, v, count, stalled);
         if (fcov != null) fcov.sample_cancel(half, v, count, stalled);
+        // A first half (or transfer) of NOPs cancelled: the Adapter may cancel
+        // NOPs to keep them from the Protocol Layer and never replay them
+        // (r3.0 Table 10-3 pl_flit_cancel). What follows is a new flit, so
+        // the partial one is dropped rather than carrying its cancel counts
+        // over. A replay that follows instead starts afresh, which only
+        // resets the counts.
+        if (rx_beat == 0 && all_nop()) begin
+          n_rx_nop_cancels++;
+          rx_cur.delete();
+        end
       end
     end else if (rx_half_done && rx_beat == cfg.bpf()) begin
       publish_rx();
@@ -483,6 +504,11 @@ class ucie_fdi_monitor extends uvm_monitor;
     rx_half_done = (rx_beat % cfg.bph()) == 0;
   endfunction
 
+  local function bit all_nop();
+    foreach (rx_cur[l]) if (!rx_cur[l].is_nop()) return 1'b0;
+    return 1'b1;
+  endfunction
+
   // The flits of the finished beat(s), less the NOPs the Protocol Layer
   // discards.
   local function void publish_rx();
@@ -516,13 +542,15 @@ class ucie_fdi_monitor extends uvm_monitor;
                                           "cancel, %0d with a repeated one), %0d stalls (%0d ",
                                           "mid-flit, %0d of them with pl_trdy low); %0d TX ",
                                           "and %0d RX flits abandoned mid-flit; %0d RX beats ",
-                                          "in Reset; %0d RX NOP flits discarded, %0d RX beats ",
-                                          "not full; %0d RX errors (pl_error), %0d TX ",
-                                          "transfers with lp_corrupt_crc"}, cfg.phy,
+                                          "in Reset; %0d RX NOP flits discarded, %0d RX ",
+                                          "cancels of NOPs, %0d RX beats not full; %0d RX ",
+                                          "errors (pl_error), %0d TX transfers with ",
+                                          "lp_corrupt_crc, %0d TX NOP flits"}, cfg.phy,
                                          n_tx_flits, n_rx_flits, n_rx_cancels, n_cancels_stalled,
                                          n_rx_cancel_h1, n_rx_cancel_rep, n_stalls, n_stalls_mid,
                                          n_stalls_trdy0, n_tx_abandoned, n_rx_abandoned,
-                                         n_rx_beats_reset, n_rx_nops, n_rx_part, n_rx_errors,
-                                         n_tx_corrupt), UVM_LOW)
+                                         n_rx_beats_reset, n_rx_nops, n_rx_nop_cancels,
+                                         n_rx_part, n_rx_errors, n_tx_corrupt, n_tx_nops),
+              UVM_LOW)
   endfunction
 endclass

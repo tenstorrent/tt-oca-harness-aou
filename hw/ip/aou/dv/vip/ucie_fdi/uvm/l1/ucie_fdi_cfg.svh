@@ -5,7 +5,8 @@ class ucie_fdi_cfg extends uvm_object;
   `uvm_object_utils(ucie_fdi_cfg)
 
   int unsigned   phy = 0;
-  int unsigned   beat_bytes = 64;     // 32, 64, 128, 256, 512 or 1024 (FDI width of this PHY)
+  // FDI width of this PHY: 32 to 256, or 512 to 1024 in steps of 256
+  int unsigned   beat_bytes = 64;
   bit            is_active = 1'b1;    // 0: monitor only
 
   // TX responder
@@ -44,16 +45,34 @@ class ucie_fdi_cfg extends uvm_object;
   bit            tx_hold = 1'b0;
 
   // PL driver
-  // Fill FH/CRC with random bytes; the Protocol Layer must ignore them.
+  // Fill FH/CRC with random bytes; the Protocol Layer must ignore them. The
+  // Protocol ID and the Flit Type (Byte 0 and Byte 1 [7:6]) stay as the flit
+  // has them (ucie_flit_item::randomize_adapter_bytes).
   bit            random_adapter_bytes = 1'b0;
   bit            poison_cancelled = 1'b1; // cancelled copies carry random bytes
-  // 512 and 1024 B: chance a transfer is sent with fewer flits than it could
+  // 512 B and up: chance a transfer is sent with fewer flits than it could
   // carry, the empty lanes zero (NOP), as an Adapter does after a gap on the
   // Link (UCIe r3.0 10.3.1). Without it a transfer is short only when the
   // sequence has no more flits ready.
   int unsigned   partial_beat_pct = 0;
+  // The chance the PL driver forwards a NOP flit (ucie_flit_item::make_nop:
+  // Protocol ID 00b, random sequence number and Ack/Nak bits, r3.0 Table 3-5;
+  // an all-zero body, §3.1) before a flit of the sequence, at every width, and from 512 B
+  // up also in each further lane of a transfer. A third of the stand-alone
+  // NOPs go through uncancelled, which the Protocol Layer must discard; a
+  // third are cancelled with an ordinary cancel plan and replayed; a third are
+  // cancelled and never replayed (their first 128B half, from 256 B up the
+  // transfer, with pl_valid low in the cancel cycle), as Table 10-3
+  // pl_flit_cancel lets an Adapter do to keep NOPs from the Protocol Layer.
+  // 0 (the default): none. +ucie_nop_pct=N sets it.
+  int unsigned   nop_pct = 0;
   // pl_stream, the stream ID of the data on this FDI (UCIe r3.0 Table
-  // 10-3): tied to this value, as an integration may do (r3.0 10.2.1), and the one lp_stream must carry with lp_valid (FDI-R64). The
+  // 10-3): tied to this value, as an integration may do (r3.0 10.2.1), and
+  // the one lp_stream must carry with lp_valid (FDI-R64). Its protocol sets
+  // the flit rules: Streaming (x4h) or CXL.cachemem (x3h), whose Format 6
+  // layouts the model carries; PCIe, CXL.io and Management Transport streams
+  // are refused (stream_layout_modelled). Protocol ID 00b on TX (a NOP) is an
+  // FDI-R45 error on a Streaming stream only (stream_tx_nop_legal). The
   // default is Stack 0 Streaming, matching ucie_lsm_cfg::protocol.
   bit [7:0]      stream = UCIE_STREAM_S0_STREAMING;
   // pl_error (UCIe r3.0 Table 10-3): the chance an RX flit meets a framing
@@ -99,8 +118,8 @@ class ucie_fdi_cfg extends uvm_object;
 
   function string convert2string();
     return $sformatf({"phy=%0d beat_bytes=%0d active=%0b trdy=%s stall_pct=%0d mid=%0d ",
-                      "stall_hold=%0d..%0d trdy_free=%0b hold=%0b stream=%02h"}, phy, beat_bytes,
-                     is_active, trdy_policy.name(), stall_pct, stall_mid_pct, stall_hold_min,
-                     stall_hold_max, stall_trdy_free, tx_hold, stream);
+                      "stall_hold=%0d..%0d trdy_free=%0b hold=%0b stream=%02h nop=%0d"}, phy,
+                     beat_bytes, is_active, trdy_policy.name(), stall_pct, stall_mid_pct,
+                     stall_hold_min, stall_hold_max, stall_trdy_free, tx_hold, stream, nop_pct);
   endfunction
 endclass

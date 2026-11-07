@@ -4,7 +4,7 @@
 // One 256B Format 6 flit. For driving it carries a cancel plan per 128B half
 // and idle gaps; the monitor fills in what it observed.
 //
-// Cancel plan (UCIe r1.1 §8.2.5, r3.0 §10.2.5):
+// Cancel plan (UCIe r3.0 §10.2.5):
 //   cancel_h0 only        H0 (cancelled), H0, H1
 //   cancel_h0 and h1      H0 (cancelled), H1 (cancelled), H0, H1
 //   cancel_h1 only        H0, H1 (cancelled), then either
@@ -82,10 +82,25 @@ class ucie_flit_item extends uvm_sequence_item;
     if (idx < MAX_BEATS_PER_FLIT) t_beat[idx] = $time;
   endfunction
 
-  // A Flit Header of 0000h: a NOP, which the Protocol Layer discards when it
-  // arrives uncancelled (UCIe r3.0 Table 10-3 pl_flit_cancel, 10.3.1).
+  // A NOP flit: Protocol ID (Byte 0 [7:6]) 00b, whatever the sequence number
+  // and Ack/Nak bits in the rest of the Flit Header (UCIe r3.0 Table 3-5). The
+  // zero lanes of a wide transfer (Flit Header 0000h, §10.3.1) are a case of
+  // it. The Protocol Layer discards a NOP that arrives uncancelled (Table 10-3
+  // pl_flit_cancel).
   function bit is_nop();
-    return data[0] == 8'h00 && data[1] == 8'h00;
+    return data[0][7:6] == 2'b00;
+  endfunction
+
+  // A D2D Adapter NOP flit as an Adapter may forward it: Protocol ID and Flit
+  // Type (Byte 1 [7:6]) 00b, random sequence number and Ack/Nak bits (Byte 0
+  // [3:0], Byte 1 [5:0]; r3.0 Table 3-5) and CRC, and a body of all zeros
+  // (r3.0 §3.1: "the body of the Flit is filled with all 0 data").
+  function void make_nop();
+    clear();
+    data[0] = {4'h0, 4'($urandom)};
+    data[1] = {2'b00, 6'($urandom)};
+    data[126] = 8'($urandom); data[127] = 8'($urandom);
+    data[254] = 8'($urandom); data[255] = 8'($urandom);
   endfunction
 
   function void clear();
@@ -104,17 +119,23 @@ class ucie_flit_item extends uvm_sequence_item;
     data[254] = 8'h00; data[255] = 8'h00;
   endfunction
 
-  // The Protocol ID (Byte0[7:6]) stays: 00b would make the flit a NOP.
+  // The Protocol ID (Byte 0 [7:6]) stays: 00b would make the flit a NOP. So
+  // does the Flit Type (Byte 1 [7:6], 00b for a protocol flit; r3.0 Table
+  // 3-5): the Adapter hands the Protocol Layer protocol flits, never Test
+  // (01b) or, on a modelled stream, Management (10b) flits.
   function void randomize_adapter_bytes();
-    data[0] = {data[0][7:6], 6'($urandom)}; data[1] = 8'($urandom);
+    data[0] = {data[0][7:6], 6'($urandom)}; data[1] = {data[1][7:6], 6'($urandom)};
     data[126] = 8'($urandom); data[127] = 8'($urandom);
     data[254] = 8'($urandom); data[255] = 8'($urandom);
   endfunction
 
-  // Format 6 TX rule: Protocol ID (Byte0[7:6]) non-zero, every other
-  // Adapter-owned bit zero.
-  function bit tx_adapter_bytes_legal();
-    return data[0][7:6] != 2'b00 && data[0][5:0] == 6'h00 && data[1] == 8'h00 &&
+  // Format 6 TX rule of the modelled layout (r3.0 §3.3.4, Table 3-5): every
+  // Adapter-owned bit zero, Byte 1 included (its [7:6], the Flit Type, is 00b
+  // for a protocol flit), and a Protocol ID (Byte 0 [7:6]) other than 00b
+  // unless nop_legal: a Streaming Protocol Layer must never send 00b, a NOP
+  // (stream_tx_nop_legal).
+  function bit tx_adapter_bytes_legal(bit nop_legal = 1'b0);
+    return (nop_legal || data[0][7:6] != 2'b00) && data[0][5:0] == 6'h00 && data[1] == 8'h00 &&
            data[126] == 8'h00 && data[127] == 8'h00 && data[254] == 8'h00 && data[255] == 8'h00;
   endfunction
 
@@ -130,8 +151,9 @@ class ucie_flit_item extends uvm_sequence_item;
 
   // A cancel plan drawn evenly over the four shapes above (first half,
   // second half, both, second half with the first resent), each cancel IDLE
-  // or VALID, and a single-half cancel repeated 1-3 times (UCIe r1.1
-  // Table 8-2: the Adapter replays a half until it goes through uncancelled).
+  // or VALID, and a single-half cancel repeated 1-3 times (UCIe r3.0
+  // Table 10-3 pl_flit_cancel: the Adapter replays a half until it goes
+  // through uncancelled).
   function void mix_cancel_plan();
     ucie_fdi_cancel_e k0 = $urandom_range(1) != 0 ? UCIE_CANCEL_VALID : UCIE_CANCEL_IDLE;
     ucie_fdi_cancel_e k1 = $urandom_range(1) != 0 ? UCIE_CANCEL_VALID : UCIE_CANCEL_IDLE;

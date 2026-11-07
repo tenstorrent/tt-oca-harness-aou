@@ -27,10 +27,16 @@ class ucie_fdi_agent extends uvm_agent;
             this, "", $sformatf("fdi_mb%0d", cfg.phy), vif))
       `uvm_fatal(get_type_name(), $sformatf("no fdi_mb%0d in config_db", cfg.phy))
     if (!valid_beat_bytes(cfg.beat_bytes))
-      `uvm_fatal(get_type_name(), $sformatf("beat_bytes %0d not 32/64/128/256/512/1024",
-                                            cfg.beat_bytes))
+      `uvm_fatal(get_type_name(), $sformatf(
+                 "beat_bytes %0d: not 32, 64, 128, 256 or a multiple of 256 from 512 to %0d",
+                 cfg.beat_bytes, MAX_BEAT_BYTES))
     if (!(cfg.stream[7:4] inside {4'h0, 4'h1}) || !(cfg.stream[3:0] inside {[4'h1:4'h5]}))
       `uvm_fatal(get_type_name(), $sformatf("stream %02h is a reserved stream ID", cfg.stream))
+    if (!stream_layout_modelled(cfg.stream))
+      `uvm_fatal(get_type_name(), $sformatf({"stream %02h: the model carries the Format 6 ",
+                 "layout of Streaming and CXL.cachemem only (r3.0 Figures 3-24, 3-25), not ",
+                 "that of PCIe, CXL.io or Management Transport"}, cfg.stream))
+    void'($value$plusargs("ucie_nop_pct=%d", cfg.nop_pct));
     mon = ucie_fdi_monitor::type_id::create("mon", this);
     mon.cfg = cfg;
     mon.vif = vif;

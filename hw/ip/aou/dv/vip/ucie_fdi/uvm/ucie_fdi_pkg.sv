@@ -2,9 +2,13 @@
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //
 // L1: FDI mainband with UCIe Flit Format 6 (Latency-Optimized 256B with
-// optional bytes), on FDIs of 32 to 1024 bytes. Flit item, Format 6 codec,
-// PL driver (to the DUT RX), TX responder (pl_trdy and stallreq towards the
-// DUT TX), monitor with protocol checks and a coverage hook. Rule IDs are listed in ../README.md.
+// optional bytes) as the Streaming protocol lays it out (UCIe r3.0 §3.3.4,
+// Figure 3-25; CXL.cachemem's layout, Figure 3-24, has the same Adapter-owned
+// bytes), on FDIs of 32 to 1024 bytes. PCIe, CXL.io and Management Transport
+// flits are not modelled (see stream_layout_modelled). Flit item, Format 6
+// codec, PL driver (to the DUT RX), TX responder (pl_trdy and stallreq towards
+// the DUT TX), monitor with protocol checks and a coverage hook. Rule IDs are
+// listed in ../README.md.
 
 package ucie_fdi_pkg;
   import uvm_pkg::*;
@@ -68,6 +72,31 @@ package ucie_fdi_pkg;
     endcase
   endfunction
 
+  // The flit rules of the FDI's stream (ucie_fdi_cfg::stream). Each stream ID
+  // maps to one protocol and stack (r3.0 Table 10-3 lp_stream), and the model
+  // carries one stream per FDI, so the stream says which Format 6 layout the
+  // flits have. The model lays them out as Streaming does (Figure 3-25): the
+  // Adapter owns the Flit Header (Bytes 0-1) but for the Protocol ID, Byte 0
+  // [7:6], and the CRC (Bytes 126-127, 254-255). CXL.cachemem's layout
+  // (Figure 3-24) owns the same bytes. PCIe and CXL.io (Figure 3-23) add DLP
+  // bytes 122-125 and Flit_Marker bytes 250-253, which the Adapter and the
+  // Protocol Layer share, and Management Transport (Figure 3-26) has the
+  // Protocol Layer drive a credit return on 250-253: neither is modelled, and
+  // the agent refuses their streams. Management Flits travel on the
+  // Management Transport stream (x5h), so none appear on a modelled FDI.
+  function automatic bit stream_layout_modelled(logic [7:0] s);
+    return s[3:0] inside {4'h3, 4'h4};
+  endfunction
+
+  // Whether the Protocol Layer may send Protocol ID 00b, a NOP flit (r3.0
+  // Table 3-5). A Streaming Protocol Layer "must never set this to 00b for
+  // Flits sent across FDI" (Table 3-5; §3.3.4: "it must never set 00b for bits
+  // [7:6]"). For CXL the table lists 00b as the D2D Adapter/CXL.io NOP Flit
+  // with no such restriction, so it is accepted.
+  function automatic bit stream_tx_nop_legal(logic [7:0] s);
+    return s[3:0] != 4'h4;
+  endfunction
+
   // TX: Protocol Layer (DUT) to Adapter. RX: Adapter to Protocol Layer (DUT).
   typedef enum bit {UCIE_FDI_TX, UCIE_FDI_RX} ucie_fdi_dir_e;
 
@@ -91,27 +120,33 @@ package ucie_fdi_pkg;
 
   // ---------------------------------------------------------------------------
   // Format 6 codec. Flit byte k travels on FDI byte (k mod N) of transfer
-  // floor(k/N), N = beat bytes (UCIe r1.1 §8.3.1). Bytes 0-1 (Flit Header)
-  // and 126-127, 254-255 (CRC0/CRC1) belong to the Adapter.
+  // floor(k/N), N = beat bytes (UCIe r3.0 §10.3.1). Bytes 0-1 (Flit Header)
+  // and 126-127, 254-255 (CRC0/CRC1) belong to the Adapter, but for the
+  // Protocol ID (Byte 0 [7:6]), which the Protocol Layer sets (Streaming
+  // layout, r3.0 §3.3.4, Figure 3-25; see stream_layout_modelled).
   //
   // The cancel unit. pl_flit_cancel comes in the cycle after the last chunk
-  // of a 128B half (UCIe r1.1 Table 8-2). Up to 128 B a half ends on its own
+  // of a 128B half (UCIe r3.0 Table 10-3). Up to 128 B a half ends on its own
   // transfer, so each half has its own cancel. On a 256 B FDI the flit is one
   // transfer and both halves end in it, so the one cancel after it applies to
   // the whole flit (as UCIe r3.0 10.3.1 says of wider FDIs: a cancel applies
   // to every flit in that clock).
   //
-  // Wider FDIs (UCIe r3.0 10.3.1, Implementation Note "NBYTES"): a 512 or
-  // 1024 B transfer carries 2 or 4 flits, flit j on bytes 256j to 256j+255
-  // (lane j; the byte mapping above, continued). The Adapter forwards whole
-  // flits on the low lanes and zeros on the rest, and a Flit Header of 0000h
-  // is a NOP the Protocol Layer discards; the Protocol Layer sends valid flits
-  // on every lane. pl_flit_cancel applies to every flit of the transfer
-  // before it. The helpers below are the only place the width arithmetic
-  // lives.
+  // Wider FDIs (UCIe r3.0 10.3.1, Implementation Note "NBYTES"): a transfer
+  // of 256 B times n carries n flits, flit j on bytes 256j to 256j+255 (lane
+  // j; the byte mapping above, continued). The Adapter forwards whole flits on
+  // the low lanes and zeros on the rest, and a Flit Header of 0000h is a NOP
+  // the Protocol Layer discards; the Protocol Layer sends valid flits on every
+  // lane. pl_flit_cancel applies to every flit of the transfer before it. The
+  // helpers below are the only place the width arithmetic lives.
   // ---------------------------------------------------------------------------
+  // FDI widths: 32 to 256 B, and multiples of 256 B from 512 B up to
+  // MAX_BEAT_BYTES. The NBYTES note strongly recommends 64, 128, 256 or 512,
+  // and a multiple of 256 from 512 up (so 768 is accepted); 32 B is outside
+  // that list, accepted but not recommended.
   function automatic bit valid_beat_bytes(int unsigned n);
-    return n inside {32, 64, 128, 256, 512, 1024};
+    return n inside {32, 64, 128, 256} ||
+           (n >= 2 * FLIT_BYTES && n <= MAX_BEAT_BYTES && n % FLIT_BYTES == 0);
   endfunction
 
   // Transfers per flit: 1 once a transfer holds a whole flit.
@@ -140,6 +175,8 @@ package ucie_fdi_pkg;
     return beats_per_flit(beat_bytes) / beats_per_half(beat_bytes);
   endfunction
 
+  // The bytes the Adapter owns in the modelled layout (Byte 0 [7:6] of the
+  // Flit Header is the Protocol Layer's).
   function automatic bit is_adapter_byte(int unsigned i);
     return i inside {0, 1, 126, 127, 254, 255};
   endfunction

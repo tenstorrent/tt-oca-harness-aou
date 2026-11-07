@@ -119,6 +119,10 @@
 //    flit with a non-zero Protocol ID and an all-zero payload, which the
 //    scoreboard skips.
 //  - lp_stream is tied to `stream`; no DLLPs or Retimer credits.
+//  - With `tx_nop_pct` a TX transfer starts with a NOP flit (Protocol ID 00b,
+//    the rest zero), which a CXL Protocol Layer may send (r3.0 Table 3-5; a
+//    Streaming one never does), and which the scoreboard skips as an empty
+//    flit.
 //  - With `corrupt_pct`, a transfer of flits asks the Adapter to corrupt their
 //    CRC (lp_corrupt_crc, UCIe r3.0 Table 10-3): with lp_valid on the last
 //    transfer of the second 128B half, or of both halves; from 256 B up on the
@@ -126,7 +130,9 @@
 //  - `bad` makes one deliberate violation, on the first beat of a flit after
 //    the eighth one sent, for the negative tests of the model's checks
 //    (ucie_fdi_neg_test): "dllp" an lp_dllp_valid pulse, "retimer" an
-//    lp_retimer_crd pulse, "stream" a wrong lp_stream; "corrupt_mid"
+//    lp_retimer_crd pulse, "stream" a wrong lp_stream, "nop_tx" a NOP flit
+//    (Protocol ID 00b, which a Streaming Protocol Layer never sends; r3.0
+//    Table 3-5) in the first lane of a transfer; "corrupt_mid"
 //    lp_corrupt_crc on a transfer that does not end a half, "corrupt_h0" on the
 //    first half only (both up to 128 B), "corrupt_proto" a well-placed one
 //    while the protocol has no CXL.cachemem; "clk_ack" an lp_clk_ack pulse
@@ -154,6 +160,8 @@ class ucie_pl_stub extends uvm_component;
   int unsigned n_sent;       // flits whose last beat transferred
   int unsigned n_restarted;  // flits cut off mid-flit and sent again
   int unsigned n_fill;       // empty flits sent to fill a wide transfer
+  int unsigned tx_nop_pct;   // chance a TX transfer starts with a NOP flit (see above)
+  int unsigned n_tx_nop;     // NOP flits sent
   string       bad;          // a deliberate violation (see above); "" for none
   bit          wake_in_l1;   // start a PM exit in L1 (lp_wake_req)
   bit          linkerror_req; // request a LinkError (lp_linkerror) once
@@ -264,7 +272,7 @@ class ucie_pl_stub extends uvm_component;
   endfunction
 
   // A delivered flit, to be sent back: the payload with the Adapter-owned
-  // bytes cleared and a non-zero Protocol ID (Format 6 TX rule).
+  // bytes cleared and a non-zero Protocol ID (a protocol flit, never a NOP).
   function void write(ucie_flit_item t);
     ucie_flit_item c = ucie_flit_item::type_id::create("loopback");
     c.dir = UCIE_FDI_TX;
@@ -808,6 +816,12 @@ class ucie_pl_stub extends uvm_component;
     end else begin
       if (cur.size() == 0 && txq.size() != 0) begin
         int unsigned fpb = flits_per_beat(beat_bytes);
+        if (bad == "nop_tx" && !bad_done && n_sent >= 8) begin
+          bad_done = 1'b1;
+          cur.push_back(nop());
+        end else if (tx_nop_pct != 0 && $urandom_range(99) < tx_nop_pct) begin
+          cur.push_back(nop());
+        end
         while (cur.size() < fpb && txq.size() != 0) cur.push_back(txq.pop_front());
         while (cur.size() < fpb) cur.push_back(filler());
         cc_mask = corrupt_plan();
@@ -862,6 +876,14 @@ class ucie_pl_stub extends uvm_component;
     ucie_fdi_beat_t b = '0;
     foreach (cur[l]) b |= cur[l].get_beat(beat_bytes, beat, l);
     return b;
+  endfunction
+
+  // A NOP flit: Protocol ID 00b, everything else zero.
+  local function ucie_flit_item nop();
+    ucie_flit_item f = ucie_flit_item::type_id::create("nop");
+    f.dir = UCIE_FDI_TX;
+    n_tx_nop++;
+    return f;
   endfunction
 
   // A Protocol Flit with no messages: Protocol ID 11b, everything else zero.
