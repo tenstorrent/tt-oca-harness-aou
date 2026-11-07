@@ -24,6 +24,10 @@ class aou_fdi_t1_env extends uvm_env;
     super.new(name, parent);
     lsm_cfg = ucie_lsm_cfg::type_id::create("lsm_cfg");
     lsm_cfg.n_phy = N_PHY;
+    // Software restarts the link this many cycles after a link-down, drawn
+    // per run so a DUT that asks anything of the link meanwhile is caught at
+    // many delays; +ucie_sw_restart_delay=N (or +sw_restart_delay=N) fixes it.
+    lsm_cfg.sw_restart_delay = $urandom_range(1500, 50);
     foreach (fdi_cfg[p]) begin
       fdi_cfg[p] = ucie_fdi_cfg::type_id::create($sformatf("fdi_cfg%0d", p));
       fdi_cfg[p].phy = p;

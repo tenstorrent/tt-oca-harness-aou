@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 //
-// FDI link state (UCIe r1.1 §8.2.3, §8.2.7, Table 8-2; r3.0 §10.2, Table
-// 10-3), shared by every FDI of the link: the handshakes, the negotiated
-// protocol and format, the link's speed and width, and the error and
-// power-state indications. pl_state_sts is per FDI and lives on
-// ucie_fdi_mb_if. Signals of the Protocol Layer under test that are not FDI
-// (software pins, status outputs) belong on an interface of the bench's own.
-// The sideband configuration channel (pl_cfg, lp_cfg) is not on it.
+// FDI link state of one FDI (UCIe r3.0 §10.2, Table 10-3): the handshakes,
+// the negotiated protocol and format, the link's speed and width, and the
+// error and power-state indications. UCIe has one FDI, and so one of these,
+// per protocol stack; in the model's mirrored mode (ucie_lsm_cfg::n_phy 2)
+// two FDIs share it. pl_state_sts lives on ucie_fdi_mb_if. Signals of the
+// Protocol Layer under test that are not FDI (software pins, status outputs)
+// belong on an interface of the bench's own. The sideband configuration
+// channel (pl_cfg, lp_cfg) is not on it.
 
 interface ucie_fdi_lsm_if (
     input logic clk,
@@ -50,9 +51,9 @@ interface ucie_fdi_lsm_if (
   endclocking
 
   clocking mon_cb @(posedge clk);
-    input pl_inband_pres, pl_clk_req, pl_wake_ack, pl_rx_active_req, pl_protocol_vld,
-          pl_phyinrecenter, pl_phyinl1, pl_phyinl2, lp_state_req, lp_wake_req, lp_clk_ack,
-          lp_rx_active_sts, lp_linkerror, rst_n;
+    input pl_inband_pres, pl_clk_req, pl_wake_ack, pl_rx_active_req, pl_protocol,
+          pl_protocol_flitfmt, pl_protocol_vld, pl_phyinrecenter, pl_phyinl1, pl_phyinl2,
+          lp_state_req, lp_wake_req, lp_clk_ack, lp_rx_active_sts, lp_linkerror, rst_n;
   endclocking
 
 endinterface

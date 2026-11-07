@@ -16,8 +16,11 @@
 // (UCIe r3.0 10.3.1): a TX beat is that many flits, each checked (FDI-R45, so
 // a lane the DUT leaves empty is an error), and an RX beat is that many
 // flits, of which the zero-padded lanes are NOPs.
-// Reset flushes both directions, and so does a LinkError the Adapter entered
-// mid-flit (gate abort; UCIe r3.0 §10.3.3.7): the partial flits are abandoned.
+// Reset flushes both directions, and so does a LinkError entered mid-flit
+// (UCIe r3.0 §10.3.3.7): the partial flits are abandoned. That is seen on
+// the interface alone (pl_state_sts Active -> LinkError with a flit part-way
+// in either direction), so a passive monitor on a real Adapter judges it the
+// same way as the model's own.
 // The checks on the stall handshake follow r3.0 §10.3.2 (rules 1 to 8).
 // The Protocol Layer may present a flit (lp_valid, lp_irdy) in any state but
 // Reset and wait for pl_trdy (r3.0 10.2.4, Table 10-3 lp_irdy); pl_trdy, and
@@ -52,7 +55,7 @@ class ucie_fdi_monitor extends uvm_monitor;
   int unsigned n_rx_cancel_rep;  // RX flits with one half cancelled more than once
   int unsigned n_tx_abandoned;   // partial flits abandoned on a mid-flit LinkError
   int unsigned n_rx_abandoned;
-  int unsigned n_rx_beats_reset; // RX beats in Reset with the Receiver Active (+fdi_rx_early)
+  int unsigned n_rx_beats_reset; // RX beats in Reset with the Receiver Active (+ucie_rx_early)
   // Cycles in Active in which the Adapter would take a DUT TX beat: pl_trdy
   // high and no stall handshake under way. A test judging how much the DUT
   // sends compares against this, not wall-clock cycles, so the pl_trdy policy
@@ -123,7 +126,7 @@ class ucie_fdi_monitor extends uvm_monitor;
 
   local function void err(rule_e r, string msg);
     if (!cfg.checks_en) return;
-    ucie_rule_log::fire(RULE[r], get_type_name());
+    ucie_rule_log::fire(RULE[r], this);
     `uvm_error(get_type_name(), $sformatf("%s: phy%0d %s", RULE[r], cfg.phy, msg))
   endfunction
 
@@ -134,7 +137,7 @@ class ucie_fdi_monitor extends uvm_monitor;
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
     if (cfg.checks_en)
-      foreach (n_chk[r]) ucie_rule_log::check(RULE[r], get_type_name(), n_chk[r]);
+      foreach (n_chk[r]) ucie_rule_log::check(RULE[r], this, n_chk[r]);
     n_chk = '{default: 0};
   endfunction
 
@@ -169,7 +172,8 @@ class ucie_fdi_monitor extends uvm_monitor;
       irdy_grace = prev_sts == FDI_STS_LINKERROR ? cfg.irdy_reset_grace : 0;
     else if (irdy_grace != 0)
       irdy_grace--;
-    if (prev_sts == FDI_STS_ACTIVE && sts != FDI_STS_ACTIVE && cfg.gate.abort) abandon();
+    if (prev_sts == FDI_STS_ACTIVE && sts == FDI_STS_LINKERROR)
+      abandon(vif.mon_cb.pl_flit_cancel === 1'b1);
     sample_tx(sts);
     sample_stall();
     sample_rx(sts);
@@ -177,28 +181,34 @@ class ucie_fdi_monitor extends uvm_monitor;
     prev_rst_n = 1'b1;
   endfunction
 
-  // The Adapter left Active mid-flit: the DUT must drop its partial TX flit and
-  // the partial RX flit it got (UCIe r3.0 §10.3.3.7). It may keep presenting a
-  // flit in LinkError (pl_trdy stays low, so nothing transfers, unless the
-  // Adapter drains it under a stall handshake, FDI-R43); FDI-R44 still
-  // requires lp_irdy low in Reset once the grace after LinkError has run out.
-  local function void abandon();
+  // The link left Active for LinkError: the DUT must drop its partial TX flit
+  // and the partial RX flit it got (UCIe r3.0 §10.3.3.7: "It is required for
+  // the upper layer to internally clean up the data path, even if pl_trdy is
+  // not asserted"). A whole RX flit whose cancel cycle is this first clock of
+  // LinkError is not partial: with no cancel (c 0) it is delivered as usual.
+  // The DUT may keep presenting a flit in LinkError (pl_trdy stays low, so
+  // nothing transfers, unless the Adapter drains it under a stall handshake,
+  // FDI-R43); FDI-R44 still requires lp_irdy low in Reset once the grace
+  // after LinkError has run out.
+  local function void abandon(bit c);
+    bit rx = rx_cur.size() != 0 && !(rx_half_done && rx_beat == cfg.bpf() && !c);
     if (tx_beat != 0) begin
       n_tx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b0);
       if (fcov != null) fcov.sample_abandon(1'b0);
     end
-    if (rx_cur.size() != 0) begin
+    if (rx) begin
       n_rx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b1);
       if (fcov != null) fcov.sample_abandon(1'b1);
     end
-    if (tx_beat != 0 || rx_cur.size() != 0)
+    if (tx_beat != 0 || rx)
       `uvm_info(get_type_name(), $sformatf(
-                "left Active mid-flit: TX beat %0d, RX beat %0d abandoned", tx_beat, rx_beat),
-                UVM_MEDIUM)
-    abandon_h_done = rx_cur.size() != 0 && rx_half_done;
+                "left Active mid-flit: TX beat %0d, RX beat %0d abandoned", tx_beat,
+                rx ? rx_beat : 0), UVM_MEDIUM)
     tx_cur.delete(); tx_beat = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
+    if (!rx) return;
+    abandon_h_done = rx_half_done;
     rx_cur.delete(); rx_beat = 0; rx_bubbles = 0; rx_half_done = 1'b0;
     rx_err_unit = 1'b0;
   endfunction
@@ -329,8 +339,10 @@ class ucie_fdi_monitor extends uvm_monitor;
                          " (Protocol ID 00b, a NOP, which a Streaming Protocol Layer never sends)"
                          : ""));
     if (nop_ok && f.is_nop()) n_tx_nops++;
-    if (cov != null) cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
-    if (fcov != null) fcov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before);
+    if (cov != null)
+      cov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before, f, lane);
+    if (fcov != null)
+      fcov.sample_xfer(UCIE_FDI_TX, cfg.beat_bytes, tx_stall, f.gap_before, f, lane);
     n_tx_flits++;
     `uvm_info(get_type_name(), {"DUT TX ", f.convert2string()}, UVM_HIGH)
     ap_tx.write(f);
@@ -461,7 +473,7 @@ class ucie_fdi_monitor extends uvm_monitor;
 
     // FDI-R35, UCIe r3.0 10.2.7: flits only while the Receiver is Active,
     // pl_rx_active_req and lp_rx_active_sts both 1 with pl_state_sts Reset,
-    // Retrain or Active (rule 3; Reset with +fdi_rx_early). In Active with the
+    // Retrain or Active (rule 3; Reset with +ucie_rx_early). In Active with the
     // request low no flit may be sent either (rule 6).
     if (v) chk(R35);
     if (v && sts == FDI_STS_RESET) n_rx_beats_reset++;
@@ -523,8 +535,10 @@ class ucie_fdi_monitor extends uvm_monitor;
       if (f.n_cancel_h1 != 0) n_rx_cancel_h1++;
       if (f.n_cancel_h0 > 1 || f.n_cancel_h1 > 1) n_rx_cancel_rep++;
       f.n_stall_cycles = rx_bubbles;
-      if (cov != null) cov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before);
-      if (fcov != null) fcov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before);
+      if (cov != null)
+        cov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before, f, l);
+      if (fcov != null)
+        fcov.sample_xfer(UCIE_FDI_RX, cfg.beat_bytes, rx_bubbles, f.gap_before, f, l);
       n_rx_flits++;
       `uvm_info(get_type_name(), {"DUT RX ", f.convert2string()}, UVM_HIGH)
       ap_rx.write(f);

@@ -10,6 +10,8 @@
 // protocol layer, checker or scoreboard that follows the link state implements
 // ucie_lsm_observer and registers with add_observer(); every clock, after the
 // rule checks, each observer gets this clock's sample and the previous one.
+// Everything is decided from the interfaces, so the monitor works the same in
+// passive mode, where its Adapter-side rules check a real Adapter.
 class ucie_lsm_monitor extends uvm_monitor;
   `uvm_component_utils(ucie_lsm_monitor)
 
@@ -104,7 +106,7 @@ class ucie_lsm_monitor extends uvm_monitor;
 
   local function void err(rule_e r, string msg);
     if (!cfg.checks_en) return;
-    ucie_rule_log::fire(RULE[r], get_type_name());
+    ucie_rule_log::fire(RULE[r], this);
     `uvm_error(get_type_name(), $sformatf("%s: %s", RULE[r], msg))
   endfunction
 
@@ -156,7 +158,8 @@ class ucie_lsm_monitor extends uvm_monitor;
     if (cfg.hs_fall_timeout != 0 && rx_sts_late == cfg.hs_fall_timeout + 1)
       err(R28, $sformatf("lp_rx_active_sts still high %0d cycles after pl_rx_active_req fell",
                          cfg.hs_fall_timeout));
-    // Adapter-side rules, kept here as a self-check of the L2 driver.
+    // Adapter-side rules: a self-check of the L2 driver, and in passive mode a
+    // check of the Adapter the monitor watches.
     if (c.wake_ack && !p.wake_ack && !p.wake_req)
       err(R14, "pl_wake_ack rose without lp_wake_req in the previous cycle");
     if (!c.wake_ack && p.wake_ack && p.wake_req)
@@ -333,7 +336,7 @@ class ucie_lsm_monitor extends uvm_monitor;
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
     if (cfg.checks_en)
-      foreach (n_chk[r]) ucie_rule_log::check(RULE[r], get_type_name(), n_chk[r]);
+      foreach (n_chk[r]) ucie_rule_log::check(RULE[r], this, n_chk[r]);
     n_chk = '{default: 0};
   endfunction
 endclass

@@ -13,8 +13,8 @@ incdirs = [
 ]
 
 sources = [
+  "hw/ip/aou/dv/vip/ucie_fdi/uvm/ucie_fdi_pkg.sv",
   "hw/ip/aou/dv/vip/ucie_fdi/interface/ucie_fdi_mb_if.sv",
   "hw/ip/aou/dv/vip/ucie_fdi/interface/ucie_fdi_lsm_if.sv",
-  "hw/ip/aou/dv/vip/ucie_fdi/uvm/ucie_fdi_pkg.sv",
   "hw/ip/aou/dv/vip/ucie_fdi/uvm/ucie_lsm_pkg.sv",
 ]

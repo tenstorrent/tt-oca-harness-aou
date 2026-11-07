@@ -49,7 +49,7 @@ AXI-S03,aou_scoreboard,,DUT,Each RRESP equals the target memory's response for t
 AXI-S04,aou_scoreboard,,DUT,Read data equals golden memory on every active lane of OKAY/EXOKAY beats (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule
 AXI-S05,aou_scoreboard,,DUT,At end of test the real memories equal golden on every written byte (a byte an aborted write strobed: old or written value),AOU_TB_ARCH.adoc scoreboard rule
 FDI-R01,ucie_fdi_monitor,,DUT,A TX beat transfers only on lp_irdy & lp_valid & pl_trdy (definition used by the monitor) (L1; checks the both),UCIe r1.1 8.2.4
-FDI-R02,ucie_fdi_monitor,,DUT,No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes (L1; checks the DUT),UCIe r1.1 8.2.4
+FDI-R02,ucie_fdi_monitor,,DUT,"No bubbles inside a TX flit: lp_valid and lp_irdy stay high until the flit completes; a flit cut off when pl_state_sts goes from Active to LinkError is dropped, not a bubble, judged from the interface alone, so a passive monitor judges it too (L1; checks the DUT)",UCIe r1.1 8.2.4 / r3.0 §10.3.3.7
 FDI-R03,by construction (ucie_fdi_pl_driver),,MODEL,RX has no backpressure and the Adapter may insert bubbles inside a flit (a permission; the PL driver inserts holes),UCIe r1.1 8.2.4
 FDI-R04,via AOU-R3,,DUT,Flit byte k is FDI byte k mod N of transfer floor(k/N) both ways (a mis-mapped DUT flit decodes to undefined granules),UCIe r1.1 8.3.1
 FDI-R05,ucie_fdi_monitor,,MODEL,"pl_flit_cancel only in the cycle after the last beat of a 128B half; on a 256 B FDI after the flit's one beat, cancelling the whole flit (L1; checks the Adapter)",UCIe r1.1 Table 8-2 pl_flit_cancel

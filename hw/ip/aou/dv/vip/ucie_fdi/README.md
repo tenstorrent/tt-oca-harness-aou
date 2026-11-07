@@ -32,16 +32,20 @@ It takes three kinds of handle:
 - the flits, on the mainband monitor's analysis ports;
 - the link state, as an observer: a class that `implements ucie_lsm_observer` and
   registers with the link-state monitor, which calls it every clock;
-- coverage, as a collector that `implements ucie_fdi_cov`, set on each mainband
-  monitor.
+- coverage, as a collector that `implements ucie_fdi_cov` (or extends
+  `ucie_fdi_cov_base`), set on each mainband monitor;
+- link events, on the link-state driver's analysis port `ap_event`.
 
-Nothing the model does every clock allocates an object.
+Nothing the model does every clock allocates an object, except the flits it
+publishes: each completed flit is a new `ucie_flit_item` on `ap_tx` or `ap_rx`
+(by design, so subscribers may keep it), up to four per clock on the widest FDI.
 
 | | Item | Depends on |
 |---|---|---|
 | Done | Mainband agent (Format 6 codec, RX driver with cancels and bubbles, TX responder with `pl_trdy` policies and stalls, monitor with checks) | - |
 | Done | Link-state agent (Adapter state machine, handshakes, events: Retrain, L1 entry and exit, LinkError incl. mid-flit, LinkReset, Disabled, aborted bringups) | - |
-| Done | Extension API: link-state observers and a mainband coverage collector (interface classes), flit analysis ports; own rule ledger, self-test | - |
+| Done | Extension API: link-state observers and a mainband coverage collector (interface classes, the collector with a do-nothing base class), flit and link-event analysis ports; own rule ledger keyed by checker instance, self-test | - |
+| Done | A second consumer: one link-state agent per FDI (several links side by side, each with its own plusargs through `+<name>@<instance>`), passive monitors that need nothing from the active driver, the two-FDI mirrored mode kept as an option (see "One FDI per protocol stack") | - |
 | Done | FDI widths of 32, 64, 128 and 256 bytes; at 256 B a flit is one transfer and its cancel covers the whole flit | - |
 | Done | FDI widths of 512, 768 and 1024 bytes: 2 to 4 flits per transfer, NOP lanes on RX, a cancel covers every flit of the transfer (see "Flit widths 512 B and up") | - |
 | Done | NOP flits by their Protocol ID: the monitor drops every uncancelled RX NOP, the PL driver can forward NOPs (uncancelled, cancelled and replayed, cancelled and dropped; `nop_pct`), and the TX rule on Protocol ID 00b follows the stream's protocol (see "Flit format and protocol") | - |
@@ -70,7 +74,7 @@ Nothing the model does every clock allocates an object.
 
 ## What it models
 
-*The Adapter, seen from the Protocol Layer, on one or two FDIs.* The model plays the
+*The Adapter, seen from the Protocol Layer, on one FDI per link-state agent.* The model plays the
 UCIe Die-to-Die Adapter; the design under test is the Protocol Layer. Section numbers
 are UCIe r1.1's, which the code cites; the same sections are §10.2 and §10.3 in UCIe
 r3.0 (r1.1 §8.2.x is r3.0 §10.2.x, §8.3.x is §10.3.x).
@@ -88,6 +92,25 @@ r3.0 (r1.1 §8.2.x is r3.0 §10.2.x, §8.3.x is §10.3.x).
 | Protocol Layer requests | r3.0 Table 10-4, §10.3.3 | see "Requests the Adapter answers" below |
 | Negotiated link | r3.0 Table 10-3 | `pl_protocol`, `pl_protocol_flitfmt` (Format 6) and `pl_protocol_vld` with the bringup; `pl_speedmode`, `pl_max_speedmode`, `pl_lnk_cfg` and the stream ID from the config objects; `pl_phyinl1` in L1, `pl_phyinrecenter` while training (optional) |
 | Errors | r3.0 Table 10-3, §10.3.1 | RX: `pl_error` with `pl_valid` on one transfer of a 128B half (from 256 B up, of the transfer), the half finished and cancelled, a Retrain, then the replay (`error_pct`); TX: `lp_corrupt_crc` checked for placement and protocol |
+
+### One FDI per protocol stack
+
+UCIe r3.0 §10.2: "A single instance is used for a Protocol Layer to Adapter
+connection. However, a single Adapter can host multiple protocol stacks using multiple
+instances of FDI." Each FDI has its own link state: §10.2.8 runs the bring-up
+"independently for each Protocol Layer stack", and §10.3.3.8 lets each stack "independently
+enter these states [LinkReset, Disabled] without affecting the other protocol stack".
+The model follows that: one `ucie_lsm_agent` drives and checks the link state of one FDI
+(its `ucie_fdi_lsm_if` and the `pl_state_sts` of its `ucie_fdi_mb_if`). Several stacks
+are several link-state agents side by side, each with its own interfaces and mainband
+agent (the self-test's `ucie_fdi_reuse_test` runs two).
+
+The **mirrored mode** (`ucie_lsm_cfg.n_phy` 2, `active_phy`, `park_idle_phy`) is an
+option beyond UCIe, kept for a Protocol Layer that follows one of two FDIs through one
+set of handshakes, as the AoU bench's two-PHY builds do: one `lp_state_req`, wake, clock
+and rx_active handshake serve both FDIs, both report the same `pl_state_sts` (or the one
+not followed stays in Reset with `park_idle_phy`), and the monitor samples the followed
+one. It is not UCIe's multi-stack FDI.
 
 ### Requests the Adapter answers
 
@@ -168,12 +191,18 @@ link-wide ones on `ucie_fdi_lsm_if`. A Protocol Layer without some of them leave
 | `pl_phyinl1` | link | 1 in L1 | r3.0 Table 10-3 |
 | `pl_phyinl2` | link | holds 0: the model never enters L2 | r3.0 Table 10-3 |
 | `pl_phyinrecenter` | link | 0, or with `recenter_en` 1 from the bringup's `pl_clk_req` handshake to Active and in Retrain | r3.0 Table 10-3, §10.2.3.2 |
-| `pl_cerror`, `pl_nferror`, `pl_trainerror` | link | hold 0: no error reporting | r3.0 Table 10-3 |
+| `pl_cerror`, `pl_nferror` | link | hold 0: no error reporting | r3.0 Table 10-3 |
+| `pl_trainerror` | link | holds 0: the model never fails training (its LinkErrors are internal or requested, and the signal belongs with a training failure that stays until LinkError -> Reset) | r3.0 Table 10-3 |
 
-Not on the interfaces: the sideband configuration channel (`pl_cfg`, `pl_cfg_vld`,
-`pl_cfg_crd`, `lp_cfg`, `lp_cfg_vld`, `lp_cfg_crd`), the optional vendor-defined
-signals (`pl_vendor_defined`, `lp_vendor_defined`) and the Management Transport
-ones (`dm_param_exchange_done`, `dm_param_stack_count`).
+Not on the interfaces, with what a Protocol Layer that has them connects instead:
+
+| Signal | Tie-off | Section |
+|---|---|---|
+| `pl_cfg`, `pl_cfg_vld`, `pl_cfg_crd` | 0: no sideband packets and no credit returns from the Adapter | r3.0 Table 10-3, §10.2.1 |
+| `lp_cfg`, `lp_cfg_vld`, `lp_cfg_crd` | left open (nothing reads them) | r3.0 Table 10-3 |
+| `pl_vendor_defined` | 0 ("these signals should not assert" when unused) | r3.0 Table 10-3 |
+| `lp_vendor_defined` | left open | r3.0 Table 10-3 |
+| `dm_param_exchange_done`, `dm_param_stack_count` | 0: no Management Transport parameter exchange (right for a protocol without Management Transport; with `pl_protocol` 1xxxb a Protocol Layer that waits for it needs it driven by the bench) | r3.0 Table 10-3 |
 
 The defaults describe one consistent link: Streaming (`pl_protocol` 0111b) in Format 6
 on stream 04h (Stack 0 Streaming), 32 GT/s (`pl_speedmode` 101b) with a maximum of at
@@ -193,7 +222,7 @@ The model has no assertion modules, and its covergroups are classes in its packa
 | Path | Contents |
 |---|---|
 | `interface/ucie_fdi_mb_if.sv` | Mainband interface of one FDI (`ucie_fdi_mb_if #(DATA_W)`) |
-| `interface/ucie_fdi_lsm_if.sv` | Link-state handshakes shared by the FDIs (`ucie_fdi_lsm_if`) |
+| `interface/ucie_fdi_lsm_if.sv` | Link state of one FDI: handshakes, negotiated values, indications (`ucie_fdi_lsm_if`; shared by two FDIs in the mirrored mode) |
 | `uvm/ucie_fdi_pkg.sv`, `uvm/l1/` | L1, the mainband: flit item and codec, agent, PL driver, TX responder, monitor, coverage collector API (`ucie_fdi_cov`), flit sequence, rule ledger |
 | `uvm/ucie_lsm_pkg.sv`, `uvm/l2/` | L2, the link state: encodings, agent, driver, monitor, sample (`ucie_lsm_obs_t`), observer API (`ucie_lsm_observer`), event item and sequences |
 | `uvm/ucie_fdi_macros.svh` | `UCIE_RANDOMIZE_WITH` |
@@ -210,7 +239,8 @@ layer on top (Extension API).* `dv/` is a complete, small example of every step.
 
 Compile UVM, then `uvm/ucie_fdi.f` (with `UCIE_FDI_HOME` set to this directory) or the
 sources of `uvm/sources.toml` in order, then the bench. Packages: `ucie_fdi_pkg` (L1) and
-`ucie_lsm_pkg` (L2, imports L1).
+`ucie_lsm_pkg` (L2, imports L1). `ucie_fdi_pkg` comes before the interfaces:
+`ucie_fdi_mb_if` takes its default width from it.
 
 ### Top
 
@@ -226,13 +256,18 @@ end
 ```
 
 The mainband interface is always `BUS_W` (8192) bits wide, so every FDI has the same
-virtual-interface type; connect the low `8 * beat_bytes` bits to the design. Take the
-width from `ucie_fdi_pkg::BUS_W`, never a literal: it grows with the widest FDI the
-model supports (it was 1024 before 256 B FDIs and 2048 before 512 and 1024 B ones).
+virtual-interface type; connect the low `8 * beat_bytes` bits to the design. `DATA_W`
+defaults to `ucie_fdi_pkg::BUS_W`; take the width from there, never a literal: it grows
+with the widest FDI the model supports (it was 1024 before 256 B FDIs and 2048 before 512
+and 1024 B ones).
 The Adapter drives the `pl_*` signals; the design drives the `lp_*` ones. A design
 without some of them ties them to their idle values ("Signals"): `lp_linkerror`,
 `lp_corrupt_crc`, `lp_dllp*` and `lp_retimer_crd` to 0, and `lp_stream` to the link's
-stream (`ucie_fdi_cfg.stream`). Config-db keys: `fdi_mb<p>` per FDI, `fdi_lsm` once.
+stream (`ucie_fdi_cfg.stream`). Config-db keys: `fdi_mb<p>` per FDI (`p` is
+`ucie_fdi_cfg.phy`, unique across links), `fdi_lsm` for the link-state interface unless
+the parent sets `lsm.lsm_vif` itself, as a second link must (`ucie_fdi_selftest_env`
+does it with its `lsm_key`). The link-state agent takes the mainband interfaces from the
+agents in its `phy`.
 
 ### Environment
 
@@ -245,8 +280,14 @@ fdi = ucie_fdi_agent::type_id::create("fdi0", this);
 fdi.cfg = fdi_cfg;
 lsm = ucie_lsm_agent::type_id::create("lsm", this);
 lsm.cfg = lsm_cfg;
-lsm.phy.push_back(fdi);                        // one per FDI: L2 opens, closes and stalls them
+lsm.phy.push_back(fdi);                        // the FDI of this link: L2 opens, closes and stalls it
 ```
+
+A second protocol stack is a second FDI and a second link-state agent: a mainband agent
+with `phy` 1, a link-state agent with its own `ucie_fdi_lsm_if` in `lsm_vif`, and that
+mainband agent in its `phy`. In passive mode (`is_active` 0 in both configs) the agents
+only monitor, so they can sit beside the active model or on a real Adapter; the
+link-state agent still takes the (passive) mainband agent in `phy`.
 
 The link-state agent brings the link up after every reset by itself
 (`cfg.auto_bringup`); traffic waits for Active.
@@ -286,12 +327,16 @@ mechanism that fits it.
 |---|---|---|---|---|
 | Read flits | `uvm_analysis_port #(ucie_flit_item)` `ap_tx`, `ap_rx` on `ucie_fdi_monitor` | `fdi.mon.ap_tx.connect(...)` | at every completed flit |
 | Follow the link state | `interface class ucie_lsm_observer`: `observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev)` | `lsm.mon.add_observer(obj)` (any number) | every clock, reset included, after the monitor's own rules |
-| Collect mainband coverage | `interface class ucie_fdi_cov`: `sample_xfer`, `sample_cancel`, `sample_stall`, `sample_abandon` | `fdi.mon.cov = obj` (one per monitor; PHYs may share one) | at every flit, RX cancel, stall handshake, abandoned flit; never when null or `cov_en` is 0 |
+| Collect mainband coverage | `interface class ucie_fdi_cov`: `sample_xfer` (with the flit and its lane), `sample_cancel`, `sample_stall`, `sample_abandon`; or extend `ucie_fdi_cov_base`, which implements them all as no-ops | `fdi.mon.cov = obj` (one per monitor; PHYs may share one) | at every flit, RX cancel, stall handshake, abandoned flit; never when null or `cov_en` is 0 |
+| Read link events | `uvm_analysis_port #(ucie_lsm_item)` `ap_event` on `ucie_lsm_driver` | `lsm.drv.ap_event.connect(...)` (active only) | when an event from the sequencer has run, its bringup included |
 
 **Why interface classes for two of them.** An observer or a collector in a UVM bench
 already has a base class of its own, a `uvm_component` or a `uvm_object`. An interface
-class adds the model's API to it without taking that place. Flits keep UVM's analysis
-ports because many unrelated subscribers read them and may keep them.
+class adds the model's API to it without taking that place. A collector that can be a
+`uvm_object` extends `ucie_fdi_cov_base` instead and overrides only what it samples, so a
+method a later version adds does not break it; one that implements the interface class
+directly must add every new method. Flits and link events keep UVM's analysis ports
+because many unrelated subscribers read them and may keep them.
 
 **What an observer gets.** `ucie_lsm_obs_t` is a struct passed by value: this clock's
 link-state signals as the Protocol Layer sees them (`pl_state_sts` of `active_phy`'s
@@ -337,7 +382,8 @@ class my_fdi_cov extends uvm_object implements ucie_fdi_cov;
     super.new(name);
   endfunction
   virtual function void sample_xfer(ucie_fdi_dir_e dir, int unsigned beat_bytes,
-                                    int unsigned stall, int unsigned gap); endfunction
+                                    int unsigned stall, int unsigned gap, ucie_flit_item f,
+                                    int unsigned lane); endfunction
   virtual function void sample_cancel(int unsigned half, bit with_valid, int unsigned count,
                                       bit stalled); endfunction
   virtual function void sample_stall(int unsigned lat, int unsigned hold, bit mid,
@@ -402,15 +448,16 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `ucie_fdi_tx_responder` | `pl_trdy`, `pl_stallreq` | `stall_begin()`, `stall_end()`, `stalled()` |
 | `ucie_fdi_monitor` | both directions, checks | `ap_tx`, `ap_rx`, `cov`, counters `n_tx_flits`, `n_rx_flits`, `n_rx_cancels`, `n_stalls`, `n_rx_nops` (uncancelled RX NOP flits discarded), `n_rx_nop_cancels` (cancels of a first half or transfer of NOPs), `n_tx_nops` (TX NOPs where the stream allows them), ... |
 | `ucie_fdi_cov` | interface class: a mainband coverage collector | `sample_xfer`, `sample_cancel`, `sample_stall`, `sample_abandon` (Extension API) |
+| `ucie_fdi_cov_base` | a `uvm_object` implementing `ucie_fdi_cov` with no-ops, to extend | as `ucie_fdi_cov` |
 | `ucie_fdi_fcov` | the model's mainband covergroups, a `ucie_fdi_cov` | `fdi_bytes` (the FDI width); `sample_lanes()`, `sample_trdy()` besides the interface's; `convert2string()` (each group's score) |
-| `ucie_rule_log` | rule ledger | `check()`, `fire()`, `lines()`, `clear()` (static) |
+| `ucie_rule_log` | rule ledger, keyed by rule and checker instance | `check(rule, who)`, `fire(rule, who)` (`who`: the checker component), `lines()` ("RULE-LEDGER <rule> <checker class> checks=<n> fires=<n> at=<instance>"), `clear()` (static) |
 
 ### L2: `ucie_lsm_cfg`
 
 | Field | Default | Meaning |
 |---|---|---|
-| `n_phy`, `active_phy` | 1, 0 | FDIs, and the one the Protocol Layer follows |
-| `park_idle_phy` | 0 | two FDIs: the other one stays in Reset with its mainband closed |
+| `n_phy`, `active_phy` | 1, 0 | FDIs under this link state, and the one the Protocol Layer follows; 2 is the mirrored mode, beyond UCIe (see "One FDI per protocol stack") |
+| `park_idle_phy` | 0 | mirrored mode: the FDI not followed stays in Reset with its mainband closed |
 | `is_active` | 1 | 0: monitor only |
 | `lat_min`, `lat_max` | 1, 6 | Adapter response latency |
 | `dwell_min`, `dwell_max` | 8, 40 | time in Retrain, L1, LinkError, ... |
@@ -424,7 +471,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 | `remote_rsp_max` | 0 | extra clocks, drawn in [0:N], for the remote die's sideband answer to a LinkReset or Disabled request while the link is up or training (r3.0 §10.3.3.8 Implementation Note); 0 answers at once |
 | `linkdown_via_active_pct` | 0 | chance a LinkReset or Disabled answered in Retrain, or in Reset after `pl_inband_pres`, first goes through Active (r3.0 §10.3.3.4 rule 2, §10.3.3.1 rules 2 and 3) |
 | `restart_on` | `LSM_RESTART_SW` | what restarts the training after a link-down (LinkError, LinkReset or Disabled -> Reset; r3.0 §10.3.3.8): `LSM_RESTART_SW` software, `sw_restart_delay` cycles later; `LSM_RESTART_PL` the Protocol Layer's NOP->Active on `lp_state_req` in that Reset, which may come before `pl_inband_pres` and return to NOP; `LSM_RESTART_EITHER` whichever comes first. With PL or EITHER the Adapter also answers the trigger between events, so a link left down (`rebringup_after_down` 0) comes up on it |
-| `sw_restart_delay` | random 50..1500 | cycles in Reset after a link-down before software restarts the training (`restart_on` SW or EITHER) |
+| `sw_restart_delay` | 300 | cycles in Reset after a link-down before software restarts the training (`restart_on` SW or EITHER); the agent keeps the value set here (a bench that wants many delays draws one per run, as the self-test and the AoU bench do in [50:1500]) |
 | `remote_active_first_pct` | 0 | chance an Active entry from Reset (after `pl_inband_pres`, under `pl_clk_req`) or from a Retrain entered from Active starts the rx_active handshake before the Protocol Layer's Active request, as when the remote die's Active request arrives first (r3.0 §10.2.7 rule 1, §10.2.8 step 4) |
 | `le_mid_flit_pct` | 0 | chance an Adapter LinkError is entered mid-flit |
 | `rx_early` | 0 | cycles RX flits flow in Reset once the Receiver is active (§8.2.7) |
@@ -444,11 +491,11 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 
 | Class | Role | Public |
 |---|---|---|
-| `ucie_lsm_agent` | the link | `cfg`, `phy[$]` (the mainband agents, set before build), `sqr`, `drv`, `mon`, `fcov` (null with `fcov_en` 0) |
+| `ucie_lsm_agent` | the link state of one FDI | `cfg`, `lsm_vif` (set before build, or config-db `fdi_lsm`), `phy[$]` (the mainband agent, two in the mirrored mode, set before build), `sqr`, `drv`, `mon`, `fcov` (null with `fcov_en` 0) |
 | `ucie_lsm_item` | one event | `kind`, `cycles`; `to` (how it ends), `at`, `in_l1`, `gap`, `hold_wake_ack` (aborts) |
 | `ucie_lsm_event_seq` | one event | `of(kind)`; `ev_kind`, `ev_cycles`, `ev_to`, `ev_at`, `ev_in_l1`, `ev_gap`, `ev_hold_wake_ack` |
 | `ucie_lsm_l1_seq` | L1 entry, `ev_cycles` in L1, remote exit | as `ucie_lsm_event_seq` |
-| `ucie_lsm_driver` | Adapter state machine | `state`, `link_active`, `execute(item)`, `set_state()`, `wait_cycles()`, `parked()`, `idle()` (no event and no answer under way); counters `n_le`, `n_le_react` (LinkErrors on `lp_linkerror`), `n_down_req` (LinkReset and Disabled on `lp_state_req`), `n_via_active`, `n_exit_req` (link-down states left on the Active request), `n_le_mid_tx`, `n_le_mid_rx` |
+| `ucie_lsm_driver` | Adapter state machine | `ap_event` (each event once run), `state`, `link_active`, `execute(item)`, `set_state()`, `wait_cycles()`, `parked()`, `idle()` (no event and no answer under way); counters `n_le`, `n_le_react` (LinkErrors on `lp_linkerror`), `n_down_req` (LinkReset and Disabled on `lp_state_req`), `n_via_active`, `n_exit_req` (link-down states left on the Active request), `n_le_mid_tx`, `n_le_mid_rx` |
 | `ucie_lsm_monitor` | checks | `add_observer()`, `cur`, `prev` |
 | `ucie_lsm_obs_t` | struct: one clock | `rst_n`, `pl_state_sts`, `sts`, `inband_pres`, `clk_req`, `wake_ack`, `rx_active_req`, `lp_state_req`, `req`, `wake_req`, `clk_ack`, `rx_active_sts`, `linkerror`; `obs_reset()`, `obs2string()` |
 | `ucie_lsm_observer` | interface class: follows the link state | `observe(cur, prev)` (Extension API) |
@@ -456,22 +503,25 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) and the AoU bench's
 
 ### Plusargs
 
-| Plusarg | Sets |
-|---|---|
-| `+react_linkerror=0\|1` | `ucie_lsm_cfg.react_linkerror_en` |
-| `+sw_restart_delay=N` | `ucie_lsm_cfg.sw_restart_delay` (else random 50..1500) |
-| `+ucie_restart_on=sw\|pl\|either` | `ucie_lsm_cfg.restart_on` |
-| `+ucie_down_exit=internal\|pl\|either` | `ucie_lsm_cfg.down_exit_on` |
-| `+ucie_remote_active_first_pct=N` | `ucie_lsm_cfg.remote_active_first_pct` |
-| `+le_mid_flit_pct=N` | `ucie_lsm_cfg.le_mid_flit_pct` |
-| `+fdi_rx_early=N` | `ucie_lsm_cfg.rx_early` |
-| `+park_idle_phy=0\|1` | `ucie_lsm_cfg.park_idle_phy` |
-| `+ucie_fcov=0\|1` | `fcov_en` of `ucie_lsm_cfg` and of every `ucie_fdi_cfg` |
-| `+ucie_nop_pct=N` | `nop_pct` of every `ucie_fdi_cfg` |
+| Plusarg | Old name (alias) | Sets |
+|---|---|---|
+| `+ucie_react_linkerror=0\|1` | `+react_linkerror` | `ucie_lsm_cfg.react_linkerror_en` |
+| `+ucie_sw_restart_delay=N` | `+sw_restart_delay` | `ucie_lsm_cfg.sw_restart_delay` |
+| `+ucie_restart_on=sw\|pl\|either` | | `ucie_lsm_cfg.restart_on` |
+| `+ucie_down_exit=internal\|pl\|either` | | `ucie_lsm_cfg.down_exit_on` |
+| `+ucie_remote_active_first_pct=N` | | `ucie_lsm_cfg.remote_active_first_pct` |
+| `+ucie_le_mid_flit_pct=N` | `+le_mid_flit_pct` | `ucie_lsm_cfg.le_mid_flit_pct` |
+| `+ucie_rx_early=N` | `+fdi_rx_early` | `ucie_lsm_cfg.rx_early` |
+| `+ucie_park_idle_phy=0\|1` | `+park_idle_phy` | `ucie_lsm_cfg.park_idle_phy` |
+| `+ucie_fcov=0\|1` | | `fcov_en` of `ucie_lsm_cfg` and of every `ucie_fdi_cfg` |
+| `+ucie_nop_pct=N` | | `nop_pct` of every `ucie_fdi_cfg` |
 
 The link-state agent reads them in its `build_phase` (the mainband agents read
-`+ucie_fcov` and `+ucie_nop_pct` in theirs). Everything else is set in the
-config objects.
+`+ucie_fcov` and `+ucie_nop_pct` in theirs), overriding the config object. Each
+applies to every agent; `+<name>@<instance>=<value>`, with an agent's full name,
+applies to that agent only and wins (`+ucie_le_mid_flit_pct@uvm_test_top.env1.lsm=0`),
+so two links can differ. The old names still work, for every agent, when the new
+name is not given. Everything else is set in the config objects.
 
 ## Checks
 
@@ -479,6 +529,15 @@ config objects.
 violation is counted in `ucie_rule_log`.* A violation is a `uvm_error` with the
 checker's class name as the ID and the message starting `FDI-Rnn:`. "Design" rules
 check the Protocol Layer, "model" rules check the Adapter model itself.
+
+The monitors decide everything from the interfaces, nothing from the active driver,
+so a passive agent (`is_active` 0) checks the same rules: on a real Adapter the
+"model" rules check that Adapter. That includes a LinkError entered mid-flit (r3.0
+§10.3.3.7): the mainband monitor drops the partial flits whenever `pl_state_sts`
+goes from Active to LinkError with a flit part-way in either direction. What a
+passive agent lacks are the checks that live in the link-state driver, the
+Protocol Layer's liveness bounds on its answers and requests (FDI-R18 and R26
+within `req_timeout`, R33, R41, R48).
 
 | Rule | Checks | Checker | UCIe (r1.1 unless marked r3.0) | At 256 B | At 512/1024 B |
 |---|---|---|---|---|---|
@@ -633,7 +692,7 @@ the mainband monitor's end-of-test summary.
 ## Self-test
 
 *The model against a Protocol Layer stub that loops every delivered flit back, on one
-FDI.* `ucie_pl_stub` answers the handshakes and the state requests as a simple Protocol
+FDI (two in `ucie_fdi_reuse_test`).* `ucie_pl_stub` answers the handshakes and the state requests as a simple Protocol
 Layer would; `ucie_fdi_selftest_sb` checks that every flit sent arrives intact after
 its cancels and comes back in order; the model's monitors check the rules on the way.
 
@@ -655,6 +714,7 @@ make test UVM_HOME=<uvm-core checkout> SIM=verilator TEST=ucie_fdi_events_test P
 | `ucie_fdi_reset_req_test` | the exit from Reset and the restart after a link-down (r3.0 §10.3.3.1 rule 1, §10.3.3.8) on the cov test's events and traffic, `+reset_req=`: `held` the stub requests Active in LinkError, LinkReset and Disabled and holds it into Reset for 40 clocks of `pl_inband_pres`, with a clock of LinkReset halfway (neither is a request with no NOP first), and reports an Adapter that starts the Active entry meanwhile; `early` the stub gives NOP->Active before `pl_inband_pres` and returns to NOP or holds Active, and reports an Adapter that starts the Active entry on a trigger withdrawn to NOP before the next NOP->Active; `restart` the same with `restart_on` PL and software's delay at 20000 clocks, where `pl_inband_pres` must follow every trigger after a link-down within 300 clocks and a link left down must come up on it; `either` `restart_on` EITHER with the trigger in half the Resets; `rx_first` `remote_active_first_pct` 100 (the rx_active handshake before the request; both Reset and Retrain must see it). `+clk_hold=0\|1` sets `clk_req_hold_bringup`. Any error fails it |
 | `ucie_fdi_state_req_test` | the Protocol Layer's requests (r3.0 Table 10-4), before the cov test's events and with its traffic: LinkReset and Disabled requested in Active, Retrain (abandoning an Adapter Retrain), L1 and Reset (after a NOP; link left down, and during a bringup), Disabled in LinkReset; requests the table ignores (LinkReset in Disabled, LinkReset and Disabled in LinkError); `lp_linkerror` in Reset (before and after `pl_inband_pres`), Active (between events and abandoning an idle event), Retrain (held 2000 clocks), L1, LinkReset, Disabled and as an L1 entry starts; requests that stop a job while its `pl_clk_req` waits for a slow `lp_clk_ack` (`+slow_ack=N`, default 50): LinkReset and Disabled as the Adapter's L1 exit raises it, `lp_linkerror` as a bringup raises it and as the answer to a LinkReset request in Reset raises it. The stub reports a request not answered within `req_bound`, an ignored one answered, a LinkReset or Disabled request that leads to a LinkError it did not request, and a `pl_clk_req` that falls before `lp_clk_ack` answered it. `+state_req=`: `basic`; `gated` with the clock-gating stub, which wakes itself with `lp_wake_req` for its own requests in Reset, LinkReset, Disabled and L1, and `remote_rsp_max` 30; `exit_pl` (`down_exit_on` PL, the stub reports an exit it did not ask for or one before `linkerror_min_res`), `exit_either`, `via_active` (`linkdown_via_active_pct` 100). `+clk_hold=0\|1` sets `clk_req_hold_bringup`. Any error fails it |
 | `ucie_fdi_stall_exit_test` | stand-alone stalls around the Adapter's exits from Active, with dense stalls (`+stall_pct=N`, default 25), `pl_trdy` held high during them (`+stall_trdy_free=1` has it follow the policy) and a stub that acknowledges `+stall_ack=N` clocks after the flit boundary (default 40); with `+hold_present=1` the stub presents flits without waiting for `pl_trdy` and keeps a presented flit up through `pl_stallreq` until it transfers (legal: r3.0 §10.2.4, §10.3.2 rules 6 and 7), and the run must see such a flit accepted: `+stall_exit=directed` issues Retrain, LinkReset, Disabled, a mid-flit LinkError and a LinkError at a flit boundary while a stall waits for `lp_stallack`, then a PM entry and exit after one; `req` has the stub request LinkReset while an Adapter Retrain waits for one, raise `lp_linkerror` while an Adapter LinkReset waits, and request Disabled during one; `random` adds nothing but a random acknowledge delay (0..N); each then runs the cov test's events. Fails if the status leaves Active for Retrain, LinkReset or Disabled, or LinkError for Reset, with the handshake under way, or the model drives `pl_trdy` in LinkError, and, with `+stall_ack` 20 or more, if a LinkError (at a flit boundary, or answering `lp_linkerror` in `req`) waits for `lp_stallack` (§10.3.3.7); FDI-R43 checks `pl_trdy` outside Active. `+trdy_le_stall=1` has the top force `pl_trdy` high for a clock in LinkError during a stall handshake, which r3.0 allows (Table 10-3) and FDI-R43 must accept |
+| `ucie_fdi_reuse_test` | the model as a second consumer uses it, on the events test plus three LinkErrors, `+reuse=`: `passive` passive mainband and link-state agents beside the active model, whose flits must match the active monitor's one by one, with the same cancels, stalls and abandoned flits and no error; `two_link` a second link (FDI 1, its own link-state interface) whose state must move by itself, and the instance plusarg `+ucie_le_mid_flit_pct@uvm_test_top.env1.lsm=0` reaching link 1 only; `mirror` and `park` the mirrored mode (`n_phy` 2), FDI 1 reporting FDI 0's status (and stalled before the L1 entry, the top acknowledging for it), or Reset, every clock; `restart` a `sw_restart_delay` of 777 set in the cfg (or `+expect_restart=N` with the plusarg) standing, every software restart taking at least that long. In every mode the stub samples `pl_protocol` and `pl_protocol_flitfmt` in Reset before requesting Active and checks `pl_stream` |
 | `ucie_fdi_neg_test` | the model's checks against one deliberate violation (`+neg=dllp\|retimer\|stream\|nop_tx\|corrupt_mid\|corrupt_h0\|corrupt_proto\|clk_ack\|irdy_reset\|wake\|wake_held\|xfer\|trdy_down\|trdy_le\|le_exit\|rx_inactive\|clk_exit\|le_after\|level\|inband_active\|held_forever\|no_restart\|wake_down\|wake_le\|unanswered`): the rule that must catch it (FDI-R62, R63, R64, R45, R59, R60, R61, R18, R44, R16, R16, R43, R43, R43, R49, R35, R22, R21, R20, the driver's refusal, R33, R33, R16, R16, the stub's answer checks) has to fire, as often as the violation is made, and its errors are expected; `corrupt_mid` and `corrupt_h0` need an FDI of 128 B or less. `nop_tx` is a NOP flit (Protocol ID 00b) on the default Streaming stream. `clk_ack` is an `lp_clk_ack` pulse without `pl_clk_req`, `irdy_reset` a flit presented through LinkReset and Disabled into Reset, `wake` an Active request in Reset with `lp_wake_req` never raised, `wake_held` the same with `lp_wake_req` held through LinkError and dropped on entry to Reset, over a bringup and three LinkErrors (four reports). Adapter faults the top forces: with `xfer` `pl_trdy` high for a clock while a flit waits in Retrain (256 B or more), with `trdy_down` the same with no flit presented, with `trdy_le` `pl_trdy` high for a clock in LinkError with no stall handshake, with `le_exit` Reset for a clock while the stub holds `lp_linkerror` in LinkError (the LinkError re-entered from that Reset without `pl_clk_req` also draws FDI-R21, expected too), with `rx_inactive` `pl_rx_active_req` low in Active while flits go on, with `clk_exit` `pl_clk_req` low through LinkReset -> Reset, with `le_after` Reset for a clock after a LinkError from Reset reported before its `pl_clk_req` was acknowledged, with `level` `pl_phyinrecenter` high for 40 clocks in Reset with no `pl_clk_req`. `inband_active` asks for `LSM_EV_INBAND_DROP` in Active, which the driver refuses with an error (`pl_inband_pres` falls only in Reset). `held_forever` holds an Active request from a LinkReset into Reset for good, so the stub never asks to leave Reset; `no_restart` waits, with `restart_on` PL, for a NOP->Active the stub never gives; both with `req_timeout` 3000. `wake_down` requests LinkReset after a NOP in Reset (link left down) with no `lp_wake_req`, `wake_le` raises `lp_linkerror` there with none (r3.0 §10.2.3.1); `unanswered` sets `react_en` 0, so the stub's own checks must report its LinkReset request in Active and its `lp_linkerror` as unanswered (two reports, `req_bound` 300) |
 
 Knobs: `+beat_bytes=32|64|128|256|512|768|1024`, `+trdy=always|random|bursty|holes`, `+n_flits=N`, plus
@@ -700,8 +760,9 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
 - One Protocol Layer per Adapter: the LinkReset and Disabled handshakes of several
   Protocol Layers sharing an Adapter, and the RDI state they resolve to (§10.3.3.8), are
   not modelled.
-- With two FDIs both report the same state, or the one not followed stays in Reset
-  (`park_idle_phy`); they do not train independently.
+- In the mirrored mode (`n_phy` 2) both FDIs report the same state, or the one not
+  followed stays in Reset (`park_idle_phy`); they do not train independently (use one
+  link-state agent per FDI for that). One link-state agent takes at most two FDIs.
 - The model does not check what is in a flit beyond the Adapter-owned bytes; that is
   the protocol layer's.
 - Stand-alone stalls (`stall_pct`, off by default) are stress beyond UCIe r3.0: in Flit
@@ -737,7 +798,8 @@ config's `source_lists`) and adds `aou_fdi_layer_pkg`:
   (idle on reset, `pulse_sw()`), steps the reference model of the DUT's bringup
   controller (`aou_bringup_model`, with its own comparison slack `ref_slack`, apart
   from the model's liveness bounds) every clock, checks that the DUT never requests L2,
-  and holds the coverage collectors. The bench's envs create it and call
+  and holds the coverage collectors. Its env configs draw `sw_restart_delay` in
+  [50:1500] per run, which `+sw_restart_delay=N` fixes. The bench's envs create it and call
   `attach(lsm)` in `connect_phase`.
 - `aou_fdi_cov` (a `ucie_fdi_cov`, set on every mainband monitor) and `aou_lsm_cov`
   (sampled by the layer and the reference model): feeding the bench's coverage

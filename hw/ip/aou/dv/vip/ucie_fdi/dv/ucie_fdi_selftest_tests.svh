@@ -56,19 +56,24 @@ class ucie_fdi_smoke_test extends uvm_test;
   endtask
 
   task traffic();
+    traffic_on(env, n_flits);
+  endtask
+
+  // n random flits into the Protocol Layer of env's link.
+  protected task traffic_on(ucie_fdi_selftest_env e, int unsigned n);
     ucie_flit_seq seq = ucie_flit_seq::type_id::create("flits");
-    for (int unsigned i = 0; i < n_flits; i++) begin
+    for (int unsigned i = 0; i < n; i++) begin
       ucie_flit_item f = ucie_flit_item::type_id::create("payload");
       f.randomize_payload();
       seq.payloads.push_back(f);
-      env.sb.expect_rx(f);
+      e.sb.expect_rx(f);
     end
     seq.n_flits = 0;
     seq.cancel_pct = 25;
     seq.cancel_mix = 1'b1;
     seq.gap_pct = 30;
     seq.bubble_pct = 10;
-    seq.start(env.fdi.sqr);
+    seq.start(e.fdi.sqr);
   endtask
 
   // Link events alongside the traffic; none here.
@@ -76,13 +81,18 @@ class ucie_fdi_smoke_test extends uvm_test;
   endtask
 
   task drain();
+    drain_on(env);
+  endtask
+
+  // Until everything sent on env's link is delivered and looped back (bounded).
+  protected task drain_on(ucie_fdi_selftest_env e);
     int unsigned n;
-    while (!(env.sb.rx_exp.size() == 0 && env.sb.lb_exp.size() == 0 && env.pl.idle()) &&
+    while (!(e.sb.rx_exp.size() == 0 && e.sb.lb_exp.size() == 0 && e.pl.idle()) &&
            n < drain_timeout) begin
-      @(env.pl.lsm.mon_cb);
+      @(e.pl.lsm.mon_cb);
       n++;
     end
-    repeat (100) @(env.pl.lsm.mon_cb);
+    repeat (100) @(e.pl.lsm.mon_cb);
   endtask
 
   function void check_phase(uvm_phase phase);
@@ -1544,5 +1554,304 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
     else
       `uvm_info(get_type_name(), $sformatf("%s caught the %s violation (%0d reports)",
                                            catcher.rule, neg, catcher.n), UVM_NONE)
+  endfunction
+endclass
+
+`uvm_analysis_imp_decl(_act)
+`uvm_analysis_imp_decl(_pas)
+
+// Compares the flits of two monitors on the same FDI, one by one: the active
+// agent's and a passive one's (ucie_fdi_reuse_test). They publish in the same
+// clock, in either order, so a flit waits only for its twin.
+class ucie_fdi_flit_cmp extends uvm_component;
+  `uvm_component_utils(ucie_fdi_flit_cmp)
+
+  uvm_analysis_imp_act #(ucie_flit_item, ucie_fdi_flit_cmp) act_imp;
+  uvm_analysis_imp_pas #(ucie_flit_item, ucie_fdi_flit_cmp) pas_imp;
+  int unsigned n_match;
+  local ucie_flit_item act_q[$];
+  local ucie_flit_item pas_q[$];
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+    act_imp = new("act_imp", this);
+    pas_imp = new("pas_imp", this);
+  endfunction
+
+  function void write_act(ucie_flit_item f);
+    pair(f, pas_q, act_q);
+  endfunction
+
+  function void write_pas(ucie_flit_item f);
+    pair(f, act_q, pas_q);
+  endfunction
+
+  local function void pair(ucie_flit_item f, ref ucie_flit_item other[$],
+                           ref ucie_flit_item mine[$]);
+    if (other.size() == 0) begin
+      mine.push_back(f);
+      return;
+    end
+    if (other[0].dir != f.dir || !other[0].same_payload(f) || other[0].data[0] != f.data[0])
+      `uvm_error(get_type_name(), {"the passive monitor's flit differs from the active one's: ",
+                                   f.convert2string(), " vs ", other[0].convert2string()})
+    else
+      n_match++;
+    void'(other.pop_front());
+  endfunction
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (act_q.size() != 0 || pas_q.size() != 0)
+      `uvm_error(get_type_name(), $sformatf(
+                 "%0d flits of the active monitor and %0d of the passive one unmatched",
+                 act_q.size(), pas_q.size()))
+  endfunction
+endclass
+
+// Counts what a link-state monitor sees (ucie_fdi_reuse_test): entries to each
+// state, and the clocks from a Reset entered after a link-down to
+// pl_inband_pres, the software restart (the shortest one).
+class ucie_fdi_reuse_obs implements ucie_lsm_observer;
+  int unsigned n_enter[ucie_lsm_state_e];
+  int unsigned min_restart = '1;
+  int unsigned n_restart;
+  local int unsigned down_cycles;  // clocks in Reset after a link-down; 0: none
+  virtual function void observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
+    if (!cur.rst_n) begin
+      down_cycles = 0;
+      return;
+    end
+    if (cur.sts != prev.sts) n_enter[cur.sts] = n_enter.exists(cur.sts) ? n_enter[cur.sts] + 1 : 1;
+    if (cur.sts == LSM_RESET && prev.sts inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED})
+      down_cycles = 1;
+    else if (down_cycles != 0 && cur.sts == LSM_RESET && !cur.inband_pres)
+      down_cycles++;
+    else if (down_cycles != 0) begin
+      if (cur.inband_pres && down_cycles < min_restart) min_restart = down_cycles;
+      if (cur.inband_pres) n_restart++;
+      down_cycles = 0;
+    end
+  endfunction
+  function int unsigned n(ucie_lsm_state_e s);
+    return n_enter.exists(s) ? n_enter[s] : 0;
+  endfunction
+endclass
+
+// The model as a second consumer uses it, on the events test's traffic and
+// events (mid-flit LinkErrors included) plus three more LinkErrors. UCIe r3.0
+// has one FDI, and one link state, per protocol stack (§10.2, §10.2.8,
+// §10.3.3.8). +reuse=:
+//  passive   a passive set of monitors (mainband and link-state agents with
+//            is_active 0, so no gate) on the same interfaces as the active
+//            model: it must publish the same flits, compared one by one, and
+//            count the same cancels, stalls and abandoned flits, with no error.
+//  two_link  a second link (env1: FDI 1 and its own link-state interface) with
+//            traffic of its own and only LinkErrors as events; its state must
+//            move by itself (no Retrain, LinkReset or Disabled, which only link
+//            0 runs). Both cfgs set le_mid_flit_pct 100, and the run gives
+//            +ucie_le_mid_flit_pct@uvm_test_top.env1.lsm=0, which must reach
+//            link 1 only: its LinkErrors fall at flit boundaries.
+//  mirror    two FDIs under one link state (n_phy 2, the mirrored mode): FDI 1
+//            must report the same pl_state_sts as FDI 0 every clock, and be
+//            stalled before the L1 entry too (the top acknowledges for it);
+//  park      the same with park_idle_phy: FDI 1 stays in Reset, never stalled.
+//  restart   sw_restart_delay set to 777 in the cfg (or +expect_restart=N, to
+//            check a value given by plusarg) must stand, and every software
+//            restart after a link-down must take at least that long.
+// In every mode the stub samples pl_protocol and pl_protocol_flitfmt in Reset
+// before it requests Active and checks pl_stream with pl_valid.
+class ucie_fdi_reuse_test extends ucie_fdi_events_test;
+  `uvm_component_utils(ucie_fdi_reuse_test)
+
+  string                mode = "passive";
+  int unsigned          exp_restart = 777;
+  ucie_fdi_selftest_env env1;
+  ucie_fdi_agent        pfdi;
+  ucie_lsm_agent        plsm;
+  ucie_fdi_flit_cmp     cmp;
+  ucie_fdi_reuse_obs    obs0, obs1;
+  int unsigned          n_mirror_bad;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    super.configure();
+    void'($value$plusargs("reuse=%s", mode));
+    case (mode)
+      "passive", "two_link": ;
+      "mirror": env.lsm_cfg.n_phy = 2;
+      "park": begin
+        env.lsm_cfg.n_phy = 2;
+        env.lsm_cfg.park_idle_phy = 1'b1;
+      end
+      "restart": begin
+        void'($value$plusargs("expect_restart=%d", exp_restart));
+        env.lsm_cfg.sw_restart_delay = 777;
+      end
+      default: `uvm_fatal(get_type_name(), {"+reuse: unknown mode ", mode})
+    endcase
+    env.fdi1_cfg.beat_bytes = env.fdi_cfg.beat_bytes;
+    env.fdi1_cfg.trdy_policy = env.fdi_cfg.trdy_policy;
+  endfunction
+
+  function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    obs0 = new();
+    if (mode == "passive") begin
+      ucie_fdi_cfg pc = ucie_fdi_cfg::type_id::create("pfdi_cfg");
+      ucie_lsm_cfg lc = ucie_lsm_cfg::type_id::create("plsm_cfg");
+      pc.is_active = 1'b0;
+      pc.beat_bytes = env.fdi_cfg.beat_bytes;
+      pc.stream = env.fdi_cfg.stream;
+      lc.is_active = 1'b0;
+      lc.protocol = env.lsm_cfg.protocol;
+      pfdi = ucie_fdi_agent::type_id::create("pfdi", this);
+      pfdi.cfg = pc;
+      plsm = ucie_lsm_agent::type_id::create("plsm", this);
+      plsm.cfg = lc;
+      plsm.phy.push_back(pfdi);
+      cmp = ucie_fdi_flit_cmp::type_id::create("cmp", this);
+    end
+    if (mode == "two_link") begin
+      env1 = ucie_fdi_selftest_env::type_id::create("env1", this);
+      env1.fdi_cfg.phy = 1;
+      env1.lsm_key = "fdi_lsm1";
+      env1.fdi_cfg.beat_bytes = env.fdi_cfg.beat_bytes;
+      env1.fdi_cfg.trdy_policy = env.fdi_cfg.trdy_policy;
+      env1.fdi_cfg.partial_beat_pct = env.fdi_cfg.partial_beat_pct;
+      env1.lsm_cfg.le_mid_flit_pct = 100;
+      obs1 = new();
+    end
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.lsm.mon.add_observer(obs0);
+    if (mode == "passive") begin
+      env.fdi.mon.ap_rx.connect(cmp.act_imp);
+      env.fdi.mon.ap_tx.connect(cmp.act_imp);
+      pfdi.mon.ap_rx.connect(cmp.pas_imp);
+      pfdi.mon.ap_tx.connect(cmp.pas_imp);
+    end
+    if (mode == "two_link") env1.lsm.mon.add_observer(obs1);
+  endfunction
+
+  task run_phase(uvm_phase phase);
+    phase.raise_objection(this);
+    if (mode inside {"mirror", "park"})
+      fork
+        watch_mirror();
+      join_none
+    fork
+      traffic();
+      begin
+        events();
+        repeat (3) begin
+          ev_on(env, LSM_EV_IDLE);
+          ev_on(env, LSM_EV_LINKERROR);
+        end
+      end
+      begin
+        if (mode == "two_link") traffic_on(env1, n_flits);
+      end
+      begin
+        if (mode == "two_link")
+          repeat (3) begin
+            ev_on(env1, LSM_EV_IDLE);
+            ev_on(env1, LSM_EV_LINKERROR);
+          end
+      end
+    join
+    drain();
+    if (mode == "two_link") drain_on(env1);
+    phase.drop_objection(this);
+  endtask
+
+  local task ev_on(ucie_fdi_selftest_env e, ucie_lsm_ev_e kind);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::of(kind);
+    s.start(e.lsm.sqr);
+  endtask
+
+  // Mirrored mode: FDI 1 reports FDI 0's status (Reset when parked), every
+  // clock, until the test ends.
+  local task watch_mirror();
+    forever begin
+      logic [3:0] s0, s1;
+      @(env.fdi.vif.mon_cb);
+      s0 = env.fdi.vif.mon_cb.pl_state_sts;
+      s1 = env.fdi1.vif.mon_cb.pl_state_sts;
+      if (env.fdi.vif.mon_cb.rst_n === 1'b1 && s1 !== (mode == "park" ? FDI_STS_RESET : s0)) begin
+        if (n_mirror_bad++ == 0)
+          `uvm_error(get_type_name(), $sformatf("FDI 1 reports pl_state_sts %0h with FDI 0 at %0h",
+                                                s1, s0))
+      end
+    end
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (env.pl.n_proto == 0) `uvm_error(get_type_name(), "the stub never sampled pl_protocol")
+    if (env.pl.n_stream == 0) `uvm_error(get_type_name(), "the stub never checked pl_stream")
+    case (mode)
+      "passive": begin
+        ucie_fdi_monitor a = env.fdi.mon, p = pfdi.mon;
+        if (cmp.n_match == 0) `uvm_error(get_type_name(), "no flit compared")
+        if (a.n_tx_flits != p.n_tx_flits || a.n_rx_flits != p.n_rx_flits ||
+            a.n_rx_cancels != p.n_rx_cancels || a.n_stalls != p.n_stalls ||
+            a.n_tx_abandoned != p.n_tx_abandoned || a.n_rx_abandoned != p.n_rx_abandoned)
+          `uvm_error(get_type_name(), $sformatf({"active and passive monitors differ: TX %0d/%0d, ",
+                     "RX %0d/%0d, cancels %0d/%0d, stalls %0d/%0d, abandoned TX %0d/%0d, RX ",
+                     "%0d/%0d"}, a.n_tx_flits, p.n_tx_flits, a.n_rx_flits, p.n_rx_flits,
+                     a.n_rx_cancels, p.n_rx_cancels, a.n_stalls, p.n_stalls, a.n_tx_abandoned,
+                     p.n_tx_abandoned, a.n_rx_abandoned, p.n_rx_abandoned))
+      end
+      "two_link": begin
+        if (env1.sb.n_tx == 0) `uvm_error(get_type_name(), "no flit looped back on link 1")
+        if (env.lsm_cfg.le_mid_flit_pct != 100 || env1.lsm_cfg.le_mid_flit_pct != 0)
+          `uvm_error(get_type_name(), $sformatf({"le_mid_flit_pct %0d on link 0, %0d on link 1; ",
+                     "expected 100 and 0 (+ucie_le_mid_flit_pct@uvm_test_top.env1.lsm=0)"},
+                     env.lsm_cfg.le_mid_flit_pct, env1.lsm_cfg.le_mid_flit_pct))
+        if (env1.lsm.drv.n_le != 3 || env1.lsm.drv.n_le_mid_tx + env1.lsm.drv.n_le_mid_rx != 0)
+          `uvm_error(get_type_name(), $sformatf(
+                     "link 1: %0d LinkErrors, %0d mid-flit; expected 3, 0", env1.lsm.drv.n_le,
+                     env1.lsm.drv.n_le_mid_tx + env1.lsm.drv.n_le_mid_rx))
+        if (obs1.n(LSM_LINKERROR) != 3 || obs1.n(LSM_RETRAIN) != 0 ||
+            obs1.n(LSM_LINKRESET) != 0 || obs1.n(LSM_DISABLED) != 0)
+          `uvm_error(get_type_name(), $sformatf({"link 1 entered LinkError %0d, Retrain %0d, ",
+                     "LinkReset %0d, Disabled %0d times; expected 3, 0, 0, 0"},
+                     obs1.n(LSM_LINKERROR), obs1.n(LSM_RETRAIN), obs1.n(LSM_LINKRESET),
+                     obs1.n(LSM_DISABLED)))
+        if (obs0.n(LSM_RETRAIN) == 0 || obs0.n(LSM_LINKRESET) == 0 || obs0.n(LSM_DISABLED) == 0)
+          `uvm_error(get_type_name(), "link 0 missed a Retrain, LinkReset or Disabled")
+      end
+      "mirror", "park": begin
+        if (env.fdi1 == null || obs0.n(LSM_ACTIVE) == 0)
+          `uvm_error(get_type_name(), "no mirrored FDI, or the link never came up")
+        else if ((env.fdi1.mon.n_stalls == 0) != (mode == "park"))
+          `uvm_error(get_type_name(), $sformatf("%0d stall handshakes on FDI 1 in mode %s",
+                                                env.fdi1.mon.n_stalls, mode))
+      end
+      "restart": begin
+        if (env.lsm_cfg.sw_restart_delay != exp_restart)
+          `uvm_error(get_type_name(), $sformatf("sw_restart_delay is %0d, expected %0d",
+                                                env.lsm_cfg.sw_restart_delay, exp_restart))
+        if (obs0.n_restart == 0 || obs0.min_restart < exp_restart)
+          `uvm_error(get_type_name(), $sformatf({"%0d restarts after a link-down, the shortest ",
+                     "%0d clocks; expected some, none shorter than %0d"}, obs0.n_restart,
+                     obs0.min_restart, exp_restart))
+      end
+      default: ;
+    endcase
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf({"reuse %s: %0d flits compared, %0d pl_protocol ",
+              "samples, %0d pl_stream checks, %0d restarts (shortest %0d clocks)"}, mode,
+              cmp != null ? cmp.n_match : 0, env.pl.n_proto, env.pl.n_stream, obs0.n_restart,
+              obs0.min_restart), UVM_NONE)
   endfunction
 endclass

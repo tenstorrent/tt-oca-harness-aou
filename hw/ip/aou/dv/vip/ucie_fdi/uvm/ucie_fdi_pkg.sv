@@ -185,6 +185,25 @@ package ucie_fdi_pkg;
     return i inside {126, 127, 254, 255};
   endfunction
 
+  // The model's plusargs (README "Plusargs"), read by its agents in
+  // build_phase: +<name>@<inst>=<v> sets the knob of the one agent whose full
+  // name is <inst>, so two links can differ; +<name>=<v> sets it for every
+  // agent; +<old>=<v>, an older name kept as an alias, does the same when
+  // neither is given. 1 and the value in v when one was found.
+  function automatic bit plusarg_int(string name, string inst, output int unsigned v,
+                                     input string old = "");
+    v = 0;
+    if ($value$plusargs({name, "@", inst, "=%d"}, v)) return 1'b1;
+    if ($value$plusargs({name, "=%d"}, v)) return 1'b1;
+    return old != "" && $value$plusargs({old, "=%d"}, v);
+  endfunction
+
+  function automatic bit plusarg_str(string name, string inst, output string v);
+    v = "";
+    if ($value$plusargs({name, "@", inst, "=%s"}, v)) return 1'b1;
+    return $value$plusargs({name, "=%s"}, v);
+  endfunction
+
   `include "ucie_rule_log.svh"
   `include "l1/ucie_fdi_gate.svh"
   `include "l1/ucie_fdi_cfg.svh"
