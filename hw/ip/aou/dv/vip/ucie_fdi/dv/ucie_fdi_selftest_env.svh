@@ -8,10 +8,11 @@
 // Protocol Layer intact (ap_rx, after the cancels), and every delivered flit
 // comes back in order on the Protocol Layer's TX side (ap_tx). The model's
 // own monitors check the FDI rules on the way. An RX flit may be lost only
-// to a LinkError the Adapter entered mid-flit (UCIe r1.1 §8.3.3.7), so the
+// to a LinkError the Adapter entered mid-flit (UCIe r3.0 §10.3.3.7), so the
 // RX check skips ahead only after a link-down, which the scoreboard sees as an
 // observer of the link-state monitor. TX flits with an all-zero payload are
-// the stub's fillers of a wide transfer and are skipped.
+// the stub's fillers of a wide transfer, or its NOP flits, and are skipped.
+// Every delivered flit must be a protocol flit (no NOP, Flit Type 00b).
 class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   `uvm_component_utils(ucie_fdi_selftest_sb)
 
@@ -35,6 +36,11 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
 
   function void write_rx(ucie_flit_item t);
     int unsigned skipped;
+    // The model hands the Protocol Layer protocol flits only: no NOP, and a
+    // Flit Type of 00b even with random Adapter bytes (r3.0 Table 3-5).
+    if (t.is_nop() || t.data[1][7:6] != 2'b00)
+      `uvm_error(get_type_name(), $sformatf("RX flit with Protocol ID %02b, Flit Type %02b: %s",
+                                            t.data[0][7:6], t.data[1][7:6], t.convert2string()))
     lb_exp.push_back(t);
     while (rx_exp.size() != 0 && rx_resync && !rx_exp[0].same_payload(t)) begin
       void'(rx_exp.pop_front());

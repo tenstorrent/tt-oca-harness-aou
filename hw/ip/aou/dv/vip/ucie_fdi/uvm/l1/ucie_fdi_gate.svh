@@ -29,7 +29,7 @@ class ucie_fdi_gate extends uvm_object;
   // flits in progress at once instead of finishing them. Cleared when the
   // gate opens again.
   bit abort = 1'b0;
-  int unsigned n_abandoned;  // RX flits the PL driver abandoned on an abort
+  int unsigned n_abandoned;  // RX flits (NOPs not counted) the PL driver abandoned on an abort
   // L1: a framing error was flagged on pl_error; L2 retrains the link. L2
   // clears it whenever it closes the gate.
   bit retrain_req = 1'b0;

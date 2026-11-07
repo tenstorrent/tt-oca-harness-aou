@@ -6,7 +6,7 @@
 // (mid-flit ones included; from 256 B up, where a flit is one beat, cancels
 // cover every flit of the beat and stalls start at flit boundaries). On a 512
 // or 1024 B FDI some RX beats carry fewer flits than lanes, the rest NOPs.
-// Knobs: +beat_bytes=32|64|128|256|512|1024 (FDI width),
+// Knobs: +beat_bytes=32|64|128|256|512|768|1024 (FDI width),
 // +n_flits=N, +trdy=always|random|bursty|holes.
 class ucie_fdi_smoke_test extends uvm_test;
   `uvm_component_utils(ucie_fdi_smoke_test)
@@ -238,6 +238,58 @@ class ucie_fdi_cov_test extends ucie_fdi_events_test;
     abort(LSM_AB_WAKE, LSM_LINKRESET, 2, 1'b1);
     abort(LSM_AB_WAKE, LSM_DISABLED, 2, 1'b1);
   endtask
+endclass
+
+// NOP flits (r3.0 Table 3-5) both ways, on the smoke test's traffic. RX: the
+// PL driver forwards NOPs (nop_pct 15, or +ucie_nop_pct) with random sequence
+// number and Ack/Nak bits and an all-zero body (r3.0 §3.1), at every width: through uncancelled,
+// cancelled and replayed, cancelled and never replayed, and from 512 B up in
+// lanes among other flits. The Protocol Layer must discard them (Table 10-3
+// pl_flit_cancel), so the scoreboard, which takes every delivered flit for the
+// next one sent, must see none. With +nop_tx=1 the link is CXL.2 (stream 03h),
+// where a Protocol Layer may send a NOP, and the stub starts a tenth of its TX
+// transfers with one, which FDI-R45 must accept. Fails if the run saw no NOP
+// of each kind.
+class ucie_fdi_nop_test extends ucie_fdi_smoke_test;
+  `uvm_component_utils(ucie_fdi_nop_test)
+
+  bit nop_tx;
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    env.fdi_cfg.nop_pct = 15;
+    void'($value$plusargs("nop_tx=%b", nop_tx));
+    if (nop_tx) begin
+      env.fdi_cfg.stream = 8'h03;
+      env.lsm_cfg.protocol = UCIE_PROTO_CXL2;
+    end
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    if (nop_tx) env.pl.tx_nop_pct = 10;
+  endfunction
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (env.fdi.drv.n_nops_dropped == 0 || env.fdi.mon.n_rx_nop_cancels == 0)
+      `uvm_error(get_type_name(), "no RX NOP was cancelled and dropped")
+    if (env.fdi.mon.n_rx_nops == 0) `uvm_error(get_type_name(), "no uncancelled RX NOP was seen")
+    if (nop_tx && env.fdi.mon.n_tx_nops == 0) `uvm_error(get_type_name(), "no TX NOP was seen")
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf({"NOPs: %0d forwarded (%0d dropped), %0d discarded ",
+                                          "uncancelled, %0d cancels of NOPs; %0d sent and %0d ",
+                                          "seen on TX"}, env.fdi.drv.n_nops,
+                                         env.fdi.drv.n_nops_dropped, env.fdi.mon.n_rx_nops,
+                                         env.fdi.mon.n_rx_nop_cancels, env.pl.n_tx_nop,
+                                         env.fdi.mon.n_tx_nops), UVM_NONE)
+  endfunction
 endclass
 
 // The smoke test's traffic with errors both ways, on a link whose protocol
@@ -1272,7 +1324,7 @@ class ucie_fdi_expect_catcher extends uvm_report_catcher;
 endclass
 
 // Negative test of the model's checks: the stub makes one deliberate violation
-// (+neg=dllp|retimer|stream|corrupt_mid|corrupt_h0|corrupt_proto|clk_ack|
+// (+neg=dllp|retimer|stream|nop_tx|corrupt_mid|corrupt_h0|corrupt_proto|clk_ack|
 // irdy_reset|wake|wake_held, see ucie_pl_stub::bad; corrupt_mid and
 // corrupt_h0 need an FDI of 128 B or less), or the top breaks the Adapter
 // (ucie_fdi_selftest_top): with +neg=xfer it forces pl_trdy high for a clock
@@ -1323,6 +1375,7 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       "dllp":    catcher.rule = "FDI-R62";
       "retimer": catcher.rule = "FDI-R63";
       "stream":  catcher.rule = "FDI-R64";
+      "nop_tx":  catcher.rule = "FDI-R45";
       "corrupt_mid", "corrupt_h0": begin
         catcher.rule = neg == "corrupt_mid" ? "FDI-R59" : "FDI-R60";
         // A protocol where lp_corrupt_crc applies, so only the placement is wrong.
