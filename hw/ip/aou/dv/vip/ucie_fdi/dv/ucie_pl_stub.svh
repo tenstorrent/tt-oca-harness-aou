@@ -86,7 +86,9 @@
 //  - TX: a flit starts only in Active with the Receiver active and pl_trdy
 //    high, then runs to its end with no bubbles (§8.2.4). pl_stallreq is
 //    acknowledged at the next flit boundary, a clock later at the earliest
-//    (§8.3.2). A flit cut off when the Adapter leaves Active mid-flit is sent
+//    (r3.0 §10.3.2 rules 4 and 8), or `stall_ack_delay` clocks after that
+//    boundary (with `stall_ack_rand`, a random 0 to `stall_ack_delay` per
+//    stall; rule 4 gives no time). A flit cut off when the Adapter leaves Active mid-flit is sent
 //    again from its start, so the loopback loses nothing.
 //  - With `early_present` a queued flit is presented (lp_valid, lp_irdy)
 //    without waiting for pl_trdy, in Active and through Retrain and LinkError,
@@ -95,6 +97,15 @@
 //    only Reset). After LinkError -> Reset lp_irdy stays up `irdy_linger` more
 //    clocks, which Table 10-3 allows ("a few clocks"). Never with a stall
 //    under way, nor in Reset otherwise, L1 or L2.
+//  - With `hold_present` flits are presented as with `early_present`, and a
+//    flit presented in Active is kept up until it transfers, through a
+//    pl_stallreq that rises meanwhile. That is legal: a Protocol Layer may
+//    present a flit and wait for pl_trdy (§10.2.4, Table 10-3 lp_irdy), and
+//    §10.3.2 rule 7 makes the Adapter accept data presented before
+//    lp_stallack, which then waits until nothing is presented (rule 6). If
+//    the status leaves Active first, the flit is withdrawn (in LinkError the
+//    Protocol Layer cleans up its data path, §10.3.3.7). n_kept counts the
+//    flits presented when pl_stallreq was seen that then transferred.
 //  - With `valid_alone` lp_valid toggles without lp_irdy between flits, which
 //    transfers nothing (Table 10-3 lp_irdy).
 //  - On a 512 or 1024 B FDI a TX transfer carries 2 or 4 flits; one sent
@@ -145,6 +156,8 @@ class ucie_pl_stub extends uvm_component;
   int unsigned n_corrupt;    // transfers sent with lp_corrupt_crc
   // Legal behaviours the model must accept (see above).
   bit          early_present;
+  bit          hold_present;
+  int unsigned n_kept;           // hold_present: flits presented at pl_stallreq, then sent
   int unsigned down_present = 4;
   int unsigned irdy_linger = 2;
   bit          valid_alone;
@@ -168,6 +181,8 @@ class ucie_pl_stub extends uvm_component;
   int unsigned n_rx_first;       // pl_rx_active_req rises in Reset before the stub's Active
   int unsigned n_rx_first_rt;    // ... in Retrain
   int unsigned n_presented_down; // clocks a flit was presented outside Active
+  int unsigned stall_ack_delay;  // clocks from the flit boundary to lp_stallack (see above)
+  bit          stall_ack_rand;
   // Requests of its own (see the header).
   typedef struct {
     ucie_lsm_state_e in;      // the state to make it in
@@ -195,7 +210,10 @@ class ucie_pl_stub extends uvm_component;
   local ucie_flit_item cur[$];  // the flits of the transfer, one per lane
   local int unsigned   beat;
   local bit            presenting;
+  local bit            kept;       // hold_present: the flit presented was kept through pl_stallreq
   local bit            stallack;
+  local bit            sa_armed;   // pl_stallreq seen at a flit boundary, lp_stallack due
+  local int unsigned   sa_left;    // ... in this many clocks
   local bit            nop_seen;
   local ucie_lsm_state_e st;       // pl_state_sts as last seen
   local ucie_lsm_state_e st_from;  // ... and the state before it
@@ -295,7 +313,9 @@ class ucie_pl_stub extends uvm_component;
     mb.lp_retimer_crd <= 1'b0;
     beat = 0;
     presenting = 1'b0;
+    kept = 1'b0;
     stallack = 1'b0;
+    sa_armed = 1'b0;
     nop_seen = 1'b0;
     bad_done = 1'b0;
     st = LSM_RESET;
@@ -723,12 +743,17 @@ class ucie_pl_stub extends uvm_component;
     bit active = sts == FDI_STS_ACTIVE;
     bit rx_on = mb.mon_cb.rx_active === 1'b1;
     int unsigned bpf = beats_per_flit(beat_bytes);
+    bit done = 1'b0;
+    bit keep;
+    if (hold_present && presenting && beat == 0 && stallreq) kept = 1'b1;
     if (presenting && trdy) begin
       beat++;
       if (beat == bpf) begin
         n_sent += cur.size();
+        if (kept) n_kept++;
         cur.delete();
         beat = 0;
+        done = 1'b1;
       end
     end
     if (!active && beat != 0) begin
@@ -736,8 +761,24 @@ class ucie_pl_stub extends uvm_component;
       n_restarted++;
       beat = 0;
     end
-    if (stallreq && !stallack && beat == 0) stallack = 1'b1;
-    else if (!stallreq && stallack) stallack = 1'b0;
+    // hold_present: a flit presented at a boundary that has not transferred
+    // stays up, and lp_stallack waits for it (see the header).
+    keep = hold_present && presenting && !done && beat == 0 && active;
+    if (!presenting || done || !active) kept = 1'b0;
+    if (stallreq && !stallack && beat == 0 && !keep) begin
+      if (!sa_armed) begin
+        sa_armed = 1'b1;
+        sa_left = stall_ack_rand ? $urandom_range(stall_ack_delay) : stall_ack_delay;
+      end
+      if (sa_left == 0) begin
+        stallack = 1'b1;
+        sa_armed = 1'b0;
+      end else begin
+        sa_left--;
+      end
+    end else if (!stallreq && stallack) begin
+      stallack = 1'b0;
+    end
     if (beat != 0) begin
       presenting = 1'b1;
     end else begin
@@ -747,8 +788,8 @@ class ucie_pl_stub extends uvm_component;
         while (cur.size() < fpb) cur.push_back(filler());
         cc_mask = corrupt_plan();
       end
-      if (early_present)
-        presenting = cur.size() != 0 && !stallack && !stallreq && may_present();
+      if (early_present || hold_present)
+        presenting = cur.size() != 0 && !stallack && (!stallreq || keep) && may_present();
       else
         presenting = cur.size() != 0 && active && rx_on && trdy && !stallack && !stallreq;
     end

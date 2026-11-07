@@ -828,6 +828,263 @@ class ucie_fdi_state_req_test extends ucie_fdi_cov_test;
   endfunction
 endclass
 
+// Stand-alone stalls around the Adapter's exits from Active. In Flit mode the
+// stall handshake belongs to PM entry only (UCIe r3.0 §10.3.2), and pl_trdy may
+// be high only in Active, or in LinkError during a stall handshake (Table 10-3
+// pl_trdy); the model's stand-alone stalls are stress beyond that, and a
+// handshake under way when the link leaves Active must neither leave pl_trdy
+// high outside Active nor be cut (rule 3). Stalls here are dense (stall_pct,
+// +stall_pct=N, default 25), pl_trdy is held high between pl_stallreq and
+// lp_stallack (+stall_trdy_free=1 has it follow the policy instead), and the
+// stub acknowledges late: +stall_ack=N clocks after the flit boundary
+// (default 40; with +stall_exit=random a random 0..N per stall). With
+// +hold_present=1 the stub presents flits without waiting for pl_trdy and
+// keeps a presented flit up through pl_stallreq until it transfers (legal:
+// §10.2.4, §10.3.2 rules 6 and 7), so a stall in which the Adapter withholds pl_trdy never
+// ends; the run must then see such a flit accepted. +stall_exit=:
+//  directed  Retrain, LinkReset and Disabled issued while a stall waits for
+//            lp_stallack, a LinkError entered mid-flit then (retried up to
+//            five times until one catches a flit in flight), a LinkError at
+//            a flit boundary then, and a PM entry and exit after one;
+//  req       Protocol Layer requests during a stall: LinkReset stopping an
+//            Adapter Retrain, lp_linkerror stopping an Adapter LinkReset, and
+//            a Disabled request with no event running;
+//  random    nothing of its own.
+// Each mode then runs the cov test's events. Besides the monitor's FDI-R43
+// (pl_trdy outside Active) the test checks that the status leaves Active for
+// Retrain, LinkReset or Disabled, and leaves LinkError for Reset, only with
+// the handshake done (pl_stallreq and lp_stallack low), and that the model
+// keeps pl_trdy low in LinkError. With +stall_ack=20 or more it also checks
+// that a LinkError (the Adapter's at a flit boundary, or the answer to
+// lp_linkerror) is entered without waiting for lp_stallack (r3.0 §10.3.3.7,
+// Table 10-3 lp_linkerror). With +trdy_le_stall=1 the top forces pl_trdy high
+// for a clock in LinkError during a stall handshake, which r3.0 allows and
+// FDI-R43 must accept (the pl_trdy-low check is then off).
+class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
+  `uvm_component_utils(ucie_fdi_stall_exit_test)
+
+  string           mode = "directed";
+  int unsigned     stall_ack = 40;
+  bit              trdy_forced;
+  bit              hold;
+  int unsigned     n_hit;       // events and requests started while a stall waited for its ack
+  int unsigned     n_le_stall;  // LinkErrors entered with pl_stallreq high
+  int unsigned     n_exits;     // exits from Active checked
+  int unsigned     n_after;     // ... to Retrain, LinkReset, Disabled or LinkError within 10
+                                // clocks of a stall handshake's end (it likely waited for it)
+  ucie_lsm_state_e exit_to;     // the state the link last left Active for
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void configure();
+    int unsigned v;
+    super.configure();
+    void'($value$plusargs("stall_exit=%s", mode));
+    void'($value$plusargs("stall_ack=%d", stall_ack));
+    if (!(mode inside {"directed", "req", "random"}))
+      `uvm_fatal(get_type_name(), {"+stall_exit: unknown mode ", mode})
+    void'($value$plusargs("trdy_le_stall=%b", trdy_forced));
+    void'($value$plusargs("hold_present=%b", hold));
+    env.fdi_cfg.stall_pct = 25;
+    if ($value$plusargs("stall_pct=%d", v)) env.fdi_cfg.stall_pct = v;
+    env.fdi_cfg.stall_trdy_free = 1'b0;
+    if ($value$plusargs("stall_trdy_free=%d", v)) env.fdi_cfg.stall_trdy_free = v != 0;
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    env.pl.stall_ack_delay = stall_ack;
+    env.pl.stall_ack_rand = mode == "random";
+    env.pl.hold_present = hold;
+    `uvm_info(get_type_name(), $sformatf("stall_exit %s: stall_ack %0d, hold_present %0b, %s",
+              mode, stall_ack, hold, env.fdi_cfg.convert2string()), UVM_NONE)
+  endfunction
+
+  // The test's own checks (see the header), every clock.
+  local task watch();
+    ucie_lsm_state_e prev = LSM_RESET;
+    int unsigned since = 1000;  // clocks since lp_stallack last fell
+    bit sa_q;
+    forever begin
+      ucie_lsm_state_e s;
+      bit sr;
+      bit sa;
+      @(env.pl.mb.mon_cb);
+      if (env.pl.mb.mon_cb.rst_n !== 1'b1) begin
+        prev = LSM_RESET;
+        continue;
+      end
+      s = sts_decode(env.pl.mb.mon_cb.pl_state_sts);
+      sr = env.pl.mb.mon_cb.pl_stallreq === 1'b1;
+      sa = env.pl.mb.mon_cb.lp_stallack === 1'b1;
+      if (sa_q && !sa) since = 0;
+      else if (since < 1000) since++;
+      sa_q = sa;
+      if (prev == LSM_ACTIVE && s != LSM_ACTIVE) begin
+        exit_to = s;
+        n_exits++;
+        if (s != LSM_L1 && since <= 10) n_after++;
+        if (s inside {LSM_RETRAIN, LSM_LINKRESET, LSM_DISABLED} && (sr || sa))
+          `uvm_error(get_type_name(), $sformatf({"Active -> %s with a stall handshake under way ",
+                     "(pl_stallreq %0b, lp_stallack %0b)"}, s.name(), sr, sa))
+        if (s == LSM_LINKERROR && sr) n_le_stall++;
+      end
+      if (prev == LSM_LINKERROR && s == LSM_RESET && (sr || sa))
+        `uvm_error(get_type_name(), $sformatf({"LinkError -> Reset with a stall handshake under ",
+                   "way (pl_stallreq %0b, lp_stallack %0b)"}, sr, sa))
+      if (s == LSM_LINKERROR && !trdy_forced && env.pl.mb.mon_cb.pl_trdy === 1'b1)
+        `uvm_error(get_type_name(), "the model drove pl_trdy high in LinkError")
+      prev = s;
+    end
+  endtask
+
+  // Wait (bounded) until the link is Active with no event running and a stall
+  // is waiting for lp_stallack.
+  local task wait_stall();
+    int unsigned n;
+    while (!(env.lsm.drv.idle() && env.lsm.drv.state == LSM_ACTIVE && env.lsm.drv.link_active &&
+             env.pl.mb.mon_cb.pl_stallreq === 1'b1 && env.pl.mb.mon_cb.lp_stallack !== 1'b1) &&
+           n++ < 50000)
+      @(env.pl.mb.mon_cb);
+    if (n >= 50000) `uvm_error(get_type_name(), "no stall waited for lp_stallack in Active")
+    else n_hit++;
+  endtask
+
+  // Wait (bounded) until nothing is under way and the link is Active again.
+  local task settle();
+    int unsigned n;
+    while (!(env.lsm.drv.idle() && env.pl.plan.size() == 0) && n++ < 100000)
+      @(env.pl.lsm.mon_cb);
+    if (n >= 100000) `uvm_error(get_type_name(), "a request or event never finished")
+    wait_active();
+  endtask
+
+  local task ask(ucie_lsm_req_e r);
+    ucie_pl_stub::plan_t p;
+    p.in = LSM_ACTIVE;
+    p.req = r;
+    p.up = -1;
+    p.ignore = 1'b0;
+    env.pl.plan.push_back(p);
+  endtask
+
+  local function void expect_exit(ucie_lsm_state_e s, string what);
+    if (exit_to != s)
+      `uvm_error(get_type_name(), {what, ": the link left Active for ", exit_to.name(),
+                                   ", not ", s.name()})
+  endfunction
+
+  // LinkError does not wait for the Protocol Layer's lp_stallack (r3.0
+  // §10.3.3.7: "It is not required to complete the stallreq/ack handshake
+  // before entering this state"; Table 10-3 lp_linkerror: "immediate action").
+  // Checked only when the stub acknowledges late enough to tell.
+  local function void expect_le_early(int unsigned n0, string what);
+    if (stall_ack >= 20 && n_le_stall == n0)
+      `uvm_error(get_type_name(), {what, ": LinkError was not entered while the stall ",
+                                   "waited for lp_stallack"})
+  endfunction
+
+  local task directed();
+    ucie_lsm_ev_e kinds[3] = '{LSM_EV_RETRAIN, LSM_EV_LINK_RESET, LSM_EV_DISABLED};
+    int unsigned  le_mid;
+    int unsigned  n0;
+    foreach (kinds[i]) begin
+      wait_active();
+      wait_stall();
+      cev(kinds[i]);
+    end
+    for (int k = 0; k < 5 && n_le_stall == 0; k++) begin
+      wait_active();
+      wait_stall();
+      cev(LSM_EV_LINKERROR);
+    end
+    if (n_le_stall == 0)
+      `uvm_error(get_type_name(), "no LinkError was entered during a stall handshake")
+    // A LinkError at a flit boundary while a stall waits.
+    le_mid = env.lsm_cfg.le_mid_flit_pct;
+    env.lsm_cfg.le_mid_flit_pct = 0;
+    wait_active();
+    wait_stall();
+    n0 = n_le_stall;
+    cev(LSM_EV_LINKERROR);
+    expect_le_early(n0, "LinkError at a flit boundary during a stall");
+    env.lsm_cfg.le_mid_flit_pct = le_mid;
+    // A PM entry after a stall (its own stall at a closed gate), and the exit.
+    wait_active();
+    wait_stall();
+    cev(LSM_EV_L1_ENTRY);
+    cev(LSM_EV_L1_EXIT);
+  endtask
+
+  local task req_cases();
+    int unsigned n0;
+    int unsigned le0;
+    // LinkReset requested while an Adapter Retrain waits for the stall.
+    wait_active();
+    wait_stall();
+    fork
+      cev(LSM_EV_RETRAIN);
+      begin
+        repeat (4) @(env.pl.mb.mon_cb);
+        ask(LSM_REQ_LINKRESET);
+      end
+    join
+    settle();
+    expect_exit(LSM_LINKRESET, "LinkReset request during a Retrain's wait");
+    // lp_linkerror while an Adapter LinkReset waits for the stall.
+    wait_stall();
+    n0 = env.pl.n_le_answered;
+    le0 = n_le_stall;
+    fork
+      cev(LSM_EV_LINK_RESET);
+      begin
+        repeat (4) @(env.pl.mb.mon_cb);
+        env.pl.linkerror_req = 1'b1;
+        while (env.pl.n_le_answered == n0 && env.pl.linkerror_req) @(env.pl.mb.mon_cb);
+        env.pl.linkerror_req = 1'b0;
+      end
+    join
+    settle();
+    expect_exit(LSM_LINKERROR, "lp_linkerror during a LinkReset's wait");
+    expect_le_early(le0, "lp_linkerror during a LinkReset's wait");
+    // A Disabled request during a stall, no event running.
+    wait_stall();
+    ask(LSM_REQ_DISABLED);
+    settle();
+    expect_exit(LSM_DISABLED, "Disabled request during a stall");
+  endtask
+
+  task events();
+    fork
+      watch();
+    join_none
+    case (mode)
+      "directed": directed();
+      "req":      req_cases();
+      default: ;
+    endcase
+    super.events();
+  endtask
+
+  function void check_phase(uvm_phase phase);
+    super.check_phase(phase);
+    if (mode != "random" && n_hit < 3)
+      `uvm_error(get_type_name(), $sformatf("only %0d exits started during a stall", n_hit))
+    if (hold && env.pl.n_kept == 0)
+      `uvm_error(get_type_name(), "no flit presented at pl_stallreq was kept up and accepted")
+  endfunction
+
+  function void report_phase(uvm_phase phase);
+    super.report_phase(phase);
+    `uvm_info(get_type_name(), $sformatf({"exits from Active %0d, started during a stall %0d, ",
+              "within 10 clocks of a stall's end %0d, LinkErrors entered during one %0d, ",
+              "stalls %0d, flits kept up through pl_stallreq and accepted %0d"}, n_exits, n_hit,
+              n_after, n_le_stall, env.fdi.mon.n_stalls, env.pl.n_kept), UVM_NONE)
+  endfunction
+endclass
+
 // Wait (bounded) until the stub has a flit to send back.
 task automatic wait_flit_queued(ucie_fdi_selftest_env env);
   int unsigned n;
@@ -946,7 +1203,11 @@ endclass
 // corrupt_h0 need an FDI of 128 B or less), or the top breaks the Adapter
 // (ucie_fdi_selftest_top): with +neg=xfer it forces pl_trdy high for a clock
 // while the stub presents a flit in Retrain (needs an FDI of 256 B or more,
-// where that transfer is a whole flit), with +neg=le_exit it reports Reset
+// where that transfer is a whole flit), with +neg=trdy_down it forces pl_trdy
+// high for a clock in Retrain with no flit presented, and with +neg=trdy_le
+// in LinkError with no stall handshake (FDI-R43 either way: pl_trdy only in
+// Active, or in LinkError while pl_stallreq is high; r3.0 Table 10-3), with
+// +neg=le_exit it reports Reset
 // for a clock while the stub holds lp_linkerror in LinkError, with
 // +neg=rx_inactive it drops pl_rx_active_req in Active while flits go on, and
 // with clk_exit, le_after and level it breaks the pl_clk_req handshake around
@@ -1038,6 +1299,7 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
         if (env.fdi_cfg.bpf() != 1)
           `uvm_fatal(get_type_name(), "+neg=xfer needs an FDI of 256 B or more")
       end
+      "trdy_down", "trdy_le": catcher.rule = "FDI-R43";
       default:   `uvm_fatal(get_type_name(), {"+neg: unknown violation ", neg})
     endcase
     uvm_report_cb::add(null, catcher);
@@ -1082,6 +1344,10 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
       end
       "inband_active": begin
         nev(LSM_EV_INBAND_DROP);
+        return;
+      end
+      "trdy_down", "trdy_le": begin
+        nev(neg == "trdy_down" ? LSM_EV_RETRAIN : LSM_EV_LINKERROR);
         return;
       end
       "wake_down", "wake_le": begin

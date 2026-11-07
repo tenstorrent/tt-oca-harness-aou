@@ -29,6 +29,10 @@ module ucie_fdi_selftest_top;
   // ucie_fdi_neg_test: Adapter faults the model never makes. The model drives
   // pl_state_sts and pl_rx_active_req only when they change, so each force
   // ends on the value the model drove, which the signal keeps once released.
+  // pl_trdy is written back to 0 on release, the value the model drives in
+  // the states where it is forced: a simulator may skip a clocking-block
+  // drive that repeats the last value, and the released variable would keep
+  // the forced 1.
   //  - xfer: pl_trdy high for one clock while the stub presents a flit in
   //    Retrain, so a transfer happens outside Active (FDI-R43).
   //  - le_exit: Reset for one clock while the stub holds lp_linkerror in
@@ -44,6 +48,14 @@ module ucie_fdi_selftest_top;
   //    short by Reset for a clock, before lp_clk_ack (FDI-R21; rule 6).
   //  - level: pl_phyinrecenter high for 40 clocks in Reset after a LinkReset,
   //    with no pl_clk_req (FDI-R20; rule 5).
+  //  - trdy_down: pl_trdy high for one clock in Retrain while the stub
+  //    presents nothing, so no transfer happens but pl_trdy is outside Active
+  //    (FDI-R43; r3.0 Table 10-3 pl_trdy).
+  //  - trdy_le: pl_trdy high for one clock in LinkError with pl_stallreq low
+  //    (FDI-R43: in LinkError only during a stall handshake).
+  // And one the monitor must accept (ucie_fdi_stall_exit_test, +trdy_le_stall=1):
+  // pl_trdy high for one clock in LinkError while pl_stallreq is high and
+  // lp_stallack low, the drain r3.0 Table 10-3 and §10.3.3.7 allow there.
   initial begin
     string neg;
     void'($value$plusargs("neg=%s", neg));
@@ -54,6 +66,7 @@ module ucie_fdi_selftest_top;
         force fdi_mb0.pl_trdy = 1'b1;
         @(posedge clk);
         release fdi_mb0.pl_trdy;
+        fdi_mb0.pl_trdy = 1'b0;
       end
       "le_exit": begin
         @(posedge clk iff (fdi_mb0.pl_state_sts == 4'hA && fdi_lsm.lp_linkerror === 1'b1));
@@ -103,8 +116,39 @@ module ucie_fdi_selftest_top;
         force fdi_lsm.pl_phyinrecenter = 1'b0;
         release fdi_lsm.pl_phyinrecenter;
       end
+      "trdy_down": begin
+        @(posedge clk iff (fdi_mb0.pl_state_sts == 4'hB && fdi_mb0.lp_valid !== 1'b1 &&
+                           fdi_mb0.lp_irdy !== 1'b1));
+        force fdi_mb0.pl_trdy = 1'b1;
+        @(posedge clk);
+        release fdi_mb0.pl_trdy;
+        fdi_mb0.pl_trdy = 1'b0;
+      end
+      "trdy_le": begin
+        @(posedge clk iff (fdi_mb0.pl_state_sts == 4'hA && fdi_mb0.pl_stallreq !== 1'b1 &&
+                           fdi_mb0.lp_valid !== 1'b1));
+        force fdi_mb0.pl_trdy = 1'b1;
+        @(posedge clk);
+        release fdi_mb0.pl_trdy;
+        fdi_mb0.pl_trdy = 1'b0;
+      end
       default: ;
     endcase
+  end
+
+  initial begin
+    bit le_stall;
+    void'($value$plusargs("trdy_le_stall=%b", le_stall));
+    if (le_stall) begin
+      @(posedge clk iff (fdi_mb0.pl_state_sts == 4'hA && fdi_mb0.pl_stallreq === 1'b1 &&
+                         fdi_mb0.lp_stallack !== 1'b1 && fdi_mb0.lp_valid !== 1'b1));
+      $display("selftest top @ %0t: pl_trdy forced high in LinkError during a stall handshake",
+               $time);
+      force fdi_mb0.pl_trdy = 1'b1;
+      @(posedge clk);
+      release fdi_mb0.pl_trdy;
+      fdi_mb0.pl_trdy = 1'b0;
+    end
   end
 
   initial begin

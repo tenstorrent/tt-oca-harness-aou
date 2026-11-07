@@ -17,9 +17,12 @@
 // flits, of which the zero-padded lanes are NOPs.
 // Reset flushes both directions, and so does a LinkError the Adapter entered
 // mid-flit (gate abort; UCIe r3.0 §10.3.3.7): the partial flits are abandoned.
+// The checks on the stall handshake follow r3.0 §10.3.2 (rules 1 to 8).
 // The Protocol Layer may present a flit (lp_valid, lp_irdy) in any state but
-// Reset and wait for pl_trdy (r3.0 10.2.4, Table 10-3 lp_irdy); only a transfer
-// needs Active (FDI-R43), and lp_valid alone transfers nothing.
+// Reset and wait for pl_trdy (r3.0 10.2.4, Table 10-3 lp_irdy); pl_trdy, and
+// with it every transfer, needs Active or a stall handshake in LinkError
+// (FDI-R43), and lp_valid alone
+// transfers nothing.
 // Errors (UCIe r3.0 Table 10-3, 10.3.1): a cancel unit that carried pl_error
 // must be cancelled and no RX data may follow until the link has left Active
 // (FDI-R06), and pl_error needs the Receiver active (FDI-R58); lp_corrupt_crc
@@ -173,7 +176,8 @@ class ucie_fdi_monitor extends uvm_monitor;
 
   // The Adapter left Active mid-flit: the DUT must drop its partial TX flit and
   // the partial RX flit it got (UCIe r3.0 §10.3.3.7). It may keep presenting a
-  // flit in LinkError (pl_trdy stays low, so nothing transfers); FDI-R44 still
+  // flit in LinkError (pl_trdy stays low, so nothing transfers, unless the
+  // Adapter drains it under a stall handshake, FDI-R43); FDI-R44 still
   // requires lp_irdy low in Reset once the grace after LinkError has run out.
   local function void abandon();
     if (tx_beat != 0) begin
@@ -225,14 +229,21 @@ class ucie_fdi_monitor extends uvm_monitor;
       tx_cc_h0 = 1'b0;
       tx_cc_any = 1'b0;
     end
-    // FDI-R43: data moves only in Active, or in LinkError while the Adapter
-    // drains the Protocol Layer under a stall handshake (UCIe r3.0 Table 10-3
-    // pl_trdy, §10.3.3.7; §10.3.2 rule 7). Presenting a flit and waiting through
-    // Retrain, LinkReset or Disabled is legal: the Adapter keeps pl_trdy low.
-    if (v && i && t) chk(R43);
-    if (v && i && t && sts != FDI_STS_ACTIVE &&
-        !(sts == FDI_STS_LINKERROR && vif.mon_cb.pl_stallreq === 1'b1))
-      err(R43, $sformatf("TX transfer (beat %0d) while pl_state_sts=0x%0h", tx_beat, sts));
+    // FDI-R43: pl_trdy "must be asserted only if pl_state_sts is Active or
+    // when performing the pl_stallreq/lp_stallack handshake when the
+    // pl_state_sts is LinkError" (UCIe r3.0 Table 10-3; §10.3.3.7: an Adapter
+    // that runs the handshake in LinkError provides pl_trdy to drain the
+    // Protocol Layer). The handshake lasts until lp_stallack falls (§10.3.2
+    // rule 9), and rule 6 keeps lp_valid and lp_irdy low while lp_stallack is
+    // high. Every transfer needs pl_trdy, so none happens outside those
+    // either. Presenting a flit and waiting through Retrain, LinkReset or
+    // Disabled is legal: the Adapter keeps pl_trdy low.
+    if (t) chk(R43);
+    if (t && sts != FDI_STS_ACTIVE &&
+        !(sts == FDI_STS_LINKERROR &&
+          (vif.mon_cb.pl_stallreq === 1'b1 || vif.mon_cb.lp_stallack === 1'b1)))
+      err(R43, $sformatf("pl_trdy high while pl_state_sts=0x%0h%s", sts,
+                         v && i ? $sformatf(" (a TX transfer, beat %0d)", tx_beat) : ""));
 
     if (t && sts == FDI_STS_ACTIVE && vif.mon_cb.pl_stallreq !== 1'b1 &&
         vif.mon_cb.lp_stallack !== 1'b1)

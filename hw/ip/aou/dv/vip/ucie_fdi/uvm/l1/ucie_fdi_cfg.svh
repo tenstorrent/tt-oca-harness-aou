@@ -13,17 +13,29 @@ class ucie_fdi_cfg extends uvm_object;
   int unsigned   trdy_pct = 70;       // RANDOM: chance trdy is high
   int unsigned   hole_pct = 20;       // HOLES: chance of a hole before a mid-flit beat
   int unsigned   burst_max = 8;       // BURSTY: longest high or low run
-  int unsigned   stall_pct = 0;       // chance of a stand-alone stall at a flit boundary
-  // Cycles pl_stallreq stays high after lp_stallack, from stall_hold_min to
-  // stall_hold_max. 0 drops it as soon as the ack is seen (UCIe r1.1 8.3.2 sets
-  // no minimum), the shortest stall the DUT can see.
+  // Stand-alone stalls: the chance of a pl_stallreq/lp_stallack handshake with
+  // no state change, per flit boundary in Active. Out-of-spec stress: in Flit
+  // mode UCIe r3.0 §10.3.2 uses the handshake only when exiting Active to PM
+  // ("must only be used when exiting Active State to a PM state"), so a
+  // Protocol Layer may take pl_stallreq as the start of a PM entry. 0 (the
+  // default): none, only the stall of a PM entry. A stall under way when the
+  // link leaves Active is finished first, except on the way to LinkError,
+  // where it runs on (ucie_fdi_tx_responder).
+  int unsigned   stall_pct = 0;
+  // Cycles a stand-alone stall holds pl_stallreq high after lp_stallack, from
+  // stall_hold_min to stall_hold_max. 0 drops it as soon as the ack is seen
+  // (r3.0 §10.3.2 sets no minimum), the shortest stall the DUT can see.
   int unsigned   stall_hold_min = 1;
   int unsigned   stall_hold_max = 8;
-  // Stall corners (UCIe r1.1 8.3.2): the share of stand-alone stalls raised
+  // Stall corners (r3.0 §10.3.2): the share of stand-alone stalls raised
   // mid-flit instead of at a boundary (none on a 256 B FDI, where a flit is
-  // one beat and every cycle is a flit boundary), and pl_trdy keeping its policy (lows
-  // included; rule 7 does not require consecutive pl_trdy) between pl_stallreq
-  // and lp_stallack instead of being held high.
+  // one beat and every cycle is a flit boundary; out-of-spec with stall_pct),
+  // and pl_trdy following its policy (lows included; rule 7: "pl_trdy is not
+  // required to be asserted consecutively") between pl_stallreq and
+  // lp_stallack instead of being held high, for every stall, a PM entry's
+  // included. Either way pl_trdy keeps coming during the stall, whether the
+  // gate is open or closed, so data presented before lp_stallack is accepted
+  // (rule 7); every policy raises it again (RANDOM needs trdy_pct > 0).
   int unsigned   stall_mid_pct = 0;
   bit            stall_trdy_free = 1'b0;
   // FDI-R57: lp_stallack must answer pl_stallreq within this many cycles.
