@@ -40,6 +40,18 @@ class ucie_fdi_cfg extends uvm_object;
   // (rule 7); every policy raises it again (RANDOM needs trdy_pct > 0).
   int unsigned   stall_mid_pct = 0;
   bit            stall_trdy_free = 1'b0;
+  // A stall handshake open when the link enters LinkError (r3.0 §10.3.3.7:
+  // "It is not required to complete the stallreq/ack handshake before
+  // entering this state"). 0: the Adapter does not perform it there:
+  // pl_stallreq falls on the first clock of LinkError and pl_trdy stays low.
+  // 1: it does ("If the lower layer decides to perform a pl_stallreq/
+  // lp_stallack handshake, it must provide pl_trdy to the upper layer to
+  // drain the packets"): pl_trdy drains the Protocol Layer until lp_stallack,
+  // and a handshake still open when the link leaves LinkError is abandoned
+  // with the move to Reset. Either way the Adapter never waits for
+  // lp_stallack in LinkError: the upper layer must clean up its data path
+  // there "even if pl_trdy is not asserted", and need not acknowledge.
+  bit            le_stall_drain = 1'b0;
   // FDI-R57: lp_stallack must answer pl_stallreq within this many cycles.
   int unsigned   stall_timeout = 2000;
   // Back-pressure hold: pl_trdy low from the next flit boundary while set.
@@ -119,8 +131,9 @@ class ucie_fdi_cfg extends uvm_object;
 
   function string convert2string();
     return $sformatf({"phy=%0d beat_bytes=%0d active=%0b trdy=%s stall_pct=%0d mid=%0d ",
-                      "stall_hold=%0d..%0d trdy_free=%0b hold=%0b stream=%02h nop=%0d"}, phy,
-                     beat_bytes, is_active, trdy_policy.name(), stall_pct, stall_mid_pct,
-                     stall_hold_min, stall_hold_max, stall_trdy_free, tx_hold, stream, nop_pct);
+                      "stall_hold=%0d..%0d trdy_free=%0b le_drain=%0b hold=%0b stream=%02h ",
+                      "nop=%0d"}, phy, beat_bytes, is_active, trdy_policy.name(), stall_pct,
+                     stall_mid_pct, stall_hold_min, stall_hold_max, stall_trdy_free,
+                     le_stall_drain, tx_hold, stream, nop_pct);
   endfunction
 endclass

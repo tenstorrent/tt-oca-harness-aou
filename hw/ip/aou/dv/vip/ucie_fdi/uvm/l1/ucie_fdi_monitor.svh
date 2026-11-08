@@ -26,7 +26,9 @@
 // Reset and wait for pl_trdy (r3.0 §10.2.4, Table 10-3 lp_irdy); pl_trdy, and
 // with it every transfer, needs Active or a stall handshake in LinkError
 // (FDI-R43), and lp_valid alone
-// transfers nothing.
+// transfers nothing. A transfer in LinkError is a drain (§10.3.3.7): it is
+// dropped, never published, and only the Protocol Layer's place in its flit is
+// kept (see abandon()).
 // Errors (UCIe r3.0 Table 10-3, §10.3.1): a cancel unit that carried pl_error
 // must be cancelled and no RX data may follow until the link has left Active
 // (FDI-R06), and pl_error needs the Receiver active (FDI-R58); lp_corrupt_crc
@@ -174,8 +176,10 @@ class ucie_fdi_monitor extends uvm_monitor;
       irdy_grace--;
     if (prev_sts == FDI_STS_ACTIVE && sts == FDI_STS_LINKERROR)
       abandon(vif.mon_cb.pl_flit_cancel === 1'b1);
+    // A drain ends with LinkError (nothing was framed during it).
+    if (prev_sts == FDI_STS_LINKERROR && sts != FDI_STS_LINKERROR) tx_beat = 0;
     sample_tx(sts);
-    sample_stall();
+    sample_stall(sts);
     sample_rx(sts);
     prev_sts = sts;
     prev_rst_n = 1'b1;
@@ -189,9 +193,16 @@ class ucie_fdi_monitor extends uvm_monitor;
   // The Protocol Layer may keep presenting a flit in LinkError (pl_trdy stays low, so
   // nothing transfers, unless the Adapter drains it under a stall handshake,
   // FDI-R43); FDI-R44 still requires lp_irdy low in Reset once the grace
-  // after LinkError has run out.
+  // after LinkError has run out. With a stall handshake open (pl_stallreq
+  // high, lp_stallack low) the partial TX flit is dropped too, but its place
+  // (tx_beat) is kept: the Adapter drains the Protocol Layer until
+  // lp_stallack (§10.3.3.7: it "must provide pl_trdy to the upper layer to
+  // drain the packets"), and one that holds its flit may finish it there and
+  // acknowledge at its boundary (§10.3.2 rule 4), which FDI-R13 then sees as
+  // one. sample_tx() follows the drain.
   local function void abandon(bit c);
     bit rx = rx_cur.size() != 0 && !(rx_half_done && rx_beat == cfg.bpf() && !c);
+    bit hs = vif.mon_cb.pl_stallreq === 1'b1 && vif.mon_cb.lp_stallack !== 1'b1;
     if (tx_beat != 0) begin
       n_tx_abandoned++;
       if (cov != null) cov.sample_abandon(1'b0);
@@ -210,7 +221,8 @@ class ucie_fdi_monitor extends uvm_monitor;
                                  tx_beat, cfg.bpf()) : "",
                 rx ? $sformatf(" RX flit abandoned after %0d transfer(s) (a flit takes %0d)",
                                rx_beat, cfg.bpf()) : ""), UVM_MEDIUM)
-    tx_cur.delete(); tx_beat = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
+    tx_cur.delete(); tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
+    if (!hs) tx_beat = 0;
     if (!rx) return;
     abandon_h_done = rx_half_done;
     rx_cur.delete(); rx_beat = 0; rx_bubbles = 0; rx_half_done = 1'b0;
@@ -235,8 +247,10 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (vif.mon_cb.lp_stallack === 1'b1) chk(R10);
     if (vif.mon_cb.lp_stallack === 1'b1 && (v || i))
       err(R10, $sformatf("lp_valid=%0b lp_irdy=%0b while lp_stallack is high", v, i));
-    if (tx_beat != 0) chk(R02);
-    if (tx_beat != 0 && !(v && i)) begin
+    // In LinkError a Protocol Layer that stops presenting part-way has
+    // cleaned up its data path (§10.3.3.7): no bubble (drain below).
+    if (tx_beat != 0 && sts != FDI_STS_LINKERROR) chk(R02);
+    if (tx_beat != 0 && sts != FDI_STS_LINKERROR && !(v && i)) begin
       err(R02, $sformatf("bubble inside a TX flit at beat %0d", tx_beat));
       // The partial flit is lost; resynchronise on the next lp_valid so one
       // truncation is one report, not one per idle cycle that follows.
@@ -268,6 +282,10 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (fcov != null) sample_trdy_run(sts, t);
     if (tx_beat != 0 && !t) tx_stall++;
     check_corrupt(v, v && i && t);
+    if (sts == FDI_STS_LINKERROR) begin
+      drain(v && i, t);
+      return;
+    end
     if (!(v && i && t)) begin
       if (tx_beat == 0 && tx_gap < 1000) tx_gap++;
       return;
@@ -295,6 +313,23 @@ class ucie_fdi_monitor extends uvm_monitor;
       end
       tx_cur.delete();
       tx_beat = 0;
+      tx_cc_h0 = 1'b0;
+      tx_cc_any = 1'b0;
+    end
+  endfunction
+
+  // A TX clock in LinkError. pl_trdy is high there only under a stall
+  // handshake (FDI-R43), when the Adapter drains the Protocol Layer and drops
+  // what it takes (UCIe r3.0 §10.3.3.7: "these packets could be dropped and
+  // not transmitted on the Link"): a transfer moves the Protocol Layer's place
+  // in its flit on, and nothing is framed, checked as a flit or published.
+  // Presenting nothing ends a flit in progress: the Protocol Layer has
+  // cleaned up its data path, which it may do at any time there (§10.3.3.7),
+  // so its acknowledge afterwards is at a clean boundary (§10.3.2 rule 4).
+  local function void drain(bit vi, bit t);
+    if (vi && t) tx_beat = (tx_beat + 1) % cfg.bpf();
+    else if (!vi) tx_beat = 0;
+    if (tx_beat == 0) begin
       tx_cc_h0 = 1'b0;
       tx_cc_any = 1'b0;
     end
@@ -370,9 +405,17 @@ class ucie_fdi_monitor extends uvm_monitor;
     end
   endfunction
 
-  local function void sample_stall();
+  // In LinkError the handshake need not complete (UCIe r3.0 §10.3.3.7: "It is
+  // not required to complete the stallreq/ack handshake before entering this
+  // state"), and the Protocol Layer there must clean up its data path "even
+  // if pl_trdy is not asserted" but need not acknowledge. So FDI-R57 does not
+  // run in LinkError, and pl_stallreq may fall unacknowledged in LinkError or
+  // with its exit to Reset, which abandons the handshake; FDI-R08 holds
+  // everywhere else.
+  local function void sample_stall(logic [3:0] sts);
     bit sr = vif.mon_cb.pl_stallreq === 1'b1;
     bit sa = vif.mon_cb.lp_stallack === 1'b1;
+    bit le = sts == FDI_STS_LINKERROR || prev_sts == FDI_STS_LINKERROR && sts == FDI_STS_RESET;
     if (sr != prev_sr) chk(R08);
     if (sa != prev_sa) chk(R09);
     if (sa && !prev_sa) begin
@@ -380,7 +423,8 @@ class ucie_fdi_monitor extends uvm_monitor;
       chk(R13);
     end
     if (sr && !prev_sr && prev_sa) err(R08, "pl_stallreq rose while lp_stallack was high");
-    if (!sr && prev_sr && !prev_sa) err(R08, "pl_stallreq fell before lp_stallack rose");
+    if (!sr && prev_sr && !prev_sa && !le)
+      err(R08, "pl_stallreq fell before lp_stallack rose");
     if (sa && !prev_sa && !prev_sr) begin
       if (sr) err(R12, "lp_stallack rose in the same cycle as pl_stallreq");
       else err(R09, "lp_stallack rose without pl_stallreq");
@@ -398,7 +442,7 @@ class ucie_fdi_monitor extends uvm_monitor;
     end
     if (sr && !sa) sr_cycles++;
     if (sa && !prev_sa) chk(R57);
-    if (sr && !sa && sr_cycles == cfg.stall_timeout) begin
+    if (sr && !sa && sr_cycles == cfg.stall_timeout && sts != FDI_STS_LINKERROR) begin
       chk(R57);
       err(R57, $sformatf("no lp_stallack %0d cycles after pl_stallreq (TX beat %0d)",
                                sr_cycles, tx_beat));
