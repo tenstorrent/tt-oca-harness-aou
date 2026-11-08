@@ -103,6 +103,22 @@
 //    boundary (with `stall_ack_rand`, a random 0 to `stall_ack_delay` per
 //    stall; rule 4 gives no time). A flit cut off when the Adapter leaves Active mid-flit is sent
 //    again from its start, so the loopback loses nothing.
+//  - With `keep_partial` a flit cut off by a mid-flit LinkError stays presented
+//    (lp_valid, lp_irdy) from where it stood, rather than withdrawn at once:
+//    r3.0 §10.3.3.7 has the Protocol Layer clean up its data path in
+//    LinkError but sets no time for it, and Table 10-3 lp_irdy allows it
+//    there. With a stall handshake open an Adapter that drains it ("must
+//    provide pl_trdy to the upper layer to drain the packets", §10.3.3.7)
+//    lets the stub finish the flit and acknowledge at its boundary (§10.3.2
+//    rule 4); otherwise it waits until Reset. A flit whose last transfer is
+//    in LinkError was drained and dropped, not delivered, so it too is sent
+//    again later (n_drained counts them).
+//  - With `le_ignore` the stub does the same but takes no pl_trdy outside
+//    Active (its transfers count only there) and never acknowledges in
+//    LinkError: r3.0 §10.3.3.7 requires the upper layer there to clean up its
+//    data path "even if pl_trdy is not asserted", not to acknowledge, and
+//    LinkError needs no completed handshake. The Adapter must not wait for it.
+//    n_stall_unacked counts pl_stallreq falling before the stub acknowledged.
 //  - With `early_present` a queued flit is presented (lp_valid, lp_irdy)
 //    without waiting for pl_trdy, in Active and through Retrain and LinkError,
 //    and for the first `down_present` clocks of LinkReset or Disabled (r3.0
@@ -177,6 +193,11 @@ class ucie_pl_stub extends uvm_component;
 
   int unsigned n_sent;       // flits whose last beat transferred
   int unsigned n_restarted;  // flits cut off mid-flit and sent again
+  int unsigned n_drained;    // flits whose last transfer was in LinkError, sent again
+  int unsigned n_cut_stalled; // flits cut by LinkError with pl_stallreq up and unacknowledged
+  bit          keep_partial; // keep a flit cut off by LinkError presented (see above)
+  bit          le_ignore;    // ... take no pl_trdy outside Active, no lp_stallack in LinkError
+  int unsigned n_stall_unacked; // pl_stallreq fell before the stub's lp_stallack
   int unsigned n_fill;       // empty flits sent to fill a wide transfer
   int unsigned tx_nop_pct;   // chance a TX transfer starts with a NOP flit (see above)
   int unsigned n_tx_nop;     // NOP flits sent
@@ -250,6 +271,7 @@ class ucie_pl_stub extends uvm_component;
   local bit            kept;       // hold_present: the flit presented was kept through pl_stallreq
   local bit            stallack;
   local bit            sa_armed;   // pl_stallreq seen at a flit boundary, lp_stallack due
+  local bit            sr_q;       // pl_stallreq as last seen
   local int unsigned   sa_left;    // ... in this many clocks
   local bit            nop_seen;
   local ucie_lsm_state_e st;       // pl_state_sts as last seen
@@ -357,6 +379,7 @@ class ucie_pl_stub extends uvm_component;
     kept = 1'b0;
     stallack = 1'b0;
     sa_armed = 1'b0;
+    sr_q = 1'b0;
     nop_seen = 1'b0;
     bad_done = 1'b0;
     st = LSM_RESET;
@@ -841,18 +864,28 @@ class ucie_pl_stub extends uvm_component;
     int unsigned bpf = beats_per_flit(beat_bytes);
     bit done = 1'b0;
     bit keep;
+    if (st == LSM_LINKERROR && st_from == LSM_ACTIVE && st_cycles == 0 && beat != 0 && stallreq &&
+        !stallack)
+      n_cut_stalled++;
+    if (sr_q && !stallreq && !stallack) n_stall_unacked++;
+    sr_q = stallreq;
     if (hold_present && presenting && beat == 0 && stallreq) kept = 1'b1;
-    if (presenting && trdy) begin
+    if (presenting && trdy && !(le_ignore && !active)) begin
       beat++;
       if (beat == bpf) begin
-        n_sent += cur.size();
-        if (kept) n_kept++;
-        cur.delete();
         beat = 0;
         done = 1'b1;
+        // A drain in LinkError drops the flit: keep it to send again.
+        if (sts != FDI_STS_LINKERROR) begin
+          n_sent += cur.size();
+          if (kept) n_kept++;
+          cur.delete();
+        end else begin
+          n_drained++;
+        end
       end
     end
-    if (!active && beat != 0) begin
+    if (!active && beat != 0 && !((keep_partial || le_ignore) && sts == FDI_STS_LINKERROR)) begin
       // Cut off mid-flit (a LinkError): send the whole flit again later.
       n_restarted++;
       beat = 0;
@@ -861,7 +894,8 @@ class ucie_pl_stub extends uvm_component;
     // stays up, and lp_stallack waits for it (see the header).
     keep = hold_present && presenting && !done && beat == 0 && active;
     if (!presenting || done || !active) kept = 1'b0;
-    if (stallreq && !stallack && beat == 0 && !keep) begin
+    if (stallreq && !stallack && beat == 0 && !keep &&
+        !(le_ignore && sts == FDI_STS_LINKERROR)) begin
       if (!sa_armed) begin
         sa_armed = 1'b1;
         sa_left = stall_ack_rand ? $urandom_range(stall_ack_delay) : stall_ack_delay;
@@ -875,6 +909,7 @@ class ucie_pl_stub extends uvm_component;
     end else if (!stallreq && stallack) begin
       stallack = 1'b0;
     end
+    if (!stallreq) sa_armed = 1'b0;
     if (beat != 0) begin
       presenting = 1'b1;
     end else begin

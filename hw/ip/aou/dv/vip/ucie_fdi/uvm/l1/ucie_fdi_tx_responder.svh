@@ -17,10 +17,30 @@
 //   until it transfers (§10.2.4) and may not acknowledge before (rule 6), so
 //   without this the handshake might never end (FDI-R11).
 // - LinkError does not wait for the handshake (§10.3.3.7; gate.stall_cut, or
-//   gate.abort mid-flit): trdy then only finishes a started flit (none after
-//   an abort, where the partial flit is abandoned), and the Protocol Layer
-//   cleans up its data path without pl_trdy (§10.3.3.7). The handshake runs
-//   on in LinkError: pl_stallreq falls only after lp_stallack (rule 3).
+//   gate.abort mid-flit): until the status is LinkError, trdy only finishes a
+//   started flit (none after an abort, where the partial flit is abandoned).
+//   In LinkError the handshake need not complete, and by default
+//   (cfg.le_stall_drain 0) the model does not perform it there: pl_stallreq
+//   falls on the first clock it samples LinkError, with pl_trdy low, and the
+//   Protocol Layer cleans up its data path (§10.3.3.7). With le_stall_drain
+//   the model performs it ("If the lower layer decides to perform a
+//   pl_stallreq/lp_stallack handshake, it must provide pl_trdy to the upper
+//   layer to drain the packets", §10.3.3.7; rule 7; Table 10-3 pl_trdy
+//   allows it): until lp_stallack it drains the Protocol Layer, trdy
+//   as in a stall above (held high, or by policy with stall_trdy_free), and
+//   drops what it takes ("these packets could be dropped and not transmitted
+//   on the Link"). Through the drain tx_beat keeps the Protocol Layer's place
+//   in a flit an abort cut, so one that holds its partial flit may finish it
+//   and acknowledge at its boundary (rule 4); one that stops presenting has
+//   cleaned up its data path (§10.3.3.7), and tx_beat restarts. Nothing
+//   requires the Protocol Layer to take pl_trdy or to acknowledge in
+//   LinkError ("It is required for the upper layer to internally clean up
+//   the data path, even if pl_trdy is not asserted"), so the model never
+//   waits for it: a handshake still open when L2 leaves LinkError is
+//   abandoned with the move to Reset (gate.stall_dropped()), pl_stallreq
+//   falling and pl_trdy low with the status change. LinkError is read from
+//   pl_state_sts as sampled (the status of the clock before), so the drain
+//   starts a clock after the status changes.
 // - Stand-alone stalls (cfg.stall_pct) start only while the gate is open, at
 //   a flit boundary, or mid-flit for cfg.stall_mid_pct of them (on a 256 B
 //   FDI a flit is one beat, so always at a boundary). In Flit mode r3.0 uses
@@ -33,7 +53,8 @@
 // - pl_stallreq rises only with lp_stallack low and falls only with it high
 //   (rules 2 and 3, FDI-R08). Reset drops it (rule 3 allows that) and ends
 //   any handshake in progress, so neither a stand-alone stall nor the stall
-//   of a PM entry that a reset stopped is resumed afterwards.
+//   of a PM entry that a reset stopped is resumed afterwards; so does the
+//   exit from LinkError to Reset (above).
 class ucie_fdi_tx_responder extends uvm_component;
   `uvm_component_utils(ucie_fdi_tx_responder)
 
@@ -43,7 +64,7 @@ class ucie_fdi_tx_responder extends uvm_component;
   local bit          trdy_q;
   local bit          stallreq_q;
   local bit          stall_want;
-  local int unsigned n_resets;  // resets that ended a handshake under way
+  local int unsigned n_resets;  // resets and LinkError exits that ended a handshake under way
   local int unsigned tx_beat;
   local bit          run_val;
   local int unsigned run_left;
@@ -68,6 +89,9 @@ class ucie_fdi_tx_responder extends uvm_component;
 
   local function void step();
     bit ack = vif.drv_cb.lp_stallack === 1'b1;
+    bit pres = vif.drv_cb.lp_valid === 1'b1 && vif.drv_cb.lp_irdy === 1'b1;
+    bit le = vif.drv_cb.pl_state_sts === FDI_STS_LINKERROR;
+    bit hs = stallreq_q && !ack;  // a stall handshake waited for lp_stallack in that clock
     bit rise = 1'b0;
     if (vif.drv_cb.rst_n !== 1'b1) begin
       trdy_q = 1'b0;
@@ -79,11 +103,24 @@ class ucie_fdi_tx_responder extends uvm_component;
       cfg.gate.set_tx_busy(1'b0);
       return;
     end
-    if (trdy_q && vif.drv_cb.lp_valid === 1'b1 && vif.drv_cb.lp_irdy === 1'b1)
-      tx_beat = (tx_beat + 1) % cfg.bpf();
-    // LinkError mid-flit: the partial TX flit is abandoned, never accepted.
-    if (cfg.gate.abort) tx_beat = 0;
-    cfg.gate.set_tx_busy(tx_beat != 0);
+    // LinkError abandons an open handshake, at once or, with the drain, on its
+    // exit (see the header).
+    if ((le && !cfg.le_stall_drain || cfg.gate.stall_dropped()) &&
+        (stall_want || stallreq_q || cfg.gate.stall_busy)) begin
+      n_resets++;
+      stall_want = 1'b0;
+      stallreq_q = 1'b0;
+      cfg.gate.stall_busy = 1'b0;
+      tx_beat = 0;
+      hs = 1'b0;
+    end
+    if (trdy_q && pres) tx_beat = (tx_beat + 1) % cfg.bpf();
+    // LinkError mid-flit: the partial TX flit is abandoned, never accepted;
+    // with a stall handshake open its place is kept for the drain, until the
+    // Protocol Layer stops presenting in LinkError (it cleaned up).
+    if (cfg.gate.abort && !hs || le && !pres) tx_beat = 0;
+    // A drain is no flit in progress for L2: none is delivered.
+    cfg.gate.set_tx_busy(tx_beat != 0 && !cfg.gate.abort && !le);
 
     if (stall_want && !stallreq_q && !ack) begin
       stallreq_q = 1'b1;
@@ -92,7 +129,8 @@ class ucie_fdi_tx_responder extends uvm_component;
       stallreq_q = 1'b0;
     end
 
-    if (cfg.gate.abort) trdy_q = 1'b0;
+    if (stallreq_q && !ack && le) trdy_q = cfg.stall_trdy_free ? policy() : 1'b1;  // drain
+    else if (cfg.gate.abort) trdy_q = 1'b0;
     else if (stallreq_q && !ack && !cfg.gate.stall_cut)
       trdy_q = cfg.stall_trdy_free ? policy() : 1'b1;
     else if (!cfg.gate.open || cfg.tx_hold) trdy_q = tx_beat != 0;
@@ -119,7 +157,8 @@ class ucie_fdi_tx_responder extends uvm_component;
 
   // Raise pl_stallreq and return once lp_stallack is high. Used by L2 before
   // a PM entry and by the random stalls; callers take turns. Returns early if
-  // a reset ends the handshake (the caller then skips stall_end).
+  // a reset or the exit from LinkError ends the handshake (the caller then
+  // skips stall_end).
   task stall_begin();
     int unsigned r;
     while (cfg.gate.stall_busy) @(vif.drv_cb);

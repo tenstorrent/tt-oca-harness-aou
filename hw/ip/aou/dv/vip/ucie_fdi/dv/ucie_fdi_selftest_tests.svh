@@ -462,7 +462,9 @@ endclass
 //            pl_clk_req up until Active whatever the drop does with it
 //            (§10.2.3.2 rule 7, FDI-R22). The test fails unless each drop was
 //            made in its bringup, in Reset (it logs where each one was made).
-//            clk_req_hold_bringup defaults to 0;
+//            clk_req_hold_bringup defaults to 0, and the mode cannot run with
+//            +clk_hold=1: the drop waits for pl_clk_req to be released in
+//            Reset;
 //  drop_overlap  the same stub, and one drop (30 clocks) beside the bringup
 //            of a LinkReset event as it waits to restart the training
 //            (sw_restart_delay 4), pl_inband_pres and pl_clk_req low, with
@@ -471,9 +473,11 @@ endclass
 //            lp_clk_ack, raises pl_inband_pres once acknowledged and releases
 //            its request, all inside the drop. pl_clk_req must stay up from
 //            that lp_clk_ack until pl_inband_pres rises, although the drop
-//            releases its own request in between (rules 5 and 7; FDI-R20
-//            reports a rise without the handshake). clk_req_hold_bringup
-//            defaults to 0.
+//            releases its own request in between: the test's watcher checks the
+//            model's own bringup sequence, while FDI-R20 (§10.2.3.2 rule 5) is
+//            the spec-level check that reports a rise without the handshake
+//            (rule 7 does not apply here: the status does not change).
+//            clk_req_hold_bringup defaults to 0.
 // +clk_hold=0|1 sets clk_req_hold_bringup (default 1). Any error fails it.
 class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
   `uvm_component_utils(ucie_fdi_reset_req_test)
@@ -1094,17 +1098,41 @@ endclass
 //            link must still leave Active for LinkError and come back up
 //            (the Adapter has seen the assertion; LinkError has priority,
 //            r3.0 §10.3.3.8);
+//  le_mid    (below 256 B) Adapter LinkErrors entered mid-flit while a stall waits for
+//            lp_stallack with a TX flit part-way (stall_mid_pct 90, pl_trdy
+//            random at 25 % meanwhile, the stall's own pl_trdy as
+//            stall_trdy_free has it): up to 40
+//            tries, until 3 catch the stub inside a flit with pl_stallreq up;
+//            at least one must. +le_stall_drain=1 (any mode) sets the model's
+//            le_stall_drain: the Adapter performs the handshake in LinkError
+//            and drains the Protocol Layer (§10.3.3.7: "must provide pl_trdy
+//            to the upper layer to drain the packets"), abandoning it on the
+//            exit to Reset; by default it abandons it on entry. With
+//            +keep_partial=1 (any mode) the stub keeps such a flit presented
+//            in LinkError, as a Protocol Layer may that cleans up its data
+//            path later (§10.3.3.7 sets no time); with the drain it finishes
+//            the flit there and acknowledges at its boundary (rule 4), and
+//            le_mid fails unless a flit was drained so. With +le_ignore=1
+//            (any mode) it keeps the flit presented but takes no pl_trdy
+//            outside Active and never acknowledges in LinkError, which r3.0
+//            allows (§10.3.3.7 requires the upper layer to clean up "even if
+//            pl_trdy is not asserted", not to acknowledge). With le_ignore,
+//            or without the drain, le_mid fails unless a handshake was
+//            abandoned (pl_stallreq fell unacknowledged);
 //  random    nothing of its own.
 // Each mode then runs the cov test's events. Besides the monitor's FDI-R43
 // (pl_trdy outside Active) the test checks that the status leaves Active for
-// Retrain, LinkReset or Disabled, and leaves LinkError for Reset, only with
-// the handshake done (pl_stallreq and lp_stallack low), and that the model
-// keeps pl_trdy low in LinkError. With +stall_ack=20 or more it also checks
+// Retrain, LinkReset or Disabled only with the handshake done (pl_stallreq and
+// lp_stallack low), that pl_stallreq is low once LinkError has gone to Reset
+// (the exit abandons an open handshake), and that the model
+// raises pl_trdy in LinkError only to drain, while pl_stallreq is high and
+// lp_stallack was still low a clock before. With +stall_ack=20 or more it also checks
 // that a LinkError (the Adapter's at a flit boundary, or the answer to
 // lp_linkerror) is entered without waiting for lp_stallack (r3.0 §10.3.3.7,
 // Table 10-3 lp_linkerror). With +trdy_le_stall=1 the top forces pl_trdy high
 // for a clock in LinkError during a stall handshake, which r3.0 allows and
-// FDI-R43 must accept (the pl_trdy-low check is then off).
+// FDI-R43 must accept (the pl_trdy check in LinkError is then off; it implies
+// +le_stall_drain=1, so the handshake runs on in LinkError).
 class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
   `uvm_component_utils(ucie_fdi_stall_exit_test)
 
@@ -1112,6 +1140,9 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
   int unsigned     stall_ack = 40;
   bit              trdy_forced;
   bit              hold;
+  bit              keep;        // +keep_partial: the stub keeps a cut flit up in LinkError
+  bit              ignore;      // +le_ignore: ... and takes no pl_trdy or stall there
+  bit              drain;       // +le_stall_drain: the model's le_stall_drain
   int unsigned     n_hit;       // events and requests started while a stall waited for its ack
   int unsigned     n_le_stall;  // LinkErrors entered with pl_stallreq high
   int unsigned     n_le_drop_held;  // le_drop cases started with a flit held at pl_trdy low
@@ -1129,11 +1160,17 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     super.configure();
     void'($value$plusargs("stall_exit=%s", mode));
     void'($value$plusargs("stall_ack=%d", stall_ack));
-    if (!(mode inside {"directed", "req", "le_drop", "random"}))
+    if (!(mode inside {"directed", "req", "le_drop", "le_mid", "random"}))
       `uvm_fatal(get_type_name(), {"+stall_exit: unknown mode ", mode})
     void'($value$plusargs("trdy_le_stall=%b", trdy_forced));
     void'($value$plusargs("hold_present=%b", hold));
+    void'($value$plusargs("keep_partial=%b", keep));
+    void'($value$plusargs("le_ignore=%b", ignore));
+    void'($value$plusargs("le_stall_drain=%b", drain));
+    drain |= trdy_forced;
+    env.fdi_cfg.le_stall_drain = drain;
     env.fdi_cfg.stall_pct = 25;
+    if (mode == "le_mid") env.fdi_cfg.stall_mid_pct = 90;
     if ($value$plusargs("stall_pct=%d", v)) env.fdi_cfg.stall_pct = v;
     env.fdi_cfg.stall_trdy_free = 1'b0;
     if ($value$plusargs("stall_trdy_free=%d", v)) env.fdi_cfg.stall_trdy_free = v != 0;
@@ -1144,8 +1181,11 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     env.pl.stall_ack_delay = stall_ack;
     env.pl.stall_ack_rand = mode == "random";
     env.pl.hold_present = hold;
-    `uvm_info(get_type_name(), $sformatf("stall_exit %s: stall_ack %0d, hold_present %0b, %s",
-              mode, stall_ack, hold, env.fdi_cfg.convert2string()), UVM_NONE)
+    env.pl.keep_partial = keep;
+    env.pl.le_ignore = ignore;
+    `uvm_info(get_type_name(), $sformatf(
+              "stall_exit %s: stall_ack %0d, hold_present %0b, keep_partial %0b, le_ignore %0b, %s",
+              mode, stall_ack, hold, keep, ignore, env.fdi_cfg.convert2string()), UVM_NONE)
   endfunction
 
   // The test's own checks (see the header), every clock.
@@ -1157,6 +1197,7 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
       ucie_lsm_state_e s;
       bit sr;
       bit sa;
+      bit sa_prev = sa_q;
       @(env.pl.mb.mon_cb);
       if (env.pl.mb.mon_cb.rst_n !== 1'b1) begin
         prev = LSM_RESET;
@@ -1177,11 +1218,15 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
                      "(pl_stallreq %0b, lp_stallack %0b)"}, s.name(), sr, sa))
         if (s == LSM_LINKERROR && sr) n_le_stall++;
       end
-      if (prev == LSM_LINKERROR && s == LSM_RESET && (sr || sa))
-        `uvm_error(get_type_name(), $sformatf({"LinkError -> Reset with a stall handshake under ",
-                   "way (pl_stallreq %0b, lp_stallack %0b)"}, sr, sa))
-      if (s == LSM_LINKERROR && !trdy_forced && env.pl.mb.mon_cb.pl_trdy === 1'b1)
-        `uvm_error(get_type_name(), "the model drove pl_trdy high in LinkError")
+      if (prev == LSM_LINKERROR && s == LSM_RESET && sr)
+        `uvm_error(get_type_name(), "LinkError -> Reset with pl_stallreq still high")
+      // The drain: pl_trdy follows a lp_stallack still low (sampled a clock
+      // before) with pl_stallreq high.
+      if (s == LSM_LINKERROR && !trdy_forced && env.pl.mb.mon_cb.pl_trdy === 1'b1 &&
+          (!sr || sa_prev))
+        `uvm_error(get_type_name(), $sformatf({"the model drove pl_trdy high in LinkError with ",
+                   "no stall handshake to drain (pl_stallreq %0b, lp_stallack %0b a clock ",
+                   "before)"}, sr, sa_prev))
       prev = s;
     end
   endtask
@@ -1365,6 +1410,30 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     end
   endtask
 
+  // Adapter LinkErrors mid-flit with a stall open and a TX flit part-way (see
+  // the header). The stub counts the flits so cut (n_cut_stalled). Meanwhile
+  // pl_trdy is random at 25 %, so a flit lasts long enough to be caught.
+  local task le_mid_cases();
+    int unsigned    le_mid = env.lsm_cfg.le_mid_flit_pct;
+    ucie_fdi_trdy_e pol = env.fdi_cfg.trdy_policy;
+    int unsigned    pct = env.fdi_cfg.trdy_pct;
+    env.lsm_cfg.le_mid_flit_pct = 100;
+    env.fdi_cfg.trdy_policy = UCIE_TRDY_RANDOM;
+    env.fdi_cfg.trdy_pct = 25;
+    for (int k = 0; k < 40 && env.pl.n_cut_stalled < 3; k++) begin
+      int unsigned n;
+      wait_active();
+      while (!(stall_waiting() && env.fdi_cfg.gate.tx_busy) && n++ < 50000) @(env.pl.mb.mon_cb);
+      if (n >= 50000) continue;
+      n_hit++;
+      cev(LSM_EV_LINKERROR);
+    end
+    env.lsm_cfg.le_mid_flit_pct = le_mid;
+    env.fdi_cfg.trdy_policy = pol;
+    env.fdi_cfg.trdy_pct = pct;
+    wait_active();
+  endtask
+
   task events();
     fork
       watch();
@@ -1373,6 +1442,7 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
       "directed": directed();
       "req":      req_cases();
       "le_drop":  le_drop_cases();
+      "le_mid":   le_mid_cases();
       default: ;
     endcase
     super.events();
@@ -1384,6 +1454,12 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
       `uvm_error(get_type_name(), $sformatf("only %0d exits started during a stall", n_hit))
     if (hold && env.pl.n_kept == 0)
       `uvm_error(get_type_name(), "no flit presented at pl_stallreq was kept up and accepted")
+    if (mode == "le_mid" && env.pl.n_cut_stalled == 0)
+      `uvm_error(get_type_name(), "no LinkError cut a TX flit with pl_stallreq up")
+    if (mode == "le_mid" && drain && keep && !ignore && env.pl.n_drained == 0)
+      `uvm_error(get_type_name(), "no flit cut by LinkError was drained to its end")
+    if (mode == "le_mid" && (ignore || !drain) && env.pl.n_stall_unacked == 0)
+      `uvm_error(get_type_name(), "no stall handshake was abandoned in LinkError")
   endfunction
 
   function void report_phase(uvm_phase phase);
@@ -1391,9 +1467,11 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     `uvm_info(get_type_name(), $sformatf({"exits from Active %0d, started during a stall %0d, ",
               "within 10 clocks of a stall's end %0d, LinkErrors entered during one %0d, ",
               "stalls %0d, flits kept up through pl_stallreq and accepted %0d, lp_linkerror ",
-              "dropped before LinkError %0d (%0d with a flit held)"}, n_exits, n_hit, n_after,
-              n_le_stall, env.fdi.mon.n_stalls, env.pl.n_kept, env.pl.n_le_dropped,
-              n_le_drop_held), UVM_NONE)
+              "dropped before LinkError %0d (%0d with a flit held), TX flits cut by LinkError ",
+              "with pl_stallreq up %0d, flits drained in LinkError %0d, stalls ended ",
+              "unacknowledged %0d"}, n_exits, n_hit, n_after, n_le_stall, env.fdi.mon.n_stalls,
+              env.pl.n_kept, env.pl.n_le_dropped, n_le_drop_held, env.pl.n_cut_stalled,
+              env.pl.n_drained, env.pl.n_stall_unacked), UVM_NONE)
   endfunction
 endclass
 

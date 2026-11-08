@@ -7,7 +7,9 @@
 // ucie_lsm_item. pl_wake_ack follows lp_wake_req in the background. Before
 // leaving Active it closes the mainband (L1) gates (flit boundary in both directions,
 // and, except for LinkError, a stand-alone stall handshake under way
-// finished: pl_trdy is high only in Active, r3.0 Table 10-3) and lowers
+// finished: pl_trdy is high only in Active, or in LinkError to drain the
+// Protocol Layer under a stall handshake with ucie_fdi_cfg::le_stall_drain,
+// r3.0 Table 10-3) and lowers
 // rx_active (FDI-R29); every entry to Active repeats the rx_active handshake
 // (FDI-R34). Reset aborts the current event.
 //
@@ -908,7 +910,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // close_gates waits for it again. Without stall_wait (LinkError, which
   // §10.3.3.7 lets enter with the handshake incomplete) pl_trdy only
   // finishes a started flit from now on (gate.stall_cut), and the handshake
-  // runs on in LinkError (leave_linkerror waits for its end). On the way to
+  // ends in LinkError: abandoned at once, or with
+  // ucie_fdi_cfg::le_stall_drain completed by lp_stallack while the TX
+  // responder drains the Protocol Layer, or abandoned on the exit
+  // (drop_stalls). On the way to
   // an Adapter LinkError, or to the answer to lp_linkerror, no request stops
   // the job once this has run (req_loop), so stall_cut then holds only on
   // that way and in LinkError. A Retrain that ends in LinkError may still be
@@ -936,20 +941,20 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   endtask
 
   // A stall handshake carried into LinkError (close_gates without stall_wait)
-  // ends before the status leaves LinkError: pl_stallreq falls only after
-  // lp_stallack (r3.0 §10.3.2 rule 3), and both are low again before Reset.
-  local task wait_stall_done();
-    int unsigned n;
-    foreach (gate[i]) begin
-      while (gate[i].stall_busy) begin
-        @(lsm_vif.drv_cb);
-        if (++n == 100000) begin
-          `uvm_error(get_type_name(), $sformatf(
-                     "phy%0d stall handshake never ended in LinkError", i))
-          return;
-        end
-      end
-    end
+  // and still open when the Adapter leaves it (with the drain,
+  // ucie_fdi_cfg::le_stall_drain) is abandoned with the move to Reset: r3.0 §10.3.3.7 needs no completed handshake ("It is not required
+  // to complete the stallreq/ack handshake before entering this state") and
+  // requires the Protocol Layer to clean up its data path "even if pl_trdy
+  // is not asserted", not to acknowledge. The TX responder drops pl_stallreq
+  // and ends the drain on the clock after drop_stall(), the clock the status
+  // changes on.
+  local task drop_stalls();
+    bit open;
+    foreach (gate[i]) open |= gate[i].stall_busy;
+    if (!open) return;
+    `uvm_info(get_type_name(), "LinkError -> Reset: stall handshake abandoned", UVM_MEDIUM)
+    foreach (gate[i]) gate[i].drop_stall();
+    @(lsm_vif.drv_cb);
   endtask
 
   // With cfg.rx_early the RX mainband opens once rx_active req and sts are
@@ -967,6 +972,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     wait_cycles(cfg.lat());
     set_state(LSM_ACTIVE);
     foreach (gate[i]) gate[i].abort = 1'b0;
+    foreach (gate[i]) gate[i].stall_drop = 1'b0;
     foreach (gate[i]) gate[i].stall_cut = 1'b0;
     foreach (gate[i]) gate[i].open = !parked(i);
     foreach (gate[i]) gate[i].rx_early = 1'b0;
@@ -1081,9 +1087,12 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // flight in either direction, then leave Active at once. The mainband (L1)
   // abandons both flits, and the Protocol Layer must drop its partial ones. LinkError needs
   // no completed stall handshake (§10.3.3.7), so a stand-alone stall may be
-  // under way: pl_stallreq stays high until lp_stallack (§10.3.2 rule 3) with
-  // pl_trdy low (the abort), and the status leaves LinkError only once the
-  // handshake has ended (leave_linkerror).
+  // under way: pl_trdy drops with the abort, and the TX responder abandons
+  // the handshake on the first clock of LinkError, or with
+  // ucie_fdi_cfg::le_stall_drain drains the Protocol Layer there until
+  // lp_stallack (§10.3.3.7: "must provide pl_trdy to the upper layer to drain
+  // the packets") and abandons it on the exit (drop_stalls). The Adapter never
+  // waits for lp_stallack in LinkError: a Protocol Layer may clean up instead.
   local task abort_mid_flit();
     int unsigned n;
     bit tx;
@@ -1208,7 +1217,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     end
     if (n != 0)
       `uvm_info(get_type_name(), $sformatf("lp_linkerror released (+%0d cycles)", n), UVM_MEDIUM)
-    wait_stall_done();
+    drop_stalls();
     set_state(LSM_RESET);
   endtask
 

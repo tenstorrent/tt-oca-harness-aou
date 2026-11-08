@@ -21,14 +21,27 @@ class ucie_fdi_gate extends uvm_object;
   // L2 leaves Active for LinkError without waiting for a stall handshake under
   // way (r3.0 §10.3.3.7: "It is not required to complete the stallreq/ack
   // handshake before entering this state"): the TX responder then raises
-  // pl_trdy only to finish a started flit, stall or not, and the handshake
-  // runs on in LinkError. Cleared when the gate opens again.
+  // pl_trdy only to finish a started flit, stall or not. In LinkError the
+  // responder abandons the handshake, or with ucie_fdi_cfg::le_stall_drain
+  // drains the Protocol Layer until lp_stallack (§10.3.3.7) or until L2
+  // abandons it on the exit to Reset (stall_drop). Cleared when the gate
+  // opens again.
   bit stall_cut = 1'b0;
   local realtime tx_done_t = -1.0;  // when tx_busy last fell
   // L2 left Active mid-flit (LinkError, UCIe r3.0 §10.3.3.7): L1 abandons the
-  // flits in progress at once instead of finishing them. Cleared when the
-  // gate opens again.
+  // flits in progress at once instead of finishing them (a TX flit under an
+  // open stall handshake is drained in LinkError, never delivered). Cleared
+  // when the gate opens again.
   bit abort = 1'b0;
+  // L2 leaves LinkError for Reset with a stall handshake still open: the
+  // handshake is abandoned there (UCIe r3.0 §10.3.3.7 needs none completed,
+  // and nothing in it requires the Protocol Layer's lp_stallack in
+  // LinkError). drop_stall() sets it; the TX responder acts from the next
+  // clock (stall_dropped()), the clock on which L2 changes the status, so
+  // pl_stallreq falls and pl_trdy is low with the move to Reset. Cleared
+  // when the gate opens again.
+  bit stall_drop = 1'b0;
+  local realtime stall_drop_t;
   int unsigned n_abandoned;  // RX flits (NOPs not counted) the PL driver abandoned on an abort
   // L1: a framing error was flagged on pl_error; L2 retrains the link. L2
   // clears it whenever it closes the gate.
@@ -54,6 +67,15 @@ class ucie_fdi_gate extends uvm_object;
   function void set_tx_busy(bit b);
     if (tx_busy && !b) tx_done_t = $realtime;
     tx_busy = b;
+  endfunction
+
+  function void drop_stall();
+    stall_drop = 1'b1;
+    stall_drop_t = $realtime;
+  endfunction
+
+  function bit stall_dropped();
+    return stall_drop && stall_drop_t != $realtime;
   endfunction
 
   // No flit in progress either way: with stall_cut set, L2 may enter

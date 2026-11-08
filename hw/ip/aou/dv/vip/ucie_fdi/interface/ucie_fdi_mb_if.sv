@@ -47,11 +47,12 @@ interface ucie_fdi_mb_if #(
   // drives it.
   logic              rx_active;
 
-  // L1: mainband stimulus and TX responder.
+  // L1: mainband stimulus and TX responder (which reads pl_state_sts back for
+  // the drain in LinkError).
   clocking drv_cb @(posedge clk);
     output pl_valid, pl_data, pl_flit_cancel, pl_error, pl_stream, pl_dllp, pl_dllp_valid,
            pl_dllp_ofc, pl_retimer_crd, pl_trdy, pl_stallreq;
-    input  lp_valid, lp_irdy, lp_stallack, rst_n;
+    input  lp_valid, lp_irdy, lp_stallack, pl_state_sts, rst_n;
   endclocking
 
   // L2: link state of this PHY.
