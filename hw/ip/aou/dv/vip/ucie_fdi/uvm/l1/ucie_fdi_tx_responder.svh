@@ -45,11 +45,17 @@
 //   a flit boundary, or mid-flit for cfg.stall_mid_pct of them (on a 256 B
 //   FDI a flit is one beat, so always at a boundary). In Flit mode r3.0 uses
 //   the handshake only on the way to PM (§10.3.2), so they are stress beyond
-//   the spec. One under way when L2 closes the gate for Retrain, LinkReset or
-//   Disabled runs to its end, all four phases, before L2 changes the status
-//   (gate.stall_busy, quiet()), so pl_trdy is never high outside Active
-//   (Table 10-3 pl_trdy). A PM entry's stall ends with lp_stallack before L2
-//   leaves Active.
+//   the spec. None begins once L2 has decided to leave Active: one requested
+//   on the clock edge L2 closes the gate (the two processes run in either
+//   order) is withdrawn before pl_stallreq rises, because step() looks at the
+//   gate again on the edge it would raise it, and L2 closes the gate at least
+//   one edge before it changes the status. One already raised when L2 closes
+//   the gate for Retrain, LinkReset or Disabled runs to its end, all four
+//   phases, before L2 changes the status (gate.stall_busy, quiet()), so
+//   pl_trdy is never high outside Active (Table 10-3 pl_trdy); one already
+//   raised when L2 leaves for LinkError is carried into it (below). A PM
+//   entry's stall, which L2 starts after closing the gate, is never withdrawn
+//   and ends with lp_stallack before L2 leaves Active.
 // - pl_stallreq rises only with lp_stallack low and falls only with it high
 //   (rules 2 and 3, FDI-R08). Reset drops it (rule 3 allows that) and ends
 //   any handshake in progress, so neither a stand-alone stall nor the stall
@@ -64,7 +70,10 @@ class ucie_fdi_tx_responder extends uvm_component;
   local bit          trdy_q;
   local bit          stallreq_q;
   local bit          stall_want;
-  local int unsigned n_resets;  // resets and LinkError exits that ended a handshake under way
+  local bit          stall_solo;  // the stall wanted is a stand-alone one (random_stalls)
+  // Resets and LinkError exits that ended a handshake under way, and
+  // stand-alone stalls withdrawn before pl_stallreq rose.
+  local int unsigned n_resets;
   local int unsigned tx_beat;
   local bit          run_val;
   local int unsigned run_left;
@@ -102,6 +111,15 @@ class ucie_fdi_tx_responder extends uvm_component;
       tx_beat = 0;
       cfg.gate.set_tx_busy(1'b0);
       return;
+    end
+    // A stand-alone stall not yet raised is withdrawn once L2 has closed the
+    // gate to leave Active (see the header): random_stalls() may have seen the
+    // gate open on the very edge L2 closed it.
+    if (stall_want && stall_solo && !stallreq_q &&
+        (!cfg.gate.open || cfg.gate.abort || cfg.gate.stall_cut)) begin
+      n_resets++;
+      stall_want = 1'b0;
+      cfg.gate.stall_busy = 1'b0;
     end
     // LinkError abandons an open handshake, at once or, with the drain, on its
     // exit (see the header).
@@ -156,13 +174,15 @@ class ucie_fdi_tx_responder extends uvm_component;
   endfunction
 
   // Raise pl_stallreq and return once lp_stallack is high. Used by L2 before
-  // a PM entry and by the random stalls; callers take turns. Returns early if
-  // a reset or the exit from LinkError ends the handshake (the caller then
-  // skips stall_end).
-  task stall_begin();
+  // a PM entry and by the random stalls (solo); callers take turns. Returns
+  // early if a reset or the exit from LinkError ends the handshake, or if a
+  // stand-alone stall is withdrawn before pl_stallreq rises because L2 closed
+  // the gate (the caller then skips stall_end).
+  task stall_begin(bit solo = 1'b0);
     int unsigned r;
     while (cfg.gate.stall_busy) @(vif.drv_cb);
     cfg.gate.stall_busy = 1'b1;
+    stall_solo = solo;
     stall_want = 1'b1;
     r = n_resets;
     do @(vif.drv_cb);
@@ -184,7 +204,8 @@ class ucie_fdi_tx_responder extends uvm_component;
 
   // Stand-alone stalls (cfg.stall_pct; see the header). Only while the gate
   // is open: L2 closes it before it leaves Active and then waits for one
-  // already under way (gate.quiet()). A reset ends one where it stands.
+  // already under way (gate.quiet()); one requested on the edge it closes is
+  // withdrawn in step(). A reset ends one where it stands.
   local task random_stalls();
     if (cfg.stall_pct == 0) return;
     forever begin
@@ -197,7 +218,7 @@ class ucie_fdi_tx_responder extends uvm_component;
       if (cfg.gate.open && !cfg.tx_hold && (mid ? tx_beat != 0 : tx_beat == 0) &&
           !cfg.gate.stall_busy && $urandom_range(99) < cfg.stall_pct) begin
         r = n_resets;
-        stall_begin();
+        stall_begin(1'b1);
         if (r == n_resets) repeat ($urandom_range(cfg.stall_hold_max, cfg.stall_hold_min))
           @(vif.drv_cb);
         if (r == n_resets) stall_end();
