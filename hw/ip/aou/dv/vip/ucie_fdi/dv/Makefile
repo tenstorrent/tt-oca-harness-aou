@@ -7,9 +7,10 @@
 #   make UVM_HOME=<uvm-core> [SIM=vcs|verilator] [TEST=ucie_fdi_smoke_test] [SEED=1] [PLUSARGS=...]
 #
 # `make build` compiles, `make run` runs one test (in build/<sim>/<test>.seed<n>[.<RUN_TAG>]),
-# `make test` does both. A run
-# passes when it ends with no UVM_ERROR and no UVM_FATAL; `make run` exits
-# non-zero otherwise. Builds and runs stay under build/ (git-ignored). Verilator
+# `make test` does both. A run passes when the simulator exits 0 and the log
+# ends with no UVM_ERROR and no UVM_FATAL; `make run` exits non-zero otherwise,
+# and the FAIL line gives the simulator's exit status when it is not 0 (128+N is
+# death by signal N). Builds and runs stay under build/ (git-ignored). Verilator
 # solves randomize() with z3: put it on PATH or set VERILATOR_SOLVER="<z3> --in".
 
 UCIE_FDI_HOME := $(abspath ..)
@@ -50,8 +51,9 @@ build:
 
 run:
 	@mkdir -p $(RUN_DIR)
-	@cd $(RUN_DIR) && $(RUN_CMD) > sim.log 2>&1; \
-	  if grep -q 'UVM_ERROR :\s*0$$' sim.log && grep -q 'UVM_FATAL :\s*0$$' sim.log; then \
+	@cd $(RUN_DIR) && $(RUN_CMD) > sim.log 2>&1; rc=$$?; \
+	  if [ $$rc -ne 0 ]; then echo "FAIL: $(RUN_DIR)/sim.log (simulator exit $$rc)"; exit 1; \
+	  elif grep -q 'UVM_ERROR :\s*0$$' sim.log && grep -q 'UVM_FATAL :\s*0$$' sim.log; then \
 	    echo "PASS: $(RUN_DIR)/sim.log"; else echo "FAIL: $(RUN_DIR)/sim.log"; exit 1; fi
 
 test: build
