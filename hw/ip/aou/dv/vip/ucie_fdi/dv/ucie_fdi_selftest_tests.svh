@@ -464,7 +464,10 @@ endclass
 //            made in its bringup, in Reset (it logs where each one was made),
 //            and unless each drop's pl_clk_req rises inband_drop_clk_lag
 //            clocks after it (+ucie_inband_drop_clk_lag=N: the drop first,
-//            r3.0 §10.2.3.2 rule 5; FDI-R20 must stay silent).
+//            r3.0 §10.2.3.2 rule 5; FDI-R20 must stay silent). A lag above
+//            clk_req_window is a negative case: the driver must refuse it
+//            with an error at each drop (which the test expects and demotes)
+//            and use clk_req_window instead, which the test then measures.
 //            clk_req_hold_bringup defaults to 0, and the mode cannot run with
 //            +clk_hold=1: the drop waits for pl_clk_req to be released in
 //            Reset;
@@ -482,6 +485,8 @@ endclass
 //            (rule 7 does not apply here: the status does not change).
 //            clk_req_hold_bringup defaults to 0.
 // +clk_hold=0|1 sets clk_req_hold_bringup (default 1). Any error fails it.
+typedef class ucie_fdi_expect_catcher;
+
 class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
   `uvm_component_utils(ucie_fdi_reset_req_test)
 
@@ -493,6 +498,8 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
   string       drop_at[$];
   int unsigned n_kept_up;   // drop_overlap: pl_clk_req kept up until pl_inband_pres rose
   int unsigned drop_lag[$]; // drop: clocks from each drop to its pl_clk_req
+  int unsigned exp_lag;     // drop: the lag the driver must use
+  ucie_fdi_expect_catcher lag_refusal;  // drop with a lag above the bound
   local bit    lr_done;     // the LinkReset event (and its bringup) has ended
 
   function new(string name, uvm_component parent);
@@ -522,7 +529,18 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
     env.pl.remote_first = env.lsm_cfg.remote_active_first_pct != 0;
     if (mode == "either") env.pl.early_pct = 50;
     if (mode inside {"drop", "drop_overlap"}) env.pl.act_delay = 100;
-    if (mode == "drop") env.pl.drop_pulse = 1'b1;
+    if (mode == "drop") begin
+      // The driver's bound on the lag (see ucie_lsm_driver::drop_clk_lag).
+      int unsigned lim = env.lsm_cfg.clk_req_window == 0 ? 1 : env.lsm_cfg.clk_req_window;
+      env.pl.drop_pulse = 1'b1;
+      exp_lag = env.lsm_cfg.inband_drop_clk_lag;
+      if (exp_lag > lim) begin
+        exp_lag = lim;
+        lag_refusal = new("lag_refusal");
+        lag_refusal.rule = "inband_drop_clk_lag";
+        uvm_report_cb::add(null, lag_refusal);
+      end
+    end
     if (mode == "restart") begin
       env.lsm_cfg.sw_restart_delay = 20000;
       env.pl.restart_bound = 300;
@@ -709,10 +727,14 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
           `uvm_error(get_type_name(), $sformatf("%0d drops, %0d of them with a pl_clk_req seen",
                      n_overlaps, drop_lag.size()))
         foreach (drop_lag[i])
-          if (drop_lag[i] != env.lsm_cfg.inband_drop_clk_lag)
+          if (drop_lag[i] != exp_lag)
             `uvm_error(get_type_name(), $sformatf({"drop %0d: pl_clk_req %0d clocks after ",
-                       "pl_inband_pres fell, inband_drop_clk_lag %0d"}, i + 1, drop_lag[i],
-                       env.lsm_cfg.inband_drop_clk_lag))
+                       "pl_inband_pres fell, expected %0d (inband_drop_clk_lag %0d)"}, i + 1,
+                       drop_lag[i], exp_lag, env.lsm_cfg.inband_drop_clk_lag))
+        if (lag_refusal != null && lag_refusal.n != n_overlaps)
+          `uvm_error(get_type_name(), $sformatf({"%0d of %0d drops refused ",
+                     "inband_drop_clk_lag %0d, which is above clk_req_window"},
+                     lag_refusal.n, n_overlaps, env.lsm_cfg.inband_drop_clk_lag))
       end
       "drop_overlap":
         if (n_overlaps != 1 || n_placed != 1 || n_kept_up != 1)

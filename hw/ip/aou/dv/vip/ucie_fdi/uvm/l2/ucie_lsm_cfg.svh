@@ -157,10 +157,13 @@ class ucie_lsm_cfg extends uvm_object;
   // Clocks from a pl_inband_pres drop in Reset (do_inband_drop,
   // LSM_EV_INBAND_DROP) to the pl_clk_req that covers it. 0 (default):
   // pl_clk_req rises in the clock of the drop. N: the drop comes first and the
-  // drop's pl_clk_req rises exactly N clocks later (if pl_clk_req is already
-  // up for the running job, the pin does not move). UCIe r3.0 §10.2.3.2 rule
-  // 5 lets a level signal transition without waiting for lp_clk_ack and asks
-  // only that the transition be observed through the handshake; its explicit
+  // drop's pl_clk_req rises N clocks later. That is exact when lp_clk_ack is
+  // low at the drop; if a previous handshake's lp_clk_ack is still high, the
+  // request waits for it to fall first, as at 0, and the check of a level
+  // move (FDI-R20) excuses that wait. If pl_clk_req is already up for the
+  // running job, the pin does not move. UCIe r3.0 §10.2.3.2 rule 5 lets a
+  // level signal transition without waiting for lp_clk_ack and asks only
+  // that the transition be observed through the handshake; its explicit
   // "before OR after pl_clk_req asserts" names assertion only, so the drop
   // first is permitted by inference, not by an explicit sentence. Figure
   // 10-13 shows the request first, and rule 5 strongly recommends that a

@@ -54,11 +54,35 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       `uvm_fatal(get_type_name(), "no aou_bringup in config_db")
     void'($value$plusargs("sw_reset_delay_max=%d", sw_reset_delay_max));
     configure();
+    draw_drop_lag();
   endfunction
 
   virtual function void configure();
     env.lsm_cfg.clk_req_hold_bringup = 1'b0;
     foreach (env.fdi_cfg[p]) env.fdi_cfg[p].trdy_policy = UCIE_TRDY_HOLES;
+  endfunction
+
+  // The lag of the pl_inband_pres drop's pl_clk_req (see run_phase): in about
+  // one run in seven 1 to clk_req_window clocks, otherwise 0. Drawn here,
+  // after configure() and before the L2 agent's build_phase reads its
+  // plusargs and prints its configuration, so that print shows the value
+  // used. +ucie_inband_drop_clk_lag=N forces the lag (0: off).
+  function void draw_drop_lag();
+    string how = "drawn";
+    int unsigned forced;
+    if (env.lsm_cfg.clk_req_hold_bringup) return;
+    if (ucie_fdi_pkg::plusarg_int("ucie_inband_drop_clk_lag",
+                                   {env.get_full_name(), ".lsm"}, forced)) begin
+      how = "plusarg";
+      env.lsm_cfg.inband_drop_clk_lag = forced;
+    end else begin
+      env.lsm_cfg.inband_drop_clk_lag = $urandom_range(6) == 0 ?
+          $urandom_range(env.lsm_cfg.clk_req_window > 1 ? env.lsm_cfg.clk_req_window : 1, 1) :
+          0;
+    end
+    `uvm_info(get_type_name(), $sformatf({"pl_inband_pres drop in WAIT_PRESENCE: pl_clk_req ",
+              "%0d clocks after the drop (inband_drop_clk_lag, %s)"},
+              env.lsm_cfg.inband_drop_clk_lag, how), UVM_LOW)
   endfunction
 
   function void connect_phase(uvm_phase phase);
@@ -96,23 +120,9 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       // level move without waiting for lp_clk_ack, and only names an order for
       // assertion, so this order is legal by inference but uncommon (Figure
       // 10-13 shows the request first). The DUT then goes from WAIT_PRESENCE
-      // straight to RESET. +ucie_inband_drop_clk_lag=N forces the lag (0: off).
+      // straight to RESET. The lag is drawn in build_phase (draw_drop_lag()).
       // When pl_inband_pres rises again pl_clk_req falls in that same clock,
       // so the DUT waits for the software trigger again.
-      begin
-        string how = "plusarg";
-        int unsigned forced;
-        if (!ucie_fdi_pkg::plusarg_int("ucie_inband_drop_clk_lag", env.lsm.get_full_name(),
-                                       forced)) begin
-          how = "drawn";
-          env.lsm_cfg.inband_drop_clk_lag = $urandom_range(6) == 0 ?
-              $urandom_range(env.lsm_cfg.clk_req_window > 1 ? env.lsm_cfg.clk_req_window : 1, 1) :
-              0;
-        end
-        `uvm_info(get_type_name(), $sformatf({"pl_inband_pres drop in WAIT_PRESENCE: pl_clk_req ",
-                  "%0d clocks after the drop (inband_drop_clk_lag, %s)"},
-                  env.lsm_cfg.inband_drop_clk_lag, how), UVM_LOW)
-      end
       env.lsm.drv.do_inband_drop(30);
       repeat (10) @(lsm_vif.mon_cb);
     end
