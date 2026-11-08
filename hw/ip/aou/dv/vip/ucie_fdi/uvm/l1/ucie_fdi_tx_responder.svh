@@ -46,16 +46,19 @@
 //   FDI a flit is one beat, so always at a boundary). In Flit mode r3.0 uses
 //   the handshake only on the way to PM (§10.3.2), so they are stress beyond
 //   the spec. None begins once L2 has decided to leave Active: one requested
-//   on the clock edge L2 closes the gate (the two processes run in either
-//   order) is withdrawn before pl_stallreq rises, because step() looks at the
-//   gate again on the edge it would raise it, and L2 closes the gate at least
-//   one edge before it changes the status. One already raised when L2 closes
-//   the gate for Retrain, LinkReset or Disabled runs to its end, all four
-//   phases, before L2 changes the status (gate.stall_busy, quiet()), so
-//   pl_trdy is never high outside Active (Table 10-3 pl_trdy); one already
-//   raised when L2 leaves for LinkError is carried into it (below). A PM
-//   entry's stall, which L2 starts after closing the gate, is never withdrawn
-//   and ends with lp_stallack before L2 leaves Active.
+//   on the clock edge L2 closes the gate (the processes run in any order) is
+//   withdrawn before pl_stallreq rises, because step() looks at the gate
+//   again on the edge it would raise it, and L2 closes the gate at least one
+//   edge before it changes the status. The exception is the order generator,
+//   step(), L2 on that edge: step() still sees the gate open and raises
+//   pl_stallreq there, and the stall is then handled as one already under
+//   way, which is legal (the gate was open when it rose). One already raised
+//   when L2 closes the gate for Retrain, LinkReset or Disabled runs to its
+//   end, all four phases, before L2 changes the status (gate.stall_busy,
+//   quiet()), so pl_trdy is never high outside Active (Table 10-3 pl_trdy);
+//   one already raised when L2 leaves for LinkError is carried into it
+//   (below). A PM entry's stall, which L2 starts after closing the gate, is
+//   never withdrawn and ends with lp_stallack before L2 leaves Active.
 // - pl_stallreq rises only with lp_stallack low and falls only with it high
 //   (rules 2 and 3, FDI-R08). Reset drops it (rule 3 allows that) and ends
 //   any handshake in progress, so neither a stand-alone stall nor the stall
@@ -205,7 +208,9 @@ class ucie_fdi_tx_responder extends uvm_component;
   // Stand-alone stalls (cfg.stall_pct; see the header). Only while the gate
   // is open: L2 closes it before it leaves Active and then waits for one
   // already under way (gate.quiet()); one requested on the edge it closes is
-  // withdrawn in step(). A reset ends one where it stands.
+  // withdrawn in step(), unless step() raised it on that same edge before L2
+  // closed the gate (then it is one under way). A reset ends one where it
+  // stands.
   local task random_stalls();
     if (cfg.stall_pct == 0) return;
     forever begin
