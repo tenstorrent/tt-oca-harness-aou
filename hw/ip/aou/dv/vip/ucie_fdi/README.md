@@ -86,7 +86,7 @@ and figure numbers are UCIe r3.0's, as in the code.
 | Flit format | §3.3.4, Figure 3-25, Table 3-5 | Latency-Optimized 256B with optional bytes (Format 6) as the Streaming protocol lays it out (and CXL.cachemem, Figure 3-24, with the same Adapter-owned bytes): two 128B halves, Flit Header bytes 0-1 (but for the Protocol ID, Byte 0 [7:6]) and CRC bytes 126-127, 254-255 owned by the Adapter. See "Flit format and protocol" |
 | Byte mapping | §10.3.1 | Flit byte k on FDI byte k mod N of transfer floor(k/N), N = 32, 64, 128 or 256 bytes; at 256 the flit is one transfer; at 512 and 1024 B flit j of a transfer on bytes 256j to 256j+255 |
 | Data transfer | §10.2.4, §10.2.5, Table 10-3 | RX: `pl_valid` with bubbles, `pl_flit_cancel` of either half (idle or with the replay's first beat, repeated), of the whole flit at 256 B (see "Flit width 256 B"), of every flit of the transfer at 512 B and up, where RX transfers may carry NOP lanes; optionally NOP flits (Table 3-5, Table 10-3 `pl_flit_cancel`: `nop_pct`); TX: `pl_trdy` by policy |
-| Stall | §10.3.2 | `pl_stallreq` / `lp_stallack` before every PM entry; optionally stand-alone stalls with no state change, at a flit boundary or mid-flit (`stall_pct`: out-of-spec stress in Flit mode, see Known limits), none begun once the model has decided to leave Active (one requested on the clock it decides is dropped before `pl_stallreq` rises), each already raised finished before the link leaves Active for Retrain, LinkReset or Disabled; one carried into LinkError is abandoned there (`pl_stallreq` falls unacknowledged), or with `le_stall_drain` drains the Protocol Layer (`pl_trdy` until `lp_stallack`, the drained transfers dropped; §10.3.3.7) and is abandoned if still open when the link leaves LinkError |
+| Stall | §10.3.2 | `pl_stallreq` / `lp_stallack` before every PM entry; optionally stand-alone stalls with no state change, at a flit boundary or mid-flit (`stall_pct`: out-of-spec stress in Flit mode, see Known limits), none begun once the model has decided to leave Active (one requested on the clock it decides is dropped before `pl_stallreq` rises, unless `pl_stallreq` rose on that same clock, in which case it is handled as one already under way), each already raised finished before the link leaves Active for Retrain, LinkReset or Disabled; one carried into LinkError is abandoned there (`pl_stallreq` falls unacknowledged), or with `le_stall_drain` drains the Protocol Layer (`pl_trdy` until `lp_stallack`, the drained transfers dropped; §10.3.3.7) and is abandoned if still open when the link leaves LinkError |
 | Clock gating | §10.2.3.1, §10.2.3.2 | `lp_wake_req` / `pl_wake_ack` responder, `pl_clk_req` / `lp_clk_ack` handshakes: before every status change out of Reset, LinkReset, Disabled or L1 and around every move of a level signal there (§10.2.3.2 rules 5 to 7); a `pl_inband_pres` drop a test runs beside the running job (`lsm.drv.do_inband_drop(n)`, say while the bringup waits in Reset) holds `pl_clk_req` on its own, so neither releases a request the other still needs. A drop raises `pl_clk_req` in its own clock by default; with `inband_drop_clk_lag` N it drops `pl_inband_pres` first and raises `pl_clk_req` N clocks later (see the option) |
 | rx_active | §10.2.7 | `pl_rx_active_req` / `lp_rx_active_sts` on every Active entry and exit, optionally before the Protocol Layer's Active request in Reset and Retrain, as when the remote die asks first (`remote_active_first_pct`); optionally RX flits in Reset once the Receiver is active |
 | Bring-up | §10.2.8, §10.3.3.1 | clock handshake, `pl_inband_pres`, the Protocol Layer's request to leave Reset (§10.3.3.1 rule 1: `lp_state_req` NOP for at least one clock in Reset, then Active; an Active held into Reset is no request), Active |
@@ -434,7 +434,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) is a complete exampl
 | `beat_bytes` | 64 | FDI width: 32, 64, 128, 256, 512 or 1024 bytes, no other (r3.0 §10.3.1, Implementation Note NBYTES: 64 to 512, and multiples of 256 from 512 up, are recommended; of those multiples the model supports only 512 and 1024; 32 is accepted but not recommended) |
 | `is_active` | 1 | 0: monitor only |
 | `trdy_policy` | `ALWAYS` | `pl_trdy`: always, `RANDOM` (`trdy_pct`), `BURSTY` (runs of 1..`burst_max`), `HOLES` (only inside a flit, `hole_pct` per beat) |
-| `stall_pct`, `stall_mid_pct` | 0, 0 | out-of-spec stress for Flit mode (see below and "Known limits"): chance of a stand-alone stall (a stall handshake with no state change) per flit boundary in Active, and the share raised mid-flit (none from 256 B up, where every cycle is a flit boundary). Out-of-spec stress: in Flit mode r3.0 §10.3.2 uses the handshake only on the way to PM, so a Protocol Layer may read `pl_stallreq` as a PM entry. None begins once the model has decided to leave Active (one requested on the clock it decides is dropped before `pl_stallreq` rises). One under way when the link leaves Active for Retrain, LinkReset or Disabled is finished, all four phases, before the status changes; LinkError does not wait for it (Known limits) |
+| `stall_pct`, `stall_mid_pct` | 0, 0 | out-of-spec stress for Flit mode (see below and "Known limits"): chance of a stand-alone stall (a stall handshake with no state change) per flit boundary in Active, and the share raised mid-flit (none from 256 B up, where every cycle is a flit boundary). Out-of-spec stress: in Flit mode r3.0 §10.3.2 uses the handshake only on the way to PM, so a Protocol Layer may read `pl_stallreq` as a PM entry. None begins once the model has decided to leave Active (one requested on the clock it decides is dropped before `pl_stallreq` rises, unless `pl_stallreq` rose on that same clock, in which case it is handled as one already under way). One under way when the link leaves Active for Retrain, LinkReset or Disabled is finished, all four phases, before the status changes; LinkError does not wait for it (Known limits) |
 | `stall_hold_min`, `stall_hold_max` | 1, 8 | cycles a stand-alone stall (out-of-spec stress, `stall_pct`) holds `pl_stallreq` high after `lp_stallack` |
 | `stall_trdy_free` | 0 | `pl_trdy` follows its policy between `pl_stallreq` and `lp_stallack` instead of being held high, on every stall: within r3.0 on a PM entry's stall, out-of-spec stress on a stand-alone one (`stall_pct`) (r3.0 §10.3.2 rule 7: `pl_trdy` "is not required to be asserted consecutively"). Either way `pl_trdy` keeps coming during the stall with the gate open or closed, so a flit the Protocol Layer presented before `lp_stallack` is accepted (rule 7: "any data presented on the interface must be accepted by the physical layer until the rising edge of lp_stallack"); every policy raises it again (`RANDOM` needs `trdy_pct` > 0) |
 | `le_stall_drain` | 0 | a stall handshake open when the link enters LinkError (r3.0 §10.3.3.7): 0 abandoned a clock after the status changes (`pl_stallreq`, still high in the first clock that shows LinkError, falls unacknowledged on the next, and `pl_trdy` stays low); 1 performed there, `pl_trdy` draining the Protocol Layer until `lp_stallack` (the transfers dropped), and abandoned with the move to Reset if still open. Either way the Adapter never waits for `lp_stallack` in LinkError (Known limits) |
@@ -708,15 +708,17 @@ transfer, NOPs not included. `sample_cancel`'s `half` is 0 or 1 for a 128B half 
 for a cancel of the whole transfer from 256 B up (one call per cancel, however many
 flits it drops). From 256 B up a collector can never see a TX stall between beats, a
 stall raised mid-flit, a half cancel or an abandoned TX flit, so bins for those belong
-only to the narrower widths. Stimulus quality figures (cancels, stalls, abandoned flits, RX beats in Reset, RX NOPs and short wide transfers) are also in
-the mainband monitor's end-of-test summary.
+only to the narrower widths. Stimulus quality figures (cancels, stalls, abandoned flits,
+RX beats in Reset, RX NOPs and short wide transfers) are also in the mainband monitor's
+end-of-test summary.
 
 ## Self-test
 
 *The model against a Protocol Layer stub that loops every delivered flit back, on one
-FDI (two in `ucie_fdi_reuse_test`).* `ucie_pl_stub` answers the handshakes and the state requests as a simple Protocol
-Layer would; `ucie_fdi_selftest_sb` checks that every flit sent arrives intact after
-its cancels and comes back in order; the model's monitors check the rules on the way.
+FDI (two in `ucie_fdi_reuse_test`).* `ucie_pl_stub` answers the handshakes and the state
+requests as a simple Protocol Layer would; `ucie_fdi_selftest_sb` checks that every flit
+sent arrives intact after its cancels and comes back in order; the model's monitors check
+the rules on the way.
 
 ```sh
 cd dv
@@ -813,39 +815,40 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
   mode the stall handshake "must only be used when exiting Active State to a PM state"
   (§10.3.2), so a Protocol Layer may treat `pl_stallreq` as the start of a PM entry. None
   begins once the model has decided to leave Active: one requested on the clock it decides
-  is dropped before `pl_stallreq` rises. The model finishes one under way (the Protocol Layer acknowledges, then both signals fall)
-  before it leaves Active for Retrain, LinkReset or Disabled. LinkError does not wait for
-  it (§10.3.3.7: "It is not required to complete the stallreq/ack handshake before
-  entering this state"; Table 10-3 `lp_linkerror`: "immediate action"): the model enters
-  LinkError at the next flit boundary, or at once mid-flit. From the decision to enter
-  LinkError to the status change (two clocks plus the end of a started flit) the link is
-  still Active with `pl_stallreq` up, and a flit presented then gets no `pl_trdy`: the model
-  reads §10.3.3.7 as ending rule 7's "must be accepted ... until the rising edge of
-  lp_stallack" once it has decided on LinkError, as a mid-flit LinkError abandons a flit.
-  In LinkError the Adapter never waits for `lp_stallack`: §10.3.3.7 requires the upper layer
-  there "to internally clean up the data path, even if pl_trdy is not asserted", not to
-  acknowledge, so a Protocol Layer that never takes `pl_trdy` or acknowledges there is
-  legal. By default (`le_stall_drain` 0) the model does not perform the handshake in
-  LinkError: `pl_stallreq` stays high in the first clock that shows LinkError and falls,
+  is dropped before `pl_stallreq` rises, unless `pl_stallreq` rose on that same clock, in
+  which case it is handled as one already under way. The model finishes one under way (the
+  Protocol Layer acknowledges, then both signals fall) before it leaves Active for
+  Retrain, LinkReset or Disabled. LinkError does not wait for it (§10.3.3.7: "It is not
+  required to complete the stallreq/ack handshake before entering this state"; Table 10-3
+  `lp_linkerror`: "immediate action"): the model enters LinkError at the next flit
+  boundary, or at once mid-flit. From the decision to enter LinkError to the status change
+  (two clocks plus the end of a started flit) the link is still Active with `pl_stallreq`
+  up, and a flit presented then gets no `pl_trdy`: the model reads §10.3.3.7 as ending
+  rule 7's "must be accepted ... until the rising edge of lp_stallack" once it has decided
+  on LinkError, as a mid-flit LinkError abandons a flit. In LinkError the Adapter never
+  waits for `lp_stallack`: §10.3.3.7 requires the upper layer there "to internally clean
+  up the data path, even if pl_trdy is not asserted", not to acknowledge, so a Protocol
+  Layer that never takes `pl_trdy` or acknowledges there is legal. By default
+  (`le_stall_drain` 0) the model does not perform the handshake in LinkError:
+  `pl_stallreq` stays high in the first clock that shows LinkError and falls,
   unacknowledged, on the next (the model reads `pl_state_sts` as sampled, so it acts a
   clock after the status change), and `pl_trdy` stays low. With `le_stall_drain` it does
   ("If the lower layer decides to perform a pl_stallreq/lp_stallack handshake, it must
-  provide pl_trdy to the upper layer to drain the packets"):
-  from the clock after the status change until `lp_stallack` it
-  drains the Protocol Layer, `pl_trdy` as during any stall (held high, or by policy with
-  `stall_trdy_free`), the transfers dropped, never delivered ("these packets could be
-  dropped and not transmitted on the Link"; Table 10-3 `pl_trdy`; FDI-R43); a Protocol
-  Layer that holds a flit a mid-flit LinkError cut can so finish it and acknowledge at its
-  boundary (rule 4), and a handshake still open when the link leaves LinkError is abandoned
-  with the move to Reset, `pl_stallreq` falling and `pl_trdy` low on the clock the status
-  changes. r3.0 does not say how a handshake left incomplete in LinkError ends; rule 3
-  lets `pl_stallreq` fall before `lp_stallack` only "when domain is in reset", and the
-  model reads §10.3.3.7's "not required to complete the stallreq/ack handshake" as
-  allowing that fall in LinkError or on its exit to Reset. FDI-R08 accepts it there, and
-  FDI-R57 does not run in LinkError. The default keeps `pl_trdy` low outside Active:
-  draining gains nothing from a Protocol Layer that cleans up in LinkError, and a
-  checker that frames every `lp_valid & lp_irdy & pl_trdy` as a flit, whatever the state,
-  would take drained transfers for flits.
+  provide pl_trdy to the upper layer to drain the packets"): from the clock after the
+  status change until `lp_stallack` it drains the Protocol Layer, `pl_trdy` as during any
+  stall (held high, or by policy with `stall_trdy_free`), the transfers dropped, never
+  delivered ("these packets could be dropped and not transmitted on the Link"; Table 10-3
+  `pl_trdy`; FDI-R43); a Protocol Layer that holds a flit a mid-flit LinkError cut can so
+  finish it and acknowledge at its boundary (rule 4), and a handshake still open when the
+  link leaves LinkError is abandoned with the move to Reset, `pl_stallreq` falling and
+  `pl_trdy` low on the clock the status changes. r3.0 does not say how a handshake left
+  incomplete in LinkError ends; rule 3 lets `pl_stallreq` fall before `lp_stallack` only
+  "when domain is in reset", and the model reads §10.3.3.7's "not required to complete the
+  stallreq/ack handshake" as allowing that fall in LinkError or on its exit to Reset.
+  FDI-R08 accepts it there, and FDI-R57 does not run in LinkError. The default keeps
+  `pl_trdy` low outside Active: draining gains nothing from a Protocol Layer that cleans
+  up in LinkError, and a checker that frames every `lp_valid & lp_irdy & pl_trdy` as a
+  flit, whatever the state, would take drained transfers for flits.
 
 ## The AoU bench as a consumer
 
@@ -855,14 +858,14 @@ config's `source_lists`), and its regressions run on it unchanged. It adds
 
 - `aou_bringup_if`: the DUT's bringup pins that are not FDI (PHY select, software
   pins, status outputs, internal triggers).
-- `aou_fdi_layer`: one component and a `ucie_lsm_observer`. It drives those pins
-  (idle on reset, `pulse_sw()`) and samples them in the same `observe()`, steps the reference model of the DUT's bringup
-  controller (`aou_bringup_model`, with its own comparison slack `ref_slack`, apart
-  from the model's liveness bounds) every clock, checks that the DUT never requests L2,
-  and holds the coverage collectors. Its env configs draw `sw_restart_delay` in
-  [50:1500] per run, so a DUT that asks anything of the link meanwhile is caught at many
-  delays; `+ucie_sw_restart_delay=N` fixes it. The bench's envs create it and call
-  `attach(lsm)` in `connect_phase`.
+- `aou_fdi_layer`: one component and a `ucie_lsm_observer`. It drives those pins (idle on
+  reset, `pulse_sw()`) and samples them in the same `observe()`, steps the reference model
+  of the DUT's bringup controller (`aou_bringup_model`, with its own comparison slack
+  `ref_slack`, apart from the model's liveness bounds) every clock, checks that the DUT
+  never requests L2, and holds the coverage collectors. Its env configs draw
+  `sw_restart_delay` in [50:1500] per run, so a DUT that asks anything of the link
+  meanwhile is caught at many delays; `+ucie_sw_restart_delay=N` fixes it. The bench's
+  envs create it and call `attach(lsm)` in `connect_phase`.
 - `aou_fdi_cov` (a `ucie_fdi_cov`, set on every mainband monitor) and `aou_lsm_cov`
   (sampled by the layer and the reference model): feeding the bench's coverage
   service.
