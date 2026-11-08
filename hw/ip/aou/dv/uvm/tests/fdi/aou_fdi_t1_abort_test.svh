@@ -7,17 +7,25 @@
 // - from Reset: LinkError before pl_inband_pres (status first, or pl_clk_req
 //   first); LinkError with the DUT waiting for a trigger, one cycle after the
 //   waking pl_clk_req, and with pl_wake_ack held back; LinkReset or Disabled
-//   with pl_wake_ack held back; LinkError, LinkReset or Disabled after the DUT
-//   requested Active, before the Active entry; and pl_inband_pres falling
-//   again, with pl_wake_ack held back or after the Active request (UCIe r3.0
-//   §10.2.3: the DUT must return lp_state_req to NOP);
+//   one cycle after the waking pl_clk_req, and with pl_wake_ack held back;
+//   LinkError, LinkReset or Disabled after the DUT requested Active, before
+//   the Active entry; and pl_inband_pres falling again, with pl_wake_ack held
+//   back or after the Active request (UCIe r3.0 §10.2.3: the DUT must return
+//   lp_state_req to NOP);
 // - from L1: LinkError before the pl_clk_req; LinkError, LinkReset or
-//   Disabled one cycle after it, with pl_wake_ack held back, and after the
-//   DUT requested Active.
+//   Disabled one cycle after it; LinkReset or Disabled two cycles after it;
+//   LinkError, LinkReset or Disabled with pl_wake_ack held back, and after
+//   the DUT requested Active.
 // pl_clk_req always comes before a LinkReset or Disabled (UCIe r3.0 §10.2.3.2
 // rule 7) and before or after a LinkError (rule 6). LinkReset or Disabled
 // straight from L1 or from the DUT waiting for a trigger needs the request in
-// the same cycle as the status change, so neither is sent. After a LinkError
+// the same cycle as the status change, so neither is sent. The same moves one
+// cycle after the waking pl_clk_req in Reset, or two cycles after it in L1,
+// land in the clock the DUT spends on its wake step, before it waits for
+// pl_wake_ack (Reset -> LinkReset or Disabled on the remote partner's request,
+// §10.3.3.1; L1 -> LinkReset or Disabled, §10.3.3.8). That timing depends on
+// the DUT reacting to pl_clk_req within a clock; the points are stimulus only,
+// so a change there shows as a coverage hole, not a failure. After a LinkError
 // the DUT holds the link down until software's AOU_SW_RESET (the bringup
 // test's background software), then the Adapter trains again. The bringup
 // model checks every DUT output throughout; the test only provides the
@@ -71,15 +79,17 @@ class aou_fdi_t1_abort_test extends aou_fdi_t1_bringup_test;
     q.push_back(mk(1'b0, LSM_AB_WAKE, LSM_LINKERROR, 1, 1'b0));
     q.push_back(mk(1'b0, LSM_AB_WAKE, LSM_LINKERROR, $urandom_range(30, 3), 1'b1));
     q.push_back(mk(1'b0, LSM_AB_WAKE, down(), $urandom_range(30, 3), 1'b1));
+    q.push_back(mk(1'b0, LSM_AB_WAKE, down(), 1, 1'b0));
     q.push_back(mk(1'b0, LSM_AB_WAKE, LSM_RESET, $urandom_range(30, 3), 1'b1));
     // Reset, the DUT requesting Active: REQ_ACTIVE.
     q.push_back(mk(1'b0, LSM_AB_REQ_ACTIVE, LSM_LINKERROR, $urandom_range(3), 1'b0));
     q.push_back(mk(1'b0, LSM_AB_REQ_ACTIVE, down(), $urandom_range(3), 1'b0));
     q.push_back(mk(1'b0, LSM_AB_REQ_ACTIVE, LSM_RESET, $urandom_range(3), 1'b0));
-    // L1: L1, L1_CLK_WAKE, WAKE_WAIT_ACK, REQ_ACTIVE.
+    // L1: L1, L1_CLK_WAKE, WAKE_ASSERT, WAKE_WAIT_ACK, REQ_ACTIVE.
     q.push_back(mk(1'b1, LSM_AB_WAKE, LSM_LINKERROR, 0, 1'b0));
     q.push_back(mk(1'b1, LSM_AB_WAKE, LSM_LINKERROR, 1, 1'b0));
     q.push_back(mk(1'b1, LSM_AB_WAKE, down(), 1, 1'b0));
+    q.push_back(mk(1'b1, LSM_AB_WAKE, down(), 2, 1'b0));
     q.push_back(mk(1'b1, LSM_AB_WAKE, LSM_LINKERROR, $urandom_range(30, 3), 1'b1));
     q.push_back(mk(1'b1, LSM_AB_WAKE, down(), $urandom_range(30, 3), 1'b1));
     q.push_back(mk(1'b1, LSM_AB_REQ_ACTIVE, LSM_LINKERROR, $urandom_range(3), 1'b0));
