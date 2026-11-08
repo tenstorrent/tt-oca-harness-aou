@@ -89,6 +89,13 @@
 //    link-down (the training-trigger policy). n_rx_first and n_rx_first_rt
 //    count pl_rx_active_req rising in Reset and in Retrain before the stub
 //    requested Active.
+//  - With `act_delay` the stub requests Active in Reset only after
+//    pl_inband_pres has been 1 for that many clocks (a Protocol Layer that
+//    waits for software first). With `drop_pulse`, when pl_inband_pres falls
+//    in Reset it gives NOP->Active for one clock, with lp_wake_req, and
+//    returns to NOP (a Protocol Layer whose request was already on its way;
+//    §10.2.3.2, last paragraph, has it return to NOP). That withdrawn
+//    trigger is checked as an `early_trigger` one (n_drop_pulses counts them).
 //  - TX: a flit starts only in Active with the Receiver active and pl_trdy
 //    high, then runs to its end with no bubbles (§10.2.4). pl_stallreq is
 //    acknowledged at the next flit boundary, a clock later at the earliest
@@ -204,6 +211,9 @@ class ucie_pl_stub extends uvm_component;
   int unsigned n_early_waits;    // Resets left after a withdrawn early trigger was checked
   int unsigned n_rx_first;       // pl_rx_active_req rises in Reset before the stub's Active
   int unsigned n_rx_first_rt;    // ... in Retrain
+  int unsigned act_delay;        // clocks of pl_inband_pres before the Active request (see above)
+  bit          drop_pulse;
+  int unsigned n_drop_pulses;    // one-clock NOP->Active given as pl_inband_pres fell
   int unsigned n_presented_down; // clocks a flit was presented outside Active
   int unsigned stall_ack_delay;  // clocks from the flit boundary to lp_stallack (see above)
   bit          stall_ack_rand;
@@ -256,6 +266,8 @@ class ucie_pl_stub extends uvm_component;
   local ucie_lsm_state_e gst;      // pl_state_sts last seen while gated
   local bit            le_unseen;  // LinkError entered while gated with no pl_clk_req before
   local bit            inband_seen;
+  local int unsigned   up_n;        // clocks of pl_inband_pres 1 in this Reset (act_delay)
+  local bit            up_q;        // pl_inband_pres in the previous clock of this Reset
   local bit            holding;     // held_active: Active requested in a link-down state
   local int unsigned   held_up;     // ... clocks of it in Reset with pl_inband_pres 1
   local bit            held_err;    // ... reported the Adapter taking it
@@ -360,6 +372,8 @@ class ucie_pl_stub extends uvm_component;
     frozen = 1'b0;
     le_unseen = 1'b0;
     inband_seen = 1'b0;
+    up_n = 0;
+    up_q = 1'b0;
     holding = 1'b0;
     held_up = 0;
     held_err = 1'b0;
@@ -471,6 +485,8 @@ class ucie_pl_stub extends uvm_component;
       early_left = 0;
       early_hold = 1'b0;
       trig_wait = 0;
+      up_n = 0;
+      up_q = 1'b0;
       if (s != LSM_RESET && !(s inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED}))
         holding = 1'b0;
     end else if (st_cycles < 1000) begin
@@ -558,14 +574,25 @@ class ucie_pl_stub extends uvm_component;
     case (sts_decode(sts))
       LSM_RESET: begin
         bit up = lsm.mon_cb.pl_inband_pres === 1'b1;
+        up_n = up ? (up_n < act_delay ? up_n + 1 : up_n) : 0;
+        if (drop_pulse && up_q && !up) begin
+          n_drop_pulses++;
+          early_left = 1;
+          early_hold = 1'b0;
+          early_given = 1'b1;
+          early_quiet = 0;
+          early_armed = 1'b0;
+        end
+        up_q = up;
         if (reset_hold(up)) return;
         if (wake_late || no_wake()) begin
           // The request first, lp_wake_req a clock after it (or never).
           lsm.lp_wake_req <= !no_wake() && up && lsm.mon_cb.lp_state_req === act;
-          lsm.lp_state_req <= up && nop_seen && proto_held ? act : nop;
+          lsm.lp_state_req <= up && up_n >= act_delay && nop_seen && proto_held ? act : nop;
         end else begin
           lsm.lp_wake_req <= up;
-          if (up && nop_seen && proto_held && lsm.mon_cb.pl_wake_ack === 1'b1)
+          if (up && up_n >= act_delay && nop_seen && proto_held &&
+              lsm.mon_cb.pl_wake_ack === 1'b1)
             lsm.lp_state_req <= act;
           else lsm.lp_state_req <= nop;
         end

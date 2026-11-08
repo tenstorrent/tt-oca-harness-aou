@@ -66,7 +66,10 @@
 // §10.3.3.1 rule 1, Table 10-4 note a). The NOP may come at any time in that
 // Reset, before pl_inband_pres too; an Active held into Reset from the state
 // before (an exit request in LinkError, LinkReset or Disabled, Table 10-4) is
-// not one. track_reset_req follows it, afresh on every entry to Reset. With
+// not one. track_reset_req follows it, afresh on every entry to Reset. The
+// Active entry starts only with pl_inband_pres 1 (§10.2.3.2, last paragraph):
+// a NOP->Active given with pl_inband_pres 0 and withdrawn to NOP is a training
+// trigger (§10.3.3.8), and the request is the next NOP->Active. With
 // cfg.remote_active_first_pct the rx_active handshake of an Active entry from
 // Reset or Retrain may come before the request (the remote die went first).
 //
@@ -92,6 +95,9 @@
 // 6). Every move of pl_inband_pres, pl_rx_active_req, pl_phyinl1 or
 // pl_phyinrecenter in one of those states is covered by a pl_clk_req handshake
 // (rule 5). The link-state monitor checks all three (FDI-R20, R21, R22).
+// pl_clk_req is high while the running job or a pl_inband_pres drop a test
+// runs beside it (do_inband_drop) asks for it (clk_drive), so a release by
+// one never drops a request the other still relies on.
 class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   `uvm_component_utils(ucie_lsm_driver)
 
@@ -132,9 +138,18 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   local bit       ans_le;        // req_loop's answer under way: a LinkError ...
   local ucie_lsm_req_e ans_req;  // ... or a LinkReset or Disabled (LSM_REQ_NOP: none)
   local bit       inband_q;      // pl_inband_pres
+  local bit       inband_was;    // ... before its last change
+  local time      inband_t;      // ... when it last changed
   local bit       le_on_way;     // an LSM_EV_LINKERROR on its way to LinkError
   local bit       down_reset;    // Reset entered from LinkError/LinkReset/Disabled
+  // pl_clk_req has two owners: the running job (clk_req_q, what it asks for)
+  // and pl_inband_pres drops a test runs beside the job (clk_ext, how many of
+  // them hold it now; do_inband_drop). It is high while either asks for it
+  // (clk_drive), so neither releases a request the other still needs
+  // (§10.2.3.2 rule 7).
   local bit       clk_req_q;
+  local int unsigned clk_ext;
+  local bit       clk_pin;       // pl_clk_req as driven
   local time      clk_req_t;     // when pl_clk_req last rose
   local bit       wake_ack_q;
   local bit       wake_ack_hold; // an abort keeps pl_wake_ack low (ucie_lsm_item::hold_wake_ack)
@@ -215,8 +230,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     set_recenter(1'b0);
     set_state(LSM_RESET);
     set_inband(1'b0);
-    // Reset ends any handshake: no wait for lp_clk_ack (set_clk_req).
+    // Reset ends any handshake: no wait for lp_clk_ack (clk_drive).
     clk_req_q = 1'b0;
+    clk_ext = 0;
+    clk_pin = 1'b0;
     lsm_vif.drv_cb.pl_clk_req <= 1'b0;
     set_rx_req(1'b0);
     foreach (gate[i]) gate[i].open = 1'b0;
@@ -588,7 +605,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
       LSM_EV_L1_ENTRY:    do_l1_entry();
       LSM_EV_L1_EXIT:     do_l1_exit();
       LSM_EV_LINK_RESET:  do_link_reset(dwell, it.to == LSM_LINKERROR);
-      LSM_EV_INBAND_DROP: do_inband_drop(dwell);
+      LSM_EV_INBAND_DROP: inband_drop(dwell, 1'b0);
       LSM_EV_CLK_WAKE:    do_clk_wake();
       LSM_EV_DISABLED:    do_disabled(dwell, it.to == LSM_LINKERROR);
       LSM_EV_ABORT:       do_abort(it, dwell);
@@ -649,6 +666,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // pl_protocol_vld is 1 whenever pl_inband_pres is (the values are valid
   // before the Protocol Layer samples them, r3.0 Table 10-3).
   local task set_inband(bit v);
+    if (v != inband_q) begin
+      inband_was = inband_q;
+      inband_t = $time;
+    end
     inband_q = v;
     lsm_vif.drv_cb.pl_inband_pres <= v;
     if (v) lsm_vif.drv_cb.pl_protocol_vld <= 1'b1;
@@ -658,18 +679,49 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     lsm_vif.drv_cb.pl_phyinrecenter <= v && cfg.recenter_en;
   endtask
 
-  // pl_clk_req/lp_clk_ack is a full handshake (UCIe r3.0 §10.2.3.2 rules 2
-  // and 3): pl_clk_req falls only once lp_clk_ack has answered it, so the
-  // level moves it covers are seen (rule 5), and rises again only once
-  // lp_clk_ack has fallen, so the next lp_clk_ack answers the new request. A
-  // job stopped part-way (take) can leave either half open; whatever moves
-  // pl_clk_req next completes it first, as rx_active does for its handshake.
+  // pl_inband_pres as driven before this clock edge, whichever process moves
+  // it at this edge: what the Protocol Layer's request seen at this edge was
+  // made against.
+  local function bit inband_before();
+    return inband_t == $time ? inband_was : inband_q;
+  endfunction
+
+  // The job's pl_clk_req request (see clk_req_q).
   local task set_clk_req(bit v);
-    if (v != clk_req_q && lsm_vif.drv_cb.lp_clk_ack !== !v)
-      wait_pl_out("lp_clk_ack", {3'b0, !v}, v ? "FDI-R19" : "FDI-R18");
-    if (v && !clk_req_q) clk_req_t = $time;
     clk_req_q = v;
-    lsm_vif.drv_cb.pl_clk_req <= v;
+    clk_drive();
+  endtask
+
+  // A hold on pl_clk_req by a task run beside the job (see clk_ext).
+  local task clk_ext_hold(bit v);
+    if (v) clk_ext++;
+    else if (clk_ext != 0) clk_ext--;
+    clk_drive();
+  endtask
+
+  // pl_clk_req follows its owners' requests. pl_clk_req/lp_clk_ack is a full
+  // handshake (UCIe r3.0 §10.2.3.2 rules 2 and 3): pl_clk_req falls only once
+  // lp_clk_ack has answered it, so the level moves it covers are seen (rule
+  // 5), and rises again only once lp_clk_ack has fallen, so the next
+  // lp_clk_ack answers the new request. A job stopped part-way (take) can
+  // leave either half open; whatever moves pl_clk_req next completes it
+  // first, as rx_active does for its handshake. The requests are read again
+  // after that wait, in the time step the pin moves, so a hold taken
+  // meanwhile by the other owner is never dropped, in whatever order the
+  // simulator runs the two processes.
+  local task clk_drive();
+    forever begin
+      bit want = clk_req_q || clk_ext != 0;
+      if (want == clk_pin) return;
+      if (lsm_vif.drv_cb.lp_clk_ack !== clk_pin) begin
+        wait_pl_out("lp_clk_ack", {3'b0, clk_pin}, want ? "FDI-R19" : "FDI-R18");
+        continue;
+      end
+      if (want) clk_req_t = $time;
+      clk_pin = want;
+      lsm_vif.drv_cb.pl_clk_req <= want;
+      return;
+    end
   endtask
 
   local task set_rx_req(bit v);
@@ -736,11 +788,19 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // clock and then Active (track_reset_req; UCIe r3.0 §10.3.3.1 rule 1); an
   // error after req_timeout cycles (FDI-R33, a liveness bound). Called on a
   // clock edge; a trigger withdrawn to NOP by this clock is no request.
+  // Taken only with pl_inband_pres 1 (as driven before this edge): the
+  // Protocol Layer waits for it before it requests Active (§10.2.3.2, last
+  // paragraph), and a NOP->Active it gives with pl_inband_pres 0 and returns
+  // to NOP is a training trigger it may withdraw to gate its clocks while it
+  // waits for pl_inband_pres (§10.3.3.8), not a request; the request is the
+  // next NOP->Active. One it holds becomes the request once pl_inband_pres is
+  // 1. This matters when a test drops pl_inband_pres while the bringup waits
+  // here (do_inband_drop).
   local task wait_reset_active();
     int unsigned n;
     ucie_rule_log::check("FDI-R33", this);
     track_reset_req();
-    while (rst_req != 2) begin
+    while (!(rst_req == 2 && inband_before())) begin
       @(lsm_vif.drv_cb);
       track_reset_req();
       n++;
@@ -821,9 +881,11 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     end
   endtask
 
+  // The job's request, and lp_clk_ack answering pl_clk_req as it now is (high
+  // still, after a release, while a drop beside the job holds it).
   local task clk_handshake(bit v);
     set_clk_req(v);
-    wait_pl_out("lp_clk_ack", {3'b0, v}, v ? "FDI-R18" : "FDI-R19");
+    wait_pl_out("lp_clk_ack", {3'b0, clk_pin}, clk_pin ? "FDI-R18" : "FDI-R19");
   endtask
 
   // A request still waiting for lp_rx_active_sts (an Active entry abandoned
@@ -1341,23 +1403,57 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // handshake (§10.2.3.2 rule 5): the drop comes with the request, which is
   // released once acknowledged (after the drop the Protocol Layer may move
   // lp_state_req to NOP and gate again, §10.2.3); the rise comes after it, as
-  // in the bringup. pl_clk_req ends as it was, so a bringup holding it keeps it.
+  // in the bringup. A test may call it beside a job, typically while the
+  // bringup waits in Reset for the request to leave it: its pl_clk_req is then
+  // a hold of its own (clk_ext_hold), so its releases never drop the request
+  // the job raises meanwhile for its Active entry (rule 7). Run as an event
+  // (LSM_EV_INBAND_DROP) it moves the job's request, which ends as it was, so
+  // a bringup holding it keeps it. Called with pl_inband_pres already low (a
+  // bringup waiting to restart the training), it raises pl_inband_pres at its
+  // end, and a bringup that raises it meanwhile shortens the drop.
+  // Limits of the call beside a job; nothing checks them:
+  //  - not once the Protocol Layer may have requested Active: the drop does
+  //    not stop an Active entry under way, which then runs with
+  //    pl_inband_pres low;
+  //  - not across a reset (rst_n low): the reset clears the drop's hold, but
+  //    the drop runs on, waits for an lp_clk_ack the reset Protocol Layer may
+  //    not give (FDI-R18 after req_timeout) and raises pl_inband_pres at its
+  //    end, in the middle of the next bringup;
+  //  - not while the link may leave Reset otherwise (a LinkReset, Disabled or
+  //    LinkError request, an abort): the drop raises pl_inband_pres at its end
+  //    in whatever state the link is then in.
   task do_inband_drop(int unsigned dwell);
-    bit held = clk_req_q;
+    inband_drop(dwell, 1'b1);
+  endtask
+
+  local task inband_drop(int unsigned dwell, bit beside);
+    bit held = !beside && clk_req_q;
     if (state != LSM_RESET) begin
       `uvm_error(get_type_name(), $sformatf({"LSM_EV_INBAND_DROP in %s: pl_inband_pres may fall ",
                  "only in Reset (UCIe r3.0 Table 10-3); ignored"}, state.name()))
       return;
     end
-    if (!clk_req_q) set_clk_req(1'b1);
+    if (!held) drop_clk_req(beside, 1'b1);
     set_inband(1'b0);
     wait_pl_out("lp_clk_ack", 4'h1, "FDI-R18");
-    if (!held) clk_handshake(1'b0);
+    if (!held) drop_clk_handshake(beside, 1'b0);
     wait_cycles(dwell);
-    if (!clk_req_q) clk_handshake(1'b1);
+    if (!held) drop_clk_handshake(beside, 1'b1);
     wait_cycles(cfg.lat());
     set_inband(1'b1);
-    if (!held) clk_handshake(1'b0);
+    if (!held) drop_clk_handshake(beside, 1'b0);
+  endtask
+
+  // A drop's pl_clk_req: a hold of its own beside a job, the job's request
+  // otherwise.
+  local task drop_clk_req(bit beside, bit v);
+    if (beside) clk_ext_hold(v);
+    else set_clk_req(v);
+  endtask
+
+  local task drop_clk_handshake(bit beside, bit v);
+    drop_clk_req(beside, v);
+    wait_pl_out("lp_clk_ack", {3'b0, clk_pin}, clk_pin ? "FDI-R18" : "FDI-R19");
   endtask
 
   task do_clk_wake();
