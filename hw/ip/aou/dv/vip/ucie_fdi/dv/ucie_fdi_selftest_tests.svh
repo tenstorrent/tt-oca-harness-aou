@@ -461,7 +461,10 @@ endclass
 //            otherwise), and the Active entry it then makes must keep
 //            pl_clk_req up until Active whatever the drop does with it
 //            (§10.2.3.2 rule 7, FDI-R22). The test fails unless each drop was
-//            made in its bringup, in Reset (it logs where each one was made).
+//            made in its bringup, in Reset (it logs where each one was made),
+//            and unless each drop's pl_clk_req rises inband_drop_clk_lag
+//            clocks after it (+ucie_inband_drop_clk_lag=N: the drop first,
+//            r3.0 §10.2.3.2 rule 5; FDI-R20 must stay silent).
 //            clk_req_hold_bringup defaults to 0, and the mode cannot run with
 //            +clk_hold=1: the drop waits for pl_clk_req to be released in
 //            Reset;
@@ -489,6 +492,7 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
   int unsigned n_placed;
   string       drop_at[$];
   int unsigned n_kept_up;   // drop_overlap: pl_clk_req kept up until pl_inband_pres rose
+  int unsigned drop_lag[$]; // drop: clocks from each drop to its pl_clk_req
   local bit    lr_done;     // the LinkReset event (and its bringup) has ended
 
   function new(string name, uvm_component parent);
@@ -617,8 +621,28 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
     env.lsm_cfg.lat_min = 1;
     env.lsm_cfg.lat_max = 1;
     drop_point(after_lr, 1'b1, found);
-    if (found) env.lsm.drv.do_inband_drop(30);
-    else `uvm_error(get_type_name(), "the bringup never waited in Reset with pl_clk_req released")
+    if (found) begin
+      bit done;
+      int n = 0, fell = -1;
+      fork
+        begin
+          env.lsm.drv.do_inband_drop(30);
+          done = 1'b1;
+        end
+        // Clocks from the pl_inband_pres fall to the pl_clk_req rise.
+        while (!done && n < 1000) begin
+          @(env.pl.lsm.mon_cb);
+          if (fell == -1 && env.pl.lsm.mon_cb.pl_inband_pres !== 1'b1) fell = n;
+          if (env.pl.lsm.mon_cb.pl_clk_req === 1'b1) begin
+            if (fell == -1) fell = n;
+            drop_lag.push_back(n - fell);
+            break;
+          end
+          n++;
+        end
+      join
+    end else
+      `uvm_error(get_type_name(), "the bringup never waited in Reset with pl_clk_req released")
     env.lsm_cfg.lat_min = lat_min;
     env.lsm_cfg.lat_max = lat_max;
   endtask
@@ -681,6 +705,14 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
                      "the first bringup, one beside the LinkReset event's)"}, n_overlaps, n_placed))
         if (env.pl.n_drop_pulses < 2)
           `uvm_error(get_type_name(), "the stub gave no NOP->Active as pl_inband_pres fell")
+        if (drop_lag.size() != n_overlaps)
+          `uvm_error(get_type_name(), $sformatf("%0d drops, %0d of them with a pl_clk_req seen",
+                     n_overlaps, drop_lag.size()))
+        foreach (drop_lag[i])
+          if (drop_lag[i] != env.lsm_cfg.inband_drop_clk_lag)
+            `uvm_error(get_type_name(), $sformatf({"drop %0d: pl_clk_req %0d clocks after ",
+                       "pl_inband_pres fell, inband_drop_clk_lag %0d"}, i + 1, drop_lag[i],
+                       env.lsm_cfg.inband_drop_clk_lag))
       end
       "drop_overlap":
         if (n_overlaps != 1 || n_placed != 1 || n_kept_up != 1)
@@ -711,6 +743,9 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
               env.pl.n_restarts, env.pl.n_rx_first, env.pl.n_rx_first_rt, n_overlaps, n_placed,
               n_kept_up, env.pl.n_drop_pulses), UVM_NONE)
     foreach (drop_at[i]) `uvm_info(get_type_name(), drop_at[i], UVM_NONE)
+    foreach (drop_lag[i])
+      `uvm_info(get_type_name(), $sformatf("drop %0d: pl_clk_req %0d clocks after the drop",
+                i + 1, drop_lag[i]), UVM_NONE)
   endfunction
 endclass
 

@@ -154,6 +154,22 @@ class ucie_lsm_cfg extends uvm_object;
   // pl_clk_req must be high by this many cycles after the move (a liveness
   // bound); 0 asks for it by the cycle after the move, as 1 does.
   int unsigned  clk_req_window = 16;
+  // Clocks from a pl_inband_pres drop in Reset (do_inband_drop,
+  // LSM_EV_INBAND_DROP) to the pl_clk_req that covers it. 0 (default):
+  // pl_clk_req rises in the clock of the drop. N: the drop comes first and the
+  // drop's pl_clk_req rises exactly N clocks later (if pl_clk_req is already
+  // up for the running job, the pin does not move). UCIe r3.0 §10.2.3.2 rule
+  // 5 lets a level signal transition without waiting for lp_clk_ack and asks
+  // only that the transition be observed through the handshake; its explicit
+  // "before OR after pl_clk_req asserts" names assertion only, so the drop
+  // first is permitted by inference, not by an explicit sentence. Figure
+  // 10-13 shows the request first, and rule 5 strongly recommends that a
+  // bringup keep pl_clk_req up until the status leaves Reset or presence drops
+  // (clk_req_hold_bringup 1), which makes the order moot: a less common but
+  // legal Adapter. At most clk_req_window (1 when that is 0), which FDI-R20
+  // accepts; the driver refuses more with an error and uses that bound.
+  // +ucie_inband_drop_clk_lag=N.
+  int unsigned  inband_drop_clk_lag = 0;
   // A LinkError the Adapter must hold because lp_linkerror stays 1 (r3.0 Table
   // 10-3): report it once (an info) after this many cycles past the dwell (0:
   // never). The Adapter keeps waiting either way; holding is legal.
@@ -175,12 +191,12 @@ class ucie_lsm_cfg extends uvm_object;
     return $sformatf({"n_phy=%0d active_phy=%0d lat=[%0d:%0d] auto_bringup=%0b ",
                       "clk_hold=%0b restart_on=%s sw_restart_delay=%0d ",
                       "remote_active_first_pct=%0d down_exit_on=%s linkerror_min_res=%0d ",
-                      "remote_rsp_max=%0d linkdown_via_active_pct=%0d ",
+                      "remote_rsp_max=%0d linkdown_via_active_pct=%0d inband_drop_clk_lag=%0d ",
                       "protocol=%04b speedmode=%03b max_speedmode=%0b lnk_cfg=%03b recenter=%0b"},
                      n_phy, active_phy, lat_min, lat_max, auto_bringup,
                      clk_req_hold_bringup, restart_on.name(), sw_restart_delay,
                      remote_active_first_pct, down_exit_on.name(), linkerror_min_res,
-                     remote_rsp_max, linkdown_via_active_pct, protocol, speedmode,
-                     max_speedmode, lnk_cfg, recenter_en);
+                     remote_rsp_max, linkdown_via_active_pct, inband_drop_clk_lag, protocol,
+                     speedmode, max_speedmode, lnk_cfg, recenter_en);
   endfunction
 endclass

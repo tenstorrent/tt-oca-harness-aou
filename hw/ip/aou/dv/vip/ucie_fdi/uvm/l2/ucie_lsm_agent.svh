@@ -57,6 +57,7 @@ class ucie_lsm_agent extends uvm_agent;
     if (plusarg_int("ucie_le_mid_flit_pct", me, n, "le_mid_flit_pct")) cfg.le_mid_flit_pct = n;
     if (plusarg_int("ucie_rx_early", me, n, "fdi_rx_early")) cfg.rx_early = n;
     if (plusarg_int("ucie_park_idle_phy", me, n, "park_idle_phy")) cfg.park_idle_phy = n != 0;
+    if (plusarg_int("ucie_inband_drop_clk_lag", me, n)) cfg.inband_drop_clk_lag = n;
     if (plusarg_int("ucie_fcov", me, n)) cfg.fcov_en = n != 0;
   endfunction
 

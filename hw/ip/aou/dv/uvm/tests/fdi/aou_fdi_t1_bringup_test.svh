@@ -4,7 +4,10 @@
 // FDI bringup on the real DUT, with UCIe state encodings:
 // 1. reset; the L2 agent runs the Adapter side of bringup (clk_req
 //    handshake, inband_pres) with pl_clk_req released, so the DUT waits in
-//    WAIT_PRESENCE until I_SW_ACTIVATE_START;
+//    WAIT_PRESENCE until I_SW_ACTIVATE_START; meanwhile pl_inband_pres drops
+//    for 30 clocks, with its pl_clk_req in the same clock or, in about one run
+//    in seven, 1 to clk_req_window clocks after the drop
+//    (+ucie_inband_drop_clk_lag=N forces it);
 // 2. the DUT reaches Active (O_FDI_LINK_UP); empty flits with cancels,
 //    poisoned cancelled halves and bubbles go to the DUT RX;
 // 3. APB AOU_INIT.activate_start (0x08 bit 0) makes the core send an
@@ -80,15 +83,36 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       @(lsm_vif.mon_cb);
     repeat (20) @(lsm_vif.mon_cb);
     if (!env.lsm_cfg.clk_req_hold_bringup) begin
-      // The DUT waits in WAIT_PRESENCE; losing presence sends it back to RESET.
-      // The model drops pl_inband_pres with a pl_clk_req (UCIe r3.0 §10.2.3.2
-      // rule 5), which starts the DUT's wake, and the DUT still returns to
-      // RESET. When pl_wake_ack answers that wake before the drop reaches the
-      // DUT, the DUT requests Active for a clock and returns to NOP with
-      // pl_inband_pres low; the model takes that as no request (§10.3.3.8,
-      // §10.2.3.2 last paragraph). When pl_inband_pres rises again pl_clk_req
-      // falls in that same clock, so the DUT waits for the software trigger
-      // again.
+      // The DUT waits in WAIT_PRESENCE with pl_clk_req released; losing
+      // presence sends it back to RESET. Each drop has a pl_clk_req handshake
+      // (UCIe r3.0 §10.2.3.2 rule 5). Usually the model raises pl_clk_req in
+      // the clock of the drop: the DUT starts its wake on it and returns to
+      // RESET from there. When pl_wake_ack answers that wake before the drop
+      // reaches the DUT, the DUT requests Active for a clock and returns to
+      // NOP with pl_inband_pres low; the model takes that as no request
+      // (§10.3.3.8, §10.2.3.2 last paragraph). In about one run in seven the
+      // model drops pl_inband_pres first and raises pl_clk_req 1 to
+      // clk_req_window clocks later (inband_drop_clk_lag): rule 5 lets the
+      // level move without waiting for lp_clk_ack, and only names an order for
+      // assertion, so this order is legal by inference but uncommon (Figure
+      // 10-13 shows the request first). The DUT then goes from WAIT_PRESENCE
+      // straight to RESET. +ucie_inband_drop_clk_lag=N forces the lag (0: off).
+      // When pl_inband_pres rises again pl_clk_req falls in that same clock,
+      // so the DUT waits for the software trigger again.
+      begin
+        string how = "plusarg";
+        int unsigned forced;
+        if (!ucie_fdi_pkg::plusarg_int("ucie_inband_drop_clk_lag", env.lsm.get_full_name(),
+                                       forced)) begin
+          how = "drawn";
+          env.lsm_cfg.inband_drop_clk_lag = $urandom_range(6) == 0 ?
+              $urandom_range(env.lsm_cfg.clk_req_window > 1 ? env.lsm_cfg.clk_req_window : 1, 1) :
+              0;
+        end
+        `uvm_info(get_type_name(), $sformatf({"pl_inband_pres drop in WAIT_PRESENCE: pl_clk_req ",
+                  "%0d clocks after the drop (inband_drop_clk_lag, %s)"},
+                  env.lsm_cfg.inband_drop_clk_lag, how), UVM_LOW)
+      end
       env.lsm.drv.do_inband_drop(30);
       repeat (10) @(lsm_vif.mon_cb);
     end

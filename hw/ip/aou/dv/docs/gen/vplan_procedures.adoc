@@ -87,7 +87,10 @@ Class `aou_fdi_t1_bringup_test` extends `uvm_test` (`uvm/tests/fdi/aou_fdi_t1_br
 *Purpose.* FDI bringup on the real DUT, with UCIe state encodings:
 1. reset; the L2 agent runs the Adapter side of bringup (clk_req
 handshake, inband_pres) with pl_clk_req released, so the DUT waits in
-WAIT_PRESENCE until I_SW_ACTIVATE_START;
+WAIT_PRESENCE until I_SW_ACTIVATE_START; meanwhile pl_inband_pres drops
+for 30 clocks, with its pl_clk_req in the same clock or, in about one run
+in seven, 1 to clk_req_window clocks after the drop
+(+ucie_inband_drop_clk_lag=N forces it);
 2. the DUT reaches Active (O_FDI_LINK_UP); empty flits with cancels,
 poisoned cancelled halves and bubbles go to the DUT RX;
 3. APB AOU_INIT.activate_start (0x08 bit 0) makes the core send an
