@@ -60,11 +60,11 @@ class aou_fc_db;
         first = 1'b1;
         foreach (pt.hits[b]) begin
           if (pt.kind[b] == aou_fc_point::KIND_IGNORE) continue;
-          $fwrite(fd, {"%s\n   {\"bin\": \"%s\", \"hits\": %0d, \"spec\": \"%s\", ",
-                       "%s\"plan_ids\": %s}"},
-                  first ? "" : ",", pt.bin_name[b], pt.hits[b], pt.spec[b],
-                  pt.kind[b] == aou_fc_point::KIND_ILLEGAL ? "\"illegal\": true, " : "",
-                  json_ids({grp.plan_ids, " ", pt.plan[b]}));
+          $fwrite(fd, "%s\n   {\"bin\": \"%s\", \"hits\": %0d, \"spec\": \"%s\", ",
+                  first ? "" : ",", pt.bin_name[b], pt.hits[b], pt.spec[b]);
+          if (pt.kind[b] == aou_fc_point::KIND_ILLEGAL)
+            $fwrite(fd, "\"illegal\": true, ");
+          $fwrite(fd, "\"plan_ids\": %s}", json_ids({grp.plan_ids, " ", pt.plan[b]}));
           first = 1'b0;
         end
         $fwrite(fd, "]}");
