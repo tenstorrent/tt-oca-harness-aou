@@ -910,10 +910,10 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // close_gates waits for it again. Without stall_wait (LinkError, which
   // §10.3.3.7 lets enter with the handshake incomplete) pl_trdy only
   // finishes a started flit from now on (gate.stall_cut), and the handshake
-  // ends in LinkError: abandoned at once, or with
-  // ucie_fdi_cfg::le_stall_drain completed by lp_stallack while the TX
-  // responder drains the Protocol Layer, or abandoned on the exit
-  // (drop_stalls). On the way to
+  // ends in LinkError: abandoned a clock after the status changes to
+  // LinkError, or with ucie_fdi_cfg::le_stall_drain completed by lp_stallack
+  // while the TX responder drains the Protocol Layer, or abandoned on the
+  // exit (drop_stalls). On the way to
   // an Adapter LinkError, or to the answer to lp_linkerror, no request stops
   // the job once this has run (req_loop), so stall_cut then holds only on
   // that way and in LinkError. A Retrain that ends in LinkError may still be
@@ -942,8 +942,9 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
 
   // A stall handshake carried into LinkError (close_gates without stall_wait)
   // and still open when the Adapter leaves it (with the drain,
-  // ucie_fdi_cfg::le_stall_drain) is abandoned with the move to Reset: r3.0 §10.3.3.7 needs no completed handshake ("It is not required
-  // to complete the stallreq/ack handshake before entering this state") and
+  // ucie_fdi_cfg::le_stall_drain) is abandoned with the move to Reset: r3.0
+  // §10.3.3.7 needs no completed handshake ("It is not required to complete
+  // the stallreq/ack handshake before entering this state") and
   // requires the Protocol Layer to clean up its data path "even if pl_trdy
   // is not asserted", not to acknowledge. The TX responder drops pl_stallreq
   // and ends the drain on the clock after drop_stall(), the clock the status
@@ -1088,7 +1089,7 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // abandons both flits, and the Protocol Layer must drop its partial ones. LinkError needs
   // no completed stall handshake (§10.3.3.7), so a stand-alone stall may be
   // under way: pl_trdy drops with the abort, and the TX responder abandons
-  // the handshake on the first clock of LinkError, or with
+  // the handshake a clock after the status changes to LinkError, or with
   // ucie_fdi_cfg::le_stall_drain drains the Protocol Layer there until
   // lp_stallack (§10.3.3.7: "must provide pl_trdy to the upper layer to drain
   // the packets") and abandons it on the exit (drop_stalls). The Adapter never

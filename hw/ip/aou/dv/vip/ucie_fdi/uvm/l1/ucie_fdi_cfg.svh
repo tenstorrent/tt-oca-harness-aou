@@ -43,7 +43,8 @@ class ucie_fdi_cfg extends uvm_object;
   // A stall handshake open when the link enters LinkError (r3.0 §10.3.3.7:
   // "It is not required to complete the stallreq/ack handshake before
   // entering this state"). 0: the Adapter does not perform it there:
-  // pl_stallreq falls on the first clock of LinkError and pl_trdy stays low.
+  // pl_stallreq stays high in the first clock that shows LinkError and falls
+  // on the next (a clock after the status changes), and pl_trdy stays low.
   // 1: it does ("If the lower layer decides to perform a pl_stallreq/
   // lp_stallack handshake, it must provide pl_trdy to the upper layer to
   // drain the packets"): pl_trdy drains the Protocol Layer until lp_stallack,

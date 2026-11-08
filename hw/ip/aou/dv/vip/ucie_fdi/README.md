@@ -436,7 +436,7 @@ The self-test's scoreboard (`dv/ucie_fdi_selftest_env.svh`) is a complete exampl
 | `stall_pct`, `stall_mid_pct` | 0, 0 | out-of-spec stress for Flit mode (see below and "Known limits"): chance of a stand-alone stall (a stall handshake with no state change) per flit boundary in Active, and the share raised mid-flit (none from 256 B up, where every cycle is a flit boundary). Out-of-spec stress: in Flit mode r3.0 §10.3.2 uses the handshake only on the way to PM, so a Protocol Layer may read `pl_stallreq` as a PM entry. One under way when the link leaves Active for Retrain, LinkReset or Disabled is finished, all four phases, before the status changes; LinkError does not wait for it (Known limits) |
 | `stall_hold_min`, `stall_hold_max` | 1, 8 | cycles a stand-alone stall (out-of-spec stress, `stall_pct`) holds `pl_stallreq` high after `lp_stallack` |
 | `stall_trdy_free` | 0 | `pl_trdy` follows its policy between `pl_stallreq` and `lp_stallack` instead of being held high, on every stall: within r3.0 on a PM entry's stall, out-of-spec stress on a stand-alone one (`stall_pct`) (r3.0 §10.3.2 rule 7: `pl_trdy` "is not required to be asserted consecutively"). Either way `pl_trdy` keeps coming during the stall with the gate open or closed, so a flit the Protocol Layer presented before `lp_stallack` is accepted (rule 7: "any data presented on the interface must be accepted by the physical layer until the rising edge of lp_stallack"); every policy raises it again (`RANDOM` needs `trdy_pct` > 0) |
-| `le_stall_drain` | 0 | a stall handshake open when the link enters LinkError (r3.0 §10.3.3.7): 0 abandoned on the first clock of LinkError (`pl_stallreq` falls unacknowledged, `pl_trdy` stays low); 1 performed there, `pl_trdy` draining the Protocol Layer until `lp_stallack` (the transfers dropped), and abandoned with the move to Reset if still open. Either way the Adapter never waits for `lp_stallack` in LinkError (Known limits) |
+| `le_stall_drain` | 0 | a stall handshake open when the link enters LinkError (r3.0 §10.3.3.7): 0 abandoned a clock after the status changes (`pl_stallreq`, still high in the first clock that shows LinkError, falls unacknowledged on the next, and `pl_trdy` stays low); 1 performed there, `pl_trdy` draining the Protocol Layer until `lp_stallack` (the transfers dropped), and abandoned with the move to Reset if still open. Either way the Adapter never waits for `lp_stallack` in LinkError (Known limits) |
 | `stall_timeout` | 2000 | cycles the Protocol Layer has to answer `pl_stallreq` with `lp_stallack` (FDI-R57), a liveness bound: r3.0 §10.3.2 rule 4 gives no time |
 | `tx_hold` | 0 | `pl_trdy` low from the next flit boundary (back-pressure) |
 | `random_adapter_bytes` | 0 | random Flit Header and CRC bytes on RX (the Protocol Layer must ignore them); the Protocol ID is kept, since 00b would make the flit a NOP, and so is the Flit Type (Byte 1 [7:6], 00b: a protocol flit, r3.0 Table 3-5) |
@@ -819,10 +819,12 @@ solves `randomize()` with z3 (on `PATH`, or `VERILATOR_SOLVER="<z3> --in"`).
   there "to internally clean up the data path, even if pl_trdy is not asserted", not to
   acknowledge, so a Protocol Layer that never takes `pl_trdy` or acknowledges there is
   legal. By default (`le_stall_drain` 0) the model does not perform the handshake in
-  LinkError: `pl_stallreq` falls on the first clock of LinkError, unacknowledged, and
-  `pl_trdy` stays low. With `le_stall_drain` it does ("If the lower layer decides to
-  perform a pl_stallreq/lp_stallack handshake, it must provide pl_trdy to the upper layer
-  to drain the packets"): from the clock after the status change until `lp_stallack` it
+  LinkError: `pl_stallreq` stays high in the first clock that shows LinkError and falls,
+  unacknowledged, on the next (the model reads `pl_state_sts` as sampled, so it acts a
+  clock after the status change), and `pl_trdy` stays low. With `le_stall_drain` it does
+  ("If the lower layer decides to perform a pl_stallreq/lp_stallack handshake, it must
+  provide pl_trdy to the upper layer to drain the packets"):
+  from the clock after the status change until `lp_stallack` it
   drains the Protocol Layer, `pl_trdy` as during any stall (held high, or by policy with
   `stall_trdy_free`), the transfers dropped, never delivered ("these packets could be
   dropped and not transmitted on the Link"; Table 10-3 `pl_trdy`; FDI-R43); a Protocol
