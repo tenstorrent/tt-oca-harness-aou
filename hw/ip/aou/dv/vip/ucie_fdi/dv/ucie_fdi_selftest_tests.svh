@@ -6,7 +6,7 @@
 // (mid-flit ones included; from 256 B up, where a flit is one beat, cancels
 // cover every flit of the beat and stalls start at flit boundaries). On a 512
 // or 1024 B FDI some RX beats carry fewer flits than lanes, the rest NOPs.
-// Knobs: +beat_bytes=32|64|128|256|512|768|1024 (FDI width),
+// Knobs: +beat_bytes=32|64|128|256|512|1024 (FDI width),
 // +n_flits=N, +trdy=always|random|bursty|holes.
 class ucie_fdi_smoke_test extends uvm_test;
   `uvm_component_utils(ucie_fdi_smoke_test)

@@ -197,7 +197,8 @@ class ucie_fdi_pl_driver extends uvm_driver #(ucie_flit_item);
     int unsigned err_beat;         // ... on this transfer of it
 
     if (!valid_beat_bytes(cfg.beat_bytes))
-      `uvm_fatal(get_type_name(), $sformatf("unsupported beat_bytes %0d", cfg.beat_bytes))
+      `uvm_fatal(get_type_name(), $sformatf(
+                 "beat_bytes %0d: not 32, 64, 128, 256, 512 or 1024", cfg.beat_bytes))
     if (cfg.random_adapter_bytes) foreach (lanes[l]) lanes[l].randomize_adapter_bytes();
     if (it.has_cancel() && cfg.poison_cancelled) begin
       poison.randomize_payload();
