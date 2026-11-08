@@ -219,7 +219,8 @@ Not on the interfaces, with what a Protocol Layer that has them connects instead
 The defaults describe one consistent link: Streaming (`pl_protocol` 0111b) in Format 6
 on stream 04h (Stack 0 Streaming), `pl_speedmode` 101b (the encoding for 32 GT/s, the PHY
 rate the Adapter reports) with `pl_max_speedmode` 0 (a PHY rate of at most 32 GT/s), a
-x16 module (`pl_lnk_cfg` 010b), no recentering reported, no errors. The link-state agent
+x16 module (`pl_lnk_cfg` 010b), no recentering reported (r3.0 has `pl_phyinrecenter`
+high while the link trains; `recenter_en` reports it), no errors. The link-state agent
 stops the test (`uvm_fatal`) on a reserved protocol or width, a `speedmode` encoding
 above 32 GT/s with `max_speedmode` 0, or a stream that does not name the protocol.
 
@@ -853,12 +854,23 @@ config's `source_lists`), and its regressions run on it unchanged. It adds
   controller (`aou_bringup_model`, with its own comparison slack `ref_slack`, apart
   from the model's liveness bounds) every clock, checks that the DUT never requests L2,
   and holds the coverage collectors. Its env configs draw `sw_restart_delay` in
-  [50:1500] per run, which `+sw_restart_delay=N` fixes. The bench's envs create it and call
+  [50:1500] per run, so a DUT that asks anything of the link meanwhile is caught at many
+  delays; `+ucie_sw_restart_delay=N` fixes it. The bench's envs create it and call
   `attach(lsm)` in `connect_phase`.
 - `aou_fdi_cov` (a `ucie_fdi_cov`, set on every mainband monitor) and `aou_lsm_cov`
   (sampled by the layer and the reference model): feeding the bench's coverage
   service.
 - `aou_t1_axi4pc_ctl`, the Axi4PC control, is a second observer.
+
+Its top ties the Protocol Layer outputs the DUT has no pins for: `lp_stream` to the
+link's stream, 04h (Stack 0 Streaming; r3.0 §10.2.1 allows the tie-off), so FDI-R64
+holds, and the rest to 0. The model's Adapter outputs the DUT has no pins for stay
+open.
+
+The model's own covergroups stay on in the AoU bench (their run-time cost is within noise
+on both simulators). They go into the simulator's coverage database beside the bench's,
+not into the bench's coverage service, so `make fc_report` does not count them; URG
+shows them. `+ucie_fcov=0` turns them off.
 
 Its two-PHY builds use the mirrored mode (`n_phy` 2, `active_phy`, `park_idle_phy`), as
 the DUT follows one of two FDIs through one set of handshakes. Its RX flits from
