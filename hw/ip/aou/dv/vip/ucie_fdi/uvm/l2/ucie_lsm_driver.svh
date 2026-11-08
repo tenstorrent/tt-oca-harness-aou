@@ -1410,13 +1410,17 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
   // pl_inband_pres low for `dwell` cycles in Reset, then high again. It must
   // stay high in Retrain, Active, L1 and L2 (UCIe r3.0 Table 10-3), so the
   // event is a usage error anywhere else. Each move is covered by a pl_clk_req
-  // handshake (§10.2.3.2 rule 5): the drop comes with the request, which is
-  // released once acknowledged (after the drop the Protocol Layer may move
-  // lp_state_req to NOP and gate again, §10.2.3); the rise comes after it, as
-  // in the bringup. A test may call it beside a job, typically while the
-  // bringup waits in Reset for the request to leave it: its pl_clk_req is then
-  // a hold of its own (clk_ext_hold), so its releases never drop the request
-  // the job raises meanwhile for its Active entry (rule 7). Run as an event
+  // handshake (§10.2.3.2 rule 5): the drop comes with the request, or with
+  // cfg.inband_drop_clk_lag N clocks before it (rule 5 lets the level move
+  // without waiting for lp_clk_ack and asks only that the handshake make it
+  // observed; FDI-R20 accepts the request up to clk_req_window clocks later),
+  // and the request is released once acknowledged (after the drop the
+  // Protocol Layer may move lp_state_req to NOP and gate again, §10.2.3); the
+  // rise comes after a request, as in the bringup. A test may call it beside
+  // a job, typically while the bringup waits in Reset for the request to
+  // leave it: its pl_clk_req is then a hold of its own (clk_ext_hold), so its
+  // releases never drop the request the job raises meanwhile for its Active
+  // entry (rule 7). Run as an event
   // (LSM_EV_INBAND_DROP) it moves the job's request, which ends as it was, so
   // a bringup holding it keeps it. Called with pl_inband_pres already low (a
   // bringup waiting to restart the training), it raises pl_inband_pres at its
@@ -1438,13 +1442,21 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
 
   local task inband_drop(int unsigned dwell, bit beside);
     bit held = !beside && clk_req_q;
+    int unsigned lag;
     if (state != LSM_RESET) begin
       `uvm_error(get_type_name(), $sformatf({"LSM_EV_INBAND_DROP in %s: pl_inband_pres may fall ",
                  "only in Reset (UCIe r3.0 Table 10-3); ignored"}, state.name()))
       return;
     end
-    if (!held) drop_clk_req(beside, 1'b1);
-    set_inband(1'b0);
+    if (!held) lag = drop_clk_lag();
+    if (held || lag == 0) begin
+      if (!held) drop_clk_req(beside, 1'b1);
+      set_inband(1'b0);
+    end else begin
+      set_inband(1'b0);
+      wait_cycles(lag);
+      drop_clk_req(beside, 1'b1);
+    end
     wait_pl_out("lp_clk_ack", 4'h1, "FDI-R18");
     if (!held) drop_clk_handshake(beside, 1'b0);
     wait_cycles(dwell);
@@ -1453,6 +1465,16 @@ class ucie_lsm_driver extends uvm_driver #(ucie_lsm_item);
     set_inband(1'b1);
     if (!held) drop_clk_handshake(beside, 1'b0);
   endtask
+
+  // Clocks from a drop to its pl_clk_req (cfg.inband_drop_clk_lag), refused
+  // above what FDI-R20 accepts (clk_req_window, or 1 when that is 0).
+  local function int unsigned drop_clk_lag();
+    int unsigned lim = cfg.clk_req_window == 0 ? 1 : cfg.clk_req_window;
+    if (cfg.inband_drop_clk_lag <= lim) return cfg.inband_drop_clk_lag;
+    `uvm_error(get_type_name(), $sformatf({"inband_drop_clk_lag %0d is above clk_req_window ",
+               "(%0d): FDI-R20 would fire; using %0d"}, cfg.inband_drop_clk_lag, lim, lim))
+    return lim;
+  endfunction
 
   // A drop's pl_clk_req: a hold of its own beside a job, the job's request
   // otherwise.
