@@ -82,10 +82,13 @@ class aou_fdi_t1_bringup_test extends uvm_test;
     if (!env.lsm_cfg.clk_req_hold_bringup) begin
       // The DUT waits in WAIT_PRESENCE; losing presence sends it back to RESET.
       // The model drops pl_inband_pres with a pl_clk_req (UCIe r3.0 §10.2.3.2
-      // rule 5), which starts the DUT's wake, but the presence is gone before
-      // pl_wake_ack, so the DUT still returns to RESET. When pl_inband_pres
-      // rises again pl_clk_req falls in that same clock, so the DUT waits for
-      // the software trigger again.
+      // rule 5), which starts the DUT's wake, and the DUT still returns to
+      // RESET. When pl_wake_ack answers that wake before the drop reaches the
+      // DUT, the DUT requests Active for a clock and returns to NOP with
+      // pl_inband_pres low; the model takes that as no request (§10.3.3.8,
+      // §10.2.3.2 last paragraph). When pl_inband_pres rises again pl_clk_req
+      // falls in that same clock, so the DUT waits for the software trigger
+      // again.
       env.lsm.drv.do_inband_drop(30);
       repeat (10) @(lsm_vif.mon_cb);
     end

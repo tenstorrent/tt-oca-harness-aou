@@ -205,9 +205,10 @@ class ucie_fdi_monitor extends uvm_monitor;
     if (tx_beat != 0 || rx)
       `uvm_info(get_type_name(), $sformatf(
                 "left Active for LinkError mid-flit:%s%s",
-                tx_beat != 0 ? $sformatf(" TX flit abandoned after %0d of its %0d transfers;",
-                                         tx_beat, cfg.bpf()) : "",
-                rx ? $sformatf(" RX flit abandoned with %0d of its %0d transfers kept",
+                tx_beat != 0 ? $sformatf(
+                                 " TX flit abandoned after %0d transfer(s) (a flit takes %0d);",
+                                 tx_beat, cfg.bpf()) : "",
+                rx ? $sformatf(" RX flit abandoned after %0d transfer(s) (a flit takes %0d)",
                                rx_beat, cfg.bpf()) : ""), UVM_MEDIUM)
     tx_cur.delete(); tx_beat = 0; tx_stall = 0; tx_cc_h0 = 1'b0; tx_cc_any = 1'b0;
     if (!rx) return;

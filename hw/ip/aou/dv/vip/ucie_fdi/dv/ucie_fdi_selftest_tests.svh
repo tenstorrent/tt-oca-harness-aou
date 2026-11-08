@@ -439,18 +439,53 @@ endclass
 //            trigger withdrawn to NOP the Adapter must wait for the next
 //            NOP->Active (the stub reports otherwise);
 //  restart   the same, with the training-trigger policy (restart_on PL) and
-//            software's delay at 20000 clocks: after every link-down
+//            the Adapter's own restart decision delayed to 20000 clocks
+//            (sw_restart_delay): after every link-down
 //            pl_inband_pres must follow the trigger within 300 clocks, and a
 //            link left down (rebringup_after_down 0) must come up on it;
 //  either    restart_on EITHER, the trigger in half the Resets;
 //  rx_first  remote_active_first_pct 100: the Adapter starts the rx_active
 //            handshake before the request, in Reset and in Retrain (both
-//            must happen).
+//            must happen);
+//  drop      the stub waits 100 clocks of pl_inband_pres before it requests
+//            Active (software first), and the test drops pl_inband_pres
+//            (do_inband_drop, 30 clocks) beside the bringup while it waits for
+//            that request, with the Adapter's latencies at one clock
+//            (pl_wake_ack a clock after lp_wake_req): once in the first
+//            bringup, and once in the bringup of a LinkReset event (the drop
+//            waits until the link has been in LinkReset, then for that
+//            bringup to wait in Reset). As pl_inband_pres falls
+//            the stub gives NOP->Active for one clock and returns to NOP: no
+//            request (r3.0 §10.2.3.2, last paragraph; §10.3.3.8), so the
+//            Adapter must wait for the next NOP->Active (the stub reports
+//            otherwise), and the Active entry it then makes must keep
+//            pl_clk_req up until Active whatever the drop does with it
+//            (§10.2.3.2 rule 7, FDI-R22). The test fails unless each drop was
+//            made in its bringup, in Reset (it logs where each one was made).
+//            clk_req_hold_bringup defaults to 0;
+//  drop_overlap  the same stub, and one drop (30 clocks) beside the bringup
+//            of a LinkReset event as it waits to restart the training
+//            (sw_restart_delay 4), pl_inband_pres and pl_clk_req low, with
+//            the stub acknowledging pl_clk_req 20 clocks late: the bringup
+//            raises its own pl_clk_req while the drop's still waits for
+//            lp_clk_ack, raises pl_inband_pres once acknowledged and releases
+//            its request, all inside the drop. pl_clk_req must stay up from
+//            that lp_clk_ack until pl_inband_pres rises, although the drop
+//            releases its own request in between (rules 5 and 7; FDI-R20
+//            reports a rise without the handshake). clk_req_hold_bringup
+//            defaults to 0.
 // +clk_hold=0|1 sets clk_req_hold_bringup (default 1). Any error fails it.
 class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
   `uvm_component_utils(ucie_fdi_reset_req_test)
 
   string mode = "held";
+  // drop, drop_overlap: pl_inband_pres drops made beside a bringup, those of
+  // them made where intended, and where each was made (one line per drop).
+  int unsigned n_overlaps;
+  int unsigned n_placed;
+  string       drop_at[$];
+  int unsigned n_kept_up;   // drop_overlap: pl_clk_req kept up until pl_inband_pres rose
+  local bit    lr_done;     // the LinkReset event (and its bringup) has ended
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -460,10 +495,11 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
     bit hold = 1'b1;
     super.configure();
     void'($value$plusargs("reset_req=%s", mode));
+    if (mode inside {"drop", "drop_overlap"}) hold = 1'b0;
     void'($value$plusargs("clk_hold=%b", hold));
     env.lsm_cfg.clk_req_hold_bringup = hold;
     case (mode)
-      "held", "early": ;
+      "held", "early", "drop", "drop_overlap": ;
       "restart": env.lsm_cfg.restart_on = LSM_RESTART_PL;
       "either":  env.lsm_cfg.restart_on = LSM_RESTART_EITHER;
       "rx_first": env.lsm_cfg.remote_active_first_pct = 100;
@@ -477,6 +513,8 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
     env.pl.early_trigger = mode inside {"early", "restart", "either"};
     env.pl.remote_first = env.lsm_cfg.remote_active_first_pct != 0;
     if (mode == "either") env.pl.early_pct = 50;
+    if (mode inside {"drop", "drop_overlap"}) env.pl.act_delay = 100;
+    if (mode == "drop") env.pl.drop_pulse = 1'b1;
     if (mode == "restart") begin
       env.lsm_cfg.sw_restart_delay = 20000;
       env.pl.restart_bound = 300;
@@ -493,7 +531,129 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
       env.lsm_cfg.rebringup_after_down = 1'b1;
       wait_active();
     end
+    if (mode == "drop") begin
+      drop_beside(1'b0);
+      fork
+        begin
+          cev(LSM_EV_LINK_RESET);
+          lr_done = 1'b1;
+        end
+        drop_beside(1'b1);
+      join
+      wait_active();
+    end
+    if (mode == "drop_overlap") begin
+      int unsigned delay = env.lsm_cfg.sw_restart_delay;
+      env.lsm_cfg.sw_restart_delay = 4;
+      fork
+        begin
+          cev(LSM_EV_LINK_RESET);
+          lr_done = 1'b1;
+        end
+        drop_overlap();
+      join
+      env.lsm_cfg.sw_restart_delay = delay;
+      wait_active();
+    end
     super.events();
+  endtask
+
+  // Wait (bounded) for a drop's moment: with after_lr first until the link has
+  // been in LinkReset (the LinkReset event the caller runs alongside), then
+  // until it is in Reset with pl_inband_pres at `pres` and pl_clk_req and
+  // lp_clk_ack low. Then records where the drop is made: the link state, and
+  // the bringup it is beside, the first one (the link never Active yet) or,
+  // with after_lr, the LinkReset event's (the event still running and the link
+  // not Active since LinkReset). `found` 0: the moment never came.
+  local task drop_point(bit after_lr, bit pres, output bit found);
+    int unsigned n;
+    bit seen_lr, was_up, ok;
+    string job, at;
+    found = 1'b0;
+    while (n < 50000) begin
+      ucie_lsm_state_e s;
+      @(env.pl.lsm.mon_cb);
+      n++;
+      s = env.lsm.drv.state;
+      if (s == LSM_ACTIVE) was_up = 1'b1;
+      if (after_lr && !seen_lr) begin
+        if (s != LSM_LINKRESET) continue;
+        seen_lr = 1'b1;
+        was_up = 1'b0;
+      end
+      if (s == LSM_RESET && env.pl.lsm.mon_cb.pl_inband_pres === pres &&
+          env.pl.lsm.mon_cb.pl_clk_req === 1'b0 && env.pl.lsm.mon_cb.lp_clk_ack === 1'b0) begin
+        found = 1'b1;
+        break;
+      end
+    end
+    if (!found) return;
+    job = env.lsm.drv.idle() ? "no job" :
+          was_up ? "a later bringup" :
+          !after_lr ? "the first bringup" :
+          !lr_done ? "the LinkReset event's bringup" : "a later bringup";
+    ok = job inside {"the first bringup", "the LinkReset event's bringup"};
+    n_overlaps++;
+    at = $sformatf("drop %0d @ %0t beside %s, link state %s", n_overlaps, $time, job,
+                   env.lsm.drv.state.name());
+    if (ok) n_placed++;
+    else at = {at, " (not where intended)"};
+    drop_at.push_back(at);
+    `uvm_info(get_type_name(), at, UVM_LOW)
+  endtask
+
+  // drop: once the bringup waits in Reset for the request (pl_inband_pres 1,
+  // pl_clk_req released), drop pl_inband_pres from this thread, beside it,
+  // with the Adapter's latencies at one clock. With after_lr, in the bringup
+  // that follows a LinkReset.
+  local task drop_beside(bit after_lr);
+    int unsigned lat_min = env.lsm_cfg.lat_min;
+    int unsigned lat_max = env.lsm_cfg.lat_max;
+    bit found;
+    env.lsm_cfg.lat_min = 1;
+    env.lsm_cfg.lat_max = 1;
+    drop_point(after_lr, 1'b1, found);
+    if (found) env.lsm.drv.do_inband_drop(30);
+    else `uvm_error(get_type_name(), "the bringup never waited in Reset with pl_clk_req released")
+    env.lsm_cfg.lat_min = lat_min;
+    env.lsm_cfg.lat_max = lat_max;
+  endtask
+
+  // drop_overlap: once the LinkReset event's bringup waits in Reset to
+  // restart the training (pl_inband_pres, pl_clk_req and lp_clk_ack low), drop
+  // pl_inband_pres beside it with lp_clk_ack 20 clocks late, and watch that
+  // pl_clk_req stays up from the drop's lp_clk_ack until the bringup raises
+  // pl_inband_pres.
+  local task drop_overlap();
+    int unsigned ack_delay = env.pl.clk_ack_delay;
+    bit found, done, acked, rose, kept = 1'b1;
+    drop_point(1'b1, 1'b0, found);
+    if (!found) begin
+      `uvm_error(get_type_name(), "the LinkReset event's bringup never waited in Reset to restart")
+      return;
+    end
+    env.pl.clk_ack_delay = 20;
+    fork
+      begin
+        env.lsm.drv.do_inband_drop(30);
+        done = 1'b1;
+      end
+      while (!done) begin
+        @(env.pl.lsm.mon_cb);
+        if (!acked) acked = env.pl.lsm.mon_cb.lp_clk_ack === 1'b1;
+        else if (!rose) begin
+          if (env.pl.lsm.mon_cb.pl_inband_pres === 1'b1) rose = 1'b1;
+          else if (env.pl.lsm.mon_cb.pl_clk_req !== 1'b1) kept = 1'b0;
+        end
+      end
+    join
+    env.pl.clk_ack_delay = ack_delay;
+    if (rose && kept) n_kept_up++;
+    else
+      `uvm_error(get_type_name(), $sformatf({"drop_overlap: %s inside the drop (lp_clk_ack %0b, ",
+                 "pl_inband_pres rose %0b, pl_clk_req up until then %0b)"},
+                 rose ? "pl_clk_req fell before the bringup raised pl_inband_pres" :
+                 "the bringup did not raise pl_inband_pres", acked, rose, kept))
   endtask
 
   function void check_phase(uvm_phase phase);
@@ -511,6 +671,18 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
       end
       "either":
         if (env.pl.n_early == 0) `uvm_error(get_type_name(), "no early NOP->Active was given")
+      "drop": begin
+        if (n_overlaps != 2 || n_placed != 2)
+          `uvm_error(get_type_name(), $sformatf({"%0d drops made, %0d where intended (one beside ",
+                     "the first bringup, one beside the LinkReset event's)"}, n_overlaps, n_placed))
+        if (env.pl.n_drop_pulses < 2)
+          `uvm_error(get_type_name(), "the stub gave no NOP->Active as pl_inband_pres fell")
+      end
+      "drop_overlap":
+        if (n_overlaps != 1 || n_placed != 1 || n_kept_up != 1)
+          `uvm_error(get_type_name(), $sformatf({"%0d drops made, %0d beside the LinkReset ",
+                     "event's bringup, %0d with pl_clk_req kept up"}, n_overlaps, n_placed,
+                     n_kept_up))
       "restart":
         if (env.pl.n_restarts == 0)
           `uvm_error(get_type_name(), "no training restarted on the stub's NOP->Active")
@@ -528,9 +700,13 @@ class ucie_fdi_reset_req_test extends ucie_fdi_cov_test;
     super.report_phase(phase);
     `uvm_info(get_type_name(), $sformatf({"held Active requests %0d (LinkReset then Active %0d), ",
               "early triggers %0d (withdrawn and checked %0d), restarts on them %0d, ",
-              "rx_active handshakes before the request %0d in Reset, %0d in Retrain"},
+              "rx_active handshakes before the request %0d in Reset, %0d in Retrain, ",
+              "drops beside a bringup %0d (%0d where intended, %0d with pl_clk_req kept up), ",
+              "NOP->Active pulses as pl_inband_pres fell %0d"},
               env.pl.n_held, env.pl.n_other, env.pl.n_early, env.pl.n_early_waits,
-              env.pl.n_restarts, env.pl.n_rx_first, env.pl.n_rx_first_rt), UVM_NONE)
+              env.pl.n_restarts, env.pl.n_rx_first, env.pl.n_rx_first_rt, n_overlaps, n_placed,
+              n_kept_up, env.pl.n_drop_pulses), UVM_NONE)
+    foreach (drop_at[i]) `uvm_info(get_type_name(), drop_at[i], UVM_NONE)
   endfunction
 endclass
 
@@ -1611,7 +1787,8 @@ endclass
 
 // Counts what a link-state monitor sees (ucie_fdi_reuse_test): entries to each
 // state, and the clocks from a Reset entered after a link-down to
-// pl_inband_pres, the software restart (the shortest one).
+// pl_inband_pres, the restart on the Adapter's own decision (the shortest
+// one).
 class ucie_fdi_reuse_obs implements ucie_lsm_observer;
   int unsigned n_enter[ucie_lsm_state_e];
   int unsigned min_restart = '1;
