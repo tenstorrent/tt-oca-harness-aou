@@ -4,11 +4,11 @@
 // L1: FDI mainband with UCIe Flit Format 6 (Latency-Optimized 256B with
 // optional bytes) as the Streaming protocol lays it out (UCIe r3.0 §3.3.4,
 // Figure 3-25; CXL.cachemem's layout, Figure 3-24, has the same Adapter-owned
-// bytes), on FDIs of 32 to 1024 bytes. PCIe, CXL.io and Management Transport
-// flits are not modelled (see stream_layout_modelled). Flit item, Format 6
-// codec, PL driver (to the Protocol Layer's RX), TX responder (pl_trdy and
-// stallreq towards its TX), monitor with protocol checks and a coverage hook. Rule IDs are
-// listed in ../README.md.
+// bytes), on FDIs of 32, 64, 128, 256, 512 or 1024 bytes. PCIe, CXL.io and
+// Management Transport flits are not modelled (see stream_layout_modelled).
+// Flit item, Format 6 codec, PL driver (to the Protocol Layer's RX), TX
+// responder (pl_trdy and stallreq towards its TX), monitor with protocol
+// checks and a coverage hook. Rule IDs are listed in ../README.md.
 
 package ucie_fdi_pkg;
   import uvm_pkg::*;
@@ -132,21 +132,22 @@ package ucie_fdi_pkg;
   // the whole flit (as UCIe r3.0 10.3.1 says of wider FDIs: a cancel applies
   // to every flit in that clock).
   //
-  // Wider FDIs (UCIe r3.0 10.3.1, Implementation Note "NBYTES"): a transfer
-  // of 256 B times n carries n flits, flit j on bytes 256j to 256j+255 (lane
-  // j; the byte mapping above, continued). The Adapter forwards whole flits on
-  // the low lanes and zeros on the rest, and a Flit Header of 0000h is a NOP
-  // the Protocol Layer discards; the Protocol Layer sends valid flits on every
-  // lane. pl_flit_cancel applies to every flit of the transfer before it. The
-  // helpers below are the only place the width arithmetic lives.
+  // Wider FDIs (UCIe r3.0 10.3.1, Implementation Note "NBYTES"): a 512 B
+  // transfer carries 2 flits and a 1024 B one 4, flit j on bytes 256j to
+  // 256j+255 (lane j; the byte mapping above, continued). The Adapter
+  // forwards whole flits on the low lanes and zeros on the rest, and a Flit
+  // Header of 0000h is a NOP the Protocol Layer discards; the Protocol Layer
+  // sends valid flits on every lane. pl_flit_cancel applies to every flit of
+  // the transfer before it. The helpers below are the only place the width
+  // arithmetic lives.
   // ---------------------------------------------------------------------------
-  // FDI widths: 32 to 256 B, and multiples of 256 B from 512 B up to
-  // MAX_BEAT_BYTES. The NBYTES note strongly recommends 64, 128, 256 or 512,
-  // and a multiple of 256 from 512 up (so 768 is accepted); 32 B is outside
-  // that list, accepted but not recommended.
+  // FDI widths the model supports: 32, 64, 128, 256, 512 and 1024 B. The
+  // NBYTES note strongly recommends 64, 128, 256 or 512, and a multiple of 256
+  // from 512 up; of those multiples the model takes only 512 and 1024 (not
+  // 768, nor anything above 1024). 32 B is outside the recommended list,
+  // accepted.
   function automatic bit valid_beat_bytes(int unsigned n);
-    return n inside {32, 64, 128, 256} ||
-           (n >= 2 * FLIT_BYTES && n <= MAX_BEAT_BYTES && n % FLIT_BYTES == 0);
+    return n inside {32, 64, 128, 256, 512, 1024};
   endfunction
 
   // Transfers per flit: 1 once a transfer holds a whole flit.

@@ -11,9 +11,10 @@
 // in it.
 interface class ucie_fdi_cov;
   // A completed flit (several per beat on a 512 or 1024 B FDI, NOPs not
-  // included): its direction, the FDI width (32 to 1024 bytes), the stall
-  // cycles inside it (pl_trdy low on TX, bubbles on RX; on a 256 B FDI none on
-  // TX, and on RX only the idle cycles between a cancelled flit and its replay)
+  // included): its direction, the FDI width (32, 64, 128, 256, 512 or 1024
+  // bytes), the stall cycles inside it (pl_trdy low on TX, bubbles on RX; on
+  // a 256 B FDI none on TX, and on RX only the idle cycles between a
+  // cancelled flit and its replay)
   // and the idle cycles before it; then the flit itself (the item the monitor
   // publishes on ap_tx or ap_rx) and its 256 B lane of the transfer (0 up to
   // 256 B).

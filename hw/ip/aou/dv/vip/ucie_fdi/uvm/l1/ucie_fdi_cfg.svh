@@ -5,7 +5,8 @@ class ucie_fdi_cfg extends uvm_object;
   `uvm_object_utils(ucie_fdi_cfg)
 
   int unsigned   phy = 0;
-  // FDI width of this PHY: 32 to 256, or 512 to 1024 in steps of 256
+  // FDI width of this PHY: 32, 64, 128, 256, 512 or 1024 B (any other is a
+  // fatal error)
   int unsigned   beat_bytes = 64;
   bit            is_active = 1'b1;    // 0: monitor only
 
