@@ -1155,10 +1155,13 @@ endclass
 //            link must still leave Active for LinkError and come back up
 //            (the Adapter has seen the assertion; LinkError has priority,
 //            r3.0 §10.3.3.8);
-//  le_mid    (below 256 B) Adapter LinkErrors entered mid-flit while a stall waits for
+//  le_mid    (below 256 B; a fatal at 256 B and up, where no flit is ever
+//            part-way) Adapter LinkErrors entered mid-flit while a stall waits for
 //            lp_stallack with a TX flit part-way (stall_mid_pct 90, pl_trdy
 //            random at 25 % meanwhile, the stall's own pl_trdy as
-//            stall_trdy_free has it): up to 40
+//            stall_trdy_free has it, except at 128 B, where it follows the
+//            policy: a flit is two beats there, and a pl_trdy held high ends it
+//            on the stall's first clock, before a LinkError can cut it): up to 40
 //            tries, until 3 catch the stub inside a flit with pl_stallreq up;
 //            at least one must. +le_stall_drain=1 (any mode) sets the model's
 //            le_stall_drain: the Adapter performs the handshake in LinkError
@@ -1231,6 +1234,9 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     if ($value$plusargs("stall_pct=%d", v)) env.fdi_cfg.stall_pct = v;
     env.fdi_cfg.stall_trdy_free = 1'b0;
     if ($value$plusargs("stall_trdy_free=%d", v)) env.fdi_cfg.stall_trdy_free = v != 0;
+    if (mode == "le_mid" && env.fdi_cfg.bpf() == 1)
+      `uvm_fatal(get_type_name(),
+                 "+stall_exit=le_mid needs an FDI below 256 B, where a flit spans several beats")
   endfunction
 
   function void connect_phase(uvm_phase phase);
@@ -1470,13 +1476,21 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
   // Adapter LinkErrors mid-flit with a stall open and a TX flit part-way (see
   // the header). The stub counts the flits so cut (n_cut_stalled). Meanwhile
   // pl_trdy is random at 25 %, so a flit lasts long enough to be caught.
+  // Where a flit is two beats (128 B), pl_trdy also follows that policy while
+  // the stall waits for lp_stallack: held high, it transfers the flit's last
+  // beat on the stall's first clock, one clock before a LinkError's abort can
+  // withhold it, so no flit would ever be cut. pl_trdy need not be asserted
+  // on consecutive clocks (r3.0 §10.3.2 rule 7). It is set before any stall
+  // rises, since the clock a stall rises on already decides the next pl_trdy.
   local task le_mid_cases();
     int unsigned    le_mid = env.lsm_cfg.le_mid_flit_pct;
     ucie_fdi_trdy_e pol = env.fdi_cfg.trdy_policy;
     int unsigned    pct = env.fdi_cfg.trdy_pct;
+    bit             free = env.fdi_cfg.stall_trdy_free;
     env.lsm_cfg.le_mid_flit_pct = 100;
     env.fdi_cfg.trdy_policy = UCIE_TRDY_RANDOM;
     env.fdi_cfg.trdy_pct = 25;
+    if (env.fdi_cfg.bpf() == 2) env.fdi_cfg.stall_trdy_free = 1'b1;
     for (int k = 0; k < 40 && env.pl.n_cut_stalled < 3; k++) begin
       int unsigned n;
       wait_active();
@@ -1488,6 +1502,7 @@ class ucie_fdi_stall_exit_test extends ucie_fdi_cov_test;
     env.lsm_cfg.le_mid_flit_pct = le_mid;
     env.fdi_cfg.trdy_policy = pol;
     env.fdi_cfg.trdy_pct = pct;
+    env.fdi_cfg.stall_trdy_free = free;
     wait_active();
   endtask
 
