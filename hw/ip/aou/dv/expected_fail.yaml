@@ -45,6 +45,19 @@
     64/96 on PHY1 (58-87% of the model), on either PHY
 - test: aou_perf_test
   bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 2xmix41-sp128\|0\|S1\|\w+\|l2r below target'
+  when_re: 'PERF_GATE 2xmix41-sp128\|0\|S1\|'
+  note: >-
+    FDI_PACK_WD 1024 at a 128 B FDI with 1024-bit and 256-bit RPs: the DUT TX link reaches
+    77.6-80.0 B/cycle (69-74% of the model) on the write, read and one-sided mixed windows
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 2xmix41-sp128\|0\|S1\|bw_mix_\w+\|r2l below target'
+  when_re: 'PERF_GATE 2xmix41-sp128\|0\|S1\|'
+  requires: tenstorrent/tt-oca-harness-aou#131
+  note: the DUT RX link in the mixed windows, held to the capped TX link's rate
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
   check_re: 'T1-P02: 4xmix4211-sp128\|0\|S[1235]\|\w+\|l2r below target'
   when_re: 'PERF_GATE 4xmix4211-sp128\|0\|S[1235]\|'
   note: 'FDI_PACK_WD 1024 at a 128 B FDI: the DUT TX link caps at 64 B/cycle (58-75% of the model; 82% in the all-RP S5 window)'
