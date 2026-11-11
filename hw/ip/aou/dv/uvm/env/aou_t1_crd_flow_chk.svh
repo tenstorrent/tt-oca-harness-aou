@@ -110,8 +110,8 @@ class aou_t1_crd_flow_chk extends uvm_component;
   aou_core        rm;
   aou_axi_vif_t   s_vif[];
   aou_axi_vif_t   m_vif[];
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
-  virtual aou_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif[AOU_T1_N_PHY];
+  virtual ucie_fdi_lsm_if lsm_vif;
   aou_t1_crd_block_chk blk;   // the ID-mismatch hold; null: none
   aou_t1_early_tbl_chk early; // early-table occupancy; null: none
   aou_t1_rp_map_chk rp_map;   // wire RP and own ID of each port's messages; null: identity
@@ -597,7 +597,7 @@ class aou_t1_crd_flow_chk extends uvm_component;
     // An acknowledged stall (lp_stallack high) keeps the DUT from sending even
     // with pl_trdy high.
     return mb_vif[p].mon_cb.pl_trdy === 1'b1 && mb_vif[p].mon_cb.lp_stallack !== 1'b1 &&
-           mb_vif[p].mon_cb.pl_state_sts == aou_fdi_pkg::FDI_STS_ACTIVE;
+           mb_vif[p].mon_cb.pl_state_sts == ucie_fdi_pkg::FDI_STS_ACTIVE;
   endfunction
 
   // The DUT could send a message of class c for x on this edge: the link is

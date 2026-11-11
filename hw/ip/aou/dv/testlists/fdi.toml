@@ -186,7 +186,7 @@ args = ["+event=sw_disable"]
 # Two-PHY with PHY1 active (18.25): +park_idle_phy keeps PHY0 in Reset with its
 # mainband closed, so the DUT must follow PHY1's pl_state_sts (the bringup model,
 # FDI-M01/M05/M06, follows I_PHY_TYPE) and PHY1's stalls (L1 entry, random stalls);
-# PHY0 must stay quiet (FDI-R43/R44 on its monitor).
+# PHY0 must stay quiet (FDI-R44 on its monitor: no lp_irdy in Reset).
 [[tests]]
 name = "aou_t1_slice_test.active_phy-1.park_idle_phy-1.2xmix-tp64_128"
 module = { uvm = "aou_t1_slice_test" }

@@ -65,14 +65,17 @@ protocol assertions".
 
 === DUT-Local Model Ownership
 
-Every model is DUT-local to this bench and lives under `uvm/env/`:
+Every model is DUT-local to this bench and lives under `uvm/env/`, except L1 and L2,
+which are the UCIe FDI model in `vip/ucie_fdi/` (its `README.md` is the API) with
+the bench's layer on it in `uvm/env/fdi/`:
 
 [cols="2,1,4",options="header"]
 |===
 | Package | Layer | Contents
 | `aou_axi_pkg` (`uvm/env/axi/`) | L4b, L4a | `aou_axi_txn`, `aou_axi_cfg`, manager and subordinate agents, monitor, sparse memory `aou_mem`, timing policies (`aou_axi_delay`), the remote die's AXI model `aou_remote_axi_model`, AXI sequences
-| `aou_fdi_pkg` (`uvm/env/fdi/l1/`) | L1 | Flit item, Format 6 codec, PL driver and TX responder, monitor, L1 coverage
-| `aou_lsm_pkg` (`uvm/env/fdi/l2/`) | L2 | PL link-state agent, bring-up reference model, L2 coverage
+| `ucie_fdi_pkg` (`vip/ucie_fdi/uvm/l1/`) | L1 | Flit item, Format 6 codec, PL driver and TX responder, monitor, coverage hook
+| `ucie_lsm_pkg` (`vip/ucie_fdi/uvm/l2/`) | L2 | Adapter link-state agent, monitor, coverage hook
+| `aou_fdi_layer_pkg` (`uvm/env/fdi/`) | L1, L2 | The bench's layer on the UCIe model: the DUT's bringup pins (`aou_bringup_if`), the bring-up reference model and L1 and L2 coverage, held by `aou_fdi_layer`, an observer of the model's link-state monitor
 | `aou_l3_pkg` (`uvm/env/l3/`) | L3 | Message classes, flit objects, packer with policies, unpacker, credit manager, link controller, rule checker, injection sequences, L3 coverage, the `AOU_FDI_CHECKER` adapter
 | `aou_fdi_checker_pkg`, `AOU_FDI_CHECKER` (`uvm/env/checker/`) | FDI | Passive FDI protocol checker bound to the DUT's FDI (`DESIGN.md` beside it)
 | `aou_apb_pkg`, `aou_reg_pkg` (`uvm/env/apb/`) | APB | APB agent, register adapter and predictor, register sequences on the generated RAL (`uvm/env/gen/aou_core_csr_uvm_pkg.sv`, from `csr/aou-core.rdl` by `scripts/regen_ral.sh`)
@@ -93,8 +96,8 @@ contracts.
 tb_top                                  tb/tb_top.sv (no ports)
   u_dut : AOU_TOP                       RTL/AOU_TOP.sv, parameters from the target's defines
   s_axi[r], m_axi[r] : aou_axi_bus_if   DUT S and M ports, one pair per RP
-  fdi_mb[p] : aou_fdi_mb_if             FDI mainband, one per PHY
-  fdi_lsm : aou_fdi_lsm_if              FDI link-state sideband
+  fdi_mb[p] : ucie_fdi_mb_if             FDI mainband, one per PHY
+  fdi_lsm : ucie_fdi_lsm_if              FDI link-state sideband
   apb : aou_apb_if
   status, irq, rst : aou_status_if, aou_irq_if, aou_rst_if
   wdt : aou_wdt_if                      write-watchdog taps (early-response controllers, SFR)
@@ -390,8 +393,9 @@ name.
 | Key | Type | Used by
 | `s_axi<r>` | `aou_axi_bus_if #(.DATA_W(1024))` | L4b manager agent (DUT's AXI S port)
 | `m_axi<r>` | `aou_axi_bus_if #(.DATA_W(1024))` | L4b subordinate agent (DUT's AXI M port)
-| `fdi_mb<p>` | `aou_fdi_mb_if #(.DATA_W(1024))` | L1 agent, PHY *p*
-| `fdi_lsm` | `aou_fdi_lsm_if` | L2 agent
+| `fdi_mb<p>` | `ucie_fdi_mb_if #(.DATA_W(ucie_fdi_pkg::BUS_W))` (8192 bits; the DUT uses the low bits of its FDI width; the FDI outputs the DUT has no pins for are tied in `tb_top`: `lp_stream` to Stack 0 Streaming, `lp_corrupt_crc`, `lp_dllp*` and `lp_retimer_crd` to 0) | L1 agent, PHY *p*
+| `fdi_lsm` | `ucie_fdi_lsm_if` | L2 agent
+| `aou_bringup` | `aou_bringup_if` | the bench's FDI layer (`aou_fdi_layer`: PHY select, bringup SW pins, bringup status), tests
 | `apb` | `aou_apb_if` | APB agent
 | `status` | `aou_status_if` | interrupts, FSM state, SW pins
 | `irq` | `aou_irq_if` | the same interrupts and activation status, clocked (T1 status watcher)
@@ -483,11 +487,11 @@ reports any reset asserted otherwise. A test that resets mid-access on purpose p
 [[aou-tb-api-inter-layer]]
 ==== Inter-layer APIs
 
-* *L1 ↔ L3:* `aou_flit_item` holds 256 bytes, the PHY, cancel and stall plans
+* *L1 ↔ L3:* `ucie_flit_item` holds 256 bytes, the PHY, cancel and stall plans
 for driving, and timestamps. The L1 driver takes flits from a sequencer. The L1
 monitor publishes `ap_tx` (flits the DUT sent, after cancel rollback) and `ap_rx`
 (flits delivered to the DUT).
-* *L2:* `aou_lsm_cfg` holds the latency ranges; states are encoded as in UCIe
+* *L2:* `ucie_lsm_cfg` holds the latency ranges; states are encoded as in UCIe
 r1.1 Table 8-2. The agent publishes state changes, and L1 only drives while L2
 reports Active.
 * *L3 ↔ L4a:* L3 publishes decoded messages from the DUT (`aou_msg` subclasses)
@@ -539,7 +543,7 @@ Set `sb.remote_mem` to the model's `cfg.mem`, and `sb.local_mem` to the one
 [[aou-tb-api-l1-l3]]
 ===== L1 ↔ L3 boundary and the L3 API
 
-L3 (`l3/aou_l3_pkg`) does not import `aou_fdi_pkg`. Its only flit type is
+L3 (`l3/aou_l3_pkg`) does not import `ucie_fdi_pkg`. Its only flit type is
 `aou_l3_flit_item`: `bit [7:0] bytes[256]` in wire byte order (byte *i* is the
 *i*-th byte of the 256-byte Format 6 flit, beat *k* of a 64-byte FDI carries bytes
 64k..64k+63), plus `phy` and `t_start`. L3 fills every byte; bytes 0-1 (flit
@@ -547,7 +551,7 @@ header, default PID 11b from `cfg.fh_byte0`) and 126-127/254-255 (CRC) are the
 adapter's and L1 may overwrite them.
 
 What L1 must provide, and how the integrator connects it (env glue, a byte copy
-each way: `l3_item.bytes = l1_item.data` and back; L1's `aou_flit_item.data[256]`
+each way: `l3_item.bytes = l1_item.data` and back; L1's `ucie_flit_item.data[256]`
 uses the same byte order):
 
 * *DUT → L3:* every flit the DUT sent, after cancel rollback, exactly once and
@@ -555,7 +559,7 @@ in order: L1 `ap_tx` → converter → `aou_l3_agent.rx_flit_imp`
 (`uvm_analysis_imp #(aou_l3_flit_item)`, a function, zero time).
 * *L3 → DUT:* L1's driver side pulls: a sequence on the L1 sequencer loops
 `l3.tx_flit_export.get(it)` (`uvm_blocking_get_imp`, blocks until L3 has a flit),
-copies `it.bytes` into an `aou_flit_item` and drives it. L3 builds a flit only
+copies `it.bytes` into an `ucie_flit_item` and drives it. L3 builds a flit only
 when asked, so the credits it returns are current; it never needs idle flits.
 L1 drives only while L2 reports Active.
 
@@ -690,7 +694,7 @@ Every test's virtual sequence extends this and composes these tasks:
 | `drain(timeout)` | wait until nothing is outstanding anywhere
 | `link_event(kind)` | PL-initiated Retrain, LinkError, L1 entry/exit, Reset, inband_pres drop, clk_req wake
 | `lp_mode(en, threshold)` | TX low-power mode; static configuration, only while the DUT is DISABLED (T1-LP03)
-| `hold_tx()` / `release_tx()` | back-pressure on the DUT's TX: L1 holds pl_trdy low from the next flit boundary (`aou_fdi_cfg.tx_hold`), so requests back up behind the DUT's ring buffer and arbiters
+| `hold_tx()` / `release_tx()` | back-pressure on the DUT's TX: L1 holds pl_trdy low from the next flit boundary (`ucie_fdi_cfg.tx_hold`), so requests back up behind the DUT's ring buffer and arbiters
 | `hold_remote_tx()` / `release_remote_tx()` | the remote die's counterpart: L3 holds back credited messages (`pol.hold_credited`), then packs the backlog densely
 | `inject(kind, args)` | L3 error injection (bad type, reserved bits, credit violations, out-of-state Activate/Deactivate, MsgStart, placement, over-grant, ...) and AXI error responses from memories
 | `sw_reset()` | `AOU_SW_RESET` (every SFR, the activation state and the RX FIFOs reset, MAS 7.3.6), then reprogram and re-activate

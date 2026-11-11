@@ -91,8 +91,8 @@ Code: `uvm/env/fdi/l1/aou_fdi_cov.svh`.
 [cols="2,3,5,2",options="header"]
 |===
 | Group | What it shows | Bins | Report name
-| `cg_fdi_xfer` | Every flit, each way, at every FDI width | direction × beat {32, 64, 128 B}; cycles stalled inside the flit {0, 1, 2-4, 5+} (`pl_trdy` low on TX, bubbles on RX) and idle cycles before it {0, 1-3, 4+}, each × direction | `l1.cg_fdi_xfer`
-| `cg_fdi_cancel` | `pl_flit_cancel` handling | first or second 128 B half × with or without `pl_valid` in the cancel cycle; 1st, 2nd, 3rd+ cancel of one flit; TX stalled or not | `l1.cg_fdi_cancel`
+| `cg_fdi_xfer` | Every flit, each way, at every FDI width | direction × beat {32, 64, 128, 256 B}; cycles stalled inside the flit {0, 1, 2-4, 5+} (`pl_trdy` low on TX, bubbles on RX) and idle cycles before it {0, 1-3, 4+}, each × direction | `l1.cg_fdi_xfer`
+| `cg_fdi_cancel` | `pl_flit_cancel` handling | first or second 128 B half, or the whole flit on a 256 B FDI, × with or without `pl_valid` in the cancel cycle; 1st, 2nd, 3rd+ cancel of one flit; TX stalled or not | `l1.cg_fdi_cancel`
 | `cg_fdi_stall` (DUT) | The stall handshake before a state change (UCIe r1.1 8.3.2) | `pl_stallreq` to `lp_stallack` latency {2, 3, 4-6, 7+ cycles} × request at a flit boundary or mid-flit; `lp_stallack` hold {1, 2-4, 5+}; `pl_trdy` high or low when the request rose, × boundary or mid-flit | `l1.cg_fdi_stall`
 | `cg_fdi_abandon` | A partial flit dropped because the Adapter left Active mid-flit | TX, RX | `l1.cg_fdi_abandon`
 |===

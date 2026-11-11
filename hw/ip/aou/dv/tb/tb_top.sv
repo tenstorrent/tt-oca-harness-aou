@@ -59,7 +59,7 @@ module tb_top;
   endfunction
   localparam int FDI_CFG    = `AOU_FDI_CONFIG;
   localparam int NXT_PACK   = `AOU_TX_NXT_PACKING;
-  localparam int BUS_W      = aou_fdi_pkg::BUS_W;   // widest FDI beat (256 B)
+  localparam int BUS_W      = ucie_fdi_pkg::BUS_W;  // the UCIe model's mainband width
   localparam int AXI_W      = 1024;
   localparam int WD0 = (FDI_CFG == 0 || FDI_CFG == 3) ? 256 : (FDI_CFG == 2) ? 1024 :
                        (FDI_CFG == 5) ? 2048 : 512;
@@ -177,11 +177,12 @@ module tb_top;
   // ---------------------------------------------------------------------------
   aou_axi_bus_if #(.DATA_W(AXI_W)) s_axi [RP_COUNT] (.clk(clk), .resetn(axi_port_rst_n));
   aou_axi_bus_if #(.DATA_W(AXI_W)) m_axi [RP_COUNT] (.clk(clk), .resetn(axi_port_rst_n));
-  aou_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb0 (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb0 (.clk(clk), .rst_n(rst_n));
 `ifdef TWO_PHY
-  aou_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_mb_if  #(.DATA_W(BUS_W)) fdi_mb1 (.clk(clk), .rst_n(rst_n));
 `endif
-  aou_fdi_lsm_if                   fdi_lsm (.clk(clk), .rst_n(rst_n));
+  ucie_fdi_lsm_if                   fdi_lsm (.clk(clk), .rst_n(rst_n));
+  aou_bringup_if                   fdi_brg (.clk(clk), .rst_n(rst_n));
   aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb (.pclk(pclk), .presetn(prst_n));
   aou_status_if                    status ();
   aou_irq_if                       irq (.clk(clk));
@@ -342,23 +343,38 @@ module tb_top;
   // ---------------------------------------------------------------------------
   // FDI: the mainband interfaces are BUS_W wide; the DUT uses the low WD bits.
   // ---------------------------------------------------------------------------
+  // The DUT has none of the FDI's other Protocol Layer outputs: its lp_stream
+  // is tied to Stack 0 Streaming (UCIe r3.0 10.2.1 allows the tie-off), the
+  // rest idle. The Adapter outputs it has no pins for stay open.
   logic [WD0-1:0] lp0_data;
   assign fdi_mb0.lp_data = BUS_W'(lp0_data);
   assign fdi_mb0.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
+  assign fdi_mb0.lp_stream = ucie_fdi_pkg::UCIE_STREAM_S0_STREAMING;
+  assign fdi_mb0.lp_corrupt_crc = 1'b0;
+  assign fdi_mb0.lp_dllp = '0;
+  assign fdi_mb0.lp_dllp_valid = 1'b0;
+  assign fdi_mb0.lp_dllp_ofc = 1'b0;
+  assign fdi_mb0.lp_retimer_crd = 1'b0;
 `ifdef TWO_PHY
   logic [WD1-1:0] lp1_data;
   assign fdi_mb1.lp_data = BUS_W'(lp1_data);
   assign fdi_mb1.rx_active = fdi_lsm.pl_rx_active_req && fdi_lsm.lp_rx_active_sts;
+  assign fdi_mb1.lp_stream = ucie_fdi_pkg::UCIE_STREAM_S0_STREAMING;
+  assign fdi_mb1.lp_corrupt_crc = 1'b0;
+  assign fdi_mb1.lp_dllp = '0;
+  assign fdi_mb1.lp_dllp_valid = 1'b0;
+  assign fdi_mb1.lp_dllp_ofc = 1'b0;
+  assign fdi_mb1.lp_retimer_crd = 1'b0;
 `endif
 
   // Core-to-bringup triggers for the bringup reference model and the status
   // interface. AOU_TOP keeps the activation state and LinkReset request
   // internal, so they are read from its wires.
-  assign fdi_lsm.int_req_linkreset = u_dut.w_aou_req_linkreset;
-  assign fdi_lsm.act_st_disabled   = status.activate_st_disabled;
-  assign fdi_lsm.sw_reset          = u_dut.w_sw_reset;
-  assign fdi_lsm.int_activate_start = status.int_activate_start;
-  assign fdi_lsm.int_fdi_link_down  = status.int_fdi_link_down;
+  assign fdi_brg.int_req_linkreset = u_dut.w_aou_req_linkreset;
+  assign fdi_brg.act_st_disabled   = status.activate_st_disabled;
+  assign fdi_brg.sw_reset          = u_dut.w_sw_reset;
+  assign fdi_brg.int_activate_start = status.int_activate_start;
+  assign fdi_brg.int_fdi_link_down  = status.int_fdi_link_down;
   assign status.activate_st_disabled = u_dut.w_aou_activate_st_disabled;
   assign status.activate_st_enabled  = u_dut.w_aou_activate_st_enabled;
   assign status.o_aou_req_linkreset  = u_dut.w_aou_req_linkreset;
@@ -555,7 +571,7 @@ module tb_top;
       .O_AOU_RX_AXI_S_BVALID (s_bvalid),  .I_AOU_RX_AXI_S_BREADY (s_bready),
 
 `ifdef TWO_PHY
-      .I_PHY_TYPE            (fdi_lsm.phy_type),
+      .I_PHY_TYPE            (fdi_brg.phy_type),
 `endif
       .I_FDI_PL_0_VALID      (fdi_mb0.pl_valid),
       .I_FDI_PL_0_DATA       (fdi_mb0.pl_data[WD0-1:0]),
@@ -590,10 +606,10 @@ module tb_top;
       .O_LP_RX_ACTIVE_STS    (fdi_lsm.lp_rx_active_sts),
       .O_LP_LINKERROR        (fdi_lsm.lp_linkerror),
 
-      .I_SW_ACTIVATE_START   (fdi_lsm.sw_activate_start),
-      .I_SW_LINKERROR_INJECT (fdi_lsm.sw_linkerror_inject),
-      .O_FDI_FSM_STATE       (fdi_lsm.fdi_fsm_state),
-      .O_FDI_LINK_UP         (fdi_lsm.fdi_link_up),
+      .I_SW_ACTIVATE_START   (fdi_brg.sw_activate_start),
+      .I_SW_LINKERROR_INJECT (fdi_brg.sw_linkerror_inject),
+      .O_FDI_FSM_STATE       (fdi_brg.fdi_fsm_state),
+      .O_FDI_LINK_UP         (fdi_brg.fdi_link_up),
 
       .INT_REQ_LINKRESET     (status.req_linkreset),
       .INT_SI0_ID_MISMATCH   (status.int_si0_id_mismatch),
@@ -657,7 +673,7 @@ module tb_top;
   aou_fdi_checker_if fdi_chk_p0 (.clk(clk));
   aou_fdi_checker_if fdi_chk_p1 (.clk(clk));
   // Before the LSM driver sets I_PHY_TYPE it is X; PHY 0 is watched until then.
-  wire chk_sel1 = (fdi_lsm.phy_type === 1'b1);
+  wire chk_sel1 = (fdi_brg.phy_type === 1'b1);
 
   aou_fdi_chk_phy #(.WD(WD0), .RP_COUNT(RP_COUNT)) u_fdi_chk0 (
       .clk            (clk),
@@ -741,8 +757,9 @@ module tb_top;
   import ocah_lib_pkg::*;
   import aou_rule_pkg::*;
   import aou_axi_pkg::*;
-  import aou_fdi_pkg::*;
-  import aou_lsm_pkg::*;
+  import ucie_fdi_pkg::*;
+  import ucie_lsm_pkg::*;
+  import aou_fdi_layer_pkg::*;
   import aou_l3_pkg::*;
   import aou_reg_pkg::*;
   import aou_core_csr_uvm_pkg::*;
@@ -762,11 +779,12 @@ module tb_top;
   end
 
   initial begin
-    uvm_config_db #(virtual aou_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb0", fdi_mb0);
+    uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb0", fdi_mb0);
 `ifdef TWO_PHY
-    uvm_config_db #(virtual aou_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb1", fdi_mb1);
+    uvm_config_db #(virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)))::set(null, "*", "fdi_mb1", fdi_mb1);
 `endif
-    uvm_config_db #(virtual aou_fdi_lsm_if)::set(null, "*", "fdi_lsm", fdi_lsm);
+    uvm_config_db #(virtual ucie_fdi_lsm_if)::set(null, "*", "fdi_lsm", fdi_lsm);
+    uvm_config_db #(virtual aou_bringup_if)::set(null, "*", "aou_bringup", fdi_brg);
     uvm_config_db #(virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)))::set(null, "*", "apb", apb);
     uvm_config_db #(virtual aou_status_if)::set(null, "*", "status", status);
     uvm_config_db #(virtual aou_irq_if)::set(null, "*", "irq", irq);

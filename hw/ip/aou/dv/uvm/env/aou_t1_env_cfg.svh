@@ -35,8 +35,8 @@ class aou_t1_env_cfg extends uvm_object;
   int unsigned   rp_map_pct = 50;
 
   // Agent configs
-  aou_fdi_cfg    fdi_cfg[AOU_T1_N_PHY];
-  aou_lsm_cfg    lsm_cfg;
+  ucie_fdi_cfg   fdi_cfg[AOU_T1_N_PHY];
+  ucie_lsm_cfg   lsm_cfg;
   aou_l3_cfg     l3_cfg;
   aou_axi_cfg    s_mgr_cfg[];              // local managers on the S ports
   aou_axi_cfg    m_sub_cfg[];              // local subordinates on the M ports
@@ -122,16 +122,20 @@ class aou_t1_env_cfg extends uvm_object;
 
   function new(string name = "aou_t1_env_cfg");
     super.new(name);
-    lsm_cfg = aou_lsm_cfg::type_id::create("lsm_cfg");
+    lsm_cfg = ucie_lsm_cfg::type_id::create("lsm_cfg");
     lsm_cfg.n_phy = AOU_T1_N_PHY;
+    // Software restarts the link this many cycles after a link-down, drawn
+    // per run so a DUT that asks anything of the link meanwhile is caught at
+    // many delays; +ucie_sw_restart_delay=N (or +sw_restart_delay=N) fixes it.
+    lsm_cfg.sw_restart_delay = $urandom_range(1500, 50);
     // The Adapter answers the DUT's lp_linkerror by itself, as a UCIe Adapter
-    // does (react_linkerror_en, on by default in aou_lsm_cfg); +react_linkerror=0
+    // does (react_linkerror_en, on by default in ucie_lsm_cfg); +react_linkerror=0
     // leaves it to the test's recover().
     foreach (fdi_cfg[p]) begin
-      fdi_cfg[p] = aou_fdi_cfg::type_id::create($sformatf("fdi_cfg%0d", p));
+      fdi_cfg[p] = ucie_fdi_cfg::type_id::create($sformatf("fdi_cfg%0d", p));
       fdi_cfg[p].phy = p;
       fdi_cfg[p].beat_bytes = p == 0 ? AOU_T1_BEAT0 : AOU_T1_BEAT1;
-      fdi_cfg[p].trdy_policy = AOU_TRDY_HOLES;
+      fdi_cfg[p].trdy_policy = UCIE_TRDY_HOLES;
     end
     l3_cfg = aou_l3_cfg::type_id::create("l3_cfg");
     // L3 hands a write to L4a only once all its WriteData arrived, so with
@@ -297,12 +301,12 @@ class aou_t1_env_cfg extends uvm_object;
     string s;
     int unsigned v;
     if ($value$plusargs("fdi_trdy=%s", s)) begin
-      aou_fdi_trdy_e t;
+      ucie_fdi_trdy_e t;
       case (s)
-        "always": t = AOU_TRDY_ALWAYS;
-        "random": t = AOU_TRDY_RANDOM;
-        "holes":  t = AOU_TRDY_HOLES;
-        "bursty": t = AOU_TRDY_BURSTY;
+        "always": t = UCIE_TRDY_ALWAYS;
+        "random": t = UCIE_TRDY_RANDOM;
+        "holes":  t = UCIE_TRDY_HOLES;
+        "bursty": t = UCIE_TRDY_BURSTY;
         default:  `uvm_fatal(get_type_name(), {"+fdi_trdy: unknown policy ", s})
       endcase
       foreach (fdi_cfg[p]) fdi_cfg[p].trdy_policy = t;
@@ -355,7 +359,7 @@ class aou_t1_env_cfg extends uvm_object;
     fdi_knobs();
   endfunction
 
-  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r1.1 8.3.2), per
+  // The Adapter's pl_trdy policy and stand-alone stalls (UCIe r3.0 §10.3.2), per
   // seed on every PHY. HOLES without stalls stays the common case; a fifth of
   // the seeds take RANDOM or BURSTY pl_trdy (so pl_trdy can also be low at a
   // flit boundary), and a fifth add stand-alone stalls at a boundary or
@@ -363,13 +367,14 @@ class aou_t1_env_cfg extends uvm_object;
   // handshake. +fdi_trdy and the +fdi_stall_* plusargs override this; a test
   // that measures performance or depends on the timing sets its own.
   function void fdi_knobs();
-    aou_fdi_trdy_e pol = AOU_TRDY_HOLES;
+    ucie_fdi_trdy_e pol = UCIE_TRDY_HOLES;
     bit            stalls = ($urandom_range(4) == 0);
     int unsigned   pct = $urandom_range(5, 1);
     int unsigned   mid = $urandom_range(90);
     bit            free = 1'($urandom_range(1));
     int unsigned   hmin = $urandom_range(1);
-    if ($urandom_range(4) == 0) pol = ($urandom_range(1) == 0) ? AOU_TRDY_RANDOM : AOU_TRDY_BURSTY;
+    if ($urandom_range(4) == 0)
+      pol = ($urandom_range(1) == 0) ? UCIE_TRDY_RANDOM : UCIE_TRDY_BURSTY;
     foreach (fdi_cfg[p]) begin
       fdi_cfg[p].trdy_policy = pol;
       if (!stalls) continue;

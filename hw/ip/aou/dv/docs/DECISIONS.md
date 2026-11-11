@@ -122,7 +122,7 @@ third-party AXI agent could be plugged in later behind one adapter.
 - *Use a UCIe VIP for the FDI side.* No open one exists, and the DUT's FDI needs
   only the Adapter's side of the FDI handshakes, which a model covers (D3).
 
-**Where.** `axi/`, `apb/`, `fdi/`, `l3/`, `env/`; the VIP-neutral transaction in
+**Where.** `axi/`, `apb/`, `fdi/` (with the UCIe FDI model in `vip/ucie_fdi`), `l3/`, `env/`; the VIP-neutral transaction in
 `axi/` (`aou_axi_txn`) and the swap note in `axi/README.md`. CODING_GUIDELINES.md,
 "Licensing", and AGENTS.md, "Boundaries", forbid committing Avery, Synopsys SVT
 or Arm material.
@@ -210,8 +210,8 @@ downward:
 
 | Layer | Package | Role |
 |---|---|---|
-| L1 | `aou_fdi_pkg` | FDI mainband: beats and 256-byte flits, Format 6 codec, PL driver and TX responder, monitor |
-| L2 | `aou_lsm_pkg` | FDI link state: the Adapter's side of bringup, PL-initiated events, and a reference model of the DUT's bringup controller |
+| L1 | `ucie_fdi_pkg` | FDI mainband: beats and 256-byte flits, Format 6 codec, PL driver and TX responder, monitor |
+| L2 | `ucie_lsm_pkg` | FDI link state: the Adapter's side of bringup and Adapter-initiated events; the bench layers on it (`aou_fdi_layer_pkg`, an observer of its link state) the DUT's bringup pins and a reference model of the DUT's bringup controller |
 | L3 | `aou_l3_pkg` | AoU protocol layer: messages, packing and unpacking, credits, activation and deactivation |
 | L4a / L4b | `aou_axi_pkg` | The remote die's AXI side behind L3 (L4a), and the local AXI agents on the DUT's ports (L4b) |
 
@@ -375,7 +375,7 @@ hiding all other findings. *Waiting for clarification before writing the
 check*: stalls the work and leaves the behaviour unchecked meanwhile.
 
 **Where.** `env/aou_t1_env_cfg.svh` and `l3/aou_l3_cfg.svh` (`spec_rev`),
-`fdi/aou_lsm_pkg.sv` (UCIe encodings), `l3/aou_link_ctrl.svh`
+`vip/ucie_fdi/uvm/ucie_lsm_pkg.sv` (UCIe encodings), `l3/aou_link_ctrl.svh`
 (v0.8 ERROR state), CODING_GUIDELINES.md "Oracles", AGENTS.md "Boundaries".
 
 **Consequences.** Some checks encode an interim expectation, not a settled
@@ -1061,6 +1061,12 @@ that closes an item removes it there in the same commit.
   or `aou_axi_selftest`.
 - `RTL/`, `csr/`, `DOC/` and `INTEG/` stay where they are; whether they follow
   into `hw/ip/aou/{rtl,regs,doc}` is the RTL maintainers' decision.
+- Verification IP the bench is built on but that is not AoU-specific (the UCIe
+  FDI model) lives inside the bench too, under `vip/<name>/`, laid out like the
+  harness's shared VIP (`hw/common/dv/vip/<name>/`: `interface/`, `uvm/` with its
+  `sources.toml`, `dv/` for its self-test). It has no path into the rest of the
+  bench, so it can move to the harness's shared VIP or a repository of its own
+  as a copy of its directory and one prefix change.
 
 **Why.** The sim configs had two readers and one of them, the standalone
 Makefile, had to translate the harness's vendored root
@@ -1077,7 +1083,9 @@ unmet. *`hw/aou/dv` (the flat form)*: also discovered by convention, but the
 harness groups its IPs under `hw/ip/`, and AoU is one. *Moving `RTL/` and
 `csr/` in the same change*: those trees have their own consumers (the Bender
 `aou` target, the collateral flow, the integration guide) and owners; the bench
-move does not depend on them.
+move does not depend on them. *Shared verification IP beside the bench (a
+top-level `hw/dv/`)*: the harness takes only `hw/ip/aou/dv` from this
+repository, so its copy of the bench would build without it.
 
 **Where.** The directory; `aou_*_sim_cfg.toml`; `scripts/sim_cfg.py`
 (`DV_PREFIX`, `ROOT`, `check`); `Makefile` and `scripts/regen_ral.sh`,

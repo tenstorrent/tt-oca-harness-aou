@@ -6,7 +6,7 @@
 // message the remote die sends, in DUT clock cycles:
 //   T_first / T_last  the FDI beat carrying the message's first / last granule
 //                     is delivered at the DUT's RX pins (the L1 monitor's
-//                     flits after cancel rollback, aou_flit_item::t_beat,
+//                     flits after cancel rollback, ucie_flit_item::t_beat,
 //                     paired in order with the flits L3 built, whose messages
 //                     and start granules are known)
 //   T_out             the DUT presents the message on AXI: the M-port AW/AR
@@ -42,13 +42,13 @@ class aou_rx_lat_mon extends uvm_component;
   `uvm_analysis_imp_decl(_m_txn)
   `uvm_analysis_imp_decl(_s_txn)
   uvm_analysis_imp_l3_flit #(aou_l3_flit_item, aou_rx_lat_mon) l3_flit_imp;  // l3.ap_tx_flit
-  uvm_analysis_imp_rx_flit #(aou_flit_item, aou_rx_lat_mon)    rx_flit_imp;  // fdi mon ap_rx
+  uvm_analysis_imp_rx_flit #(ucie_flit_item, aou_rx_lat_mon)    rx_flit_imp;  // fdi mon ap_rx
   uvm_analysis_imp_m_txn #(aou_axi_txn, aou_rx_lat_mon)        m_txn_imp;    // M-port monitors
   uvm_analysis_imp_s_txn #(aou_axi_txn, aou_rx_lat_mon)        s_txn_imp;    // S-port monitors
 
   aou_perf_mon           perf;        // put() sink
   aou_l3_agent           l3;          // credit counters
-  virtual aou_fdi_lsm_if vif;         // core clock
+  virtual ucie_fdi_lsm_if vif;         // core clock
   int unsigned           beat_bytes = 64;
   real                   clk_ns = 1.0;
   int unsigned           n_rp = AOU_T1_RP_COUNT;
@@ -80,7 +80,7 @@ class aou_rx_lat_mon extends uvm_component;
   } done_t;
 
   protected aou_l3_flit_item l3_q[$];      // flits built, not yet delivered
-  protected aou_flit_item    rx_q[$];      // flits delivered, not yet paired
+  protected ucie_flit_item    rx_q[$];      // flits delivered, not yet paired
   protected msg_t            carry[$];     // messages whose last granule is in the next flit
   protected int unsigned     carry_g[$];   // ...and that granule's index there
   protected msg_t            req_q[AOU_RP_MAX][2][$];   // WriteReq (0) / ReadReq (1) per RP
@@ -123,13 +123,13 @@ class aou_rx_lat_mon extends uvm_component;
     pair_flits();
   endfunction
 
-  function void write_rx_flit(aou_flit_item it);
+  function void write_rx_flit(ucie_flit_item it);
     rx_q.push_back(it);
     pair_flits();
   endfunction
 
   // The delivery time of granule g of a delivered flit.
-  function time t_granule(aou_flit_item f, int unsigned g);
+  function time t_granule(ucie_flit_item f, int unsigned g);
     int unsigned b = (aou_granule_byte(g) + 4) / beat_bytes;
     return (b < FLIT_BYTES/32) ? f.t_beat[b] : f.t_end;
   endfunction
@@ -151,7 +151,7 @@ class aou_rx_lat_mon extends uvm_component;
     return "";
   endfunction
 
-  static function bit same_bytes(aou_l3_flit_item lf, aou_flit_item rf);
+  static function bit same_bytes(aou_l3_flit_item lf, ucie_flit_item rf);
     foreach (lf.bytes[i]) if (lf.bytes[i] != rf.data[i]) return 0;
     return 1;
   endfunction
@@ -161,7 +161,7 @@ class aou_rx_lat_mon extends uvm_component;
   protected function void pair_flits();
     while (l3_q.size() > 0 && rx_q.size() > 0) begin
       aou_l3_flit_item lf;
-      aou_flit_item rf = rx_q.pop_front();
+      ucie_flit_item rf = rx_q.pop_front();
       aou_flit f;
       while (l3_q.size() > 0 && !same_bytes(l3_q[0], rf)) begin
         void'(l3_q.pop_front());

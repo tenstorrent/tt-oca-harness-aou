@@ -15,8 +15,9 @@ class aou_t1_env extends uvm_env;
   aou_t1_env_cfg       cfg;
   aou_axi_mgr_agent    s_mgr[];
   aou_axi_sub_agent    m_sub[];
-  aou_fdi_agent        fdi[AOU_T1_N_PHY];
-  aou_lsm_agent        lsm;
+  ucie_fdi_agent        fdi[AOU_T1_N_PHY];
+  ucie_lsm_agent        lsm;
+  aou_fdi_layer         fdi_layer;
   aou_l3_agent         l3;
   aou_remote_axi_model remote;
   aou_t1_l4a_adapter   l4a;
@@ -51,7 +52,8 @@ class aou_t1_env extends uvm_env;
   aou_t1_vseqr         vseqr;
   aou_t1_l1_pump_seq   pump;
 
-  virtual aou_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_lsm_if lsm_vif;
+  virtual aou_bringup_if  brg_vif;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -63,8 +65,10 @@ class aou_t1_env extends uvm_env;
       cfg = aou_t1_env_cfg::type_id::create("cfg");
     cfg.finalize();
     `uvm_info(get_type_name(), cfg.convert2string(), UVM_LOW)
-    if (!uvm_config_db #(virtual aou_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
+    if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
       `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
+    if (!uvm_config_db #(virtual aou_bringup_if)::get(this, "", "aou_bringup", brg_vif))
+      `uvm_fatal(get_type_name(), "no aou_bringup in config_db")
 
     expects = aou_t1_expect::type_id::create("expects", this);
     rst = aou_t1_reset_agent::type_id::create("rst", this);
@@ -80,12 +84,13 @@ class aou_t1_env extends uvm_env;
     end
 
     foreach (fdi[p]) begin
-      fdi[p] = aou_fdi_agent::type_id::create($sformatf("fdi%0d", p), this);
+      fdi[p] = ucie_fdi_agent::type_id::create($sformatf("fdi%0d", p), this);
       fdi[p].cfg = cfg.fdi_cfg[p];
-      cfg.lsm_cfg.gate.push_back(cfg.fdi_cfg[p].gate);
     end
-    lsm = aou_lsm_agent::type_id::create("lsm", this);
+    lsm = ucie_lsm_agent::type_id::create("lsm", this);
     lsm.cfg = cfg.lsm_cfg;
+    foreach (fdi[p]) lsm.phy.push_back(fdi[p]);
+    fdi_layer = aou_fdi_layer::type_id::create("fdi_layer", this);
 
     remote = aou_remote_axi_model::type_id::create("remote", this);
     remote.cfg = cfg.remote_cfg;
@@ -156,9 +161,9 @@ class aou_t1_env extends uvm_env;
   function void connect_phase(uvm_phase phase);
     super.connect_phase(phase);
     foreach (fdi[p]) begin
-      if (cfg.fdi_cfg[p].is_active) cfg.lsm_cfg.rsp.push_back(fdi[p].rsp);
       fdi[p].mon.ap_tx.connect(bridge.l1_imp);
     end
+    fdi_layer.attach(lsm);
     bridge.ap.connect(l3.rx_flit_imp);
     l3.ap_rx_msg.connect(rmgr.rx_imp);
     foreach (rmgr.drv[r]) begin
@@ -228,7 +233,7 @@ class aou_t1_env extends uvm_env;
     foreach (s_mgr[r]) early_tbl.vif[r] = s_mgr[r].cfg.vif;
     crd_chk.early = early_tbl;
     if (fdi_chk != null) fdi_chk.l3_cfg = cfg.l3_cfg;
-    lsm.mon.ap.connect(axi4pc.lsm_imp);
+    lsm.mon.add_observer(axi4pc);
     axi4pc.m_drv = new[cfg.n_rp];
     foreach (m_sub[r]) axi4pc.m_drv[r] = m_sub[r].drv;
     mo_chk.vif = new[cfg.n_rp];
@@ -264,7 +269,7 @@ class aou_t1_env extends uvm_env;
     apb.mon.ap.connect(lp_cfg_chk.apb_imp);
     force_chk.apb_vif = apb.cfg.vif;
     force_chk.rst_vif = rst.vif;
-    force_chk.lsm_vif = lsm_vif;
+    force_chk.brg_vif = brg_vif;
     force_chk.rm = regs.model;
     force_chk.status = status;
     force_chk.l3_cfg = cfg.l3_cfg;

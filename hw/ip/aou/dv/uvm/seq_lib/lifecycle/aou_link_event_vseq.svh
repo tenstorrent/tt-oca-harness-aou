@@ -87,7 +87,7 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     sw_deactivate();
   endtask
 
-  task transparent(aou_lsm_ev_e ev);
+  task transparent(ucie_lsm_ev_e ev);
     traffic_nb(AOU_T1_BOTH_DIRS, num_txns);
     wait_cycles($urandom_range(500, 20));
     link_event(ev);
@@ -202,7 +202,7 @@ class aou_link_event_vseq extends aou_link_base_vseq;
     drain();
   endtask
 
-  task link_down(aou_lsm_ev_e ev, bit inband_drop);
+  task link_down(ucie_lsm_ev_e ev, bit inband_drop);
     n_down++;
     expect_event("INT_REQ_LINKRESET", 0, n_down);
     // The reset after a link loss drops the local M ports' transactions

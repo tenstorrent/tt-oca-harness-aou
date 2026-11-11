@@ -202,9 +202,10 @@ into one book with Asciidoctor.
 | Path | Contents |
 | --- | --- |
 | `tb/` | `tb_top.sv` (T1), `aou_reg_top.sv`, `aou_l3_unit_top.sv`, `aou_axi_selftest_top.sv`; the status, interrupt and reset interfaces; `aou_waves.sv` |
-| `uvm/env/` | The environment: `axi/`, `fdi/` (`l1/`, `l2/`), `l3/`, `apb/`, `checker/` (`AOU_FDI_CHECKER`), `checkers/` (`rules.csv`, the rule ledger), `chk/` and `perf/` (checkers), `gen/` (the committed register model), `pkg/`; the T1 env and its checkers at the top level |
+| `uvm/env/` | The environment: `axi/`, `fdi/` (the bench's layer on the UCIe FDI model in `vip/ucie_fdi`), `l3/`, `apb/`, `checker/` (`AOU_FDI_CHECKER`), `checkers/` (`rules.csv`, the rule ledger), `chk/` and `perf/` (checkers), `gen/` (the committed register model), `pkg/`; the T1 env and its checkers at the top level |
 | `uvm/seq_lib/` | Every virtual sequence, by area |
 | `uvm/tests/` | `aou_tests.sv` (included by `tb_top.sv` under `UVM`), the test classes by area; `reg/`, `l3_unit/`, `axi_selftest/` for the other tops |
+| `vip/` | Verification IP the bench is built on that is not AoU-specific, laid out like tt-oca-harness's shared VIP: `ucie_fdi/`, the UCIe FDI model (its `README.md`; `dv/` its self-test) |
 | `cov/` | `sv/`: the coverage service, the AXI4 coverage monitors and binds; `config/vcs/`: coverage scope, exclusion and FSM reset filter files |
 | `testlists/` | TOML testlists (`all.toml` and the per-area lists, `registers.toml`, `l3_unit.toml`, `axi_selftest.toml`), `plan_ids.yaml` |
 | `docs/` | The documents above; `gen/` is generated |
@@ -346,14 +347,14 @@ mostly, sometimes RANDOM or BURSTY, and sometimes random stalls, see
 `aou_t1_env_cfg::fdi_knobs`): `+fdi_trdy=always|random|holes|bursty`,
 `+fdi_stall_pct=N` stand-alone stalls, `+fdi_stall_mid_pct=N` the share raised
 inside a DUT TX flit, `+fdi_stall_trdy_free=1` lets `pl_trdy` drop between
-`pl_stallreq` and `lp_stallack` (UCIe r1.1 8.3.2 rule 7), `+fdi_stall_hold_min=N` and
+`pl_stallreq` and `lp_stallack` (UCIe r3.0 §10.3.2 rule 7), `+fdi_stall_hold_min=N` and
 `+fdi_stall_hold_max=N` the cycles `pl_stallreq` stays high after `lp_stallack` (default
 1..8; 0 drops it as soon as the ack is seen), `+l1_cancel_pct=N` and
 `+l1_cancel_mix=1` (second-half, both-halves and repeated flit cancels),
-`+le_mid_flit_pct=N` (Adapter LinkErrors entered mid-flit, 8.3.3.7),
+`+le_mid_flit_pct=N` (Adapter LinkErrors entered mid-flit, UCIe r3.0 §10.3.3.7),
 `+fdi_rx_early=N` (on every Active entry from Reset the Adapter forwards RX flits for N
-cycles after the rx_active handshake while `pl_state_sts` is still Reset, as UCIe r1.1
-8.2.7 allows when the remote die went Active first; off by default) and, in
+cycles after the rx_active handshake while `pl_state_sts` is still Reset, as UCIe r3.0
+§10.2.7 rule 3 allows when the remote die went Active first; off by default) and, in
 two-PHY builds, `+active_phy=1 +park_idle_phy=1` (the unselected PHY stays in Reset,
 so state and stalls must come from the selected one). The `l1.cg_fdi_stall`,
 `cg_fdi_cancel` and `cg_fdi_abandon` bins show the corners were reached.

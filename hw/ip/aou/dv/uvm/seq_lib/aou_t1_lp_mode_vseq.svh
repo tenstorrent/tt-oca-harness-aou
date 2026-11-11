@@ -24,7 +24,7 @@ class aou_t1_lp_mode_vseq extends aou_base_test_seq;
   // DUT flits seen by L3 in an idle window, and the Adapter-ready cycles of
   // the active PHY in the same window.
   task idle_flits();
-    aou_fdi_monitor mon = env.fdi[cfg.lsm_cfg.active_phy].mon;
+    ucie_fdi_monitor mon = env.fdi[cfg.lsm_cfg.active_phy].mon;
     int unsigned start;
     int unsigned start_ready;
     drain();

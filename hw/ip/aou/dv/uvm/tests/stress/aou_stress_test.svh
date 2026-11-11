@@ -85,7 +85,7 @@ class aou_stress_test extends aou_dp_base_test;
     if (bp inside {"b", "r", "all"}) cfg.remote_lat_max = stall_max;
     if (bp == "fdi") begin
       foreach (cfg.fdi_cfg[p]) begin
-        cfg.fdi_cfg[p].trdy_policy = AOU_TRDY_BURSTY;
+        cfg.fdi_cfg[p].trdy_policy = UCIE_TRDY_BURSTY;
         cfg.fdi_cfg[p].burst_max = 64;
       end
       cfg.l1_gap_pct = 50;

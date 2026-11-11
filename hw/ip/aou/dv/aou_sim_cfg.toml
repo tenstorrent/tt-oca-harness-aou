@@ -49,8 +49,12 @@ work_dir = "hw/ip/aou/dv/build/uvm"
 # The DUT: the harness's `aou` Bender target mirrors RTL/filelist.f.
 bender_targets = ["aou", "simulation"]
 # The OCAH shared framework library (aou_base_test / aou_base_test_seq extend
-# ocah_test / ocah_sequence), expanded ahead of the sources below.
-source_lists = ["hw/common/dv/vip/ocah_lib/uvm/sources.toml"]
+# ocah_test / ocah_sequence) and the UCIe FDI model the bench's L1/L2 are
+# (hw/ip/aou/dv/vip/ucie_fdi), expanded ahead of the sources below.
+source_lists = [
+  "hw/common/dv/vip/ocah_lib/uvm/sources.toml",
+  "hw/ip/aou/dv/vip/ucie_fdi/uvm/sources.toml",
+]
 incdirs = [
   "hw/ip/aou/dv/uvm/env/pkg",
   "hw/ip/aou/dv/uvm/env/checkers",
@@ -66,7 +70,8 @@ incdirs = [
 ]
 # Compile order is load-bearing (each package imports the ones before it):
 # the generated register model (make ral) -> the rule ledger -> functional
-# coverage -> AXI (stream A) -> FDI L1/L2 (B) -> AOU_FDI_CHECKER and its
+# coverage -> AXI (stream A) -> the bench's layer on the UCIe FDI model
+# (B; the model itself comes from source_lists) -> AOU_FDI_CHECKER and its
 # wire packages -> L3 (C) -> APB and the register layer (D) -> the top's
 # status/irq/reset interfaces -> the shared env -> the T1 env (cfgs,
 # checkers, aou_base_test_seq) -> the sequence library -> the FDI bring-up
@@ -77,10 +82,8 @@ sources = [
   "hw/ip/aou/dv/cov/sv/aou_fc_pkg.sv",
   "hw/ip/aou/dv/uvm/env/axi/aou_axi_bus_if.sv",
   "hw/ip/aou/dv/uvm/env/axi/aou_axi_pkg.sv",
-  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_mb_if.sv",
-  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_lsm_if.sv",
-  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_pkg.sv",
-  "hw/ip/aou/dv/uvm/env/fdi/aou_lsm_pkg.sv",
+  "hw/ip/aou/dv/uvm/env/fdi/aou_bringup_if.sv",
+  "hw/ip/aou/dv/uvm/env/fdi/aou_fdi_layer_pkg.sv",
   "hw/ip/aou/dv/uvm/env/checker/aou_fdi_wire_pkg.sv",
   "hw/ip/aou/dv/uvm/env/checker/aou_fdi_checker_pkg.sv",
   "hw/ip/aou/dv/uvm/env/checker/AOU_FDI_CHECKER.sv",
