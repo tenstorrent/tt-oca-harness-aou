@@ -116,6 +116,71 @@ tags = ["perf"]
 run_modes = ["perf"]
 args = ["+perf_scn=S1", "+active_phy=1", "+aou_config=2x512-tp32_64"]
 
+# S1 under added remote AXI response latency: the round trip a manager's
+# outstanding depth has to cover. +perf_remote_lat=<cycles> delays the remote
+# subordinate's B and R responses by exactly that many core cycles (0, the
+# default, is back to back). Each point is the smallest depth that still
+# reaches the model plateau across every S1 window, and the default depth: at 4
+# cycles of latency 4 slots still suffice, at 8 and 16 cycles 8 do; the pair at
+# each latency shows the plateau does not depend on the depth above the knee.
+# Every point is held to the ordinary T1-P02..P04 gate, so a regression in the
+# DUT's ability to cover a response round trip fails the run.
+# Beyond 16 cycles the windows whose data or response crosses the delayed
+# subordinate stop reaching the model at any depth: bw_wr/bw_mix_l2r on l2r and
+# bw_rd_l2r on r2l fall to 0.58-0.60 of their plateau at 32 cycles and 0.29-0.30
+# at 64, identically at every depth from 2 to 64 (measured 2026-11-12: the TX
+# link keeps duty 1.000 but packs 28.5 instead of 48.0 granule slots per flit,
+# and the rate is one 1024-byte transaction per latency cycle). The mirror
+# windows, whose responses come from the zero-latency local subordinate, are
+# unchanged, so that is a DUT finding of its own and is not registered here: a
+# gate cannot pass it, and none of these points may be turned into one by
+# lowering a bound.
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-4.perf_remote_lat-4.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=4", "+perf_remote_lat=4", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-8.perf_remote_lat-8.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=8", "+perf_remote_lat=8", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-32.perf_remote_lat-8.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=32", "+perf_remote_lat=8", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-8.perf_remote_lat-16.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=8", "+perf_remote_lat=16", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-32.perf_remote_lat-16.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=32", "+perf_remote_lat=16", "+aou_config=1x512-sp64"]
+
 [[tests]]
 name = "aou_perf_test.perf_scn-S2.1x512-sp64"
 module = { uvm = "aou_perf_test" }
@@ -247,7 +312,7 @@ args = ["+perf_scn=S5", "+aou_config=3x512-sp64"]
 
 [[groups]]
 name = "perf"
-expected_count = 22
+expected_count = 27
 tests = [
   "aou_perf_test.perf_scn-S1.1x512-sp64",
   "aou_perf_test.perf_scn-S1.4x512-sp64",
@@ -260,6 +325,11 @@ tests = [
   "aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128",
   "aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64",
   "aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64",
+  "aou_perf_test.perf_scn-S1.perf_slots-4.perf_remote_lat-4.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-8.perf_remote_lat-8.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-32.perf_remote_lat-8.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-8.perf_remote_lat-16.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-32.perf_remote_lat-16.1x512-sp64",
   "aou_perf_test.perf_scn-S2.1x512-sp64",
   "aou_perf_test.perf_scn-S2.1x256-sp32",
   "aou_perf_test.perf_scn-S2.4xmix4211-sp128",

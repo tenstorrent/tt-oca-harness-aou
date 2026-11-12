@@ -43,6 +43,7 @@ class aou_perf_mon extends uvm_component;
   bit           writefull = 1'b1;  // the windows' writes use full strobes
   int unsigned  remote_full_pct = 100;  // remote full-strobe beats sent as WriteDataFull
   string        perf_mode = "bw";
+  int unsigned  perf_remote_lat = 0;  // +perf_remote_lat: remote B/R response latency in cycles
 
   protected string       win;
   protected time         t_open;
@@ -112,6 +113,7 @@ class aou_perf_mon extends uvm_component;
     super.build_phase(phase);
     if ($value$plusargs("perf_ss_drop_pct=%d", v)) ss_drop_pct = v;
     if ($value$plusargs("perf_min_ss_flits=%d", v)) min_ss_flits = v;
+    if ($value$plusargs("perf_remote_lat=%d", v)) perf_remote_lat = v;
   endfunction
 
   function void put(string metric, real v);
@@ -666,11 +668,12 @@ class aou_perf_mon extends uvm_component;
                    "\"perf_mode\": \"%s\", \"active_phy\": %0d, \"n_phy\": %0d, ",
                    "\"beat_bytes\": %0d, \"rp_count\": %0d, \"rp_bytes\": %s, ",
                    "\"remote_bytes\": %s, \"max_awlen\": %s, \"max_arlen\": %s, ",
-                   "\"writefull\": %s, \"remote_full_pct\": %0d, \"l3_rx_depth\": {"},
+                   "\"writefull\": %s, \"remote_full_pct\": %0d, \"perf_remote_lat\": %0d, ",
+                   "\"l3_rx_depth\": {"},
                   config_name, sim_name(), test, seed, perf_mode, cfg.lsm_cfg.active_phy,
                   cfg.lsm_cfg.n_phy, beat_bytes, cfg.n_rp, int_list(rb), int_list(rr),
                   int_list(aw), int_list(ar),
-                  writefull ? "true" : "false", remote_full_pct);
+                  writefull ? "true" : "false", remote_full_pct, perf_remote_lat);
     foreach (ccn[c])
       s = {s, (c > 0) ? ", " : "", $sformatf("\"%s\": %0d", ccn[c], cfg.l3_cfg.rx_depth[c])};
     return {s, $sformatf("}, \"ss_drop_pct\": %0d, \"min_ss_flits\": %0d}", ss_drop_pct,
