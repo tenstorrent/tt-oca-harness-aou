@@ -369,6 +369,11 @@
   priority: P2
   title: 'Back-pressure on every AXI channel and on FDI trdy: throughput and correctness under stall'
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
+- id: '10.16'
+  added: 'Performance methodology: throughput versus outstanding transaction depth'
+  priority: P2
+  title: 'Throughput versus outstanding transaction depth: S1 at +perf_slots 1, 2, 4, 8, 16 and 32, measured and reported per link, so the depth at which a configuration reaches its plateau is reproducible (report only, no independent bound)'
+  note: Each AXI manager already keeps +perf_slots transactions outstanding (the DUT's S_*_MO_CNT default is 32); performance results so far assume that one depth. The sweep separates a round-trip concurrency limit from the TX packing limit of the 128 B FDI builds, and gives the outstanding depth behind the PPA efficiency figures, which those tables do not state.
 - id: '11.16'
   added: 'integration guide 3.1.1'
   priority: P2
