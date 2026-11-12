@@ -30,6 +30,12 @@
 // Managers keep +perf_slots outstanding (default 32): with the drivers'
 // default 16 the remote die's reads could not cover their round trip when
 // both sides read, and the bench, not the DUT, set the rate.
+// +perf_remote_lat=<cycles> delays the remote subordinate's B and R responses
+// by exactly that many core cycles (default 0, back to back) and
+// aou_perf_vseq::full_rate() applies it to every window, so a window can be
+// measured against a downstream responder that takes time to answer. It is
+// fixed, not the env's seed-drawn 0..remote_lat_max range, so a window
+// measures the same bench on every seed.
 // The remote die advertises enough credit that it is never the limit (the
 // DUT's counters hold 2048 per class); +perf_l3_depth=env keeps the env's
 // smaller defaults.

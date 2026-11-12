@@ -105,13 +105,14 @@ def model_section(out_dir, rid=None):
              "(T1-P02, under (1 - tol) x model), ABOVE (T1-P03), MIX (T1-P04), SHORT (steady",
              "state under min_ss_flits), NO_TARGET. Run: the run's verdict against",
              "expected_fail.yaml.", "",
-             "| build | PHY | scenario | window | link | measured | model | ratio | gate | run |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+             "| build | PHY | lat | scenario | window | link | measured | model | ratio | gate | run |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["build"], r["active_phy"], r["scenario"], r["run"],
                                          r["window"], r["dir"])):
         model = "-" if r["model"] is None else f"{r['model']:.2f}"
         ratio = "-" if r["ratio"] is None else f"{r['ratio']:.3f}"
-        lines.append(f"| {r['build']} | {r['active_phy']} | {r['scenario']} | {r['window']} | "
+        lines.append(f"| {r['build']} | {r['active_phy']} | {r.get('perf_remote_lat', '')} | "
+                     f"{r['scenario']} | {r['window']} | "
                      f"{r['dir']} | {r['measured']:.2f} | {model} | {ratio} | {r['verdict']} | "
                      f"{r['run_verdict']} |")
     return lines + [""]
