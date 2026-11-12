@@ -64,6 +64,8 @@ unchanged. Schema version: 1.
     "test": "aou_perf_test",
     "seed": 1,
     "perf_mode": "bw",
+    "perf_slots": 32,
+    "report_only": false,
     "active_phy": 0,
     "n_phy": 1,
     "beat_bytes": 64,
@@ -133,6 +135,8 @@ unchanged. Schema version: 1.
 | `writefull` | True when the windows' writes use full strobes, so WriteDataFull is the expected data message. |
 | `remote_full_pct` | Percentage of the remote die's full-strobe write beats sent as WriteDataFull (the rest as WriteData). Perf runs use 100. |
 | `l3_rx_depth` | Credits (granules) the remote-die model advertises per credit class and RP; the bench must not be the limit. |
+| `perf_slots` | Transactions each AXI manager keeps outstanding (`+perf_slots`, default 32, the DUT's S_*_MO_CNT). Performance results are only comparable at the same depth. |
+| `report_only` | True when `+perf_report_only=1`: every window is measured and recorded and no T1-P0x gate judges it. Used by the outstanding-depth sweep, which has no bound of its own. |
 | `ss_drop_pct`, `min_ss_flits` | Steady-state parameters (see Conventions). |
 
 `windows[]`
