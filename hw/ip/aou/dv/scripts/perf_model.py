@@ -608,6 +608,7 @@ def judge_runs(out_dir, table, live=False):
                     os.path.dirname(run_dir)), run_verdict=run_verdict(run_dir), key=k,
                     config=b.get("config", ""), active_phy=b.get("active_phy", 0),
                     sim=b.get("sim", ""), seed=b.get("seed"), scenario=w["scenario"],
+                    perf_slots=b.get("perf_slots", ""),
                     window=w["name"], dir=d, measured=meas["bpc"],
                     model=tgt["model"] if tgt else None, tol=tgt["tol"] if tgt else None,
                     ratio=ratio, verdict=verdict, duty=meas["duty"])

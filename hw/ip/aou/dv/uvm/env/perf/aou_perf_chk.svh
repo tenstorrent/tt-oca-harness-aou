@@ -23,6 +23,10 @@
 //   total). A mismatch means the model was fed the wrong traffic (split
 //   length, strobes, widths), or the DUT sends other messages than the spec's.
 // Efficiency and FDI duty are diagnostics in perf.json, not gated.
+// +perf_report_only=1 records each window without judging it: the PERF_GATE
+// lines and perf.json carry the measured and modelled values, and no T1-P0x
+// error is raised. It is for measurements that have no bound of their own,
+// such as a sweep of outstanding depth below the point where the link saturates.
 class aou_perf_chk extends uvm_component;
   `uvm_component_utils(aou_perf_chk)
 
@@ -33,6 +37,7 @@ class aou_perf_chk extends uvm_component;
   real           mix_rel = 0.002;
   int unsigned   n_links;
   int unsigned   n_fail;
+  bit            report_only;      // +perf_report_only: report the windows, judge none
 
   protected string msg_names[12] = '{"ReadReq", "WriteReq", "WriteResp", "ReadData256",
                                      "ReadData512", "ReadData1024", "WriteData256",
@@ -45,8 +50,10 @@ class aou_perf_chk extends uvm_component;
   endfunction
 
   function void build_phase(uvm_phase phase);
+    int v;
     super.build_phase(phase);
     void'($value$plusargs("aou_config=%s", config_name));
+    if ($value$plusargs("perf_report_only=%d", v)) report_only = (v != 0);
   endfunction
 
   static function bit data_path(string k);
@@ -66,6 +73,14 @@ class aou_perf_chk extends uvm_component;
     real   hi;
     real   ratio;
     string verdict = "PASS";
+    if (report_only) begin
+      if (!r.data[l]) return;
+      m = aou_perf_targets::has(k) ? aou_perf_targets::model[k] : 0.0;
+      `uvm_info(get_type_name(), $sformatf({"PERF_GATE %s measured %0.3f model %0.3f ",
+                                            "ratio %0.4f REPORT_ONLY"},
+                                           k, r.bpc[l], m, (m > 0.0) ? r.bpc[l] / m : 0.0), UVM_LOW)
+      return;
+    end
     if (!aou_perf_targets::has(k)) begin
       if (!r.data[l]) return;
       n_links++;
