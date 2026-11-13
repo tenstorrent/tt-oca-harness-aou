@@ -365,7 +365,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 522
+expected_count = 524
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -716,6 +716,8 @@ tests = [
   "aou_mrp_test.mrp_scn-seq.4xmix4211-sp128",
   "aou_mrp_test.mrp_scn-seq.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-interleave.4x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.dp_wr_pct-0.dp_n-500.4x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.dp_wr_pct-100.dp_n-500.4x512-sp64",
   "aou_mrp_test.mrp_scn-interleave.4xmix4211-sp128",
   "aou_mrp_test.mrp_scn-interleave.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-indep.4x512-sp64",

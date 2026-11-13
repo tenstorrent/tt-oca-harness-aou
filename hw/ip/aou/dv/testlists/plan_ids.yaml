@@ -359,6 +359,8 @@ plan_ids:
   aou_mrp_test.mrp_scn-seq.4xmix4211-sp128: '12.7,12.18,12.19'
   aou_mrp_test.mrp_scn-seq.4xmix2144-sp64: '12.7,12.18,12.19'
   aou_mrp_test.mrp_scn-interleave.4x512-sp64: '12.8,12.19'
+  aou_mrp_test.mrp_scn-interleave.dp_wr_pct-0.dp_n-500.4x512-sp64: '12.8,12.19'
+  aou_mrp_test.mrp_scn-interleave.dp_wr_pct-100.dp_n-500.4x512-sp64: '12.8,12.19'
   aou_mrp_test.mrp_scn-interleave.4xmix4211-sp128: '12.8,12.18,12.19'
   aou_mrp_test.mrp_scn-interleave.4xmix2144-sp64: '12.8,12.18,12.19'
   aou_mrp_test.mrp_scn-indep.4x512-sp64: '12.8,12.19'
