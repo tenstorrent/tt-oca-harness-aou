@@ -36,6 +36,11 @@ class aou_perf_vseq extends aou_dp_vseq;
   aou_tx_lat_mon tx_lat;
   string         mode = "bw";
   string         scn;
+  // +perf_remote_lat=<cycles>: fixed latency of the remote subordinate's B and
+  // R responses, in core cycles. full_rate() sets it so the windows measure
+  // the same bench at each setting; a manager's outstanding depth must cover
+  // the round trip it adds.
+  int unsigned   remote_lat = 0;
 
   function new(string name = "aou_perf_vseq");
     super.new(name);
@@ -47,6 +52,7 @@ class aou_perf_vseq extends aou_dp_vseq;
       `uvm_fatal(get_type_name(), "no perf_mon in config_db")
     void'($value$plusargs("perf_mode=%s", mode));
     if ($value$plusargs("perf_scn=%s", scn)) mode = "scn";
+    void'($value$plusargs("perf_remote_lat=%d", remote_lat));
     if (mode == "rxlat" && !uvm_config_db#(aou_rx_lat_mon)::get(null, "*", "rx_lat_mon", rx_lat))
       `uvm_fatal(get_type_name(), "no rx_lat_mon in config_db")
     if (mode == "rxlat")
@@ -58,8 +64,16 @@ class aou_perf_vseq extends aou_dp_vseq;
       cfg.s_mgr_cfg[r].timing.apply(AOU_AXI_TIMING_ZERO);
       cfg.m_sub_cfg[r].timing.apply(AOU_AXI_TIMING_ZERO);
     end
-    cfg.remote_cfg.timing.b_lat.set_zero();
-    cfg.remote_cfg.timing.r_lat.set_zero();
+    if (remote_lat == 0) begin
+      cfg.remote_cfg.timing.b_lat.set_zero();
+      cfg.remote_cfg.timing.r_lat.set_zero();
+    end else begin
+      cfg.remote_cfg.timing.b_lat.set_fixed(remote_lat);
+      cfg.remote_cfg.timing.r_lat.set_fixed(remote_lat);
+    end
+    `uvm_info(get_type_name(), $sformatf("remote AXI response latency %0d cycles%s",
+                                         remote_lat,
+                                         (remote_lat == 0) ? " (back to back)" : ""), UVM_LOW)
   endfunction
 
   function aou_t1_traffic_cfg prof(int wr_pct, int unsigned slots, bit [3:0] m);

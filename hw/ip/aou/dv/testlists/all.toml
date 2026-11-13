@@ -365,7 +365,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 522
+expected_count = 527
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -820,6 +820,11 @@ tests = [
   "aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128",
   "aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64",
   "aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64",
+  "aou_perf_test.perf_scn-S1.perf_slots-4.perf_remote_lat-4.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-8.perf_remote_lat-8.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-32.perf_remote_lat-8.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-8.perf_remote_lat-16.1x512-sp64",
+  "aou_perf_test.perf_scn-S1.perf_slots-32.perf_remote_lat-16.1x512-sp64",
   "aou_perf_test.perf_scn-S2.1x512-sp64",
   "aou_perf_test.perf_scn-S2.1x256-sp32",
   "aou_perf_test.perf_scn-S2.4xmix4211-sp128",

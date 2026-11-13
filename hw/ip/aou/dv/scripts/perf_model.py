@@ -607,7 +607,8 @@ def judge_runs(out_dir, table, live=False):
                 r = dict(run=os.path.relpath(run_dir, out_dir), build=os.path.basename(
                     os.path.dirname(run_dir)), run_verdict=run_verdict(run_dir), key=k,
                     config=b.get("config", ""), active_phy=b.get("active_phy", 0),
-                    sim=b.get("sim", ""), seed=b.get("seed"), scenario=w["scenario"],
+                    sim=b.get("sim", ""), seed=b.get("seed"),
+                    perf_remote_lat=b.get("perf_remote_lat", ""), scenario=w["scenario"],
                     window=w["name"], dir=d, measured=meas["bpc"],
                     model=tgt["model"] if tgt else None, tol=tgt["tol"] if tgt else None,
                     ratio=ratio, verdict=verdict, duty=meas["duty"])

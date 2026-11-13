@@ -50,8 +50,10 @@ unchanged. Schema version: 1.
   per direction per bandwidth window, default 768) or `+perf_n=<n>`
   (transactions per RP and direction); `+perf_dir=l2r|r2l|both` (which side
   issues, default both); `+perf_slots=<n>` (outstanding transactions per
-  manager, default 32); `+perf_l3_depth=env` (the env's small remote-die
-  credit depths instead of the perf ones).
+  manager, default 32); `+perf_remote_lat=<cycles>` (fixed latency of the
+  remote subordinate's B and R responses in core cycles, default 0: back to
+  back); `+perf_l3_depth=env` (the env's small remote-die credit depths
+  instead of the perf ones).
 
 ## Layout
 
@@ -74,6 +76,7 @@ unchanged. Schema version: 1.
     "max_arlen": [15],
     "writefull": true,
     "remote_full_pct": 100,
+    "perf_remote_lat": 0,
     "l3_rx_depth": {"WREQ": 64, "RREQ": 64, "WDATA": 256, "RDATA": 256, "WRESP": 32},
     "ss_drop_pct": 10,
     "min_ss_flits": 2000
@@ -132,6 +135,7 @@ unchanged. Schema version: 1.
 | `max_awlen[]`, `max_arlen[]` | The DUT's split-transaction maximum AxLEN per RP, read from the RAL mirror (`AXI_SPLIT_TR_RPn`) when the window opens. The splitter divides the requests the DUT receives, at its manager port; bursts cross the link whole. |
 | `writefull` | True when the windows' writes use full strobes, so WriteDataFull is the expected data message. |
 | `remote_full_pct` | Percentage of the remote die's full-strobe write beats sent as WriteDataFull (the rest as WriteData). Perf runs use 100. |
+| `perf_remote_lat` | Fixed latency, in core cycles, of the remote AXI subordinate's B and R responses (`+perf_remote_lat`, default 0: back to back). Nonzero values model a downstream service delay behind the remote end of the link; performance results are only comparable at the same value. |
 | `l3_rx_depth` | Credits (granules) the remote-die model advertises per credit class and RP; the bench must not be the limit. |
 | `ss_drop_pct`, `min_ss_flits` | Steady-state parameters (see Conventions). |
 
