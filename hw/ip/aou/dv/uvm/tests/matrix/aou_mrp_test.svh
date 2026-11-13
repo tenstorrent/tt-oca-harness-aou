@@ -6,6 +6,12 @@
 // (T1-M02) and independence (T1-M03) checks. Both directions, every size up
 // to each side's width, 1-16 beats. +mrp_scn=crd_rr opens round-robin credit
 // windows for the env's aou_t1_crd_rr_chk (T1-C03).
+// The arbitration window also reports, without judging (plan 12.19), the per-RP
+// service share, the longest service gap, the longest stretch of other RPs
+// served in between and the delivered bytes/cycle, plus the window aggregate:
+// how the arbiter serves four equal RPs that the scenario drives concurrently
+// under sustained contention. The two scenarios that pin every shape knob and
+// measure it are mrp_scn-interleave.dp_wr_pct-{0,100}.dp_n-500.4x512-sp64.
 class aou_mrp_test extends aou_dp_base_test;
   `uvm_component_utils(aou_mrp_test)
 
