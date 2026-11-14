@@ -165,6 +165,42 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+mrp_scn=interleave"]
 
+# Four equal RPs under sustained contention, one request class at a time: the
+# arbitration window's report-only metrics (aou_mrp_chk, plan 12.19) measure
+# the service each RP gets once the arbiter, not the stimulus, sets the rate.
+# Every knob that would make the traffic or the bench non-deterministic is
+# pinned: one bus-wide 16-beat burst per transaction, unique IDs, 500
+# transactions per RP so the window is steady state, identity mapping (no merge
+# group), FDI always ready, no L1 gaps, no local or remote timing. The
+# read-only point is the clean one: one ReadReq per arbitration decision, no
+# WriteData competing for the same link.
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.dp_wr_pct-0.dp_n-500.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1,2,3", "+rp_map_pct=0", "+dp_dir=l2r",
+        "+dp_wr_pct=0", "+dp_full_size=1", "+dp_len=15", "+dp_strb=full", "+dp_ids=unique",
+        "+dp_n=500", "+fdi_trdy=always", "+fdi_stall_pct=0", "+l1_cancel_pct=0",
+        "+l1_bubble_pct=0", "+l1_gap_pct=0"]
+
+[[tests]]
+name = "aou_mrp_test.mrp_scn-interleave.dp_wr_pct-100.dp_n-500.4x512-sp64"
+module = { uvm = "aou_mrp_test" }
+target = "4x512-sp64"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+mrp_scn=interleave", "+mrp_rps=0,1,2,3", "+rp_map_pct=0", "+dp_dir=l2r",
+        "+dp_wr_pct=100", "+dp_full_size=1", "+dp_len=15", "+dp_strb=full", "+dp_ids=unique",
+        "+dp_n=500", "+fdi_trdy=always", "+fdi_stall_pct=0", "+l1_cancel_pct=0",
+        "+l1_bubble_pct=0", "+l1_gap_pct=0"]
+
 [[tests]]
 name = "aou_mrp_test.mrp_scn-interleave.4xmix4211-sp128"
 module = { uvm = "aou_mrp_test" }
@@ -1353,7 +1389,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 132
+expected_count = 134
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1375,6 +1411,8 @@ tests = [
   "aou_mrp_test.mrp_scn-seq.4xmix4211-sp128",
   "aou_mrp_test.mrp_scn-seq.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-interleave.4x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.dp_wr_pct-0.dp_n-500.4x512-sp64",
+  "aou_mrp_test.mrp_scn-interleave.dp_wr_pct-100.dp_n-500.4x512-sp64",
   "aou_mrp_test.mrp_scn-interleave.4xmix4211-sp128",
   "aou_mrp_test.mrp_scn-interleave.4xmix2144-sp64",
   "aou_mrp_test.mrp_scn-indep.4x512-sp64",
