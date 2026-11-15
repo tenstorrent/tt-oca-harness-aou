@@ -21,6 +21,13 @@
 // and the issued-traffic histogram; docs/PERF_JSON.md is the schema. Each
 // bandwidth window's per-link figures also go to res_ap (aou_perf_result) for
 // aou_perf_chk, the gate.
+//
+// Those per-link figures include the flit capacity the window used: granule
+// slots offered, granules carried, the empty remainder, occupancy, messages and
+// granules per flit, and utilization (duty x occupancy). Duty alone says the
+// link sent a flit at every slot; occupancy says how much of each flit carried
+// messages. Both are reported, neither is judged: no throughput or packing
+// requirement exists to judge them against.
 class aou_perf_mon extends uvm_component;
   `uvm_component_utils(aou_perf_mon)
 
@@ -359,18 +366,41 @@ class aou_perf_mon extends uvm_component;
   // <win>.link_<l2r|r2l>.<pre><metric>. The payload is the transactions
   // completed in (ta, tb] when scale < 0, else scale times the DLENGTH bytes of
   // the data messages that crossed in (ta, tb].
+  //
+  // Flit capacity, report only: `granule_slots` is the granule capacity the link
+  // offered (AOU_GRANULES per flit), `used_granules` the granules of the
+  // messages that crossed it, `empty_granules` the difference, `occupancy`
+  // their ratio, and `utilization` is duty x occupancy: the fraction of the
+  // link's granule capacity the window used. A link can be busy at every flit
+  // slot (duty 1) and still carry part-filled flits; occupancy, and the
+  // messages and granules per flit, are what tell the two apart. These numbers
+  // measure capacity carried, not why a granule was empty, which is left to
+  // whoever judges the link. A message that spans the interval boundary is
+  // counted whole, so the measured granules can exceed the slots offered by up
+  // to one message; used_granules is capped at granule_slots, which keeps
+  // occupancy within [0, 1] and empty_granules = granule_slots - used_granules.
   function string link_obj(int l, time ta, time tb, string pre, real scale,
                            output int unsigned nfl, output longint o_app, output longint o_g,
                            output real o_cyc);
     longint      app = 0;
     longint      db = 0;
     longint      g = 0;
+    longint      dg = 0;      // granules of the data messages in the interval
+    int unsigned nd = 0;      // data messages in the interval
+    int unsigned nmsg = 0;    // messages of any class in the interval
+    longint      slots;
+    longint      used;
+    longint      empty;
     int unsigned gk[string];
     int unsigned nk[string];
     string       s;
     string       sep;
     real         cyc = cycles(tb - ta);
     real         duty;
+    real         occ;         // granules used / granules the flits offered
+    real         util;        // duty x occupancy
+    real         mpf;         // messages per flit
+    real         gpd;         // granules per data message
     string       dn = (l == 0) ? "l2r" : "r2l";
     if (scale < 0.0) begin
       foreach (tx_t[i])
@@ -381,6 +411,11 @@ class aou_perf_mon extends uvm_component;
       if (msg_t[l][i] <= ta || msg_t[l][i] > tb) continue;
       g += longint'(msg_g[l][i]);
       db += longint'(msg_db[l][i]);
+      nmsg++;
+      if (msg_db[l][i] != 0) begin
+        nd++;
+        dg += longint'(msg_g[l][i]);
+      end
       if (!gk.exists(k)) begin
         gk[k] = 0;
         nk[k] = 0;
@@ -394,13 +429,33 @@ class aou_perf_mon extends uvm_component;
     o_g = g;
     o_cyc = cyc;
     duty = (cyc > 0) ? real'(nfl) / (cyc * real'(beat_bytes) / 256.0) : 0.0;
+    slots = longint'(AOU_GRANULES) * longint'(nfl);
+    used = (g > slots) ? slots : g;
+    empty = slots - used;
+    occ = (slots > 0) ? real'(used) / real'(slots) : 0.0;
+    util = duty * occ;
+    mpf = (nfl > 0) ? real'(nmsg) / real'(nfl) : 0.0;
+    gpd = (nd > 0) ? real'(dg) / real'(nd) : 0.0;
     put({win, ".link_", dn, ".", pre, "bytes_per_cycle"}, (cyc > 0) ? real'(app) / cyc : 0.0);
     put({win, ".link_", dn, ".", pre, "cycles"}, cyc);
     put({win, ".link_", dn, ".", pre, "flits"}, real'(nfl));
     put({win, ".link_", dn, ".", pre, "duty"}, duty);
-    if (nfl > 0) put({win, ".link_", dn, ".", pre, "granules_per_flit"}, real'(g) / real'(nfl));
+    put({win, ".link_", dn, ".", pre, "granule_slots"}, real'(slots));
+    put({win, ".link_", dn, ".", pre, "used_granules"}, real'(used));
+    put({win, ".link_", dn, ".", pre, "empty_granules"}, real'(empty));
+    put({win, ".link_", dn, ".", pre, "occupancy"}, occ);
+    put({win, ".link_", dn, ".", pre, "utilization"}, util);
+    if (nfl > 0) begin
+      put({win, ".link_", dn, ".", pre, "granules_per_flit"}, real'(g) / real'(nfl));
+      put({win, ".link_", dn, ".", pre, "messages_per_flit"}, mpf);
+    end
+    if (nd > 0) put({win, ".link_", dn, ".", pre, "granules_per_data_message"}, gpd);
     s = $sformatf({"{\"app_bytes\": %0d, \"cycles\": %s, \"flits\": %0d, \"granules\": %0d, ",
-                   "\"duty\": %s"}, app, jnum(cyc), nfl, g, jnum(duty));
+                   "\"granule_slots\": %0d, \"used_granules\": %0d, \"empty_granules\": %0d, ",
+                   "\"occupancy\": %s, \"messages_per_flit\": %s, ",
+                   "\"granules_per_data_message\": %s, \"duty\": %s, \"utilization\": %s"},
+                  app, jnum(cyc), nfl, g, slots, used, empty, jnum(occ), jnum(mpf), jnum(gpd),
+                  jnum(duty), jnum(util));
     s = {s, ", \"granules_by_msg\": {"};
     sep = "";
     foreach (gk[k]) begin
@@ -454,7 +509,10 @@ class aou_perf_mon extends uvm_component;
     end
     if (t.size() == 0 || d.size() == 0)
       return {"{\"full\": null, \"ss\": null, \"app_bytes\": 0, \"cycles\": 0, \"flits\": 0, ",
-              "\"granules_by_msg\": {}, \"duty\": 0}"};
+              "\"granules_by_msg\": {}, \"granule_slots\": 0, \"used_granules\": 0, ",
+              "\"empty_granules\": 0, ",
+              "\"occupancy\": 0, \"messages_per_flit\": 0, \"granules_per_data_message\": 0, ",
+              "\"duty\": 0, \"utilization\": 0}"};
     t.sort();
     full = link_obj(l, t_open, t[$], "", -1.0, nfl, f_app, f_g, f_cyc);
     res.data[l] = (f_app > 0);
