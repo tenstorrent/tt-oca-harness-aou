@@ -177,7 +177,8 @@ class aou_credit_mgr extends uvm_object;
     rx_pending[r][c] += n;
   endfunction
 
-  // Time for AOU_RET_DELAYED, counted in flits sent and received.
+  // Time for AOU_RET_DELAYED, counted in flits sent and received (and, in T1,
+  // in cycles of a quiet link: aou_t1_env quiet_credit_tick).
   function bit tick();
     bit moved = 1'b0;
     tick_now++;

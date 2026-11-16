@@ -314,6 +314,25 @@ class aou_t1_env extends uvm_env;
         wresp_batch_loop();
       join_none
     end
+    fork
+      quiet_credit_tick();
+    join_none
+  endtask
+
+  // The remote die holds an AOU_RET_DELAYED credit return for ret_delay ticks,
+  // and its model counts a tick per flit sent or received. A link neither side
+  // uses moves no flit: a DUT in TX low-power mode with nothing to send leaves it
+  // quiet, and so does the remote die once it waits for the very credit it
+  // holds, so the delay would never end. A cycle with no valid beat in either
+  // direction on the active PHY counts as a tick too.
+  task quiet_credit_tick();
+    int unsigned p = cfg.lsm_cfg.active_phy;
+    forever begin
+      @(fdi[p].vif.mon_cb);
+      if (fdi[p].vif.mon_cb.lp_valid !== 1'b1 && fdi[p].vif.mon_cb.pl_valid !== 1'b1 &&
+          l3.model.crd.tick())
+        l3.model.kick();
+    end
   endtask
 
   // The remote die returns its WriteResps in batches (aou_packer_policy::
