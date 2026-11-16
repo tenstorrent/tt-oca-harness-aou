@@ -1845,7 +1845,7 @@
 - id: '11.19'
   section: '2.11'
   section_title: Corner Case Tests
-  title: 'DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path'
+  title: 'DFT scan mode: the software reset path is bypassed in scan shift and acts in capture'
   priority: P2
   added: integration guide 8.7/3.13.1
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.

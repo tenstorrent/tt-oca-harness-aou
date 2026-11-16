@@ -1,20 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// DFT scan mode (plan 11.19). TIEL_DFT_MODESCAN=1 switches the core reset mux to
-// its scan input, which the integration guide (3.13.1) says de-asserts the
-// software reset so that scan shifting is not disturbed: the core comes out of
-// any software reset and AOU_SW_RESET has no effect while scan mode lasts.
+// DFT scan mode (plan 11.19). With TIEL_DFT_MODESCAN=1 the core reset mux takes
+// I_RESETN alone while TIEL_DFT_SCANEN=1 (scan shift), so that no software reset
+// disturbs shifting, and the functional reset (I_RESETN and the software reset)
+// while TIEL_DFT_SCANEN=0 (capture), as the integration guide (3.13.1) says.
 // Sequence: traffic; the link goes to Reset as for a software reset; a marker
-// value goes into a configuration register; scan mode on; the marker must
-// survive (T1-DFT02, register read-backs at the end of each step), also after an
-// AOU_SW_RESET write; scan mode off, and the pending software reset takes effect
-// (the marker reads its reset value); a hard reset and traffic again. The core
-// reset itself is judged by aou_t1_sw_reset_chk (T1-DFT01) whenever scan mode is on.
+// value goes into a configuration register; scan mode on, in shift; the marker
+// must survive (T1-DFT02, register read-backs at the end of each step), also
+// after an AOU_SW_RESET write; a capture window, in which the pending software
+// reset resets the core (the marker and AOU_SW_RESET read their reset values);
+// I_RESETN pulsed in a capture window, as a pattern that tests the reset does;
+// scan mode off, a hard reset and traffic again. The core reset itself is judged
+// by aou_t1_sw_reset_chk (T1-DFT01) whenever scan mode is on.
 class aou_dft_scan_vseq extends aou_link_base_vseq;
   `uvm_object_utils(aou_dft_scan_vseq)
 
   localparam int unsigned SCAN_CYCLES = 200;
+  localparam int unsigned CAPTURE_CYCLES = 4;
   localparam int unsigned APB_TIMEOUT = 20000;
 
   function new(string name = "aou_dft_scan_vseq");
@@ -35,32 +38,48 @@ class aou_dft_scan_vseq extends aou_link_base_vseq;
     wr(marker, 6);
     check_field(marker, 6, "T1-DFT02", "marker before scan mode");
 
-    `uvm_info(get_type_name(), "TIEL_DFT_MODESCAN=1", UVM_LOW)
+    `uvm_info(get_type_name(), "scan mode, shift", UVM_LOW)
     scan(1'b1);
     wait_cycles(SCAN_CYCLES);
-    apb_check(marker, 6, "marker in scan mode");
-    `uvm_info(get_type_name(), "AOU_SW_RESET in scan mode", UVM_LOW)
+    apb_check(marker, 6, "marker in scan shift");
+    `uvm_info(get_type_name(), "AOU_SW_RESET in scan shift", UVM_LOW)
     apb_write_sw_reset();
     wait_cycles(SCAN_CYCLES);
-    apb_check(marker, 6, "AOU_SW_RESET in scan mode must not reset the SFRs");
-    `uvm_info(get_type_name(), "TIEL_DFT_MODESCAN=0", UVM_LOW)
-    scan(1'b0);
+    apb_check(marker, 6, "AOU_SW_RESET in scan shift must not reset the SFRs");
+    `uvm_info(get_type_name(), "scan capture", UVM_LOW)
+    scan_enable(1'b0);
+    wait_cycles(CAPTURE_CYCLES);
+    scan_enable(1'b1);
     wait_cycles(SCAN_CYCLES);
-    // The AOU_SW_RESET bit lives in the SFRs, which scan mode kept out of reset, so the
-    // write above is still pending and resets the core once the mux selects it again.
-    check_field(marker, marker.get_reset(), "T1-DFT02", "software reset pending at scan exit");
-    check_field(p_sequencer.regs.aou_con0.aou_sw_reset, 0, "T1-DFT02",
-                "software reset pending at scan exit");
-    aou_rule_log::check("T1-DFT02", get_type_name());
+    // The AOU_SW_RESET bit lives in the SFRs, which shift kept out of reset, so the
+    // write above was still pending and reset the core once capture selected it.
+    apb_check(marker, marker.get_reset(), "software reset pending in shift, applied in capture");
+    apb_check(p_sequencer.regs.aou_con0.aou_sw_reset, 0,
+              "software reset pending in shift, applied in capture");
+    `uvm_info(get_type_name(), "I_RESETN in scan capture", UVM_LOW)
+    scan_enable(1'b0);
+    env.rst.do_reset(AOU_T1_RST_CORE);
+    scan_enable(1'b1);
+    wait_cycles(SCAN_CYCLES);
+    scan(1'b0);
     `uvm_info(get_type_name(), "hard reset", UVM_LOW)
     hard_reset(AOU_T1_RST_BOTH);
     traffic(AOU_T1_BOTH_DIRS, num_txns / 2 + 1, null);
     drain();
   endtask
 
+  // Scan mode on, in shift, or off: TIEL_DFT_MODESCAN and TIEL_DFT_SCANEN together.
   task scan(bit on);
     @(env.rst.vif.drv_cb);
     env.rst.vif.drv_cb.dft_modescan <= on;
+    env.rst.vif.drv_cb.dft_scanen <= on;
+    @(env.rst.vif.drv_cb);
+  endtask
+
+  // In scan mode, shift (1) or capture (0).
+  task scan_enable(bit on);
+    @(env.rst.vif.drv_cb);
+    env.rst.vif.drv_cb.dft_scanen <= on;
     @(env.rst.vif.drv_cb);
   endtask
 

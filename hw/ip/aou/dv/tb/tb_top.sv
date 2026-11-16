@@ -141,6 +141,7 @@ module tb_top;
   assign rst.rst_n = rst_n;
   assign rst.prst_n = prst_n;
   assign rst.core_rst_n = u_dut.u_aou_core_top.w_DFTED_sw_resetn;
+  assign rst.sw_reset = u_dut.u_aou_core_top.O_SW_RESET;
   assign rst.apb_psel = apb.psel;
   assign rst.apb_bridge_idle =
       u_dut.u_aou_core_top.u_async_apb_bridge.u_async_apb_bridge_si.r_si_crt_st == 2'b00 &&

@@ -71,3 +71,14 @@
     the one-step packer (FDI_CFG_SP_256B) builds the whole flit in the cycle it pops the
     Activation message, while the request FIFOs are held, so the ActivateAck's flit carries
     nothing else and the test passes there
+
+# DFT scan mode: the core reset mux selects its scan input for the whole of scan mode, so
+# in capture neither the software reset nor I_RESETN reaches AOU_CORE or the RX FIFOs.
+- test: aou_dft_scan_test
+  bug: tenstorrent/tt-oca-harness-aou#171
+  check: 'T1-DFT01: in scan capture the core reset was not the functional reset'
+  note: the pending AOU_SW_RESET and the I_RESETN pulse in capture leave w_DFTED_sw_resetn high
+- test: aou_dft_scan_test
+  bug: tenstorrent/tt-oca-harness-aou#171
+  check: 'software reset pending in shift, applied in capture'
+  note: the marker and AOU_SW_RESET keep their values through the capture window

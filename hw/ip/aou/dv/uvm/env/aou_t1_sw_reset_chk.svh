@@ -17,9 +17,12 @@
 // software reset for every channel of every RP, and on the M ports for the W
 // case: no W handshake after the release may be a beat pending at it.
 //
-// DFT scan mode (T1-DFT01, integration guide 3.13.1): TIEL_DFT_MODESCAN=1
-// neutralises the software reset path, so with I_RESETN high the core reset
-// stays de-asserted. One report per scan window.
+// DFT scan mode (T1-DFT01, integration guide 3.13.1/3.13.2): with
+// TIEL_DFT_MODESCAN=1 the core reset is I_RESETN alone during scan shift
+// (TIEL_DFT_SCANEN=1), so that no software reset disturbs shifting, and the
+// functional reset (I_RESETN, and the software reset, O_SW_RESET) in capture
+// (TIEL_DFT_SCANEN=0), so that ATPG reaches both sources. One report per scan
+// window and phase.
 class aou_t1_sw_reset_chk extends uvm_component;
   `uvm_component_utils(aou_t1_sw_reset_chk)
 
@@ -33,9 +36,13 @@ class aou_t1_sw_reset_chk extends uvm_component;
   // watch_m_port clears).
   protected bit [7:0] stale_owed;
 
-  // The current scan window: cycles, cycles with the core reset asserted, start.
+  // The current scan window: cycles, shift and capture cycles, cycles of each
+  // with the core reset other than predicted, start.
   protected int unsigned scan_cyc;
-  protected int unsigned scan_bad;
+  protected int unsigned shift_cyc;
+  protected int unsigned shift_bad;
+  protected int unsigned capture_cyc;
+  protected int unsigned capture_bad;
   protected time         scan_t0;
 
   function new(string name, uvm_component parent);
@@ -77,11 +84,19 @@ class aou_t1_sw_reset_chk extends uvm_component;
   protected task watch_dft_scan();
     forever begin
       @(rst_vif.mon_cb);
-      if (rst_vif.mon_cb.dft_modescan === 1'b1 && rst_vif.mon_cb.rst_n === 1'b1) begin
+      if (rst_vif.mon_cb.dft_modescan === 1'b1) begin
         if (scan_cyc == 0) scan_t0 = $time;
         scan_cyc++;
         // The mux is combinational; allow the first cycle for the switch.
-        if (scan_cyc > 1 && rst_vif.mon_cb.core_rst_n !== 1'b1) scan_bad++;
+        if (scan_cyc == 1) continue;
+        if (rst_vif.mon_cb.dft_scanen === 1'b1) begin
+          shift_cyc++;
+          if (rst_vif.mon_cb.core_rst_n !== rst_vif.mon_cb.rst_n) shift_bad++;
+        end else begin
+          capture_cyc++;
+          if (rst_vif.mon_cb.core_rst_n !== (rst_vif.mon_cb.rst_n & ~rst_vif.mon_cb.sw_reset))
+            capture_bad++;
+        end
       end else begin
         close_scan();
       end
@@ -90,14 +105,23 @@ class aou_t1_sw_reset_chk extends uvm_component;
 
   protected function void close_scan();
     if (scan_cyc == 0) return;
-    if (scan_bad != 0) begin
-      `uvm_error(get_type_name(), $sformatf({"T1-DFT01: the core reset was asserted for %0d of ",
-                 "%0d cycles of the scan window from %0t (integration guide 3.13.1: ",
-                 "TIEL_DFT_MODESCAN=1 de-asserts the software reset)"}, scan_bad, scan_cyc,
-                 scan_t0))
+    if (shift_bad != 0) begin
+      `uvm_error(get_type_name(), $sformatf({"T1-DFT01: in scan shift the core reset did not ",
+                 "follow I_RESETN for %0d of %0d shift cycles of the scan window from %0t ",
+                 "(integration guide 3.13.1: the software reset is bypassed in shift)"},
+                 shift_bad, shift_cyc, scan_t0))
+    end
+    if (capture_bad != 0) begin
+      `uvm_error(get_type_name(), $sformatf({"T1-DFT01: in scan capture the core reset was not ",
+                 "the functional reset (I_RESETN, O_SW_RESET) for %0d of %0d capture cycles of ",
+                 "the scan window from %0t (integration guide 3.13.1: the software reset acts in ",
+                 "capture)"}, capture_bad, capture_cyc, scan_t0))
     end
     scan_cyc = 0;
-    scan_bad = 0;
+    shift_cyc = 0;
+    shift_bad = 0;
+    capture_cyc = 0;
+    capture_bad = 0;
   endfunction
 
   // At the first core clock with the core out of AOU_SW_RESET (I_RESETN high,
