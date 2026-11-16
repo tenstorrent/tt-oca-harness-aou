@@ -3,6 +3,7 @@
 
 // TX low-power mode (plan 21.1-21.6; old F7). +lp_mode=0|1 and +lp_thr=T
 // (default: random 1..255 when +lp_mode=1) are programmed before activation;
+// +lp_reset=1 leaves both at their reset values (FEAT-R31).
 // aou_lp_mode_vseq counts idle flits from the L1 monitor. Traffic both ways
 // before and after the idle window, so credits are returned in LP mode (21.6).
 class aou_lp_mode_test extends aou_dp_base_test;
@@ -18,9 +19,16 @@ class aou_lp_mode_test extends aou_dp_base_test;
   function void set_knobs();
     int lp = 0;
     int thr = -1;
+    int lp_reset = 0;
     void'($value$plusargs("lp_mode=%d", lp));
     void'($value$plusargs("lp_thr=%d", thr));
-    if (thr < 0) thr = (lp != 0) ? $urandom_range(255, 1) : 4;
+    void'($value$plusargs("lp_reset=%d", lp_reset));
+    if (lp_reset != 0) begin
+      lp = -1;
+      `uvm_info(get_type_name(), "TX_LP_MODE and threshold left at reset (+lp_reset=1)", UVM_LOW)
+    end else if (thr < 0) begin
+      thr = (lp != 0) ? $urandom_range(255, 1) : 4;
+    end
     k.feat = aou_t1_feature_cfg::type_id::create("feat");
     k.feat.lp_mode = lp;
     k.feat.lp_threshold = thr;

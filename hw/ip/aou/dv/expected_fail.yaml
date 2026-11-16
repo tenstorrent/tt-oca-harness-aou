@@ -71,3 +71,11 @@
     the one-step packer (FDI_CFG_SP_256B) builds the whole flit in the cycle it pops the
     Activation message, while the request FIFOs are held, so the ActivateAck's flit carries
     nothing else and the test passes there
+
+# The reset configuration of AOU_CON0 is TX_LP_MODE = 0: an idle ENABLED DUT sends an
+# empty flit at every FDI opportunity.
+- test: aou_lp_mode_test
+  bug: tenstorrent/tt-oca-harness-aou#170
+  check: 'FEAT-R31: TX_LP_MODE and threshold at reset:'
+  when_re: 'TX_LP_MODE and threshold left at reset \(\+lp_reset=1\)'
+  note: +lp_reset=1; the idle window counts a flit at nearly every FDI opportunity instead of none

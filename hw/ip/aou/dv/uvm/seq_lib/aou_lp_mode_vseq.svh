@@ -8,7 +8,10 @@
 //   (the L1 model's trdy holes take some);
 // - TX_LP_MODE=1, threshold 0: no flit;
 // - TX_LP_MODE=1, threshold T: at most one per max(T+1, flit cycles) plus one,
-//   and at least half the rate of one flit T+1 cycles after each flit ends.
+//   and at least half the rate of one flit T+1 cycles after each flit ends;
+// - the reset configuration (neither field programmed): no flit (FEAT-R31,
+//   tenstorrent/tt-oca-harness-aou#170): an empty flit takes a slot from every other protocol that
+//   shares the FDI.
 // Then traffic runs again, so leaving the idle state is covered too.
 class aou_lp_mode_vseq extends aou_dp_vseq;
   `uvm_object_utils(aou_lp_mode_vseq)
@@ -34,6 +37,8 @@ class aou_lp_mode_vseq extends aou_dp_vseq;
     int unsigned n;
     int unsigned lo;
     int unsigned hi;
+    string what = $sformatf("FEAT-R08: TX_LP_MODE=%0d threshold=%0d", k.feat.lp_mode,
+                            k.feat.lp_threshold);
     time t0;
     super.scenario();
     drain();
@@ -41,7 +46,11 @@ class aou_lp_mode_vseq extends aou_dp_vseq;
     t0 = $time;
     wait_cycles(WINDOW);
     n = cnt.count(t0, $time);
-    if (k.feat.lp_mode == 0) begin
+    if (k.feat.lp_mode < 0) begin
+      what = "FEAT-R31: TX_LP_MODE and threshold at reset";
+      lo = 0;
+      hi = 0;
+    end else if (k.feat.lp_mode == 0) begin
       lo = slots / 4;
       hi = slots + 1;
     end else if (k.feat.lp_threshold == 0) begin
@@ -56,11 +65,10 @@ class aou_lp_mode_vseq extends aou_dp_vseq;
     end
     if (n < lo || n > hi)
       `uvm_error(get_type_name(), $sformatf(
-          "FEAT-R08: TX_LP_MODE=%0d threshold=%0d: %0d flits in %0d idle cycles, expected %0d..%0d",
-          k.feat.lp_mode, k.feat.lp_threshold, n, WINDOW, lo, hi))
+          "%s: %0d flits in %0d idle cycles, expected %0d..%0d", what, n, WINDOW, lo, hi))
     else
-      `uvm_info(get_type_name(), $sformatf("TX_LP_MODE=%0d thr=%0d: %0d idle flits (%0d..%0d)",
-                                           k.feat.lp_mode, k.feat.lp_threshold, n, lo, hi), UVM_LOW)
+      `uvm_info(get_type_name(), $sformatf("%s: %0d idle flits (%0d..%0d)", what, n, lo, hi),
+                UVM_LOW)
     super.scenario();
   endtask
 endclass
