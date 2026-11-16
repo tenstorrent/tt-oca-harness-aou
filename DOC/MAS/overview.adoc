@@ -17,6 +17,9 @@ endif::[]
 ifndef::aou-ppa-xref[]
 :aou-ppa-xref: ppa-appendices.adoc
 endif::[]
+ifndef::aou-software-xref[]
+:aou-software-xref: software-operation.adoc
+endif::[]
 
 Apache License Release +
 AOU_CORE Microarchitecture specification +

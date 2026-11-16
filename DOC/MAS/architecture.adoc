@@ -11,6 +11,9 @@ endif::[]
 ifndef::aou-overview-xref[]
 :aou-overview-xref: overview.adoc
 endif::[]
+ifndef::aou-software-xref[]
+:aou-software-xref: software-operation.adoc
+endif::[]
 
 [[aou-architecture]]
 == Architecture
@@ -505,14 +508,7 @@ The [.monospaced]#++WRITE_EARLY_RESPONSE_WDT_CTL++# register ([.monospaced]#++0x
 |WDT_THRESHOLD |[31:0] |RW |Watchdog threshold in I_CLK cycles. Reset [.monospaced]#++0xC3500++# (800000 cycles).
 |==============================================================================================
 
-See the
-ifdef::backend-pdf[]
-xref:#aou-sfr-setting[full register map]
-endif::backend-pdf[]
-ifdef::backend-html5[]
-xref:ocah-docs:ROOT:aou-software-operation.adoc#aou-sfr-setting[full register map]
-endif::backend-html5[]
-for the complete SFR listing.
+See the xref:{aou-software-xref}#aou-sfr-setting[full register map] for the complete SFR listing.
 
 [[aou-axi-aggregator]]
 === AXI Aggregator

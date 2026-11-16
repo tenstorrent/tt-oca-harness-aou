@@ -502,17 +502,7 @@ image::error-debug-fifo-access.svg[Figure 23. R/B Response Error Debug FIFO Acce
 
 When the early write-response feature is enabled ([.monospaced]#++EARLY_BRESP_EN = 1++#) and the actual BRESP from the remote die carries an error for a transaction that already received an early OKAY, the error is reported via the [.monospaced]#++INT_EARLY_RESP_ERR++# interrupt. The failing transactionpass:[']s AXI ID and BRESP type are captured in [.monospaced]#++WRITE_EARLY_RESPONSE_RPn++# ([.monospaced]#++WRITE_RESP_ERR_ID_INFO++#, [.monospaced]#++WRITE_RESP_ERR_TYPE_INFO++#); a further error while [.monospaced]#++WRITE_RESP_ERR++# is still set overwrites them, so they report the latest error. SW clears the error by writing 1 to [.monospaced]#++WRITE_RESP_ERR++# (W1C), which clears both INFO fields.
 
-+For a detailed description of the early response error flow, see
-+ifdef::backend-pdf[]
-+xref:{aou-architecture-xref}#aou-transaction-flow----error-case[Transaction Flow \-- Error Case]
-+and
-+xref:{aou-architecture-xref}#aou-write-early-response-controller-sfr-fields[SFR Fields].
-+endif::backend-pdf[]
-+ifdef::backend-html5[]
-+xref:ocah-docs:ROOT:aou-architecture.adoc#aou-transaction-flow----error-case[Transaction Flow \-- Error Case]
-+and
-+xref:ocah-docs:ROOT:aou-architecture.adoc#aou-write-early-response-controller-sfr-fields[SFR Fields].
-+endif::backend-html5[]
+For a detailed description of the early response error flow, see xref:{aou-architecture-xref}#aou-transaction-flow----error-case[Transaction Flow \-- Error Case] and xref:{aou-architecture-xref}#aou-write-early-response-controller-sfr-fields[SFR Fields].
 
 [[aou-write-transaction-watchdog]]
 ==== Write Transaction Watchdog
