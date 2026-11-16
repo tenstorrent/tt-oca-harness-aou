@@ -93,8 +93,8 @@ Don't override. Generated from: aou_core
 | 3:1 |      reserved_3_1      |   r  | 0x0 |  — |
 |  4  |      aou_sw_reset      |   w  | 0x0 |  — |
 | 10:5|      reserved_10_5     |   r  | 0x0 |  — |
-|  11 |       tx_lp_mode       |  rw  | 0x0 |  — |
-|19:12|  tx_lp_mode_threshold  |  rw  | 0x4 |  — |
+|  11 |       tx_lp_mode       |  rw  | 0x1 |  — |
+|19:12|  tx_lp_mode_threshold  |  rw  | 0x0 |  — |
 |  20 |  rp0_axi_aggregator_en |  rw  | 0x0 |  — |
 |  21 |  rp1_axi_aggregator_en |  rw  | 0x0 |  — |
 |  22 |  rp2_axi_aggregator_en |  rw  | 0x0 |  — |
@@ -115,7 +115,7 @@ Don't override. Generated from: aou_core
 
 #### tx_lp_mode field
 
-<p>TX low-power mode enable. When set to 1, AOU_CORE only sends payload to FDI when there are remaining AXI messages to send. Credit-only flit behavior is gated by tx_lp_mode_threshold: non-zero threshold preserves the legacy heartbeat (a partially-filled flit every threshold+1 cycles while the link is active); a zero threshold disables the heartbeat entirely so the TX only emits flits when AXI traffic is pending or credits need to be returned. When 0 (default), AOU_CORE always sends messages to FDI for lowest latency. Static configuration: program it only while the activation FSM is DISABLED (ACTIVATE_STATE_DISABLED = 1), before ACTIVATE_START or after a deactivation has completed. It must not be changed while the link is activating, ENABLED or deactivating: the TX core may be mid-flit, and the flit is not preserved across a change of mode.</p>
+<p>TX low-power mode enable. When set to 1 (default), AOU_CORE only sends payload to FDI when there are remaining AXI messages to send. Credit-only flit behavior is gated by tx_lp_mode_threshold: non-zero threshold preserves the legacy heartbeat (a partially-filled flit every threshold+1 cycles while the link is active); a zero threshold disables the heartbeat entirely so the TX only emits flits when AXI traffic is pending or credits need to be returned. When 0, AOU_CORE launches a flit at every FDI opportunity, empty when it has nothing to send. Static configuration: program it only while the activation FSM is DISABLED (ACTIVATE_STATE_DISABLED = 1), before ACTIVATE_START or after a deactivation has completed. It must not be changed while the link is activating, ENABLED or deactivating: the TX core may be mid-flit, and the flit is not preserved across a change of mode.</p>
 
 #### tx_lp_mode_threshold field
 

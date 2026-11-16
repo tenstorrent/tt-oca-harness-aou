@@ -491,7 +491,7 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_aou_con0_tx_lp_mode_threshold <= 8'h4;
+        r_aou_con0_tx_lp_mode_threshold <= 8'h0;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_CON0_ADDR)) begin
         r_aou_con0_tx_lp_mode_threshold <= I_PWDATA[19:12];
     end
@@ -499,7 +499,7 @@ end
 
 always @(posedge I_PCLK or negedge I_PRESETN) begin
     if (!I_PRESETN) begin
-        r_aou_con0_tx_lp_mode <= 1'h0;
+        r_aou_con0_tx_lp_mode <= 1'h1;
     end else if (I_PSEL & ~I_PENABLE & I_PWRITE & (I_PADDR[15:0] == SFR_AOU_CON0_ADDR)) begin
         r_aou_con0_tx_lp_mode <= I_PWDATA[11];
     end

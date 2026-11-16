@@ -30,7 +30,7 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 |IP_VERSION |0x0000 | | | |0x00010000
 | |　 |MAJOR_VERSION |[31:16] |RO |0x0001
 | |　 |MINOR_VERSION |[15:0] |RO |0x0000
-|AOU_CON0 |0x0004 | | | |0x00004000
+|AOU_CON0 |0x0004 | | | |0x00000800
 | | |Rsvd |[31:28] |RO |0x0
 | | |RP3_ERROR_INFO_ACCESS_EN |[27] |RW |0x0
 | | |RP2_ERROR_INFO_ACCESS_EN |[26] |RW |0x0
@@ -40,8 +40,8 @@ The SFR block decodes [.monospaced]#++PADDR[15:0]++# only: the offsets in xref:t
 | | |RP2_AXI_AGGREGATOR_EN |[22] |RW |0x0
 | | |RP1_AXI_AGGREGATOR_EN |[21] |RW |0x0
 | | |RP0_AXI_AGGREGATOR_EN |[20] |RW |0x0
-| | |TX_LP_MODE_THRESHOLD |[19:12] |RW |0x4
-| | |TX_LP_MODE |[11] |RW |0x0
+| | |TX_LP_MODE_THRESHOLD |[19:12] |RW |0x0
+| | |TX_LP_MODE |[11] |RW |0x1
 | | |Rsvd |[10:5] |RO |0x0
 | | |AOU_SW_RESET |[4] |WO |0x0
 | | |Rsvd |[3:1] |RO |0x0
@@ -372,8 +372,9 @@ The DISABLED signal is asserted to indicate that deactivation has been completed
 
 *Low Power mode*
 
-* For lowering power, AOU_CORE uses low power mode. By setting AOU_CON0.TX_LP_MODE = 1, AOU_CORE only sends payload to FDI when there are remaining AXI messages to send. Since AOU_CORE need to send Credit when there are no remaining AXI messages, by setting AOU_CON0.TX_LP_MODE_THRESHOLD value, SW can configure the message transmission frequency.
+* For lowering power, AOU_CORE uses low power mode. With AOU_CON0.TX_LP_MODE = 1, AOU_CORE only sends payload to FDI when there are remaining AXI messages to send. With AOU_CON0.TX_LP_MODE = 0 it launches a flit at every FDI opportunity, empty when it has nothing to send. Since AOU_CORE need to send Credit when there are no remaining AXI messages, by setting AOU_CON0.TX_LP_MODE_THRESHOLD value, SW can configure the message transmission frequency.
 * AOU_CON0.TX_LP_MODE_THRESHOLD = 0 selects a fully-gated low-power mode: the periodic heartbeat is disabled and the TX only launches an FDI flit when there is real work to send (AXI traffic, CrdtGrant credit-return messages, or pending MsgCredit-header credits). Once a flit is started it always finishes; any granule slots that were not filled are sent as zeros and the corresponding MsgStart bits are 0.
+* The fully-gated mode (TX_LP_MODE = 1, TX_LP_MODE_THRESHOLD = 0) is the reset value. An idle AOU_CORE then leaves the FDI to other protocol layers that share it: an empty flit would take a flit slot from them, and an arbiter in front of the FDI cannot tell it from a flit that carries only the continuation of a message.
 * AOU_CON0.TX_LP_MODE and AOU_CON0.TX_LP_MODE_THRESHOLD are static configuration. Program them only while the activation FSM is DISABLED (ACTIVATE_STATE_DISABLED = 1): before AOU_INIT.ACTIVATE_START, or after a deactivation has completed. They must not be changed while the link is activating, ENABLED or deactivating; the TX core may be in the middle of a flit, and the flit is not preserved across a change of mode.
 
 [caption=""]

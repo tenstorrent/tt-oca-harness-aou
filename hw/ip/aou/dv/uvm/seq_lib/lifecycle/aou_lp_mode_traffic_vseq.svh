@@ -37,6 +37,7 @@ class aou_lp_mode_traffic_vseq extends aou_link_base_vseq;
     `uvm_info(get_type_name(), $sformatf("LP threshold %0d, idle window %0d cycles", thr, win),
               UVM_LOW)
     link_up();
+    lp_mode(1'b0);
     sw_activate();
     check_traffic(num_txns);
     idle_flits(win);
