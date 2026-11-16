@@ -13,11 +13,14 @@ ifndef::aou-overview-xref[]
 endif::[]
 
 [[aou-4-interrupt]]
-== 4. Interrupt
+== Interrupt
+
+<<table-4>> lists the interrupt names, access behavior, and triggering conditions.
 
 [[table-4]]
 
 [width="100%",cols="34%,33%,33%",options="header",]
+.Interrupt Sources
 |=================================================================================================================================
 |Interrupt Name |Access |Description
 |INT_ACTIVATE_START |W1C |Asserted when activation of the AoU Protocol layer is required.
@@ -30,56 +33,55 @@ endif::[]
 |INT_FDI_LINK_DOWN |W1C |Asserted when the FDI link is lost (LinkError, LinkReset, Disabled or Reset; not Retrain or L1) while the AoU activation FSM is in ACTIVATE, ENABLED or DEACTIVATE, or in DISABLED with an ActivateReq already sent or received (its entry to ACTIVATE is cancelled). The activation FSM returns to DISABLED.
 |=================================================================================================================================
 
-_Table 4. Interrupt Sources_
 
 * *INT_ACTIVATE_START*
 
-An interrupt that occurs when activation of the AoU Protocol layer is required. The interrupt can be cleared by writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_ACTIVATE_START SFR. For details, please refer to the Interrupt description in xref:{aou-software-xref}#aou-73-activation-deactivation-flow[Section 7.3] "Activation & Deactivation Flow".
+An interrupt that occurs when activation of the AoU Protocol layer is required. The interrupt can be cleared by writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_ACTIVATE_START SFR. For details, please refer to the Interrupt description in xref:{aou-software-xref}#aou-activation-deactivation-flow[Activation & Deactivation Flow].
 
 * *INT_DEACTIVATE_START*
 
-An interrupt that occurs when deactivation of the AoU Protocol layer is required. The interrupt can be cleared by writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_DEACTIVATE_START SFR. For details, please refer to the Interrupt description in xref:{aou-software-xref}#aou-73-activation-deactivation-flow[Section 7.3] "Activation & Deactivation Flow".
+An interrupt that occurs when deactivation of the AoU Protocol layer is required. The interrupt can be cleared by writing pass:[']1pass:['] to the AOU_CORE.AOU_INIT.INT_DEACTIVATE_START SFR. For details, please refer to the Interrupt description in xref:{aou-software-xref}#aou-activation-deactivation-flow[Activation & Deactivation Flow].
 
 * *INT_SI0_ID_MISMATCH*
 
-An interrupt that occurs on the AXI Subordinate Interface when a B or R channel response is received with an ID that was not previously issued as a request. Each RP's checker is enabled by [.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN++#. With that bit clear, the RP does not raise this interrupt. Program the enable only while the activation FSM is DISABLED and no AXI traffic is outstanding on that RP. For details, see xref:{aou-software-xref}#aou-722-axi-id-mismatch-error[Section 7.2.2].
+An interrupt that occurs on the AXI Subordinate Interface when a B or R channel response is received with an ID that was not previously issued as a request. Each RP's checker is enabled by [.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN++#. With that bit clear, the RP does not raise this interrupt. Program the enable only while the activation FSM is DISABLED and no AXI traffic is outstanding on that RP. For details, see xref:{aou-software-xref}#aou-axi-id-mismatch-error[AXI ID Mismatch Error].
 
 Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.AXI_SLV_ID_MISMATCH_ERR_RPn++#. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AXI_SLV_BID_MISMATCH_ERR++# or [.monospaced]#++AXI_SLV_RID_MISMATCH_ERR++#.
 
 * *INT_MI0_ID_MISMATCH*
 
-An interrupt that occurs on the AXI Manager Interface when a B or R channel response is received with an ID that was not previously issued as a request. This is detected by the xref:aou-36-axi-transaction-splitter[AXI Transaction Splitter] destination table.
+An interrupt that occurs on the AXI Manager Interface when a B or R channel response is received with an ID that was not previously issued as a request. This is detected by the xref:aou-axi-transaction-splitter[] destination table.
 
 Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.ERROR_INFO++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.ERROR_INFO.SPLIT_BID_MISMATCH_ERR++# / [.monospaced]#++SPLIT_RID_MISMATCH_ERR++#.
 
 * *INT_EARLY_RESP_ERR*
 
-An interrupt that occurs when, due to the xref:aou-37-write-early-response-controller[Write Early Response] feature, a B response has already been sent through the AXI Subordinate Interface, and a subsequent actual B response arrives with an error. For details, see xref:aou-373-transaction-flow----error-case[Section 3.7.3].
+An interrupt that occurs when, due to the xref:aou-write-early-response-controller[] feature, a B response has already been sent through the AXI Subordinate Interface, and a subsequent actual B response arrives with an error. For details, see xref:aou-transaction-flow----error-case[].
 
 Software can check the ID and error type of the transaction in which the error occurred by reading [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE.WRITE_RESP_ERR++#.
 
 * *INT_EARLY_WDT_ERR*
 
-An interrupt that occurs when the write-transaction watchdog of the xref:aou-37-write-early-response-controller[Write Early Response Controller] expires on an RP. The watchdog is enabled per RP by [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_EN++#; it counts I_CLK cycles in which neither an AW nor a B handshake occurs while the RP has writes outstanding (AW accepted, actual B from the remote die not yet received), restarts on either handshake, and expires when the count reaches [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD++# (shared by all RPs). An expiry typically means the remote die stopped answering writes for which an early OKAY may already have been returned. For details, see xref:aou-375-write-outstanding-queue-backpressure[Section 3.7.5].
+An interrupt that occurs when the write-transaction watchdog of the xref:aou-write-early-response-controller[Write Early Response Controller] expires on an RP. The watchdog is enabled per RP by [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_EN++#; it counts I_CLK cycles in which neither an AW nor a B handshake occurs while the RP has writes outstanding (AW accepted, actual B from the remote die not yet received), restarts on either handshake, and expires when the count reaches [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD++# (shared by all RPs). An expiry typically means the remote die stopped answering writes for which an early OKAY may already have been returned. For details, see xref:aou-write-outstanding-queue-backpressure[Write-Outstanding Queue Backpressure].
 
 Software can find the RP by reading [.monospaced]#++AOU_CORE.WRITE_EARLY_RESPONSE_RPn.WDT_TRANS_TIMEOUT_ERR++#. The status bit is sticky; the interrupt can be cleared by writing pass:[']1pass:['] to it, and masked for all RPs with [.monospaced]#++AOU_CORE.AOU_INTERRUPT_MASK.INT_EARLY_WDT_MASK++# (the mask gates the pin, not the status bit).
 
 * *INT_REQ_LINKRESET*
 
-An interrupt that occurs when AOU_CORE receives an AoU protocol violation. Refer to xref:{aou-software-xref}#aou-723-linkreset-error-reporting[Section 7.2.3] LinkReset Error Reporting. When AOU_CORE receives a protocol violation, software must perform a software reset of AOU_CORE and re-enter the activation sequence.
+An interrupt that occurs when AOU_CORE receives an AoU protocol violation. Refer to xref:{aou-software-xref}#aou-linkreset-error-reporting[LinkReset Error Reporting]. When AOU_CORE receives a protocol violation, software must perform a software reset of AOU_CORE and re-enter the activation sequence.
 
 * *INT_FDI_LINK_DOWN*
 
 An interrupt that occurs when the FDI link is lost while AoU is in use: [.monospaced]#++I_INT_FSM_IN_ACTIVE++# falls (on [.monospaced]#++AOU_TOP++# the FDI bringup controller left Active for LinkError, LinkReset, Disabled or Reset; Retrain and L1 keep it asserted and do not raise this interrupt) while the activation FSM is in [.monospaced]#++ACTIVATE++#, [.monospaced]#++ENABLED++# or [.monospaced]#++DEACTIVATE++#, or in [.monospaced]#++DISABLED++# with an ActivateReq already sent or received. In the same cycle the activation FSM returns to (or stays in) [.monospaced]#++DISABLED++#, any Activate/Deactivate handshake in flight is dropped and a pending entry to [.monospaced]#++ACTIVATE++# is cancelled (AoU specification v0.8 section 8.3.3), so no Ack timeout follows and [.monospaced]#++AOU_INIT.ACTIVATE_STATE_DISABLED++# reads 1. A link that drops while the FSM is [.monospaced]#++DISABLED++# with no ActivateReq outstanding does not raise it.
 
-The status bit is [.monospaced]#++AOU_CORE.AOU_INIT.INT_FDI_LINK_DOWN++# [12] (sticky, write 1 to clear; like every other AOU_CORE register it is cleared by [.monospaced]#++AOU_SW_RESET++#, so the handler reads it first), and the pin can be masked with [.monospaced]#++AOU_CORE.AOU_INTERRUPT_MASK.INT_FDI_LINK_DOWN_MASK++# [10] (the mask gates the pin, not the status bit). The handler is the LinkReset sequence of xref:{aou-software-xref}#aou-736-pm-entry--linkreset--linkdisabled-sequence[Section 7.3.6]: read [.monospaced]#++AOU_INIT++#, [.monospaced]#++AOU_CON0.AOU_SW_RESET++#, restart the link on the UCIe controller, reprogram the configuration registers, [.monospaced]#++ACTIVATE_START++#.
+The status bit is [.monospaced]#++AOU_CORE.AOU_INIT.INT_FDI_LINK_DOWN++# [12] (sticky, write 1 to clear; like every other AOU_CORE register it is cleared by [.monospaced]#++AOU_SW_RESET++#, so the handler reads it first), and the pin can be masked with [.monospaced]#++AOU_CORE.AOU_INTERRUPT_MASK.INT_FDI_LINK_DOWN_MASK++# [10] (the mask gates the pin, not the status bit). The handler is the LinkReset sequence of xref:{aou-software-xref}#aou-pm-entry--linkreset--linkdisabled-sequence[PM entry / LinkReset / LinkDisabled sequence]: read [.monospaced]#++AOU_INIT++#, [.monospaced]#++AOU_CON0.AOU_SW_RESET++#, restart the link on the UCIe controller, reprogram the configuration registers, [.monospaced]#++ACTIVATE_START++#.
 
 [[aou-5-error]]
-== 5. Error
+== Error
 
 *TBD*
 
-[[aou-51-non-compliant-requests]]
-=== 5.1. Non-compliant requests from the remote die
+[[aou-non-compliant-requests]]
+=== Non-compliant requests from the remote die
 
-A WriteReq or ReadReq from the remote die that violates the AXI4 rules listed in xref:{aou-overview-xref}#aou-22-assumptions[Section 2.2] (a burst crossing a 4 KB boundary, or exceeding Max_Transaction_Bytes) is not detected. The request is forwarded to the AXI Manager interface as described there; no interrupt is raised and no LinkReset is requested.
+A WriteReq or ReadReq from the remote die that violates the AXI4 rules listed in xref:{aou-overview-xref}#aou-assumptions[Assumptions] (a burst crossing a 4 KB boundary, or exceeding Max_Transaction_Bytes) is not detected. The request is forwarded to the AXI Manager interface as described there; no interrupt is raised and no LinkReset is requested.
