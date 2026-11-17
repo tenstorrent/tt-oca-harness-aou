@@ -9,7 +9,7 @@ SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 holds what ran (the build and the traffic issued) and what was measured, so a
 reference model can be rebuilt for exactly that run and compared with it.
 `perf.txt` (one `metric value` per line, read by `scripts/perf_report.py`) is
-unchanged. Schema version: 1.
+unchanged. Schema version: 2.
 
 ## Conventions
 

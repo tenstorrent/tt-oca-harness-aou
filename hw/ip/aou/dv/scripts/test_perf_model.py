@@ -16,6 +16,7 @@ import unittest
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perf_model as pm  # noqa: E402
+import perf_report as pr  # noqa: E402
 
 HAVE_MODEL = bool(os.environ.get("D2D_COMPARE"))
 needs_model = unittest.skipUnless(HAVE_MODEL, "D2D_COMPARE not set")
@@ -263,9 +264,14 @@ class TableTest(unittest.TestCase):
         self.assertEqual(pm.judge({"bpc": 50.0, "cycles": 1000, "msgs": bad}, tgt)[0], "MIX")
 
     def test_check_runs(self):
-        """judge_runs reads perf.json link values (steady-state copies) and keys them."""
+        """judge_runs reads perf.json link values (steady-state copies) and keys them.
+
+        The l2r link carries the flit-capacity figures with values deliberately unlike
+        duty, the measured rate and each other, so a field swapped in extraction is
+        visible. r2l is an older record without them and must read as None."""
         win = {"name": "bw_wr", "scenario": "S1", "dir": {
             "l2r": {"app_bytes": 53000, "cycles": 1000, "duty": 0.99,
+                    "occupancy": 0.625, "utilization": 0.500,
                     "ss": {"ss_ok": True, "msgs_by_msg": {}}},
             "r2l": {"app_bytes": 40000, "cycles": 1000, "duty": 0.99, "ss": None}}}
         perf = {"build": {"config": "1x512-sp64", "active_phy": 0}, "windows": [win]}
@@ -280,6 +286,33 @@ class TableTest(unittest.TestCase):
         self.assertEqual(rows["l2r"]["verdict"], "PASS")
         self.assertEqual(rows["r2l"]["verdict"], "BELOW+SHORT")
         self.assertEqual(rows["l2r"]["build"], "vcs-t1-1x512-sp64")
+        self.assertEqual(rows["l2r"]["occupancy"], 0.625)
+        self.assertEqual(rows["l2r"]["utilization"], 0.500)
+        # Older records without the fields stay loadable and are not defaulted to 0.
+        self.assertIsNone(rows["r2l"]["occupancy"])
+        self.assertIsNone(rows["r2l"]["utilization"])
+
+    def test_report_renders_capacity(self):
+        """The occ/util columns show the figures, and "-" for an older record."""
+        def run(d, name, extra):
+            w = {"name": "bw_wr", "scenario": "S1", "dir": {
+                "l2r": {"app_bytes": 53000, "cycles": 1000, "duty": 0.99,
+                        "ss": {"ss_ok": True, "msgs_by_msg": {}}}}}
+            w["dir"]["l2r"].update(extra)
+            perf = {"build": {"config": "1x512-sp64", "active_phy": 0},
+                    "windows": [w]}
+            p = os.path.join(d, name, "aou_perf_test.rid.1")
+            os.makedirs(p)
+            with open(os.path.join(p, "perf.json"), "w", encoding="utf-8") as fh:
+                json.dump(perf, fh)
+        with tempfile.TemporaryDirectory() as d:
+            run(d, "vcs-t1-1x512-sp64-new", {"occupancy": 0.625, "utilization": 0.500})
+            run(d, "vcs-t1-1x512-sp64-old", {})
+            text = "\n".join(pr.model_section(d))
+        new_row = [l for l in text.splitlines() if "-new |" in l and "| l2r |" in l][0]
+        old_row = [l for l in text.splitlines() if "-old |" in l and "| l2r |" in l][0]
+        self.assertIn("| 0.625 | 0.500 |", new_row)
+        self.assertIn("| - | - |", old_row)
 
 
 if __name__ == "__main__":
