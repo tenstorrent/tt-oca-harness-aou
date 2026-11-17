@@ -39,7 +39,8 @@ class aou_perf_vseq extends aou_dp_vseq;
   // +perf_remote_lat=<cycles>: fixed latency of the remote subordinate's B and
   // R responses, in core cycles. full_rate() sets it so the windows measure
   // the same bench at each setting; a manager's outstanding depth must cover
-  // the round trip it adds.
+  // the round trip it adds, which it can only do when the remote responder
+  // keeps several requests in flight (+perf_resp_fork=1).
   int unsigned   remote_lat = 0;
 
   function new(string name = "aou_perf_vseq");

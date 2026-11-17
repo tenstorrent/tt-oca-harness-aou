@@ -44,6 +44,10 @@ class aou_perf_mon extends uvm_component;
   int unsigned  remote_full_pct = 100;  // remote full-strobe beats sent as WriteDataFull
   string        perf_mode = "bw";
   int unsigned  perf_remote_lat = 0;  // +perf_remote_lat: remote B/R response latency in cycles
+  // The remote responder's mode (+perf_resp_fork) is not stored here: it is
+  // cfg.l3_cfg.resp_fork. build_json() records it as build.resp_fork, so a
+  // latency window says whether the bench served its requests one at a time or
+  // concurrently.
 
   protected string       win;
   protected time         t_open;
@@ -669,11 +673,12 @@ class aou_perf_mon extends uvm_component;
                    "\"beat_bytes\": %0d, \"rp_count\": %0d, \"rp_bytes\": %s, ",
                    "\"remote_bytes\": %s, \"max_awlen\": %s, \"max_arlen\": %s, ",
                    "\"writefull\": %s, \"remote_full_pct\": %0d, \"perf_remote_lat\": %0d, ",
-                   "\"l3_rx_depth\": {"},
+                   "\"resp_fork\": %s, \"l3_rx_depth\": {"},
                   config_name, sim_name(), test, seed, perf_mode, cfg.lsm_cfg.active_phy,
                   cfg.lsm_cfg.n_phy, beat_bytes, cfg.n_rp, int_list(rb), int_list(rr),
                   int_list(aw), int_list(ar),
-                  writefull ? "true" : "false", remote_full_pct, perf_remote_lat);
+                  writefull ? "true" : "false", remote_full_pct, perf_remote_lat,
+                  cfg.l3_cfg.resp_fork ? "true" : "false");
     foreach (ccn[c])
       s = {s, (c > 0) ? ", " : "", $sformatf("\"%s\": %0d", ccn[c], cfg.l3_cfg.rx_depth[c])};
     return {s, $sformatf("}, \"ss_drop_pct\": %0d, \"min_ss_flits\": %0d}", ss_drop_pct,

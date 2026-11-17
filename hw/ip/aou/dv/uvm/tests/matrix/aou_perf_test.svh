@@ -19,7 +19,7 @@
 // are fixed, so every seed and simulator measures the same bench:
 // +perf_r_interleave=0|1 (local subordinates interleave R beats across IDs,
 // default 0), +perf_w_before_aw=0|1 (default 1), +perf_resp_fork=0|1 (remote
-// responder serves requests concurrently, default 0).
+// responder serves requests concurrently, default 0: one at a time per RP).
 // The remote die's bus on each RP is as wide as the DUT's (+remote_bytes
 // overrides), so neither side's bursts are resized on the way: a pairing of
 // different widths is a correctness scenario, not a bandwidth one.
@@ -35,7 +35,12 @@
 // aou_perf_vseq::full_rate() applies it to every window, so a window can be
 // measured against a downstream responder that takes time to answer. It is
 // fixed, not the env's seed-drawn 0..remote_lat_max range, so a window
-// measures the same bench on every seed.
+// measures the same bench on every seed. The delay is per response, but the
+// responder serves one request per RP at a time unless +perf_resp_fork=1, and
+// a request is not issued before the previous response exists: without it the
+// setting is a transaction service period and no outstanding depth covers it.
+// The S1 latency scenarios pin +perf_resp_fork=1, so each response is delayed
+// on its own while several requests stay in flight.
 // The remote die advertises enough credit that it is never the limit (the
 // DUT's counters hold 2048 per class); +perf_l3_depth=env keeps the env's
 // smaller defaults.

@@ -1703,10 +1703,10 @@
 - id: '10.17'
   section: '2.10'
   section_title: Performance Tests
-  title: 'Throughput versus remote AXI response latency: S1 on 1x512-sp64 with the remote subordinate''s B and R responses delayed by a fixed 4, 8 and 16 core cycles, at the smallest outstanding depth that still reaches the d2d_model plateau (4, 8 and 8 managers) and at the DUT''s default depth of 32, judged per link by the ordinary T1-P02..T04 gate'
+  title: 'Throughput versus remote AXI response latency: S1 on 1x512-sp64 with the remote subordinate''s B and R responses delayed by a fixed 4, 8 and 16 core cycles and served concurrently, at the smallest outstanding depth that still reaches the d2d_model plateau (4, 8 and 8 managers) and at the DUT''s default depth of 32, judged per link by the ordinary T1-P02..T04 gate'
   priority: P2
   added: 'Performance methodology: throughput under added remote AXI response latency'
-  note: 'Added after 10.16 (the outstanding-depth sweep proposed separately) to leave that ID free. The remote model has no latency of its own in a performance run, so throughput has been measured only with a zero-cycle response round trip; this item fixes the depth a configuration needs once the downstream responder takes time to answer, which is what the PPA efficiency figures leave open. It does not add a bound of its own: every point is held to the same model gate as the zero-latency S1 runs.'
+  note: 'Added after 10.16 (the outstanding-depth sweep proposed separately) to leave that ID free. The remote model has no latency of its own in a performance run, so throughput has been measured only with a zero-cycle response round trip; this item fixes the depth a configuration needs once the downstream responder takes time to answer, which is what the PPA efficiency figures leave open. The responder serves one request per RP at a time unless +perf_resp_fork is on, and does not issue the next until the previous response exists, so every point pins +perf_resp_fork=1: each response is delayed on its own while several requests stay in flight, which is what measures the DUT. It does not add a bound of its own: every point is held to the same model gate as the zero-latency S1 runs.'
 
 - id: '11.1'
   section: '2.11'
