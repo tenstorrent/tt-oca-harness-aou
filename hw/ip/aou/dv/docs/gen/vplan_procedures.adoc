@@ -489,7 +489,7 @@ Class `aou_lp_mode_test` extends `aou_dp_base_test` (`uvm/tests/features/aou_lp_
 (default: random 1..255 when +lp_mode=1) are programmed before activation;
 
 ----
-+lp_reset=1 leaves both at their reset values (FEAT-R31).
++lp_reset=1 leaves both at their reset values (FEAT-R31) and takes no other LP plusarg.
 ----
 
 aou_lp_mode_vseq counts idle flits from the L1 monitor. Traffic both ways
