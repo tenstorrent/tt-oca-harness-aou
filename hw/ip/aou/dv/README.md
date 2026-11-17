@@ -236,6 +236,7 @@ output directories are named after it (`build/vcs-t1-1x512-sp64`,
 | `2xmix-sp64-rxf` | 2 | 1024, 256 | FDI_CFG_SP_64B | 1 | Non-default RX FIFO depth per RP and class, RX FIFO register slices off (plan 3.25) |
 | `1x1024-sp128` | 1 | 1024 | FDI_CFG_SP_128B | 1 | One 1024-bit RP on a 128-byte FDI: the zero-load latency reference (MAS 8.1 Table 8, `aou_perf_test +perf_mode=rxlat`) |
 | `1x1024-sp256` | 1 | 1024 | FDI_CFG_SP_256B | 1 | 256-byte FDI: one flit per cycle, one-step TX packer, 48 granules decoded per cycle, whole-flit cancel |
+| `1x1024-sp256-nxt` | 1 | 1024 | FDI_CFG_SP_256B | 1 | `1x1024-sp256` with `TX_NXT_PACKING_EN` 1: the registered output stage of the one-step TX packer, which also sends a MsgCredit field with every flit |
 | `4xmix-sp256` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | Mixed widths, every local width, 256-byte FDI |
 | `4xmix-sp256-rxf` | 4 | 1024, 512, 256, 512 | FDI_CFG_SP_256B | 1 | `4xmix-sp256` with non-default RX FIFO depths (`AOU_RX_FIFO_ALT`) |
 

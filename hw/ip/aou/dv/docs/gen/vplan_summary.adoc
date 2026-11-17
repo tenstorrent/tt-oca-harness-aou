@@ -396,7 +396,7 @@
 | `aou_reset_test.reset-apb.when-traffic.pclk_ps-1013` | `aou_reset_test` | `+reset=apb +when=traffic +pclk_ps=1013` | 1 |  | 11.17 | 
 | `aou_dft_scan_test` | `aou_dft_scan_test` |  | 1-2 |  | 11.19 | 
 |===
-===== `testlists/matrix.toml` (132 scenarios)
+===== `testlists/matrix.toml` (138 scenarios)
 [cols="3,2,2,1,1,2,2",options="header"]
 |===
 | Scenario | Test class | Arguments | Seeds | Target | Plan items | Expected failure
@@ -482,6 +482,12 @@
 | `aou_pack_test.pk-mixed.1x512-sp64-nxt` | `aou_pack_test` | `+pk=mixed` | 1-2 | `1x512-sp64-nxt` | 6.3 | 
 | `aou_pack_test.pk-full.1x512-sp64-nxt` | `aou_pack_test` | `+pk=full` | 1-2 | `1x512-sp64-nxt` | 6.18 | 
 | `aou_stress_test.st_bp-all.1x512-sp64-nxt` | `aou_stress_test` | `+st_bp=all` | 1-2 | `1x512-sp64-nxt` | 7.16,10.15 | 
+| `aou_sanity_test.1x1024-sp256-nxt` | `aou_sanity_test` |  | 1 | `1x1024-sp256-nxt` |  | 
+| `aou_dp_random_test.dp_dir-both.1x1024-sp256-nxt` | `aou_dp_random_test` | `+dp_dir=both` | 1-3 | `1x1024-sp256-nxt` | 10.3,7.16,8.9,8.10 | 
+| `aou_pack_test.pk-crossflit.1x1024-sp256-nxt` | `aou_pack_test` | `+pk=crossflit` | 1-2 | `1x1024-sp256-nxt` | 6.5,6.7,6.9 | 
+| `aou_pack_test.pk-mixed.1x1024-sp256-nxt` | `aou_pack_test` | `+pk=mixed` | 1-2 | `1x1024-sp256-nxt` | 6.3 | 
+| `aou_pack_test.pk-full.1x1024-sp256-nxt` | `aou_pack_test` | `+pk=full` | 1-2 | `1x1024-sp256-nxt` | 6.18 | 
+| `aou_stress_test.st_bp-all.1x1024-sp256-nxt` | `aou_stress_test` | `+st_bp=all` | 1-2 | `1x1024-sp256-nxt` | 7.16,10.15 | 
 | `aou_perf_test.perf_mode-lat.1x1024-sp128` | `aou_perf_test` | `+perf_mode=lat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.9 | 
 | `aou_perf_test.perf_mode-drain.1x1024-sp128` | `aou_perf_test` | `+perf_mode=drain +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.7 | 
 | `aou_perf_test.perf_mode-rxlat.1x1024-sp128` | `aou_perf_test` | `+perf_mode=rxlat +aou_config=1x1024-sp128` | 1 | `1x1024-sp128` | 10.4,10.5,10.6,10.14 | 

@@ -311,6 +311,12 @@ build_dir = "hw/ip/aou/dv/build/uvm"
 defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=1024",
            "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=5"]
 
+[targets.1x1024-sp256-nxt]
+description = "One 1024-bit RP on a 256-byte FDI, TX_NXT_PACKING_EN 1"
+build_dir = "hw/ip/aou/dv/build/uvm"
+defines = ["AOU_RP_COUNT=1", "AOU_RP_DATA_W=1024", "AOU_RP0_DATA_W=1024", "AOU_RP1_DATA_W=1024",
+           "AOU_RP2_DATA_W=1024", "AOU_RP3_DATA_W=1024", "AOU_FDI_CONFIG=5", "AOU_TX_NXT_PACKING=1"]
+
 [targets.4xmix-sp256]
 description = "Mixed widths, every local width, 256-byte FDI"
 build_dir = "hw/ip/aou/dv/build/uvm"
