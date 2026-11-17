@@ -42,8 +42,14 @@ module AOU_AXIMUX_1XN_SS #(
     parameter   AXI_QOS_WD    = 4,
     parameter   AXI_LEN_WD    = 8,
 
+    // Most bursts that can be outstanding on the M side at once, reads and writes.
+    parameter   AR_PENDING_MAX = 255,
+    parameter   AW_PENDING_MAX = 255,
+
     localparam  AXI_WSTRB_WD  = AXI_DATA_WD / 8,
-    localparam  LOG_SN        = $clog2(SN)
+    localparam  LOG_SN        = $clog2(SN),
+    localparam  AR_CNT_WD     = $clog2(AR_PENDING_MAX + 1),
+    localparam  AW_CNT_WD     = $clog2(AW_PENDING_MAX + 1)
 )
 (
     input                                     I_CLK         ,
@@ -400,8 +406,8 @@ reg r_cur_aw_valid;
 reg [LOG_SN-1:0] r_selected_ar_ch;
 reg [LOG_SN-1:0] r_selected_aw_ch;
 
-reg [7:0] ar_pending_cnt;
-reg [7:0] aw_pending_cnt;
+reg [AR_CNT_WD-1:0] ar_pending_cnt;
+reg [AW_CNT_WD-1:0] aw_pending_cnt;
 
 always @(posedge I_CLK or negedge I_RESETN) begin
     if (!I_RESETN) begin
@@ -624,12 +630,13 @@ assign O_S_RDATA_RS    = I_M_RDATA[r_selected_ar_ch];
 assign O_S_RRESP_RS    = I_M_RRESP[r_selected_ar_ch];
 assign O_S_RUSER_RS    = I_M_RUSER[r_selected_ar_ch];
 assign O_S_RLAST_RS    = I_M_RLAST[r_selected_ar_ch];
-assign O_S_RVALID_RS   = I_M_RVALID[r_selected_ar_ch];
+// Gated like O_M_RREADY, so an S-side handshake always takes the M-side beat.
+assign O_S_RVALID_RS   = I_M_RVALID[r_selected_ar_ch] & r_cur_ar_valid;
 
 assign O_S_BID      = I_M_BID[r_selected_aw_ch];
 assign O_S_BRESP    = I_M_BRESP[r_selected_aw_ch];
 assign O_S_BUSER    = I_M_BUSER[r_selected_aw_ch];
-assign O_S_BVALID   = I_M_BVALID[r_selected_aw_ch];
+assign O_S_BVALID   = I_M_BVALID[r_selected_aw_ch] & r_cur_aw_valid;
 
 //--------------------------------------------------------------
 `ifdef ASSERTION_ON
