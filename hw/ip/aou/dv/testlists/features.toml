@@ -244,6 +244,17 @@ tags = ["features"]
 run_modes = ["features"]
 args = ["+lp_mode=1", "+lp_thr=0", "+dp_dir=l2r", "+dp_wr_pct=0", "+dp_n=64"]
 
+# FEAT-R31 (tenstorrent/tt-oca-harness-aou#170): TX_LP_MODE and its threshold left at their reset values;
+# an idle ENABLED DUT must send no flit.
+[[tests]]
+name = "aou_lp_mode_test.lp_reset-1"
+module = { uvm = "aou_lp_mode_test" }
+seed = 1
+reseed = 2
+tags = ["features"]
+run_modes = ["features"]
+args = ["+lp_reset=1"]
+
 # 16.11/16.12: the early table fills to 32 writes (AWREADY held) and drains as the
 # remote B responses arrive.
 [[tests]]
@@ -485,7 +496,7 @@ args = ["+wdt_case=multi_rp"]
 
 [[groups]]
 name = "features"
-expected_count = 46
+expected_count = 47
 tests = [
   "aou_split_test.split_aw-15.split_ar-15.dp_len-0_1_3_7_15",
   "aou_split_test.split_aw-7.split_ar-7.dp_len-15_31",
@@ -512,6 +523,7 @@ tests = [
   "aou_lp_mode_test.lp_mode-1.lp_thr-0",
   "aou_lp_mode_test.lp_mode-1",
   "aou_lp_mode_test.lp_mode-1.lp_thr-0.dp_dir-l2r.dp_wr_pct-0.dp_n-64",
+  "aou_lp_mode_test.lp_reset-1",
   "aou_early_bresp_test.early_en-1.early_full-1.1x512-sp64",
   "aou_early_bresp_test.early_en-1.early_full-1.4x512-sp64",
   "aou_split_test.split_aw-per_rp.split_ar-per_rp.dp_len-15_31_63.4x512-sp64",

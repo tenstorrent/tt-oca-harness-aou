@@ -49,6 +49,7 @@ class aou_t1_lp_mode_vseq extends aou_base_test_seq;
     int unsigned ready_off;
     int unsigned ready_on;
     link_up();
+    lp_mode(1'b0);
     activate(AOU_T1_BY_APB, AOU_T1_DUT_FIRST);
     traffic(AOU_T1_BOTH_DIRS, num_txns / 2 + 1, null);
     idle_flits();
