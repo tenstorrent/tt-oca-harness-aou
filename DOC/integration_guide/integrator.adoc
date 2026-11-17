@@ -327,7 +327,10 @@ remap table on a merged route.
 [.monospaced]#++AOU_TX_CORE++#. 0: each FDI chunk is driven combinationally from the
 granule ring and the current packing state. 1: the chunk is computed from the
 look-ahead (next) packing state and ring contents and registered before the
-FDI output mux, so the FDI TX data leaves a register.
+FDI output mux, so the FDI TX data leaves a register. At a 256 B FDI the 16-bit
+MsgCredit field is the exception: it comes from the MsgCredit holding register,
+gated by that register's valid, so that each flit carries the credit consumed when
+it is accepted.
 
 |RP0_M_RD_MO_CNT ... RP3_M_RD_MO_CNT |parameter |32 |Number of remote read requests the RP keeps in
 service at its AXI manager port (one pending-ID table entry per request, from
@@ -2165,7 +2168,9 @@ mux.
 control logic and FIFO write.
 * *FDI TX outputs* (DATA, VALID, IRDY): Combinational. STALLACK outputs
 are registered. With [.monospaced]#++TX_NXT_PACKING_EN = 1++# the DATA output is driven from
-a register in [.monospaced]#++AOU_TX_CORE++# through the FDI output mux only.
+a register in [.monospaced]#++AOU_TX_CORE++# through the FDI output mux only, except
+the MsgCredit field at a 256 B FDI, which passes one AND gate (its valid gating)
+before that mux.
 * *FDI RX inputs*: Combinational -- data/valid pass through an input
 mux. [.monospaced]#++FLIT_CANCEL++# drives both sequential and combinational logic.
 * *Interrupt/control signals*: Combinational.
