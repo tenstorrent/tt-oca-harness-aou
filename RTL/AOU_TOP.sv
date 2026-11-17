@@ -16,7 +16,7 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 // *****************************************************************************
-// Connect the UCIe 3.0 FDI bringup controller to the AXI-over-UCIe protocol engine.
+// Connect the UCIe FDI bringup controller to the AXI-over-UCIe protocol engine.
 //
 // AOU_TOP is the top-level wrapper around AOU_FDI_BRINGUP_CTRL, the UCIe 3.0 FDI state
 // machine, and AOU_CORE_TOP, the AXI-over-UCIe protocol engine. The bringup controller
