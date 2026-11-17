@@ -529,7 +529,10 @@ import packet_def_pkg::*;
         .AXI_ADDR_WD                ( AXI_ADDR_WD   ),
         .AXI_ID_WD                  ( AXI_ID_WD     ),
         .AXI_QOS_WD                 ( 4             ),
-        .AXI_LEN_WD                 ( AXI_LEN_WD    )
+        .AXI_LEN_WD                 ( AXI_LEN_WD    ),
+        // The splitter may cut each request into 2^AXI_LEN_WD bursts (MAX_AxBURSTLEN = 0).
+        .AR_PENDING_MAX             ( M_RD_MO_CNT << AXI_LEN_WD ),
+        .AW_PENDING_MAX             ( M_WR_MO_CNT << AXI_LEN_WD )
     )u_aou_aximux_1x2_singleslave
     (
         .I_CLK                      ( I_CLK                             ),
