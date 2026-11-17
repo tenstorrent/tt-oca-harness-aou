@@ -6,17 +6,20 @@ ifdef::aou-imagesdir[]
 :imagesdir: {aou-imagesdir}
 endif::[]
 
-[[aou-8-ppa]]
-== 8. PPA
+[[aou-ppa]]
+== PPA
 
-[[aou-81-performance]]
-=== 8.1. Performance
+[[aou-performance]]
+=== Performance
 
 Latency is measured on one AOU_CORE at zero load, in AOU_CORE clock cycles, as a TX part and an RX part per AXI channel. The TX latency runs from the AXI handshake ([.monospaced]#++VALID++# and [.monospaced]#++READY++#) on the local port to [.monospaced]#++lp_valid++# of the FDI beat that carries the first granule of the message the handshake produced. The RX latency runs from [.monospaced]#++lp_valid++# of the first beat of the flit that carries the message to [.monospaced]#++VALID++# on the AXI port, with the receiving side's [.monospaced]#++READY++# held high. On a back-to-back connection the beat leaves the sending AOU_CORE and reaches the receiving AOU_CORE in the same cycle, so the end-to-end latency is the sum of the two parts; a UCIe link adds its adapter and PHY latency (Figure 29).
+
+<<table-8>> lists the measured latency of each AXI channel in a back-to-back connection.
 
 [[table-8]]
 
 [cols="3,3,^2,^2,^2",options="header",]
+.AOU_CORE Zero-Load Latency (Cycles)
 |==========================================
 |AXI Channel |AoU message |TX: AXI handshake to FDI |RX: FDI to AXI VALID |Back-to-back total
 |Read Request (AR) |ReadReq |3 |5 |8
@@ -26,8 +29,6 @@ Latency is measured on one AOU_CORE at zero load, in AOU_CORE clock cycles, as a
 |Write Response (B) |WriteResp |4 |5 |9
 |==========================================
 
-_Table 8. AOU_CORE Zero-Load Latency (Cycles)_
-
 Conditions of the measurement: one transaction in flight at a time, each a single 128-byte beat with every strobe set; the local manager asserts [.monospaced]#++AWVALID++# and [.monospaced]#++WVALID++# in the same cycle; the remote die places a WriteReq at G0 and its WriteData at G3 of the same flit, and every other message alone at G0 of its flit. A 128-byte data message occupies both beats of the 128-byte FDI, so [.monospaced]#++WVALID++# and [.monospaced]#++RVALID++# follow the flit's second beat by 8 and 5 cycles respectively. With [.monospaced]#++WVALID++# one cycle after [.monospaced]#++AWVALID++# the TX AW latency is 4 and the others are unchanged: the WriteReq leaves 3 cycles after the later of the two handshakes.
 
 The RX write channels are longer than the read channels because [.monospaced]#++AOU_AXI_WLAST_GEN++# regenerates [.monospaced]#++WLAST++# by aligning the WriteReq with its WriteData: [.monospaced]#++AWVALID++# is asserted only once the first W beat is available, so AW follows W. On the TX side the write response takes one cycle more than a request because of the register slice on the write-response path of [.monospaced]#++AOU_AXI4MUX_3X1_TOP++#, and ReadData one more again for the read-data register slice of the transaction splitter.
@@ -36,10 +37,15 @@ The measurement used [.monospaced]#++AOU_TOP++# with [.monospaced]#++RP_COUNT = 
 
 The TX flit packer drives the FDI data path combinationally from the granule ring by default ([.monospaced]#++TX_NXT_PACKING_EN = 0++#). With [.monospaced]#++TX_NXT_PACKING_EN = 1++# [.monospaced]#++AOU_TX_CORE++# computes each chunk from the look-ahead packing state and ring contents and registers it before the output mux.
 
+<<figure-29>> shows the initial transfer latency when AOU_CORE is connected through
+UCIe.
+
 [caption=""]
 .Figure 29. Initial Latency of AOU_CORE with UCIe (Cycle)
 [[figure-29]]
 image::image28.png[Figure 29. Initial Latency of AOU_CORE with UCIe (Cycle)]
+
+<<figure-30>> shows how bandwidth efficiency varies with UCIe FDI latency.
 
 [caption=""]
 .Figure 30. AoU Bandwidth Efficiency with Respect to UCIe FDI Latency
@@ -48,9 +54,13 @@ image::image29.png[Figure 30. AoU Bandwidth Efficiency with Respect to UCIe FDI 
 
 The results of efficiency measurements for read and write operations with varying burst lengths are presented. For write operations, two cases were evaluated. Normal Write and Write Full, where no write strobe bits are transmitted. The measured values and the corresponding expected values are as follows.
 
+<<table-9>> compares measured and expected efficiency across burst lengths and write
+modes.
+
 [[table-9]]
 
 [cols="a,a,a,a,a,a"]
+.AOU_CORE Data Transfer Efficiency
 |===
 a|Data transfer
 efficiency
@@ -111,17 +121,19 @@ a|66.7%
 
 |===
 
-_Table 9. AOU_CORE Data Transfer Efficiency_
 
 * 0.4% performance drop is not from IP, but just from transfer data size. If the transfer data size is the multiples of 6 burst such 132 beats, it shows the same performance number with the limit in AoU spec. Everything is the same case. Note that the efficiency is measured with 128/(cycle_from_1st_valid_to_last_valid + 1), where 1 is the hidden bubble right before the first valid. It is indispensable since AoU data message size can not covered in a single 64B chunk, unlike local AXI bus.
 
-[[aou-82-power]]
-=== 8.2. Power
+[[aou-power]]
+=== Power
 
 TBD
 
-[[aou-83-area]]
-=== 8.3. Area
+[[aou-area]]
+=== Area
+
+<<figure-31>> shows the area contribution of each submodule in a single-resource-plane
+AoU.
 
 [caption=""]
 .Figure 31. Area of 1 RP AOU
@@ -140,24 +152,28 @@ With 2 RP, each AXI bandwidth is 512 bit and 256 bit, AOU_CORE area was 197k um^
 
 The FIFO depth of the two RPs are identical.
 
+<<table-10>> compares the reported area across resource-plane configurations.
+
 [[table-10]]
 
 [cols=",",options="header",]
+.AOU_CORE Area (measured at an ++FDI_CFG_SP_64B++-equivalent configuration; numbers will scale up for ++FDI_CFG_*_128B++ configurations due to the 88 \-> 140 R/W FIFO depth bump.)
 |=============================
 |Configuration | AoU Area (um^2)
 |1RP (AXI : 512bit) |97K
 |2RP (AXI : 256bit & 512bit) |197K
 |=============================
 
-_Table 10. AOU_CORE Area (measured at an ++FDI_CFG_SP_64B++-equivalent configuration; numbers will scale up for ++FDI_CFG_*_128B++ configurations due to the 88 \-> 140 R/W FIFO depth bump.)_
-
 ifndef::release[]
 [[appendix-a-records-of-changes]]
 == Appendix A. Records of Changes
 
+<<table-11>> records the revisions of this specification.
+
 [[table-11]]
 
 [width="100%",cols="20%,20%,20%,20%,20%",options="header",]
+.Record of Changes
 |======================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
 |Version |Date |Author |Reviewer |Description of Change
 |v0.1 |2025/08/20 |Soyoung Min, Jaeyun Lee, Hojun Lee |Kwanho Kim |Initial version.
@@ -190,19 +206,19 @@ ifndef::release[]
 | |2026/11/16 |Tenstorrent | |[.monospaced]#++AOU_CON0++# resets to 0x00000800: [.monospaced]#++TX_LP_MODE = 1++# with [.monospaced]#++TX_LP_MODE_THRESHOLD = 0++#, the fully-gated low-power mode. Before, [.monospaced]#++TX_LP_MODE++# reset to 0 and an idle AOU_CORE sent an empty flit at every FDI opportunity, taking flit slots from any other protocol layer sharing the FDI (7.1).
 |======================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================================
 
-_Table 11. Record of Changes_
 endif::release[]
 
 [[appendix-b-referenced-documents]]
 == Appendix B. Referenced Documents
 
+<<table-12>> lists the documents this specification cites.
+
 [[table-12]]
 
 [width="99%",cols="28%,50%,22%",options="header",]
+.Referenced Documents
 |===================================================================================
 |Document Name |Document Location and/or URL |Issuance Date
 |AXI-over-UCIe (AoU) Specification, Revision 0.7 | https://www.openchipletatlas.org/specifications/aou/0.7.1 |2025
 |AXI-over-UCIe (AoU) Specification, Revision 0.8 | https://www.openchipletatlas.org/specifications/aou/latest |2026
 |===================================================================================
-
-_Table 12. Referenced Documents_

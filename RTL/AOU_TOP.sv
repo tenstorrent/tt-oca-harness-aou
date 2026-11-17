@@ -16,334 +16,318 @@
 //  See the License for the specific language governing permissions and
 //  limitations under the License.
 // *****************************************************************************
+// Connect the UCIe FDI bringup controller to the AXI-over-UCIe protocol engine.
 //
-//  Module     : AOU_TOP
-//  Description: Top-level wrapper integrating AOU_FDI_BRINGUP_CTRL (UCIe 3.0
-//               FDI state machine) with AOU_CORE_TOP (AXI-over-UCIe protocol
-//               engine). The bringup controller manages FDI handshakes
-//               (wake, clock, state, rx-active) and drives I_INT_FSM_IN_ACTIVE
-//               (link established: Active, Retrain or L1; falls only on a
-//               link loss, which raises INT_FDI_LINK_DOWN) into the AOU
-//               core, replacing the former external UCIE_CORE connection.
-//               O_FDI_LINK_UP is the narrower "FSM in Active".
+// AOU_TOP is the top-level wrapper around AOU_FDI_BRINGUP_CTRL, the UCIe 3.0 FDI state
+// machine, and AOU_CORE_TOP, the AXI-over-UCIe protocol engine. The bringup controller
+// manages the FDI handshakes (wake, clock, state, and rx-active) and drives
+// I_INT_FSM_IN_ACTIVE into the AOU core, so the core needs no external UCIE_CORE
+// connection. I_INT_FSM_IN_ACTIVE means the link is established (Active, Retrain, or
+// L1) and falls only on a link loss, which raises INT_FDI_LINK_DOWN. O_FDI_LINK_UP is
+// narrower and is set only while the FSM is in Active.
 //
-//               FDI data-plane ports mirror AOU_CORE_TOP's _0/_1 naming and
-//               `+define+TWO_PHY gating: PHY0 is always present, PHY1 and
-//               I_PHY_TYPE are exposed only when built with `+define+TWO_PHY.
-//               The single FDI_CONFIG parameter selects the FDI width pair
-//               for both PHYs and is forwarded directly to AOU_CORE_TOP.
-//               Local FDI_IF_WD0 / FDI_IF_WD1 localparams are derived from
-//               FDI_CONFIG only for sizing this wrapper's own FDI ports.
+// The FDI data-plane ports mirror the _0/_1 naming and the +define+TWO_PHY gating of
+// AOU_CORE_TOP. PHY0 is always present. PHY1 and I_PHY_TYPE are exposed only when the
+// design is built with +define+TWO_PHY.
 //
-// *****************************************************************************
+// The single FDI_CONFIG parameter is an integer that picks the FDI data bus widths for
+// both PHYs and, in two-PHY builds, the per-PHY pairing; packet_def_pkg::FDI_CFG_*
+// enumerates its values. FDI_CONFIG is forwarded unchanged to AOU_CORE_TOP. Its default
+// matches the legacy +define+FDI_32B single-PHY configuration. Keeping FDI_CONFIG
+// consistent with +define+TWO_PHY is the integrator's responsibility. The local
+// FDI_IF_WD0 and FDI_IF_WD1 localparams are derived from FDI_CONFIG only to size this
+// wrapper's own FDI ports and the FIFO-depth defaults, and are not forwarded.
+//
+// The RX W and R granule-store depths are given in granules. They default to 960 with the
+// 256B FDI (FDI_IF_WD0 == 2048) and to 600 otherwise.
+//
+// The ports fall into these groups:
+//
+// - APB slave interface.
+// - AXI master interface (O_AOU_RX_AXI_M_*, I_AOU_TX_AXI_M_*): the RX side, facing the
+//   downstream bus.
+// - AXI slave interface (I_AOU_TX_AXI_S_*, O_AOU_RX_AXI_S_*): the TX side, facing the
+//   upstream bus.
+// - PHY type select (I_PHY_TYPE), present only with +define+TWO_PHY.
+// - FDI data path for PHY0, always present, and for PHY1, present only with
+//   +define+TWO_PHY.
+// - FDI bringup control (I_PL_*, O_LP_*), connected to AOU_FDI_BRINGUP_CTRL.
+// - FDI bringup software control (I_SW_*) and status (O_FDI_FSM_STATE, O_FDI_LINK_UP).
+// - Interrupt outputs (INT_*).
+// - DFT.
 
 `timescale 1ns/1ps
 
 module AOU_TOP
 import packet_def_pkg::*;
 #(
-    parameter   RP_COUNT                    = 1,
+    parameter   RP_COUNT                    = 1,  // Number of receive ports (AXI master/slave
+                                                  // pairs), up to 4.
 
-    // FDI configuration selector. Single integer that picks the FDI data
-    // bus widths for both PHYs and (in two-PHY builds) the per-PHY pairing.
-    // See packet_def_pkg::FDI_CFG_* for the enumeration. Forwarded
-    // unchanged to u_aou_core_top below; the local FDI_IF_WD0 / FDI_IF_WD1
-    // localparams are derived from FDI_CONFIG only to size this wrapper's
-    // own FDI ports and the FIFO-depth defaults. Default matches the
-    // legacy +define+FDI_32B single-PHY configuration. Consistency between
-    // FDI_CONFIG and +define+TWO_PHY is the integrator's responsibility.
-    parameter int FDI_CONFIG                = FDI_CFG_SP_32B,
+    parameter int FDI_CONFIG                = FDI_CFG_SP_32B,  // FDI configuration, one of
+                                                               // packet_def_pkg::FDI_CFG_*.
 
-    // Derived FDI data bus widths (bits). Local-only; not forwarded.
-    localparam int FDI_IF_WD0 = (FDI_CONFIG == FDI_CFG_SP_32B     ) ? 256  :
+    localparam int FDI_IF_WD0 = (FDI_CONFIG == FDI_CFG_SP_32B     ) ? 256  :  // PHY0 FDI data bus width, in bits. Local only.
                                 (FDI_CONFIG == FDI_CFG_SP_64B     ) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_SP_128B    ) ? 1024 :
                                 (FDI_CONFIG == FDI_CFG_TP_32B_64B ) ? 256  :
                                 (FDI_CONFIG == FDI_CFG_TP_64B_128B) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_SP_256B    ) ? 2048 : 256,
-    localparam int FDI_IF_WD1 = (FDI_CONFIG == FDI_CFG_SP_32B     ) ? 512  :
+    localparam int FDI_IF_WD1 = (FDI_CONFIG == FDI_CFG_SP_32B     ) ? 512  :  // PHY1 FDI data bus width, in bits. Local only.
                                 (FDI_CONFIG == FDI_CFG_SP_64B     ) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_SP_128B    ) ? 1024 :
                                 (FDI_CONFIG == FDI_CFG_TP_32B_64B ) ? 512  :
                                 (FDI_CONFIG == FDI_CFG_TP_64B_128B) ? 1024 :
                                 (FDI_CONFIG == FDI_CFG_SP_256B    ) ? 2048 : 512,
 
-    // FIFO depths default to 140 for 1024b (128B) FDI data paths, 88 otherwise.
-    // Matches the original +define+FDI_128B branch which applied to both
-    // single-PHY (FDI_IF_WD0 == 1024) and two-PHY (FDI_IF_WD1 == 1024) cases.
-    parameter   RP0_RX_AW_FIFO_DEPTH        = 44,
-    parameter   RP0_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP0_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP0_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP0_RX_B_FIFO_DEPTH         = 44,
+    parameter   RP0_RX_AW_FIFO_DEPTH        = 44,  // RP0 RX write-address FIFO depth.
+    parameter   RP0_RX_AR_FIFO_DEPTH        = 44,  // RP0 RX read-address FIFO depth.
+    parameter   RP0_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP0 RX write-data granule-store depth, in granules.
+    parameter   RP0_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP0 RX read-data granule-store depth, in granules.
+    parameter   RP0_RX_B_FIFO_DEPTH         = 44,  // RP0 RX write-response FIFO depth.
 
-    parameter   RP1_RX_AW_FIFO_DEPTH        = 44,
-    parameter   RP1_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP1_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP1_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP1_RX_B_FIFO_DEPTH         = 44,
+    parameter   RP1_RX_AW_FIFO_DEPTH        = 44,  // RP1 RX write-address FIFO depth.
+    parameter   RP1_RX_AR_FIFO_DEPTH        = 44,  // RP1 RX read-address FIFO depth.
+    parameter   RP1_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP1 RX write-data granule-store depth, in granules.
+    parameter   RP1_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP1 RX read-data granule-store depth, in granules.
+    parameter   RP1_RX_B_FIFO_DEPTH         = 44,  // RP1 RX write-response FIFO depth.
 
-    parameter   RP2_RX_AW_FIFO_DEPTH        = 44,
-    parameter   RP2_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP2_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP2_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP2_RX_B_FIFO_DEPTH         = 44,
+    parameter   RP2_RX_AW_FIFO_DEPTH        = 44,  // RP2 RX write-address FIFO depth.
+    parameter   RP2_RX_AR_FIFO_DEPTH        = 44,  // RP2 RX read-address FIFO depth.
+    parameter   RP2_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP2 RX write-data granule-store depth, in granules.
+    parameter   RP2_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP2 RX read-data granule-store depth, in granules.
+    parameter   RP2_RX_B_FIFO_DEPTH         = 44,  // RP2 RX write-response FIFO depth.
 
-    parameter   RP3_RX_AW_FIFO_DEPTH        = 44,
-    parameter   RP3_RX_AR_FIFO_DEPTH        = 44,
-    parameter   RP3_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP3_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,   // granules
-    parameter   RP3_RX_B_FIFO_DEPTH         = 44,
+    parameter   RP3_RX_AW_FIFO_DEPTH        = 44,  // RP3 RX write-address FIFO depth.
+    parameter   RP3_RX_AR_FIFO_DEPTH        = 44,  // RP3 RX read-address FIFO depth.
+    parameter   RP3_RX_W_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP3 RX write-data granule-store depth, in granules.
+    parameter   RP3_RX_R_FIFO_DEPTH         = (FDI_IF_WD0 == 2048) ? 960 : 600,  // RP3 RX read-data granule-store depth, in granules.
+    parameter   RP3_RX_B_FIFO_DEPTH         = 44,  // RP3 RX write-response FIFO depth.
 
-    parameter   RX_AW_FIFO_RS_EN            = 1,
-    parameter   RX_AR_FIFO_RS_EN            = 1,
-    parameter   RX_B_FIFO_RS_EN             = 1,
+    parameter   RX_AW_FIFO_RS_EN            = 1,  // Register slice on the RX write-address FIFO
+                                                  // output.
+    parameter   RX_AR_FIFO_RS_EN            = 1,  // Register slice on the RX read-address FIFO
+                                                  // output.
+    parameter   RX_B_FIFO_RS_EN             = 1,  // Register slice on the RX write-response FIFO
+                                                  // output.
 
-    parameter   RP0_AXI_DATA_WD             = 512,
-    parameter   RP1_AXI_DATA_WD             = 512,
-    parameter   RP2_AXI_DATA_WD             = 512,
-    parameter   RP3_AXI_DATA_WD             = 512,
+    parameter   RP0_AXI_DATA_WD             = 512,  // RP0 AXI data width, in bits.
+    parameter   RP1_AXI_DATA_WD             = 512,  // RP1 AXI data width, in bits.
+    parameter   RP2_AXI_DATA_WD             = 512,  // RP2 AXI data width, in bits.
+    parameter   RP3_AXI_DATA_WD             = 512,  // RP3 AXI data width, in bits.
 
-    // The widest data message AoU defines (WriteData1024/ReadData1024). The receiver
-    // cannot know the remote die's AXI width, so the RX data path is sized for the
-    // maximum and this is not an integration parameter.
-    localparam  AXI_PEER_DIE_MAX_DATA_WD    = 1024,
+    localparam  AXI_PEER_DIE_MAX_DATA_WD    = 1024,  // Widest AoU data message (WriteData1024,
+                                                     // ReadData1024). The RX data path is sized
+                                                     // for it because the peer die's AXI width
+                                                     // is unknown.
 
-    parameter   APB_ADDR_WD                 = 32,
-    parameter   APB_DATA_WD                 = 32,
+    parameter   APB_ADDR_WD                 = 32,  // APB address width.
+    parameter   APB_DATA_WD                 = 32,  // APB data width.
 
-    parameter   RP0_S_RD_MO_CNT             = 32,
-    parameter   RP0_S_WR_MO_CNT             = 32,
-    parameter   RP0_M_RD_MO_CNT             = 32,
-    parameter   RP0_M_WR_MO_CNT             = 32,
+    parameter   RP0_S_RD_MO_CNT             = 32,  // RP0 outstanding reads on the AXI slave interface.
+    parameter   RP0_S_WR_MO_CNT             = 32,  // RP0 outstanding writes on the AXI slave interface.
+    parameter   RP0_M_RD_MO_CNT             = 32,  // RP0 outstanding reads on the AXI master interface.
+    parameter   RP0_M_WR_MO_CNT             = 32,  // RP0 outstanding writes on the AXI master interface.
 
-    parameter   RP1_S_RD_MO_CNT             = 32,
-    parameter   RP1_S_WR_MO_CNT             = 32,
-    parameter   RP1_M_RD_MO_CNT             = 32,
-    parameter   RP1_M_WR_MO_CNT             = 32,
+    parameter   RP1_S_RD_MO_CNT             = 32,  // RP1 outstanding reads on the AXI slave interface.
+    parameter   RP1_S_WR_MO_CNT             = 32,  // RP1 outstanding writes on the AXI slave interface.
+    parameter   RP1_M_RD_MO_CNT             = 32,  // RP1 outstanding reads on the AXI master interface.
+    parameter   RP1_M_WR_MO_CNT             = 32,  // RP1 outstanding writes on the AXI master interface.
 
-    parameter   RP2_S_RD_MO_CNT             = 32,
-    parameter   RP2_S_WR_MO_CNT             = 32,
-    parameter   RP2_M_RD_MO_CNT             = 32,
-    parameter   RP2_M_WR_MO_CNT             = 32,
+    parameter   RP2_S_RD_MO_CNT             = 32,  // RP2 outstanding reads on the AXI slave interface.
+    parameter   RP2_S_WR_MO_CNT             = 32,  // RP2 outstanding writes on the AXI slave interface.
+    parameter   RP2_M_RD_MO_CNT             = 32,  // RP2 outstanding reads on the AXI master interface.
+    parameter   RP2_M_WR_MO_CNT             = 32,  // RP2 outstanding writes on the AXI master interface.
 
-    parameter   RP3_S_RD_MO_CNT             = 32,
-    parameter   RP3_S_WR_MO_CNT             = 32,
-    parameter   RP3_M_RD_MO_CNT             = 32,
-    parameter   RP3_M_WR_MO_CNT             = 32,
+    parameter   RP3_S_RD_MO_CNT             = 32,  // RP3 outstanding reads on the AXI slave interface.
+    parameter   RP3_S_WR_MO_CNT             = 32,  // RP3 outstanding writes on the AXI slave interface.
+    parameter   RP3_M_RD_MO_CNT             = 32,  // RP3 outstanding reads on the AXI master interface.
+    parameter   RP3_M_WR_MO_CNT             = 32,  // RP3 outstanding writes on the AXI master interface.
 
-    // TX flit packer output stage: 0 combinational (current state),
-    // 1 registered from the look-ahead state. See AOU_TX_CORE.
-    parameter   TX_NXT_PACKING_EN           = 0,
+    parameter   TX_NXT_PACKING_EN           = 0,  // TX flit packer output stage: 0 combinational
+                                                  // from the current state, 1 registered from the
+                                                  // look-ahead state.
 
-    localparam  RP_AXI_DATA_WD_MAX          = max4(RP0_AXI_DATA_WD, RP1_AXI_DATA_WD, RP2_AXI_DATA_WD, RP3_AXI_DATA_WD),
-    localparam  RP_AXI_STRB_WD_MAX          = RP_AXI_DATA_WD_MAX / 8,
+    localparam  RP_AXI_DATA_WD_MAX          = max4(RP0_AXI_DATA_WD, RP1_AXI_DATA_WD, RP2_AXI_DATA_WD, RP3_AXI_DATA_WD),  // Widest RPn AXI data width; sizes the AXI data ports.
+    localparam  RP_AXI_STRB_WD_MAX          = RP_AXI_DATA_WD_MAX / 8,  // AXI write-strobe width for that data width.
 
-    localparam  AXI_ADDR_WD                 = 64,
-    localparam  AXI_ID_WD                   = 10,
-    localparam  AXI_LEN_WD                  = 8
+    localparam  AXI_ADDR_WD                 = 64,  // AXI address width.
+    localparam  AXI_ID_WD                   = 10,  // AXI ID width.
+    localparam  AXI_LEN_WD                  = 8  // AXI burst-length width.
 )
 (
-    input  logic                                        I_CLK,
-    input  logic                                        I_RESETN,
+    input  logic                                        I_CLK,  // Clock for the AOU core and the FDI bringup controller.
+    input  logic                                        I_RESETN,  // Active-low asynchronous reset for the I_CLK domain.
 
-    input  logic                                        I_PCLK,
-    input  logic                                        I_PRESETN,
+    input  logic                                        I_PCLK,  // APB clock, asynchronous to I_CLK.
+    input  logic                                        I_PRESETN,  // Active-low reset for the I_PCLK domain.
 
-    // ================================================================
-    // APB slave interface
-    // ================================================================
-    input  logic                                        I_AOU_APB_SI0_PSEL,
-    input  logic                                        I_AOU_APB_SI0_PENABLE,
-    input  logic [APB_ADDR_WD-1:0]                      I_AOU_APB_SI0_PADDR,
-    input  logic                                        I_AOU_APB_SI0_PWRITE,
-    input  logic [APB_DATA_WD-1:0]                      I_AOU_APB_SI0_PWDATA,
+    input  logic                                        I_AOU_APB_SI0_PSEL,  // APB select.
+    input  logic                                        I_AOU_APB_SI0_PENABLE,  // APB enable.
+    input  logic [APB_ADDR_WD-1:0]                      I_AOU_APB_SI0_PADDR,  // APB address.
+    input  logic                                        I_AOU_APB_SI0_PWRITE,  // APB write.
+    input  logic [APB_DATA_WD-1:0]                      I_AOU_APB_SI0_PWDATA,  // APB write data.
 
-    output logic [APB_DATA_WD-1:0]                      O_AOU_APB_SI0_PRDATA,
-    output logic                                        O_AOU_APB_SI0_PREADY,
-    output logic                                        O_AOU_APB_SI0_PSLVERR,
+    output logic [APB_DATA_WD-1:0]                      O_AOU_APB_SI0_PRDATA,  // APB read data.
+    output logic                                        O_AOU_APB_SI0_PREADY,  // APB ready.
+    output logic                                        O_AOU_APB_SI0_PSLVERR,  // APB slave error.
 
-    // ================================================================
-    // AXI master interface (RX → downstream)
-    // ================================================================
-    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_M_ARID,
-    output logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        O_AOU_RX_AXI_M_ARADDR,
-    output logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         O_AOU_RX_AXI_M_ARLEN,
-    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_ARSIZE,
-    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_M_ARBURST,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_ARLOCK,
-    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_ARCACHE,
-    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_ARPROT,
-    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_ARQOS,
-    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_M_ARUSER,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_ARVALID,
-    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_M_ARREADY,
+    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_M_ARID,  // AXI master read-address ID.
+    output logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        O_AOU_RX_AXI_M_ARADDR,  // AXI master read address.
+    output logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         O_AOU_RX_AXI_M_ARLEN,  // AXI master read burst length.
+    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_ARSIZE,  // AXI master read transfer size.
+    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_M_ARBURST,  // AXI master read burst type.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_ARLOCK,  // AXI master read lock.
+    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_ARCACHE,  // AXI master read cache attributes.
+    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_ARPROT,  // AXI master read protection.
+    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_ARQOS,  // AXI master read QoS.
+    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_M_ARUSER,  // AXI master read-address user: the ReadReq FLEX field.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_ARVALID,  // AXI master read-address valid.
+    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_M_ARREADY,  // AXI master read-address ready.
 
-    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_M_RID,
-    input  logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] I_AOU_TX_AXI_M_RDATA,
-    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_M_RRESP,
-    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_M_RUSER,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_M_RLAST,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_M_RVALID,
-    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_M_RREADY,
+    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_M_RID,  // AXI master read-data ID.
+    input  logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] I_AOU_TX_AXI_M_RDATA,  // AXI master read data.
+    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_M_RRESP,  // AXI master read response.
+    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_M_RUSER,  // AXI master read-data user, sent as the ReadData FLEX field.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_M_RLAST,  // AXI master last read beat.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_M_RVALID,  // AXI master read-data valid.
+    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_M_RREADY,  // AXI master read-data ready.
 
-    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_M_AWID,
-    output logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        O_AOU_RX_AXI_M_AWADDR,
-    output logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         O_AOU_RX_AXI_M_AWLEN,
-    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_AWSIZE,
-    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_M_AWBURST,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_AWLOCK,
-    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_AWCACHE,
-    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_AWPROT,
-    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_AWQOS,
-    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_M_AWUSER,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_AWVALID,
-    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_M_AWREADY,
+    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_M_AWID,  // AXI master write-address ID.
+    output logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        O_AOU_RX_AXI_M_AWADDR,  // AXI master write address.
+    output logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         O_AOU_RX_AXI_M_AWLEN,  // AXI master write burst length.
+    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_AWSIZE,  // AXI master write transfer size.
+    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_M_AWBURST,  // AXI master write burst type.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_AWLOCK,  // AXI master write lock.
+    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_AWCACHE,  // AXI master write cache attributes.
+    output logic [RP_COUNT-1:0][2:0]                    O_AOU_RX_AXI_M_AWPROT,  // AXI master write protection.
+    output logic [RP_COUNT-1:0][3:0]                    O_AOU_RX_AXI_M_AWQOS,  // AXI master write QoS.
+    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_M_AWUSER,  // AXI master write-address user: the WriteReq FLEX field.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_AWVALID,  // AXI master write-address valid.
+    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_M_AWREADY,  // AXI master write-address ready.
 
-    output logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] O_AOU_RX_AXI_M_WDATA,
-    output logic [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0] O_AOU_RX_AXI_M_WSTRB,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_WLAST,
-    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_M_WUSER,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_WVALID,
-    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_M_WREADY,
+    output logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] O_AOU_RX_AXI_M_WDATA,  // AXI master write data.
+    output logic [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0] O_AOU_RX_AXI_M_WSTRB,  // AXI master write strobes.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_WLAST,  // AXI master last write beat.
+    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_M_WUSER,  // AXI master write-data user: the WriteData FLEX field.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_M_WVALID,  // AXI master write-data valid.
+    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_M_WREADY,  // AXI master write-data ready.
 
-    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_M_BID,
-    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_M_BRESP,
-    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_M_BUSER,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_M_BVALID,
-    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_M_BREADY,
+    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_M_BID,  // AXI master write-response ID.
+    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_M_BRESP,  // AXI master write response.
+    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_M_BUSER,  // AXI master write-response user, sent as the WriteResp FLEX field.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_M_BVALID,  // AXI master write-response valid.
+    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_M_BREADY,  // AXI master write-response ready.
 
-    // ================================================================
-    // AXI slave interface (TX → upstream)
-    // ================================================================
-    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_S_ARID,
-    input  logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        I_AOU_TX_AXI_S_ARADDR,
-    input  logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         I_AOU_TX_AXI_S_ARLEN,
-    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_ARSIZE,
-    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_S_ARBURST,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_ARLOCK,
-    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_ARCACHE,
-    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_ARPROT,
-    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_ARQOS,
-    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_S_ARUSER,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_ARVALID,
-    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_S_ARREADY,
+    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_S_ARID,  // AXI slave read-address ID.
+    input  logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        I_AOU_TX_AXI_S_ARADDR,  // AXI slave read address.
+    input  logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         I_AOU_TX_AXI_S_ARLEN,  // AXI slave read burst length.
+    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_ARSIZE,  // AXI slave read transfer size.
+    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_S_ARBURST,  // AXI slave read burst type.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_ARLOCK,  // AXI slave read lock.
+    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_ARCACHE,  // AXI slave read cache attributes.
+    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_ARPROT,  // AXI slave read protection.
+    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_ARQOS,  // AXI slave read QoS.
+    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_S_ARUSER,  // AXI slave read-address user, sent as the ReadReq FLEX field.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_ARVALID,  // AXI slave read-address valid.
+    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_S_ARREADY,  // AXI slave read-address ready.
 
-    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_S_RID,
-    output logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] O_AOU_RX_AXI_S_RDATA,
-    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_S_RRESP,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_S_RLAST,
-    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_S_RUSER,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_S_RVALID,
-    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_S_RREADY,
+    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_S_RID,  // AXI slave read-data ID.
+    output logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] O_AOU_RX_AXI_S_RDATA,  // AXI slave read data.
+    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_S_RRESP,  // AXI slave read response.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_S_RLAST,  // AXI slave last read beat.
+    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_S_RUSER,  // AXI slave read-data user: the ReadData FLEX field.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_S_RVALID,  // AXI slave read-data valid.
+    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_S_RREADY,  // AXI slave read-data ready.
 
-    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_S_AWID,
-    input  logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        I_AOU_TX_AXI_S_AWADDR,
-    input  logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         I_AOU_TX_AXI_S_AWLEN,
-    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_AWSIZE,
-    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_S_AWBURST,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_AWLOCK,
-    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_AWCACHE,
-    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_AWPROT,
-    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_AWQOS,
-    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_S_AWUSER,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_AWVALID,
-    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_S_AWREADY,
+    input  logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          I_AOU_TX_AXI_S_AWID,  // AXI slave write-address ID.
+    input  logic [RP_COUNT-1:0][AXI_ADDR_WD-1:0]        I_AOU_TX_AXI_S_AWADDR,  // AXI slave write address.
+    input  logic [RP_COUNT-1:0][AXI_LEN_WD-1:0]         I_AOU_TX_AXI_S_AWLEN,  // AXI slave write burst length.
+    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_AWSIZE,  // AXI slave write transfer size.
+    input  logic [RP_COUNT-1:0][1:0]                    I_AOU_TX_AXI_S_AWBURST,  // AXI slave write burst type.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_AWLOCK,  // AXI slave write lock.
+    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_AWCACHE,  // AXI slave write cache attributes.
+    input  logic [RP_COUNT-1:0][2:0]                    I_AOU_TX_AXI_S_AWPROT,  // AXI slave write protection.
+    input  logic [RP_COUNT-1:0][3:0]                    I_AOU_TX_AXI_S_AWQOS,  // AXI slave write QoS.
+    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_S_AWUSER,  // AXI slave write-address user, sent as the WriteReq FLEX field.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_AWVALID,  // AXI slave write-address valid.
+    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_S_AWREADY,  // AXI slave write-address ready.
 
-    input  logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] I_AOU_TX_AXI_S_WDATA,
-    input  logic [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0] I_AOU_TX_AXI_S_WSTRB,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_WLAST,
-    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_S_WUSER,
-    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_WVALID,
-    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_S_WREADY,
+    input  logic [RP_COUNT-1:0][RP_AXI_DATA_WD_MAX-1:0] I_AOU_TX_AXI_S_WDATA,  // AXI slave write data.
+    input  logic [RP_COUNT-1:0][RP_AXI_STRB_WD_MAX-1:0] I_AOU_TX_AXI_S_WSTRB,  // AXI slave write strobes.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_WLAST,  // AXI slave last write beat.
+    input  logic [RP_COUNT-1:0][15:0]                   I_AOU_TX_AXI_S_WUSER,  // AXI slave write-data user, sent as the WriteData FLEX field.
+    input  logic [RP_COUNT-1:0]                         I_AOU_TX_AXI_S_WVALID,  // AXI slave write-data valid.
+    output logic [RP_COUNT-1:0]                         O_AOU_TX_AXI_S_WREADY,  // AXI slave write-data ready.
 
-    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_S_BID,
-    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_S_BRESP,
-    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_S_BUSER,
-    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_S_BVALID,
-    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_S_BREADY,
+    output logic [RP_COUNT-1:0][AXI_ID_WD-1:0]          O_AOU_RX_AXI_S_BID,  // AXI slave write-response ID.
+    output logic [RP_COUNT-1:0][1:0]                    O_AOU_RX_AXI_S_BRESP,  // AXI slave write response.
+    output logic [RP_COUNT-1:0][15:0]                   O_AOU_RX_AXI_S_BUSER,  // AXI slave write-response user: the WriteResp FLEX field, 0 for an early response.
+    output logic [RP_COUNT-1:0]                         O_AOU_RX_AXI_S_BVALID,  // AXI slave write-response valid.
+    input  logic [RP_COUNT-1:0]                         I_AOU_RX_AXI_S_BREADY,  // AXI slave write-response ready.
 
-    // ================================================================
-    // PHY type select (TWO_PHY only)
-    // ================================================================
 `ifdef TWO_PHY
-    input  logic                                        I_PHY_TYPE,
+    input  logic                                        I_PHY_TYPE,  // Active PHY: 0 selects PHY0, 1 selects PHY1.
+                                                                     // Routes the flit data path through that PHY; PHY0
+                                                                     // carries each core flit as two half-width beats.
+                                                                     // Also picks the PHY whose state status and stall
+                                                                     // request reach the bringup controller.
 `endif
 
-    // ================================================================
-    // FDI data-path interface - PHY0 (always present)
-    // ================================================================
-    input  logic                                        I_FDI_PL_0_VALID,
-    input  logic [FDI_IF_WD0-1:0]                       I_FDI_PL_0_DATA,
-    input  logic                                        I_FDI_PL_0_FLIT_CANCEL,
+    input  logic                                        I_FDI_PL_0_VALID,  // PHY0 received-flit valid.
+    input  logic [FDI_IF_WD0-1:0]                       I_FDI_PL_0_DATA,  // PHY0 received-flit data.
+    input  logic                                        I_FDI_PL_0_FLIT_CANCEL,  // PHY0 flit cancel.
 
-    input  logic                                        I_FDI_PL_0_TRDY,
-    input  logic                                        I_FDI_PL_0_STALLREQ,
-    input  logic [3:0]                                  I_FDI_PL_0_STATE_STS,
-    output logic [FDI_IF_WD0-1:0]                       O_FDI_LP_0_DATA,
-    output logic                                        O_FDI_LP_0_VALID,
-    output logic                                        O_FDI_LP_0_IRDY,
-    output logic                                        O_FDI_LP_0_STALLACK,
+    input  logic                                        I_FDI_PL_0_TRDY,  // PHY0 ready for transmit-flit data.
+    input  logic                                        I_FDI_PL_0_STALLREQ,  // PHY0 stall request.
+    input  logic [3:0]                                  I_FDI_PL_0_STATE_STS,  // PHY0 state status.
+    output logic [FDI_IF_WD0-1:0]                       O_FDI_LP_0_DATA,  // PHY0 transmit-flit data.
+    output logic                                        O_FDI_LP_0_VALID,  // PHY0 transmit-flit valid.
+    output logic                                        O_FDI_LP_0_IRDY,  // PHY0 transmit initiator ready.
+    output logic                                        O_FDI_LP_0_STALLACK,  // PHY0 stall acknowledge.
 
-    // ================================================================
-    // FDI data-path interface - PHY1 (TWO_PHY only)
-    // ================================================================
 `ifdef TWO_PHY
-    input  logic                                        I_FDI_PL_1_VALID,
-    input  logic [FDI_IF_WD1-1:0]                       I_FDI_PL_1_DATA,
-    input  logic                                        I_FDI_PL_1_FLIT_CANCEL,
+    input  logic                                        I_FDI_PL_1_VALID,  // PHY1 received-flit valid.
+    input  logic [FDI_IF_WD1-1:0]                       I_FDI_PL_1_DATA,  // PHY1 received-flit data.
+    input  logic                                        I_FDI_PL_1_FLIT_CANCEL,  // PHY1 flit cancel.
 
-    input  logic                                        I_FDI_PL_1_TRDY,
-    input  logic                                        I_FDI_PL_1_STALLREQ,
-    input  logic [3:0]                                  I_FDI_PL_1_STATE_STS,
-    output logic [FDI_IF_WD1-1:0]                       O_FDI_LP_1_DATA,
-    output logic                                        O_FDI_LP_1_VALID,
-    output logic                                        O_FDI_LP_1_IRDY,
-    output logic                                        O_FDI_LP_1_STALLACK,
+    input  logic                                        I_FDI_PL_1_TRDY,  // PHY1 ready for transmit-flit data.
+    input  logic                                        I_FDI_PL_1_STALLREQ,  // PHY1 stall request.
+    input  logic [3:0]                                  I_FDI_PL_1_STATE_STS,  // PHY1 state status.
+    output logic [FDI_IF_WD1-1:0]                       O_FDI_LP_1_DATA,  // PHY1 transmit-flit data.
+    output logic                                        O_FDI_LP_1_VALID,  // PHY1 transmit-flit valid.
+    output logic                                        O_FDI_LP_1_IRDY,  // PHY1 transmit initiator ready.
+    output logic                                        O_FDI_LP_1_STALLACK,  // PHY1 stall acknowledge.
 `endif
 
-    // ================================================================
-    // FDI bringup control interface (to AOU_FDI_BRINGUP_CTRL)
-    // ================================================================
-    input  logic                                        I_PL_INBAND_PRES,
-    input  logic                                        I_PL_CLK_REQ,
-    input  logic                                        I_PL_WAKE_ACK,
-    input  logic                                        I_PL_RX_ACTIVE_REQ,
+    input  logic                                        I_PL_INBAND_PRES,  // PHY in-band presence.
+    input  logic                                        I_PL_CLK_REQ,  // PHY clock request.
+    input  logic                                        I_PL_WAKE_ACK,  // PHY wake acknowledge.
+    input  logic                                        I_PL_RX_ACTIVE_REQ,  // PHY rx-active request.
 
-    output logic [3:0]                                  O_LP_STATE_REQ,
-    output logic                                        O_LP_WAKE_REQ,
-    output logic                                        O_LP_CLK_ACK,
-    output logic                                        O_LP_RX_ACTIVE_STS,
-    output logic                                        O_LP_LINKERROR,
+    output logic [3:0]                                  O_LP_STATE_REQ,  // Link state request to the PHY.
+    output logic                                        O_LP_WAKE_REQ,  // Wake request to the PHY.
+    output logic                                        O_LP_CLK_ACK,  // Clock acknowledge to the PHY.
+    output logic                                        O_LP_RX_ACTIVE_STS,  // Rx-active status to the PHY.
+    output logic                                        O_LP_LINKERROR,  // Link error request to the PHY.
 
-    // ================================================================
-    // FDI bringup software control
-    // ================================================================
-    input  logic                                        I_SW_ACTIVATE_START,
-    input  logic                                        I_SW_LINKERROR_INJECT,
+    input  logic                                        I_SW_ACTIVATE_START,  // Software request to start activation.
+    input  logic                                        I_SW_LINKERROR_INJECT,  // Software request to inject a link error.
 
-    // ================================================================
-    // FDI bringup status
-    // ================================================================
-    output logic [3:0]                                  O_FDI_FSM_STATE,
-    output logic                                        O_FDI_LINK_UP,
+    output logic [3:0]                                  O_FDI_FSM_STATE,  // FDI bringup FSM state.
+    output logic                                        O_FDI_LINK_UP,  // FDI link is up.
 
-    // ================================================================
-    // Interrupt outputs
-    // ================================================================
-    output logic                                        INT_REQ_LINKRESET,
-    output logic                                        INT_SI0_ID_MISMATCH,
-    output logic                                        INT_MI0_ID_MISMATCH,
-    output logic                                        INT_EARLY_RESP_ERR,
-    output logic                                        INT_EARLY_WDT_ERR,
-    output logic                                        INT_ACTIVATE_START,
-    output logic                                        INT_DEACTIVATE_START,
-    output logic                                        INT_FDI_LINK_DOWN,
+    output logic                                        INT_REQ_LINKRESET,  // Link reset request interrupt.
+    output logic                                        INT_SI0_ID_MISMATCH,  // AXI slave ID mismatch interrupt.
+    output logic                                        INT_MI0_ID_MISMATCH,  // AXI master ID mismatch interrupt.
+    output logic                                        INT_EARLY_RESP_ERR,  // Early-response error interrupt.
+    output logic                                        INT_EARLY_WDT_ERR,  // Write-transaction watchdog timeout interrupt.
+    output logic                                        INT_ACTIVATE_START,  // Activation start interrupt from the AOU core.
+                                                                             // Also drives the bringup controller.
+    output logic                                        INT_DEACTIVATE_START,  // Deactivation start interrupt from the AOU core.
+    output logic                                        INT_FDI_LINK_DOWN,  // FDI link lost while AoU was in use.
 
-    // ================================================================
-    // DFT
-    // ================================================================
-    input  logic                                        TIEL_DFT_MODESCAN
+    input  logic                                        TIEL_DFT_MODESCAN  // DFT scan mode. Tie low for functional operation.
 );
 
     // ================================================================
