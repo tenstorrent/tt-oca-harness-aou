@@ -1467,7 +1467,13 @@ end else if (FDI_PACK_WD == 2048) begin : g_pack_1step
                 r_flit_fifo_data <= w_flit_fifo_data;
             end
         end
-        assign w_flit_chunk = r_flit_fifo_data;
+        // MsgCredit must be the value u_aou_rs_msgcredit holds in the cycle the
+        // flit is accepted (that is the value popped), so it is not delayed by
+        // r_flit_fifo_data. u_aou_rs_msgcredit is itself a register.
+        always_comb begin
+            w_flit_chunk              = r_flit_fifo_data;
+            w_flit_chunk[128*8 +: 16] = w_flit_fifo_data[128*8 +: 16];
+        end
     end else begin : g_out_comb
         assign w_flit_chunk = w_flit_fifo_data;
     end
