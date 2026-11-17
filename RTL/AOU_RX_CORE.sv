@@ -35,10 +35,10 @@
 //  messages are decoded into FIFO lanes. Request lanes are position windows
 //  of three granules (at most one request starts in a window), WriteResp lanes
 //  are the granule positions, Misc lanes the first and second Misc message of
-//  the half flit. Lane 0 of each kind replays a message whose first granules
-//  were in the previous half flit. The WriteData/ReadData granules are not
-//  decoded here: the per-RP granule stores receive the granule vector with
-//  their cover and start tags.
+//  each half flit (AoU v0.8 4.4 allows two per half flit). Lane 0 of each kind
+//  replays a message whose first granules were in the previous half flit. The
+//  WriteData/ReadData granules are not decoded here: the per-RP granule stores
+//  receive the granule vector with their cover and start tags.
 //
 // *****************************************************************************
 
@@ -62,7 +62,7 @@ import packet_def_pkg::*;
     localparam  REQ_WIN                     = 8 * HF_CNT,
     localparam  REQ_LANES                   = REQ_WIN + 1,
     localparam  B_LANES                     = G_CNT,
-    localparam  MISC_LANES                  = 3
+    localparam  MISC_LANES                  = 1 + 2 * HF_CNT
 )
 (
     input                                                           I_CLK,
@@ -486,8 +486,10 @@ import packet_def_pkg::*;
         end
     end
 
-    // misc lanes: lane 0 replays a straddled CrdtGrant, lanes 1 and 2 the first
-    // and second Misc message of the half flit
+    // misc lanes: lane 0 replays a straddled CrdtGrant, lanes 2h+1 and 2h+2 the
+    // first and second Misc message of half flit h (h = 1 only on a 2048-bit
+    // FDI). Lane 1 is also the Activation lane: an Activation is alone at G0.
+    // w_misc_pre[i] counts the Misc starts before granule i in its half flit.
     logic   [G_CNT-1:0][1:0]                w_misc_pre;
     logic   [MISC_LANES-1:0]                w_misc_lane_valid;
     logic   [MISC_LANES-1:0][1:0][G_WD-1:0] w_misc_lane_g;
@@ -497,9 +499,12 @@ import packet_def_pkg::*;
     logic   [ACT_REQ_G-1:0][G_WD-1:0]       w_act_req_spec;     // byte-reversed: spec bit order
 
     always_comb begin
-        w_misc_pre[0] = '0;
-        for (int i = 1; i < G_CNT; i++)
-            w_misc_pre[i] = (w_misc_pre[i-1] == 2'd3) ? 2'd3 : w_misc_pre[i-1] + 2'(b_start_misc[i-1]);
+        for (int i = 0; i < G_CNT; i++)
+            if (i % 24 == 0)
+                w_misc_pre[i] = '0;
+            else
+                w_misc_pre[i] = (w_misc_pre[i-1] == 2'd3) ? 2'd3 :
+                                w_misc_pre[i-1] + 2'(b_start_misc[i-1]);
 
         w_misc_lane_valid[0] = r_valid & r_nd_valid & (r_nd_class == ND_MISC);
         w_misc_lane_g[0]     = {r_g[0], r_nd_g[0]};
@@ -507,7 +512,8 @@ import packet_def_pkg::*;
             w_misc_lane_valid[l] = 1'b0;
             w_misc_lane_g[l]     = '0;
             for (int i = 0; i < G_CNT; i++) begin
-                if (b_start_misc[i] && (w_misc_pre[i] == 2'(l-1))) begin
+                if (b_start_misc[i] && (i / 24 == (l-1) / 2) &&
+                    (w_misc_pre[i] == 2'((l-1) % 2))) begin
                     // a CrdtGrant starting in the last granule is replayed next half flit
                     w_misc_lane_valid[l] = (i < G_CNT-1) || (r_g[i][3:1] != MISC_OP_CRDTGRANT);
                     w_misc_lane_g[l]     = {b_g[i+1], b_g[i]};
@@ -523,7 +529,7 @@ import packet_def_pkg::*;
         // profile fields, AoU v0.8). It starts at G0 of the flit (4.4), so the
         // window never runs past the half flit; granules past it read 0.
         w_act_req_g = '0;
-        for (int i = 0; i < G_CNT; i++)
+        for (int i = 0; i < 24; i++)
             if (b_start_misc[i] && (w_misc_pre[i] == 2'd0))
                 for (int k = 0; k < ACT_REQ_G; k++)
                     if (i + k < G_CNT) w_act_req_g[k] = b_g[i + k];

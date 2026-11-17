@@ -136,7 +136,8 @@ import packet_def_pkg::*;
     localparam  G_CNT                       = (FDI_DEC_WD == 2048) ? 48 : 24,
     localparam  REQ_LANES                   = G_CNT/3 + 1,
     localparam  B_LANES                     = G_CNT,
-    localparam  MISC_LANES                  = 3,
+    // CrdtGrant lanes: a straddled grant plus two per decoded half flit
+    localparam  MISC_LANES                  = 1 + G_CNT / 12,
 
     localparam  RP0_AXI_STRB_WD             = RP0_AXI_DATA_WD / 8,
     localparam  RP1_AXI_STRB_WD             = RP1_AXI_DATA_WD / 8,
