@@ -103,7 +103,9 @@ def model_section(out_dir, rid=None):
              "Steady-state application bytes per cycle on each link (l2r: DUT TX, r2l: DUT RX)",
              "from perf.json, against the committed d2d_model targets. Gate: PASS, or BELOW",
              "(T1-P02, under (1 - tol) x model), ABOVE (T1-P03), MIX (T1-P04), SHORT (steady",
-             "state under min_ss_flits), NO_TARGET. Run: the run's verdict against",
+             "state under min_ss_flits), NO_TARGET; REPORT_ONLY for a run started with",
+             "+perf_report_only, whose checker gates nothing (the model comparison in that",
+             "row is characterization, not a verdict). Run: the run's verdict against",
              "expected_fail.yaml.", "",
              "| build | PHY | slots | scenario | window | link | measured | model | ratio | gate | run |",
              "|---|---|---|---|---|---|---|---|---|---|---|"]
