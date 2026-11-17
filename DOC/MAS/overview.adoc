@@ -17,23 +17,26 @@ endif::[]
 ifndef::aou-ppa-xref[]
 :aou-ppa-xref: ppa-appendices.adoc
 endif::[]
+ifndef::aou-software-xref[]
+:aou-software-xref: software-operation.adoc
+endif::[]
 
 Apache License Release +
 AOU_CORE Microarchitecture specification +
 Version 1.00, Feb.27 2026 +
 BOS Semiconductors
 
-[[aou-1-introduction]]
-== 1. Introduction
+[[aou-introduction]]
+== Introduction
 
 This microarchitecture specification includes detailed functional description of AOU_CORE.
 
 The contents of this document are given as follows. Section 1 is for overview. Section 2 is for features, implementation specific features, and assumptions. In Section 3, the architecture and operation of AoU IP are given. Section 4 covers interrupt sources. Section 5 covers error handling. Section 6 includes the integration guidelines such as clocks, resets, and I/O descriptions. Section 7 includes the software operation guide including the register map and activation flows. Section 8 includes performance, power, and area information.
 
-[[aou-11-overview]]
-=== 1.1. Overview
+[[aou-overview]]
+=== Overview
 
-The AOU_CORE is a bridge between AXI interface and the UCIe FDI interface, defined in AoU standard v0.7 spec. The FLEX field of the AXI-equivalent messages follows AoU v0.8 (FLEX = AXI USER[15:0] in the Basic Profile, v0.8 Sections 5.2 and 11.1) in both directions: transmitted messages carry the USER inputs, and the FLEX of received messages leaves on the USER outputs of the AXI ports driven from them. See xref:{aou-architecture-xref}#aou-354-user-signals-and-the-flex-field[Section 3.5.4]. The Activation messages also follow v0.8: the ActivateReq is four granules and announces a ProfileID, ProfileRev and ProfileOpt per RP ([.monospaced]#++PROFILE_CFG_RPn++# sent, read-only 0/0/0, [.monospaced]#++PROFILE_RMT_RPn++# received; v0.8 chapter 11, xref:{aou-software-xref}#aou-71-sfr-setting[Section 7.1]). AOU_CORE implements the Basic Profile only; the fields are informational and nothing is negotiated. To achieve low latency, AOU_CORE directly handles signals related to the UCIe FDI interface data flow control and processes data in 32-byte, 64-byte, or 128-byte chunks (selected at integration time via the [.monospaced]#++FDI_CONFIG++# parameter; see xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2]) in a cut-through manner, without converting them to 256-byte flit data. It receives AXI messages from its own AXI subordinate interface, packs them into chunks of the configured FDI width, and transmits these chunks to the remote AoU device via UCIe. The remote AoU receives the chunks from the UCIe FDI interface, unpacks them into AXI messages, and delivers the data through its AXI manager interface. The one-way AoU latency, measured from the AXI handshake at the local device to the AXI VALID at the remote device over a back-to-back connection in a single clock domain with no other traffic, is 8 cycles for read requests, 11 cycles for read data, 12 cycles for write requests, 12 cycles for write data, and 9 cycles for write responses on a 1024-bit AXI port with a 128 B FDI (one RP, AW and W in the same cycle); xref:{aou-ppa-xref}#aou-81-performance[Section 8.1] Table 8 gives the TX and RX parts, the conditions and the parameters. For applications using UCIe, including those with some CDC domains, the round-trip time (RTT) latency from an AXI read request to the corresponding AXI read response through this AoU IP over UCIe is approximately 45 cycles, excluding the memory latency of the remote device.
+The AOU_CORE is a bridge between AXI interface and the UCIe FDI interface, defined in AoU standard v0.7 spec. The FLEX field of the AXI-equivalent messages follows AoU v0.8 (FLEX = AXI USER[15:0] in the Basic Profile, v0.8 Sections 5.2 and 11.1) in both directions: transmitted messages carry the USER inputs, and the FLEX of received messages leaves on the USER outputs of the AXI ports driven from them. See xref:{aou-architecture-xref}#aou-user-signals-and-the-flex-field[USER signals and the FLEX field]. The Activation messages also follow v0.8: the ActivateReq is four granules and announces a ProfileID, ProfileRev and ProfileOpt per RP ([.monospaced]#++PROFILE_CFG_RPn++# sent, read-only 0/0/0, [.monospaced]#++PROFILE_RMT_RPn++# received; v0.8 chapter 11, xref:{aou-software-xref}#aou-sfr-setting[SFR setting]). AOU_CORE implements the Basic Profile only; the fields are informational and nothing is negotiated. To achieve low latency, AOU_CORE directly handles signals related to the UCIe FDI interface data flow control and processes data in 32-byte, 64-byte, or 128-byte chunks (selected at integration time via the [.monospaced]#++FDI_CONFIG++# parameter; see xref:{aou-integration-xref}#aou-ig-parameter-list[Parameter List]) in a cut-through manner, without converting them to 256-byte flit data. It receives AXI messages from its own AXI subordinate interface, packs them into chunks of the configured FDI width, and transmits these chunks to the remote AoU device via UCIe. The remote AoU receives the chunks from the UCIe FDI interface, unpacks them into AXI messages, and delivers the data through its AXI manager interface. The one-way AoU latency, measured from the AXI handshake at the local device to the AXI VALID at the remote device over a back-to-back connection in a single clock domain with no other traffic, is 8 cycles for read requests, 11 cycles for read data, 12 cycles for write requests, 12 cycles for write data, and 9 cycles for write responses on a 1024-bit AXI port with a 128 B FDI (one RP, AW and W in the same cycle); xref:{aou-ppa-xref}#aou-performance[Performance] Table 8 gives the TX and RX parts, the conditions and the parameters. For applications using UCIe, including those with some CDC domains, the round-trip time (RTT) latency from an AXI read request to the corresponding AXI read response through this AoU IP over UCIe is approximately 45 cycles, excluding the memory latency of the remote device.
 
 To achieve high efficiency, all TX requests and data messages are packed in a compact format, ensuring that no AoU payload slots are wasted. The current payload is even updated when the UCIe stalls the current chunk and space remains available. As a result, the throughput matches the values defined in the AoU specification. In each cycle, the RX can process the maximum number of messages defined in the AoU standard: 4 read requests, 4 write requests, 2 read data, 2 write data, and 12 write responses, respectively.
 
@@ -41,18 +44,20 @@ It supports flow control for all exceptional cases defined in the UCIe standard.
 
 AOU_CORE supports a configurable number of Resource Plane(RPs), with both the number of RPs and each RPpass:[']s AXI data width fully parameterizable. A dedicated field in the SFR allows software to configure the target RP, enabling flexible RP mapping. The AW and AR channels are arbitrated between RPs with one of three schemes: Round Robin, AXI QoS, and Port QoS; W data follows the order of the granted AWs. Additionally, a starvation-prevention mechanism is implemented to ensure fair arbitration across all RPs.
 
-The operating frequency of AOU_CORE targets 1 GHz and meets timing requirements without relying on multi-cycle paths. The TX buffer is configured with a minimal number of FIFO entries, while the RX Data buffer default depth is FDI-config aware: default 140 entries when [.monospaced]#++FDI_CONFIG++# selects a 1024b (128B) FDI interface ([.monospaced]#++FDI_CFG_SP_128B++# or [.monospaced]#++FDI_CFG_TP_64B_128B++#), and default 88 entries otherwise. The entry size takes into account the round-trip latency for credit consumption and return, and matches the per-RP [.monospaced]#++RP*_RX_W_FIFO_DEPTH++# / [.monospaced]#++RP*_RX_R_FIFO_DEPTH++# parameter defaults documented in xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2].
+The operating frequency of AOU_CORE targets 1 GHz and meets timing requirements without relying on multi-cycle paths. The TX buffer is configured with a minimal number of FIFO entries, while the RX Data buffer default depth is FDI-config aware: default 140 entries when [.monospaced]#++FDI_CONFIG++# selects a 1024b (128B) FDI interface ([.monospaced]#++FDI_CFG_SP_128B++# or [.monospaced]#++FDI_CFG_TP_64B_128B++#), and default 88 entries otherwise. The entry size takes into account the round-trip latency for credit consumption and return, and matches the per-RP [.monospaced]#++RP*_RX_W_FIFO_DEPTH++# / [.monospaced]#++RP*_RX_R_FIFO_DEPTH++# parameter defaults documented in xref:{aou-integration-xref}#aou-ig-parameter-list[the Integrator guide].
 
-[[aou-2-features]]
-== 2. Features
+[[aou-features]]
+== Features
+
+<<figure-1>> shows the AXI-to-UCIe bridge functions and their relationships.
 
 [caption=""]
 .Figure 1. Block Diagram of AOU_CORE and function description
 [[figure-1]]
 image::image1.png[Figure 1. Block Diagram of AOU_CORE and function description]
 
-[[aou-21-basic-features]]
-=== 2.1. Basic features
+[[aou-basic-features]]
+=== Basic features
 
 * Single APB subordinate interface
 ** Configuration/control/status register access
@@ -62,9 +67,9 @@ image::image1.png[Figure 1. Block Diagram of AOU_CORE and function description]
 * UCIe 256B latency-optimized flit(Format 6) support only
 * Message packing and unpacking are handled in a unit of 32, 64, or 128 bytes, corresponding to the configured FDI data width (32B@1 GHz, 64B@1 GHz, or 128B@1 GHz).
 * Selectable Early response by setting SFR
-* Selectable 32B / 64B / 128B single-PHY and 32B+64B / 64B+128B two-PHY FDI configurations, selected via the [.monospaced]#++FDI_CONFIG++# parameter (see xref:{aou-integration-xref}#aou-ig-parameter-list[Section 2]). Two-PHY variants additionally require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY ports physically exist.
+* Selectable 32B / 64B / 128B single-PHY and 32B+64B / 64B+128B two-PHY FDI configurations, selected via the [.monospaced]#++FDI_CONFIG++# parameter (see xref:{aou-integration-xref}#aou-ig-parameter-list[the Integrator guide]). Two-PHY variants additionally require the [.monospaced]#pass:c[+define+TWO_PHY]# build flag so the second-PHY ports physically exist.
 * Configurable number of Resource Plane and each RPpass:[']s AXI data width
-* RP Remapping: the remote RP of each local RP is programmable (DEST_RP), and the asymmetric RP mapping (ASYMMETRIC_RP_PROC_CON) merges several local subordinate ports onto one remote RP, so that a die uses all its RPs against a link partner that has fewer (xref:{aou-architecture-xref}#aou-310-rp-remapping[Section 3.10])
+* RP Remapping: the remote RP of each local RP is programmable (DEST_RP), and the asymmetric RP mapping (ASYMMETRIC_RP_PROC_CON) merges several local subordinate ports onto one remote RP, so that a die uses all its RPs against a link partner that has fewer (xref:{aou-architecture-xref}#aou-rp-remapping[RP Remapping])
 * QoS scheme between RPs on the AW and AR channels
 * Interoperability with different data width remote die
 * Handling of flit cancel and stall request as specified in the UCIe specification
@@ -73,8 +78,8 @@ image::image1.png[Figure 1. Block Diagram of AOU_CORE and function description]
 * Returning read data that exceeds the AXI data width of the remote die is treated as a violation.
 * For a Read Request received from the remote die, if ARSIZE is 5 or less, it returns a Read Data message with DLEN = 2pass:[']b00; if ARSIZE is 6, it returns a Read Data message with DLEN = 2pass:[']b01; if ARSIZE is 7, it returns a Read Data message with DLEN = 2pass:[']b10; Accordingly, if the local die receives a read data message from the remote die whose size is smaller than its own AXI data width, it duplicates the data to match its own AXI data width.
 
-[[aou-22-assumptions]]
-=== 2.2. Assumptions
+[[aou-assumptions]]
+=== Assumptions
 
 AOU_CORE forwards the requests it receives from the remote die to its AXI Manager interface after data-width conversion and burst splitting. It assumes that every WriteReq and ReadReq describes a transaction that is legal on an AXI4 interface (AMBA AXI, IHI 0022), in particular:
 
@@ -82,10 +87,10 @@ AOU_CORE forwards the requests it receives from the remote die to its AXI Manage
 * the burst transfers at most Max_Transaction_Bytes (4096) bytes, as defined by the AoU Basic Profile;
 * AxSIZE does not exceed the data width of the remote die.
 
-On a route the asymmetric RP mapping merges (several local subordinate ports on one remote RP, xref:{aou-architecture-xref}#aou-3104-asymmetric-rp-mapping[Section 3.10.4]) AOU_CORE further assumes:
+On a route the asymmetric RP mapping merges (several local subordinate ports on one remote RP, xref:{aou-architecture-xref}#aou-asymmetric-rp-mapping[Asymmetric RP Mapping]) AOU_CORE further assumes:
 
 * a port has at most [.monospaced]#++RPn_S_RD_MO_CNT++# (reads) and [.monospaced]#++RPn_S_WR_MO_CNT++# (writes) distinct AXI IDs outstanding at a time, and at most that many requests per ID; the port is back-pressured beyond that, which is not an error;
-* exclusive accesses are not issued on a merged route: the read and the write of an exclusive pair may reach the remote die with different IDs (xref:{aou-architecture-xref}#aou-3105-axi-id-handling-on-merged-routes[Section 3.10.5]);
+* exclusive accesses are not issued on a merged route: the read and the write of an exclusive pair may reach the remote die with different IDs (xref:{aou-architecture-xref}#aou-axi-id-handling-on-merged-routes[AXI ID Handling on Merged Routes]);
 * the mapping registers are programmed while the activation FSM is DISABLED with no AXI traffic outstanding, and are stable otherwise.
 
-AOU_CORE does not check these properties and does not split or reject a request that violates them. In particular, the xref:{aou-architecture-xref}#aou-36-axi-transaction-splitter[AXI Transaction Splitter] generates sub-burst addresses within the 4 KB page of the original request only, so a request that crosses a 4 KB boundary is issued with addresses that wrap within that page, and no error is reported. Ensuring that only compliant requests are sent is the responsibility of the AXI requesters and the AoU bridge of the remote die. See also xref:{aou-errors-xref}#aou-51-non-compliant-requests[Section 5.1].
+AOU_CORE does not check these properties and does not split or reject a request that violates them. In particular, the xref:{aou-architecture-xref}#aou-axi-transaction-splitter[AXI Transaction Splitter] generates sub-burst addresses within the 4 KB page of the original request only, so a request that crosses a 4 KB boundary is issued with addresses that wrap within that page, and no error is reported. Ensuring that only compliant requests are sent is the responsibility of the AXI requesters and the AoU bridge of the remote die. See also xref:{aou-errors-xref}#aou-non-compliant-requests[Non-compliant requests from the remote die].
