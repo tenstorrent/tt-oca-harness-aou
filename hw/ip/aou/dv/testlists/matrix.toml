@@ -820,6 +820,64 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+st_bp=all"]
 
+[[tests]]
+name = "aou_sanity_test.1x1024-sp256-nxt"
+module = { uvm = "aou_sanity_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+tags = ["matrix"]
+run_modes = ["matrix"]
+
+[[tests]]
+name = "aou_dp_random_test.dp_dir-both.1x1024-sp256-nxt"
+module = { uvm = "aou_dp_random_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+reseed = 3
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+dp_dir=both"]
+
+[[tests]]
+name = "aou_pack_test.pk-crossflit.1x1024-sp256-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=crossflit"]
+
+[[tests]]
+name = "aou_pack_test.pk-mixed.1x1024-sp256-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=mixed"]
+
+[[tests]]
+name = "aou_pack_test.pk-full.1x1024-sp256-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=full"]
+
+[[tests]]
+name = "aou_stress_test.st_bp-all.1x1024-sp256-nxt"
+module = { uvm = "aou_stress_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+st_bp=all"]
+
 # 1x1024-sp128: the single-RP 128 B latency reference (docs/fdi-rx-plan.md 13.2);
 # the latency and drain perf windows alongside 4xmix4211-sp128's.
 
@@ -1353,7 +1411,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 132
+expected_count = 138
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1442,6 +1500,12 @@ tests = [
   "aou_pack_test.pk-mixed.1x512-sp64-nxt",
   "aou_pack_test.pk-full.1x512-sp64-nxt",
   "aou_stress_test.st_bp-all.1x512-sp64-nxt",
+  "aou_sanity_test.1x1024-sp256-nxt",
+  "aou_dp_random_test.dp_dir-both.1x1024-sp256-nxt",
+  "aou_pack_test.pk-crossflit.1x1024-sp256-nxt",
+  "aou_pack_test.pk-mixed.1x1024-sp256-nxt",
+  "aou_pack_test.pk-full.1x1024-sp256-nxt",
+  "aou_stress_test.st_bp-all.1x1024-sp256-nxt",
   "aou_mrp_test.mrp_scn-interleave.mrp_rps-0_1.remote_rp_count-2",
   "aou_mrp_test.mrp_scn-solo.mrp_rps-0.remote_rp_count-1",
   "aou_mrp_test.remote_rp_count-4",

@@ -572,6 +572,7 @@ fixed at the AoU maximum; see the amendment below):
 | 2xmix-sp64-rxf | 2 | 1024, 256 | 1 (SP_64B) | Non-default RX FIFO depths, RX FIFO register slices off |
 | 1x1024-sp128 | 1 | 1024 | 2 (SP_128B) | One 1024-bit RP on a 128-byte FDI: the zero-load latency reference (MAS 8.1 Table 8) |
 | 1x1024-sp256 | 1 | 1024 | 5 (SP_256B) | 256-byte FDI: one flit per cycle, 48 granules decoded per cycle, whole-flit cancel |
+| 1x1024-sp256-nxt | 1 | 1024 | 5 (SP_256B) | 1x1024-sp256 with `TX_NXT_PACKING_EN` 1: the registered output stage of the one-step TX packer |
 | 4xmix-sp256 | 4 | 1024, 512, 256, 512 | 5 (SP_256B) | Mixed widths, every local width, 256-byte FDI |
 | 4xmix-sp256-rxf | 4 | 1024, 512, 256, 512 | 5 (SP_256B) | 4xmix-sp256 with non-default RX FIFO depths |
 
