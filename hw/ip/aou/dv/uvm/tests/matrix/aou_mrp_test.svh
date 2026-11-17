@@ -34,6 +34,18 @@ class aou_mrp_test extends aou_dp_base_test;
     if ($value$plusargs("mrp_scn=%s", scn) && scn == "crd_rr") min_l2r = 0;
   endfunction
 
+  // Self-check for the arbitration window's interval arithmetic: with
+  // +mrp_arb_selftest=1 the scenario runs as usual and then the checker feeds
+  // synthetic service sequences through the same code. Each case must produce
+  // the figures the interval definition implies, so a regression in the
+  // bookkeeping is an error rather than a different number in a log line.
+  task run_phase(uvm_phase phase);
+    int unsigned on;
+    on = $value$plusargs("mrp_arb_selftest=%d", on) ? on : 0;
+    super.run_phase(phase);
+    if (on != 0) chk.arb_metrics_selftest();
+  endtask
+
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     chk = aou_mrp_chk::type_id::create("chk", this);

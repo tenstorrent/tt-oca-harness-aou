@@ -61,6 +61,13 @@ class aou_mrp_chk extends uvm_component;
   protected time         ind_last[4][2];
   protected int unsigned ind_n[4];
   protected int unsigned n_arb_windows;
+  // The figures arb_metrics() last computed, for the selftest below.
+  int unsigned m_cnt[4];
+  int unsigned m_gap[4];
+  int unsigned m_other[4];
+  int unsigned m_n;
+  int unsigned m_run_same;
+  int unsigned m_epoch;
   protected int unsigned n_ind_windows;
 
   function new(string name, uvm_component parent);
@@ -129,6 +136,64 @@ class aou_mrp_chk extends uvm_component;
     join
   endtask
 
+  // Self-check for the interval arithmetic (report only, no DUT). Each case
+  // seeds the window's service sequence and asserts what arb_metrics() makes
+  // of it; a mismatch is an error, so `+mrp_arb_selftest=1` in a test either
+  // passes silently or shows exactly which figure moved.
+  protected function void arb_case(string name, time seq_t[$], int unsigned seq_rp[$],
+                                   int unsigned want_cnt0, int unsigned want_gap0,
+                                   int unsigned want_gap1 = 0);
+    arb_seq.delete();
+    arb_t.delete();
+    arb_ct.delete();
+    arb_crp.delete();
+    arb_cb.delete();
+    foreach (seq_t[i]) begin
+      arb_t.push_back(seq_t[i]);
+      arb_seq.push_back(seq_rp[i]);
+    end
+    arb_metrics();
+    if (m_cnt[0] != want_cnt0 || m_gap[0] != want_gap0 || m_gap[1] != want_gap1)
+      `uvm_error(get_type_name(), $sformatf(
+                 {"selftest %s: RP0 %0d services (want %0d), gap %0d (want %0d), ",
+                  "RP1 gap %0d (want %0d)"}, name, m_cnt[0], want_cnt0, m_gap[0], want_gap0,
+                 m_gap[1], want_gap1))
+    else
+      `uvm_info(get_type_name(), $sformatf("selftest %s: RP0 %0d services, gap %0d, RP1 gap %0d",
+                                           name, m_cnt[0], m_gap[0], m_gap[1]), UVM_LOW)
+  endfunction
+
+  function void arb_metrics_selftest();
+    time         t[$];
+    int unsigned rp[$];
+    // 1. A service before t0 must not become the first gap's origin.
+    //    RP0 90 130 150, RP1 100 160 -> t0 100, t1 150, RP0 gap 130->150 = 20.
+    t.delete();
+    rp.delete();
+    t = '{90, 100, 130, 150, 160};
+    rp = '{0, 1, 0, 0, 1};
+    arb_case("pre-window service", t, rp, 2, 20);
+    // 2. No pre-window service: the first in-window service initialises the state.
+    t = '{110, 100, 130, 150};
+    rp = '{0, 1, 0, 1};
+    arb_case("no pre-window service", t, rp, 2, 20);
+    // 3. Several pre-window services: none of them may contribute a gap.
+    t = '{50, 70, 90, 100, 130, 150, 160};
+    rp = '{0, 0, 0, 1, 0, 0, 1};
+    arb_case("several pre-window services", t, rp, 2, 20);
+    // 4. One in-window service for RP0: there is no gap to report for it. RP1
+    //    has two (100 and 150) and its own gap is real, so it is asserted too.
+    t = '{60, 100, 120, 150, 200};
+    rp = '{0, 1, 0, 1, 0};
+    arb_case("single in-window service", t, rp, 1, 0, 50);
+    // 5. A service after t1 is outside the interval and must not stretch a gap.
+    t = '{110, 100, 140, 150, 200};
+    rp = '{0, 1, 0, 1, 0};
+    arb_case("service after the interval", t, rp, 2, 30);
+    arb_seq.delete();
+    arb_t.delete();
+  endfunction
+
   function void arb_start();
     flush();
     arb_seq.delete();
@@ -169,6 +234,14 @@ class aou_mrp_chk extends uvm_component;
     int unsigned run_len = 0;
     int          run_rp = -1;
     flush();
+    foreach (m_cnt[r]) begin
+      m_cnt[r] = 0;
+      m_gap[r] = 0;
+      m_other[r] = 0;
+    end
+    m_n = 0;
+    m_run_same = 0;
+    m_epoch++;
     foreach (tf[r]) begin
       tf[r] = 0;
       tl[r] = 0;
@@ -194,10 +267,10 @@ class aou_mrp_chk extends uvm_component;
     for (int unsigned i = 0; i < arb_seq.size(); i++) begin
       int unsigned r = arb_seq[i];
       time         t = arb_t[i];
-      if (t < t0) begin
-        last[r] = t;
-        continue;
-      end
+      // Outside the interval: no state. Seeding `last` from here would make the
+      // first in-window gap reach back through the ramp-up, which is not a gap
+      // between two services of this interval.
+      if (t < t0) continue;
       if (t > t1) break;
       cnt[r]++;
       if (last[r] != 0 && int'(t - last[r]) > max_gap[r]) max_gap[r] = int'(t - last[r]);
@@ -232,6 +305,11 @@ class aou_mrp_chk extends uvm_component;
       n_done++;
       n_bytes += arb_cb[i];
     end
+    foreach (cnt[r]) m_cnt[r] = cnt[r];
+    foreach (max_gap[r]) m_gap[r] = max_gap[r];
+    foreach (run_other[r]) m_other[r] = run_other[r];
+    m_n = n;
+    m_run_same = run_same;
     `uvm_info(get_type_name(), $sformatf(
               {"arbitration metrics: %0d requests in %0d cycles over the common ",
                "active service interval, longest same-RP run %0d; %0d completions ",
