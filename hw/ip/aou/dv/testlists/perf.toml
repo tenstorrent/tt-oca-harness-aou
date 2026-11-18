@@ -116,6 +116,63 @@ tags = ["perf"]
 run_modes = ["perf"]
 args = ["+perf_scn=S1", "+active_phy=1", "+aou_config=2x512-tp32_64"]
 
+# Five of the seven CONFIGs the S1 model names that had no run.
+# docs/perf_scenarios.yaml generates the S1 windows on `configs: all`, so every t1
+# target has model values, but only the nine above had a run: a 256 B FDI build
+# could lose two thirds of its transmit throughput and no gate would see it. The
+# 256 B family is where #131's pack-step limit is widest (one data message per
+# flit, measured 2026-11-18: 4xmix-sp256 l2r 15.7 of 48 granules per flit against
+# 48.0 on the link in the reverse direction in the same run), so those windows are
+# tied to #131 in expected_fail.yaml, each bound to its measured plateau so a
+# further drop fails and a recovery shows as XPASS. The two non-256 B targets added
+# here measure at the model with no entry. The two non-default RX FIFO-depth builds
+# (2xmix-sp64-rxf, 4xmix-sp256-rxf) still have S1 model values and no run; they are
+# their own builds (3.25) and are left to a follow-up.
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.4xmix-sp256"
+module = { uvm = "aou_perf_test" }
+target = "4xmix-sp256"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=4xmix-sp256"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.1x1024-sp256"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp256"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=1x1024-sp256"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.1x1024-sp256-nxt"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=1x1024-sp256-nxt"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.1x512-sp64-nxt"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64-nxt"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=1x512-sp64-nxt"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.1x1024-sp128"
+module = { uvm = "aou_perf_test" }
+target = "1x1024-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+aou_config=1x1024-sp128"]
+
 [[tests]]
 name = "aou_perf_test.perf_scn-S2.1x512-sp64"
 module = { uvm = "aou_perf_test" }

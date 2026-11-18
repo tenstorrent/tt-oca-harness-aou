@@ -55,6 +55,83 @@
   requires: tenstorrent/tt-oca-harness-aou#131
   note: the DUT RX link in mixed and both-sides windows, held to the capped TX link's rate
 
+# #131 at the 256 B FDI, where one pack step is the whole flit: the DUT TX fills a
+# flit with one data message and no more (measured 2026-11-18: 1.00 messages per
+# flit on 4xmix-sp256, 15.7 of 48 granules, against 3.06 messages and 48.0 granules
+# on the reverse link in the same run). One entry per measured window, each bounded
+# to the plateau it was measured at, +-4%: a further drop stops matching and fails,
+# and a window that recovers leaves its entry unused, which is XPASS. The two r2l
+# entries are consequences of a capped l2r direction in the same window, not
+# independent symptoms (bw_rd_r2l, r2l alone, measures 219.41 on this config).
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_wr\|l2r below target: (69|7[0-4])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: >-
+    four RPs at 128/64/32/64 B on a 256 B FDI: one WriteData per flit (15.7 of 48
+    granules) where the reverse link packs 3.06 messages per flit; 71.97 B/cycle,
+    0.33 of the model
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_wr_l2r\|l2r below target: (69|7[0-4])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: the local-only window of the same pack step, 71.97 B/cycle against a model of 220.30
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_rd\|l2r below target: (69|7[0-4])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: the same pack step carrying ReadData, 72.00 B/cycle against a model of 216.85
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_rd_r2l\|l2r below target: (69|7[0-4])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: ReadData for the remote die's reads, 72.00 B/cycle against a model of 219.43
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_mix\|l2r below target: (13[89]|14[0-9])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: >-
+    both-sides mixed: two message classes per flit reach 144.09 B/cycle (31.7 of 48
+    granules), 0.66 of the model, because a flit can hold one message of each class
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_mix_l2r\|l2r below target: (69|7[0-4])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: local-mixed window, 71.97 B/cycle against a model of 217.70
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_mix_l2r\|r2l below target: 8[1-7]\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  requires: tenstorrent/tt-oca-harness-aou#131
+  note: >-
+    the response link of that window: 84.45 B/cycle, held to the capped l2r transaction
+    rate rather than to the link (bw_rd_r2l, r2l alone, is 219.41)
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_mix_r2l\|l2r below target: (69|7[0-4])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  note: remote-mixed window, 72.00 B/cycle against a model of 217.70
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 4xmix-sp256\|0\|S1\|bw_mix_r2l\|r2l below target: 8[0-6]\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 4xmix-sp256\|0\|S1\|'
+  requires: tenstorrent/tt-oca-harness-aou#131
+  note: the response link of that window, 83.66 B/cycle, held to the capped l2r rate
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 1x1024-sp256\|0\|S1\|bw_mix\|l2r below target: (19[1-9]|20[0-7])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 1x1024-sp256\|0\|S1\|'
+  note: >-
+    one 128 B RP: 199.28 B/cycle, 0.88 of the model. Two classes share a flit (1.56
+    messages, 42.4 of 48 granules) but 27+27 granules do not fit and the DUT does not
+    span; the reverse link's transmitter fills 48.0 in the same run. Every single-class
+    window of this build is at the model (128.00 of 128.00)
+- test: aou_perf_test
+  bug: tenstorrent/tt-oca-harness-aou#131
+  check_re: 'T1-P02: 1x1024-sp256-nxt\|0\|S1\|bw_mix\|l2r below target: (19[1-9]|20[0-7])\.[0-9]+ B/cycle'
+  when_re: 'PERF_GATE 1x1024-sp256-nxt\|0\|S1\|'
+  note: the NXT-packing build of the same RP, identical to 1x1024-sp256 on all 14 windows
+
 # AoU 4.4 as the v0.9 draft words it (+v0p9draft): an Activation message shares its flit
 # only with one CrdtGrant after an ActivateReq/Ack or with responses after a DeactivateReq.
 # The DUT's ActivateAck+CrdtGrant and DeactivateReq+response flits are those layouts; what
