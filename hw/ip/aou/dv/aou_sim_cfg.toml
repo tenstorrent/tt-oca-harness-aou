@@ -224,8 +224,8 @@ defines = ["AOU_AXI_DATA_BYTES=64", "AOU_FDI_DATA_W=512", "AOU_T1_AXI_AGENTS"]
 # uvm/env/aou_t1_env_pkg.sv). Unused RPs repeat RP0's width because the DUT
 # sizes its ports to the widest of all four. The register bench
 # (aou_reg_sim_cfg.toml) carries the same targets so its DUT coverage merges
-# into T1's. <CONFIG>-assert adds the RTL's ASSERTION_ON checks (they $error
-# and $finish, so a firing assertion ends the run before the UVM report).
+# into T1's. <CONFIG>-assert adds the RTL's ASSERTION_ON checks (an error from
+# one fails the run; a warning is counted in the verdict).
 # Every target names the bench's build root; the targets differ only in defines,
 # and [build.options] cache_enabled partitions that root by build fingerprint so
 # their models coexist. Standalone builds use build/<sim>-<tb>-<target> instead.

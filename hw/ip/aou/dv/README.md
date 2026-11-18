@@ -773,12 +773,17 @@ checker, two primaries, a checker that never runs, or one that never fired.
 
 Some RTL modules carry their own checks under `ASSERTION_ON` (FIFO ready/valid,
 M-port AW/AR stability in the 1xN switch, table ID errors in the early-response,
-aggregator, splitter and downsizer tables, AWREADY within 500 cycles of AWVALID in
-the WLAST generator). The WLAST generator's check is turned off with `$assertoff` in
-`+rtl_asserts=1` runs (BUGS/054: AXI puts no bound on AWREADY); every other one stays
-on. `make build RTL_ASSERT=1` compiles them into its own `-assert` build
-directory, and `run_list.py --target <CONFIG>-assert` runs on it. A firing assertion calls
-`$finish` before the UVM report, which `check_run.py` judges FAIL.
+aggregator, splitter and downsizer tables, AWREADY and WVALID within 500 cycles of
+AWVALID in the WLAST generator). All of them are on in `+rtl_asserts=1` runs.
+`make build RTL_ASSERT=1` compiles them into its own `-assert` build
+directory, and `run_list.py --target <CONFIG>-assert` runs on it. Most report with
+`$error`, and some also call `$finish`, which ends the run before the UVM report.
+`check_run.py` judges an RTL assertion error like a `UVM_ERROR` (FAIL unless an
+`expected_fail.yaml` entry explains it) and a run without the UVM report FAIL. The
+WLAST generator's two checks only warn, once per stalled write request: AXI puts no
+bound on AWREADY or WREADY, nor AoU on the link's WVALID (#132). Warnings leave the
+verdict as it is, and the verdict line ends with their count
+(`PASS: <log> (2 RTL assertion warnings)`).
 `testlists/assertions.toml` is the representative regression (plan 11.18);
 its entries pass `+rtl_asserts=1`, which is fatal on a build without the
 assertions, so they cannot pass on an ordinary build. Both simulators build them
