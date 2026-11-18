@@ -129,8 +129,9 @@ real width in the agent's config) gives one virtual-interface type per bus on
 every simulator. `aou_rst_if.apb_quiet` is read from the asynchronous APB
 bridge's state so the reset agent can honour the integration guide's reset rule.
 With `ASSERTION_ON` (the `<target>-assert` targets) the RTL's own assertions are
-compiled, all but the WLAST generator's unbounded-AWREADY check, which the top
-turns off (tenstorrent/tt-oca-harness-aou#132).
+compiled, all of them on. The WLAST generator's AWREADY and WVALID checks only
+warn, since neither has a bound in AXI or AoU (tenstorrent/tt-oca-harness-aou#132);
+`scripts/check_run.py` fails a run on an RTL assertion error and counts the warnings.
 
 Under `ifdef UVM` (always defined by the Makefile and by the harness) the top
 registers every interface in `uvm_config_db` under scope `"*"` (`s_axi<r>`,

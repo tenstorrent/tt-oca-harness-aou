@@ -110,19 +110,6 @@ module tb_top;
       `uvm_fatal("tb_top", "+rtl_asserts=1 needs the RTL assertions (make RTL_ASSERT=1)")
 `endif
   end
-`ifdef ASSERTION_ON
-  // BUGS/054: AOU_AXI_WLAST_GEN's ready_valid_assertion wants AWREADY within 500
-  // cycles of AWVALID, a bound AXI does not have, so it is the one RTL assertion
-  // turned off; every other one stays on.
-  for (genvar r = 0; r < RP_COUNT; r++) begin : g_waive_wlast_gen
-    int unsigned on;
-    initial begin
-      if ($value$plusargs("rtl_asserts=%d", on) && on != 0)
-        $assertoff(0, u_dut.u_aou_core_top.u_aou_core.gen_aou_core_rp[r].u_aou_core_rp
-                          .u_wlast_gen.ready_valid_assertion);
-    end
-  end
-`endif
 
   // Power-on reset, at least 25 cycles of each clock; the reset agent adds
   // mid-test resets through rst.

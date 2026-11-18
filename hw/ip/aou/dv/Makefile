@@ -89,8 +89,8 @@ XPROP ?=
 ifneq ($(filter-out tmerge xmerge,$(XPROP)),)
 $(error XPROP must be tmerge or xmerge)
 endif
-# RTL_ASSERT=1 compiles the RTL's own ASSERTION_ON checks (they $error and $finish, so a
-# firing assertion ends the run before the UVM report: FAIL), in a -assert build.
+# RTL_ASSERT=1 compiles the RTL's own ASSERTION_ON checks, in a -assert build. A failing
+# check that errors fails the run (check_run.py); one that only warns is counted in the verdict.
 RTL_ASSERT ?= 0
 # AXI4PC=1 binds Arm's AXI4 protocol checker (Axi4PC, BP063; README "Optional: Arm AXI4
 # protocol assertions") to every DUT AXI port of the T1 bench, compiled unmodified from

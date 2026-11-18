@@ -7,9 +7,11 @@ schema_version = 1
 #
 # Regression on a build with the RTL's own ASSERTION_ON checks (plan 11.18): FIFO
 # ready/valid, M-port AW/AR stability in the 1xN switch, table ID errors in the
-# early-response, aggregator, splitter and downsizer tables. The WLAST generator's
-# AWREADY-within-500-cycles check is off (BUGS/054, tb/tb_top.sv). A firing
-# assertion calls $finish before the UVM report, so check_run.py judges the run FAIL.
+# early-response, aggregator, splitter and downsizer tables, and the WLAST
+# generator's AWREADY and WVALID within 500 cycles of AWVALID. An assertion error
+# fails the run in check_run.py (some also $finish before the UVM report, also
+# FAIL). The WLAST generator's two checks only warn, since AXI and the link bound
+# neither (#132); the verdict line counts the warnings.
 # +rtl_asserts=1 makes a run on a build without the assertions fatal, so these
 # entries pass only on an assertion build:
 #   make build RTL_ASSERT=1 CONFIG=<c>
