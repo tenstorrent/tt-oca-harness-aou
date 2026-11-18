@@ -149,6 +149,11 @@ module AOU_AXIMUX_1XN_SS #(
     input         [SN-1:0]                    I_M_RVALID    ,
     output        [SN-1:0]                    O_M_RREADY    ,
 
+    output                                    O_STRAY_B_ERR ,
+    output        [AXI_ID_WD-1:0]             O_STRAY_BID   ,
+    output                                    O_STRAY_R_ERR ,
+    output        [AXI_ID_WD-1:0]             O_STRAY_RID   ,
+
     input         [31:0]                      I_DEBUG_ERR_UPPER_ADDR,
     input         [31:0]                      I_DEBUG_ERR_LOWER_ADDR,
     input                                     I_DEBUG_ERR_ACCESS_ENABLE
@@ -637,6 +642,13 @@ assign O_S_BID      = I_M_BID[r_selected_aw_ch];
 assign O_S_BRESP    = I_M_BRESP[r_selected_aw_ch];
 assign O_S_BUSER    = I_M_BUSER[r_selected_aw_ch];
 assign O_S_BVALID   = I_M_BVALID[r_selected_aw_ch] & r_cur_aw_valid;
+
+// M channel 0 is the external port. A response on it with no burst outstanding
+// was never requested; it is not taken, so it stays presented.
+assign O_STRAY_B_ERR = I_M_BVALID[0] & ~r_cur_aw_valid;
+assign O_STRAY_BID   = I_M_BID[0];
+assign O_STRAY_R_ERR = I_M_RVALID[0] & ~r_cur_ar_valid;
+assign O_STRAY_RID   = I_M_RID[0];
 
 //--------------------------------------------------------------
 `ifdef ASSERTION_ON

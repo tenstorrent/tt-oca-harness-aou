@@ -2165,7 +2165,8 @@ passes through arbitration muxes.
 through FIFO read mux, arbitration mux ([.monospaced]#++AXI4MUX_3X1++#), and [.monospaced]#++REV_RS++#
 mux.
 * *AXI Master inputs* (R/B data, READY feedback): Combinational -- feeds
-control logic and FIFO write.
+control logic and FIFO write. R/B valid and ID also reach the
+ID-mismatch error capture and the TX credit block.
 * *FDI TX outputs* (DATA, VALID, IRDY): Combinational. STALLACK outputs
 are registered. With [.monospaced]#++TX_NXT_PACKING_EN = 1++# the DATA output is driven from
 a register in [.monospaced]#++AOU_TX_CORE++# through the FDI output mux only, except

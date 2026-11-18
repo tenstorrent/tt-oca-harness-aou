@@ -456,8 +456,17 @@ import packet_def_pkg::*;
     logic [1:0]                    w_axi_rresp_err_bresp;
     logic                          w_axi_rresp_err;
     
+    logic  [AXI_ID_WD-1:0]         w_error_info_split_bid_mismatch_info;
+    logic                          w_error_info_split_bid_mismatch_err_set;
+
     logic  [AXI_ID_WD-1:0]         w_error_info_split_rid_mismatch_info;
     logic                          w_error_info_split_rid_mismatch_err_set;
+
+    logic  [AXI_ID_WD-1:0]         w_error_info_stray_bid;
+    logic                          w_error_info_stray_b_err;
+
+    logic  [AXI_ID_WD-1:0]         w_error_info_stray_rid;
+    logic                          w_error_info_stray_r_err;
 
     logic  [AXI_ID_WD-1:0]         w_error_info_aggre_rid_mismatch_info;
     logic                          w_error_info_aggre_rid_mismatch_err_set;
@@ -633,6 +642,11 @@ import packet_def_pkg::*;
         .I_M_BUSER                  ( {16'd0            , I_AOU_TX_AXI_M_BUSER }    ), // error-info responses carry FLEX = 0
         .I_M_BVALID                 ( {w_err_info_bvalid, I_AOU_TX_AXI_M_BVALID}    ),
         .O_M_BREADY                 ( {w_err_info_bready, O_AOU_TX_AXI_M_BREADY}    ),
+
+        .O_STRAY_B_ERR              ( w_error_info_stray_b_err          ),
+        .O_STRAY_BID                ( w_error_info_stray_bid            ),
+        .O_STRAY_R_ERR              ( w_error_info_stray_r_err          ),
+        .O_STRAY_RID                ( w_error_info_stray_rid            ),
      
         .I_DEBUG_ERR_UPPER_ADDR     ( I_DEBUG_ERROR_INFO_UPPER_ADDR     ),
         .I_DEBUG_ERR_LOWER_ADDR     ( I_DEBUG_ERROR_INFO_LOWER_ADDR     ),
@@ -1068,9 +1082,9 @@ import packet_def_pkg::*;
         .O_RRESP_ERR_RRESP              ( w_axi_rresp_err_bresp             ),
         .O_RRESP_ERR                    ( w_axi_rresp_err                   ),
 
-        .O_SPLIT_MISMATCH_BID           (O_ERROR_INFO_SPLIT_BID_MISMATCH_INFO       ),
+        .O_SPLIT_MISMATCH_BID           (w_error_info_split_bid_mismatch_info       ),
         .O_SPLIT_MISMATCH_RID           (w_error_info_split_rid_mismatch_info       ), 
-        .O_SPLIT_BID_MISMATCH_ERROR     (O_ERROR_INFO_SPLIT_BID_MISMATCH_ERR_SET    ),
+        .O_SPLIT_BID_MISMATCH_ERROR     (w_error_info_split_bid_mismatch_err_set    ),
         .O_SPLIT_RID_MISMATCH_ERROR     (w_error_info_split_rid_mismatch_err_set    ),
                                        
         .O_AGGRE_MISMATCH_RID           (w_error_info_aggre_rid_mismatch_info       ), 
@@ -1104,7 +1118,17 @@ always_comb begin
         O_ERROR_INFO_RID_MISMATCH_ERR_SET = 1'b1;
         O_ERROR_INFO_RID_MISMATCH_INFO    = w_error_info_down1024_rid_mismatch_info;
     end
+    else if (w_error_info_stray_r_err) begin
+        O_ERROR_INFO_RID_MISMATCH_ERR_SET = 1'b1;
+        O_ERROR_INFO_RID_MISMATCH_INFO    = w_error_info_stray_rid;
+    end
 end
+
+assign O_ERROR_INFO_SPLIT_BID_MISMATCH_ERR_SET =
+    w_error_info_split_bid_mismatch_err_set | w_error_info_stray_b_err;
+assign O_ERROR_INFO_SPLIT_BID_MISMATCH_INFO    =
+    (w_error_info_split_bid_mismatch_err_set | ~w_error_info_stray_b_err) ?
+    w_error_info_split_bid_mismatch_info : w_error_info_stray_bid;
 //-------------------------------------------------------------
     logic   w_aou_rx_fifo_pending;
     
