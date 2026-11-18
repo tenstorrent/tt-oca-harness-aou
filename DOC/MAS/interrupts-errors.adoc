@@ -50,7 +50,7 @@ Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.AXI
 
 * *INT_MI0_ID_MISMATCH*
 
-An interrupt that occurs on the AXI Manager Interface when a B or R channel response is received with an ID that was not previously issued as a request. This is detected by the xref:aou-axi-transaction-splitter[] destination table.
+An interrupt that occurs on the AXI Manager Interface when a B or R channel response is received with an ID that was not previously issued as a request. This is detected by the xref:aou-axi-transaction-splitter[] destination table or, for a response presented while no request is outstanding on the RP, by [.monospaced]#++AOU_AXIMUX_1XN_SS++#.
 
 Software can check the mismatched AXI ID by reading [.monospaced]#++AOU_CORE.ERROR_INFO++# SFR. The interrupt can be cleared by writing pass:[']1pass:['] to [.monospaced]#++AOU_CORE.ERROR_INFO.SPLIT_BID_MISMATCH_ERR++# / [.monospaced]#++SPLIT_RID_MISMATCH_ERR++#.
 
