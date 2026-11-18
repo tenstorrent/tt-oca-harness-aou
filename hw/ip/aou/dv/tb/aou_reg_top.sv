@@ -206,7 +206,8 @@ module aou_reg_top;
       .O_AOU_REQ_LINKRESET       (req_linkreset),
       .O_SW_RESET                (sw_reset),
 
-      .TIEL_DFT_MODESCAN(1'b0)
+      .TIEL_DFT_MODESCAN(1'b0),
+      .TIEL_DFT_SCANEN  (1'b0)
   );
 
   initial begin

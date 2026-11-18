@@ -605,7 +605,8 @@ module tb_top;
       .INT_DEACTIVATE_START  (status.int_deactivate_start),
       .INT_FDI_LINK_DOWN     (status.int_fdi_link_down),
 
-      .TIEL_DFT_MODESCAN        (rst.dft_modescan)
+      .TIEL_DFT_MODESCAN        (rst.dft_modescan),
+      .TIEL_DFT_SCANEN          (rst.dft_scanen)
   );
 
   // ---------------------------------------------------------------------------

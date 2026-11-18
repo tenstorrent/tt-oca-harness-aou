@@ -451,8 +451,8 @@ coverage model or its tooling.
 
 ==== Code-Coverage Exclusions
 
-* The integrator-replaced library cells (`AOU_SOC_SYNCHSR`, `AOU_SOC_GFMUX_LVT`,
-  `AOU_SOC_BUF`; integration guide 8.7) are excluded with their reasons in
+* The integrator-replaced library cells (`AOU_SOC_SYNCHSR`, `AOU_SOC_GFMUX_LVT`;
+  integration guide 8.7) are excluded with their reasons in
   `cov/config/vcs/cov_exclude.hier`; reset-only FSM transitions through
   `cov/config/vcs/cov_fsm_reset.filter`. Dead line, branch and FSM items are
   excluded one by one, each with its reason, in `cov/config/vcs/cov_exclude.el`.
