@@ -243,25 +243,27 @@ assign O_M_WLAST        = (w_m_awvalid_awready & (O_M_AWLEN == 'd0)) |
 `ifdef ASSERTION_ON
 // synopsys translate_off
 
+// Liveness aids, not protocol checks: AXI lets the M-port subordinate hold AWREADY and
+// WREADY low without bound, and the link paces WVALID, so these only warn. Each write
+// request starts one attempt, on the first cycle its AWVALID is presented (AWVALID rises,
+// or stays high after an S-side AW handshake), so a long stall warns once per request.
 ready_valid_assertion:
     assert
         property (
-            @(posedge I_CLK) (I_S_AWVALID) |-> ##[0:500] O_S_AWREADY
+            @(posedge I_CLK) disable iff (!I_RESETN)
+            ($rose(I_S_AWVALID) || (I_S_AWVALID && $past(I_S_AWVALID && O_S_AWREADY)))
+                |-> ##[0:500] O_S_AWREADY
         )
-        else begin
-            $error("\n[%t] Error!. You need check M_AWREADY and M_WREADY of wlastegn ", $time);
-            $finish;
-        end
+        else $warning("[%0t] %m: AWREADY not seen within 500 cycles of AWVALID", $time);
 
 s_awvalid_s_wvalid_assertion:
     assert
         property (
-            @(posedge I_CLK) (I_S_AWVALID) |-> ##[0:500] I_S_WVALID
+            @(posedge I_CLK) disable iff (!I_RESETN)
+            ($rose(I_S_AWVALID) || (I_S_AWVALID && $past(I_S_AWVALID && O_S_AWREADY)))
+                |-> ##[0:500] I_S_WVALID
         )
-        else begin
-            $error("\n[%t] Error!. You need check I_S_AWVALID and I_S_WVALID of wlastegn ", $time);
-            $finish;
-        end
+        else $warning("[%0t] %m: WVALID not seen within 500 cycles of AWVALID", $time);
 
 // synopsys translate_on
 `endif
