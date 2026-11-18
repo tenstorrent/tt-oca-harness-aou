@@ -685,16 +685,19 @@ logic           w_msgcredit_receive_err;
 //The wait for MsgCredit is armed by the Ack to our own ActivateReq, which can
 //only arrive in ACTIVATE; an Ack received in any other state is not an Ack to
 //us and arms nothing. The wait itself outlives ACTIVATE: the handshake can
-//complete before the peer's MsgCredit arrives.
+//complete before the peer's MsgCredit arrives. A CrdtGrant ends the wait,
+//including one decoded in the same cycle as the Ack (the peer may send its
+//first CrdtGrant in the same flit as its ActivateAck), so it takes priority
+//over arming.
 always_ff @ (posedge I_CLK or negedge I_RESETN) begin
     if (~I_RESETN) begin
         r_act_ack_receive <= 1'b0;
     end else if (w_fsm_abort) begin
         r_act_ack_receive <= 1'b0;
-    end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID & (r_cur_st == ACTIVATE)) begin
-        r_act_ack_receive <= 1'b1;
     end else if (I_CRDTGRANT_VALID) begin
         r_act_ack_receive <= 1'b0;
+    end else if ((I_ACTMSG_ACTIVATION_OP == ACTIVATE_ACK) & I_ACTMSG_VALID & (r_cur_st == ACTIVATE)) begin
+        r_act_ack_receive <= 1'b1;
     end else if (w_msgcredit_receive_err) begin
         r_act_ack_receive <= 1'b0;
     end
