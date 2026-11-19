@@ -1,0 +1,20 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%% MAS Figure 11: the request and response FIFOs of one RP in AOU_FIFO_RP.
+%% Lane counts are for the 64 B and 128 B FDI widths (17 and 48 at 256 B);
+%% depths are the RPn_RX_AW/AR/B_FIFO_DEPTH defaults.
+%%{init: {'theme': 'neutral', 'themeVariables': {'clusterBkg': '#fafafa', 'clusterBorder': '#707070'}, 'htmlLabels': false, 'flowchart': {'htmlLabels': false, 'wrappingWidth': 520, 'subGraphTitleMargin': {'top': 6, 'bottom': 14}}}}%%
+flowchart LR
+    AWL["WriteReq lanes<br/>from AOU_RX_CORE,<br/>9 write ports"]
+    AWF["AW FIFO, 9S1M<br/>44 entries of 113 bits<br/>AWID 10, AWADDR 64, AWLEN 8, AWSIZE 3,<br/>AWLOCK 1, AWCACHE 4, AWPROT 3, AWQOS 4,<br/>FLEX 16"]
+    AWO["to the W_LAST generator"]
+    AWL ==> AWF --> AWO
+
+    ARL["ReadReq lanes<br/>from AOU_RX_CORE,<br/>9 write ports"]
+    ARF["AR FIFO, 9S1M<br/>44 entries of 113 bits<br/>ARID 10, ARADDR 64, ARLEN 8, ARSIZE 3,<br/>ARLOCK 1, ARCACHE 4, ARPROT 3, ARQOS 4,<br/>FLEX 16"]
+    ARO["to the data width converter"]
+    ARL ==> ARF --> ARO
+
+    BL["WriteResp lanes<br/>from AOU_RX_CORE,<br/>24 write ports"]
+    BF["B FIFO, 24S1M<br/>44 entries of 28 bits<br/>BID 10, BRESP 2, FLEX 16"]
+    BO["to the subordinate<br/>B channel"]
+    BL ==> BF --> BO

@@ -1,0 +1,48 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%% MAS Figure 9: the two stages of the half-flit decoder in AOU_RX_CORE.
+%% Counts are for the 64 B and 128 B FDI widths (24 granules per decode cycle).
+%%{init: {'theme': 'neutral', 'themeVariables': {'clusterBkg': '#fafafa', 'clusterBorder': '#707070'}, 'htmlLabels': false, 'flowchart': {'htmlLabels': false, 'wrappingWidth': 520, 'subGraphTitleMargin': {'top': 6, 'bottom': 14}}}}%%
+flowchart TB
+    HF["Half flit from AOU_RX_FDI_IF<br/>24 granules of 40 bits, MsgStart[23:0], header"]
+
+    subgraph STA["Stage A: tag, in the cycle the half flit is presented"]
+        direction TB
+        LEN["Message length<br/>at every MsgStart granule,<br/>from the message type and DLENGTH"]
+        CARRY["Data carry<br/>granules still owed to a WriteData or<br/>ReadData message from the previous<br/>half flit, with its RP and class"]
+        OWN["Granule tags, per RP, for WriteData and for ReadData<br/>cover: the granule belongs to such a message<br/>start: such a message begins at the granule"]
+        LEN --> OWN
+        CARRY --> OWN
+        LEN -->|"remainder past<br/>granule 23"| CARRY
+    end
+
+    REG["Stage register<br/>granules, MsgStart, cover and start tags, MsgCredit"]
+
+    subgraph STB["Stage B: decode, one cycle later"]
+        direction TB
+        SAVE["Straddle register<br/>first 1 or 2 granules of a request or<br/>CrdtGrant that ends in the next half flit"]
+        REQ["Request lanes, 9<br/>lane 0: the straddled request, completed<br/>lanes 1 to 8: windows of 3 granules,<br/>at most one request starts in a window"]
+        RSP["WriteResp lanes, 24<br/>one per granule"]
+        MISC["Misc lanes, 3<br/>lane 0: the straddled CrdtGrant, completed<br/>lanes 1 and 2: first and second Misc<br/>message of the half flit"]
+        SAVE --> REQ
+        SAVE --> MISC
+    end
+
+    STORE["W and R granule stores<br/>of every RP"]
+    AWAR["AW FIFO or AR FIFO<br/>of the request's RP"]
+    BF["B FIFO<br/>of the response's RP"]
+    CRD["AOU_CRD_CTRL"]
+    ACT["AOU_ACTIVATION_CTRL"]
+
+    HF --> LEN
+    HF --> OWN
+    OWN --> REG
+    REG -->|"granules with<br/>cover and start tags"| STORE
+    REG --> REQ
+    REG --> RSP
+    REG --> MISC
+    REG --> SAVE
+    REG -->|"MsgCredit"| CRD
+    REQ -->|"WriteReq, ReadReq"| AWAR
+    RSP -->|"WriteResp"| BF
+    MISC -->|"CrdtGrant"| CRD
+    MISC -->|"Activation, with the profile<br/>fields of an ActivateReq"| ACT
