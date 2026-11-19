@@ -266,6 +266,14 @@ import packet_def_pkg::*;
 );
 //----------------------------------------------------------------------------
     localparam AOU_CORE_TOP_RCH_RS_EN       = 0;
+    // Width of the subordinate-side outstanding counts: the early write response
+    // controller's write count and r_slv_wr/rd_pending_cnt below. Nothing holds AW
+    // while early response and the subordinate ID check are both off, or AR while
+    // the ID check is off, so the system must then keep an RP below
+    // 2^SLV_PENDING_CNT_WD outstanding writes and reads; the counts wrap past it.
+    // S_WR_MO_CNT must be at most 2^SLV_PENDING_CNT_WD - 3 and S_RD_MO_CNT at most
+    // 2^SLV_PENDING_CNT_WD - 1 (MAS, Outstanding-Count Limits).
+    localparam int SLV_PENDING_CNT_WD       = 10;
 //----------------------------------------------------------------------------
     
     logic   [AXI_ID_WD-1:0]                 w_early_bresp_ctrl_bid          ;
@@ -794,7 +802,8 @@ import packet_def_pkg::*;
         .AXI_LEN_WD                 ( AXI_LEN_WD                        ), 
                                     
         .AW_W_FIFO_CNT_DEPTH        ( 3                                 ),
-        .WR_MO_CNT                  ( S_WR_MO_CNT                       )
+        .WR_MO_CNT                  ( S_WR_MO_CNT                       ),
+        .PENDING_CNT_WD             ( SLV_PENDING_CNT_WD                )
     ) u_aou_early_bresp_s_ctrl
     (
         .I_CLK                      ( I_CLK                             ),
@@ -1134,9 +1143,13 @@ assign O_ERROR_INFO_SPLIT_BID_MISMATCH_INFO    =
     
     assign w_aou_rx_fifo_pending = I_AOU_RX_WLAST_GEN_AWVALID | I_AOU_RX_AXI_MM_ARVALID | I_AOU_RX_WLAST_GEN_WVALID | I_EARLY_BRESP_CTRL_BVALID | I_AOU_RX_AXI_S_RVALID;
     
-    //BUS CLEANY MO CNT is 32. Never occurs overflow
-    logic [9:0]    r_slv_wr_pending_cnt;
-    logic [9:0]    r_slv_rd_pending_cnt;
+    // Requests accepted on the subordinate port and not yet answered (SLV_TR_COMPLETE).
+    // Writes: at most S_WR_MO_CNT with early response on; with it off and the ID
+    // check on, S_WR_MO_CNT in the ID checker plus the two B the early response
+    // slice can hold. Reads: at most S_RD_MO_CNT with the ID check on. Otherwise only
+    // the system bounds them, and a count of 2^SLV_PENDING_CNT_WD reads as zero.
+    logic [SLV_PENDING_CNT_WD-1:0]    r_slv_wr_pending_cnt;
+    logic [SLV_PENDING_CNT_WD-1:0]    r_slv_rd_pending_cnt;
 
     always_ff @ (posedge I_CLK or negedge I_RESETN) begin
         if (~I_RESETN) begin
@@ -1159,7 +1172,9 @@ assign O_ERROR_INFO_SPLIT_BID_MISMATCH_INFO    =
     end
 
 
-    //mst pending cnt
+    // Remote requests in the RP and not yet answered (MST_TR_COMPLETE): at most
+    // M_WR_MO_CNT + 6 writes and M_RD_MO_CNT + 3 reads, the pending tables plus the
+    // register slices before and after them. Exact while M_*_MO_CNT is at most 1000.
     logic [9:0]    r_mst_wr_pending_cnt;
     logic [9:0]    r_mst_rd_pending_cnt;
 
