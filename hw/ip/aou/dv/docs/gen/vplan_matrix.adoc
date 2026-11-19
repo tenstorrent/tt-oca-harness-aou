@@ -147,7 +147,7 @@
 | 11.2 | Continuous flit reception with no gaps | P1 | `aou_pack_test.pk-b2b`
 | 11.3 | Message ends exactly at granule 47 (flit boundary) | P1 | merged into 6.18
 | 11.4 | WriteResp (1 granule) - minimum message | P1 | merged into 6.2
-| 11.5 | CrdtGrant (2 granules) | P1 | `aou_pack_test.pk-crdt`
+| 11.5 | CrdtGrant (2 granules) | P1 | `aou_pack_test.pk-crdt`, `aou_pack_test.pk-crdt.1x1024-sp256`, `aou_pack_test.pk-crdt.1x1024-sp256-nxt`, `aou_pack_test.pk-crdt.4xmix-sp256`
 | 11.6 | WriteReq/ReadReq (3 granules) | P0 | `aou_dp_packing_test.dp_pack-granule`, `aou_pack_test.pk-wreq8`
 | 11.7 | WriteData256/ReadData256 (8 granules) | P0 | merged into 4.1
 | 11.8 | WriteData1024 (28 granules) - maximum | P1 | merged into 4.1
