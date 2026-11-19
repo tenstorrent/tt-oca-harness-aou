@@ -315,13 +315,18 @@ remap table when the asymmetric RP mapping merges the RP onto a shared lane
 (distinct IDs outstanding, and requests per ID;
 AXI ID Handling on Merged Routes in [.monospaced]#++DOC/MAS/architecture.adoc++#).
 One parameter per RP; the ones of RPs the build does not have are unused.
+At most 1023: the RP's outstanding-read count is 10 bits wide
+(xref:aou-ig-outstanding-limits[]).
 
 |RP0_S_WR_MO_CNT ... RP3_S_WR_MO_CNT |parameter |32 ([.monospaced]#++AOU_TOP++#) /
 64 ([.monospaced]#++AOU_CORE_TOP++#) |Slave write outstanding count of the RP: depth of
 the early write response table
 (Write-Outstanding Queue Backpressure in [.monospaced]#++DOC/MAS/architecture.adoc++#),
 limit of the subordinate ID checker on AW/W, and entries of the RP's AW ID
-remap table on a merged route.
+remap table on a merged route. At most 1021: the RP's 10-bit
+outstanding-write count must hold [.monospaced]#++RPn_S_WR_MO_CNT++# writes plus the two
+write responses buffered in front of the early write response controller
+(xref:aou-ig-outstanding-limits[]).
 
 |TX_NXT_PACKING_EN |parameter |0 |TX flit packer output stage in
 [.monospaced]#++AOU_TX_CORE++#. 0: each FDI chunk is driven combinationally from the
@@ -341,13 +346,18 @@ holds one entry for all of them, so the manager port may have up to
 [.monospaced]#++RPn_M_RD_MO_CNT x ceil(beats / (MAX_ARBURSTLEN + 1))++# read bursts
 outstanding, where [.monospaced]#++beats++# is the request's length at the
 manager port's data width. The local interconnect may back-pressure AR as usual.
+At most 1000, so that [.monospaced]#++AOU_INIT.MST_TR_COMPLETE++# stays exact: the RP's
+10-bit count of remote reads in service covers this table plus up to 3 reads
+held in the register slices before and after it.
 
 |RP0_M_WR_MO_CNT ... RP3_M_WR_MO_CNT |parameter |32 |Number of remote write requests the RP keeps in
 service at its AXI manager port (one pending-ID table entry per request, from
 the first AW it issues for the request until the last B). As for reads, a split
 request holds one entry for all of its sub-bursts, so the manager port may have
 up to [.monospaced]#++RPn_M_WR_MO_CNT x ceil(beats / (MAX_AWBURSTLEN + 1))++# write
-bursts outstanding.
+bursts outstanding. At most 1000, so that [.monospaced]#++AOU_INIT.MST_TR_COMPLETE++#
+stays exact: the RP's 10-bit count of remote writes in service covers this
+table plus up to 6 writes held in the register slices before and after it.
 
 |RP0_AGG_WCH_FIFO_DEPTH ... RP3_AGG_WCH_FIFO_DEPTH |localparam in
 [.monospaced]#++AOU_CORE_TOP++# (parameter of [.monospaced]#++AOU_CORE++#) |16 |Depth of the per-RP
@@ -418,6 +428,45 @@ two-PHY value.
 [.monospaced]#++AOU_TOP++# and [.monospaced]#++AOU_CORE_TOP++#. Required for [.monospaced]#++FDI_CFG_TP_*++# values of
 [.monospaced]#++FDI_CONFIG++#.
 |=======================================================================
+
+[[aou-ig-outstanding-limits]]
+=== Outstanding Transaction Limits
+
+Each RP's subordinate port supports at most 1023 outstanding writes while
+early write response ([.monospaced]#++WRITE_EARLY_RESPONSE_RPn.EARLY_BRESP_EN++#) and the
+subordinate ID check ([.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN++#)
+are both off, and at most 1023 outstanding reads while the subordinate ID
+check is off. Both are off after reset. Traffic past these limits is not
+supported, and the system must keep each RP within them: AXI and the AoU
+specification set no limit, and the RP does not hold
+[.monospaced]#++AWREADY++# or [.monospaced]#++ARREADY++# at it. Enabling early response
+holds AW at [.monospaced]#++RPn_S_WR_MO_CNT++# outstanding writes; enabling the ID check
+holds AW at [.monospaced]#++RPn_S_WR_MO_CNT++# and AR at [.monospaced]#++RPn_S_RD_MO_CNT++#.
+
+With an AoU peer at default parameters the credit loop keeps the count far
+below the limit. A non-AoU peer, or the fabric behind it, that accepts about
+a thousand requests from one RP without answering them can reach it, and so
+can an AoU peer built with much larger RX FIFO and outstanding-count
+parameters.
+
+Past the limit the RP's outstanding counts wrap: [.monospaced]#++AOU_INIT.SLV_TR_COMPLETE++#
+and [.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE++# can read 1 with requests
+outstanding. A DeactivateReq can then be sent before those requests are
+answered, and software that checks these flags before a configuration
+change, as the Enable/Disable Procedure in
+[.monospaced]#++DOC/MAS/architecture.adoc++# does, can make the change with traffic
+still pending, which is not supported. With early response off a W can also
+stall until enough write responses return; the stall is temporary. The write
+watchdog does not count while its count of outstanding writes reads zero, so
+it can miss a stall or a hang. The wrap itself corrupts no data or response, and the
+counts are right again once fewer than 1024 requests are outstanding. Keeping
+each RP within the limits avoids all of this; the RP has no hardware that
+enforces them. The parameter ranges in xref:aou-ig-parameter-list[]
+keep the write counts exact whenever early response or the ID check is on, and
+the read count whenever the ID check is on, and they keep
+[.monospaced]#++AOU_INIT.MST_TR_COMPLETE++# exact. The counters per mode and the
+reasons are in Outstanding-Count Limits in
+[.monospaced]#++DOC/MAS/architecture.adoc++#.
 
 
 [[aou-ig-interface-signals]]
@@ -968,7 +1017,8 @@ remote die has been answered) is tracked inside AOU_CORE and reported in
 [.monospaced]#++AOU_INIT.SLV_TR_COMPLETE++# / [.monospaced]#++AOU_INIT.MST_TR_COMPLETE++#; no external
 BUS_CLEANY inputs exist. [.monospaced]#++SLV_TR_COMPLETE++# also waits for the actual B
 responses of writes that received an early B response
-([.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE++#).
+([.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE++#). Both flags are exact
+only within the limits of xref:aou-ig-outstanding-limits[].
 * After AOU_CORE deactivation, the activation status transitions to
 DISABLED, allowing the UCIe link to go down. Once deactivation
 completes, [.monospaced]#++O_AOU_ACTIVATE_ST_DISABLED++# is asserted to notify the

@@ -405,7 +405,7 @@ The [.monospaced]#++early_go++# flag ensures that for transactions sharing the s
 [[aou-write-outstanding-queue-backpressure]]
 ==== Write-Outstanding Queue Backpressure
 
-The backpressure mechanism described in this section is only active when the early response feature is enabled ([.monospaced]#++EARLY_BRESP_EN = 1++#). When disabled, the module is a pass-through: AW, W, and B signals are wired directly between the subordinate and manager interfaces with no outstanding-count gating, and write depth is bounded only by whatever the downstream AOU TX datapath can accept. The one ordering rule the pass-through keeps is that W data is accepted only for a write whose AW has been accepted (or is accepted in the same cycle): [.monospaced]#++WREADY++# stays low toward a manager that presents a W burst ahead of its AW until the AW arrives (AXI4 A3.3.1 allows a subordinate to wait for [.monospaced]#++AWVALID++# before asserting [.monospaced]#++WREADY++#).
+The backpressure mechanism described in this section is only active when the early response feature is enabled ([.monospaced]#++EARLY_BRESP_EN = 1++#). When disabled, the module is a pass-through: AW, W, and B signals are wired directly between the subordinate and manager interfaces with no outstanding-count gating, so the controller does not limit the number of writes in flight; xref:aou-outstanding-count-limits[] gives the number an RP supports and the parameter ranges. The one ordering rule the pass-through keeps is that W data is accepted only for a write whose AW has been accepted (or is accepted in the same cycle): [.monospaced]#++WREADY++# stays low toward a manager that presents a W burst ahead of its AW until the AW arrives (AXI4 A3.3.1 allows a subordinate to wait for [.monospaced]#++AWVALID++# before asserting [.monospaced]#++WREADY++#).
 
 When enabled, the early table has [.monospaced]#++WR_MO_CNT++# entries (set by the RP's [.monospaced]#++RPn_S_WR_MO_CNT++# parameter: default 32 on AOU_TOP, 64 on AOU_CORE_TOP). Every write that enters the controller \-- bufferable or non-bufferable \-- occupies one table entry from the time WLAST is accepted until the *actual B response* arrives from the remote die and is consumed.
 
@@ -423,6 +423,38 @@ and draining as tracking entries become available.
 [[aou-write-outstanding-backpressure-figure]]
 .AoU write-outstanding backpressure
 image::write-outstanding-backpressure.svg["Write-outstanding queue filling, stalling, and draining as early-table entries free up"]
+
+[[aou-outstanding-count-limits]]
+===== Outstanding-Count Limits
+
+Each RP counts the requests accepted on its subordinate port and not yet answered in 10-bit counters. Nothing holds AW unless early response or the subordinate ID check is enabled, and nothing holds AR unless the subordinate ID check is enabled. With both of them off, the reset settings, an RP therefore supports at most 1023 outstanding writes, and with the subordinate ID check off at most 1023 outstanding reads. Traffic past these limits is not supported: the system must keep each RP within them. AXI and the AoU specification set no such limit and give the peer no way to learn it, so it is a constraint of this implementation on the system around it.
+
+A write is outstanding from its AW handshake on the subordinate port until its write response (for a write answered early, until the remote die's WriteResp arrives); a read is outstanding from its AR handshake until its last R beat.
+
+Early response ([.monospaced]#++WRITE_EARLY_RESPONSE_RPn.EARLY_BRESP_EN++#) holds AW while [.monospaced]#++RPn_S_WR_MO_CNT++# writes are outstanding. The subordinate ID check ([.monospaced]#++AXI_SLV_ID_MISMATCH_ERR_RPn.AXI_SLV_ID_MISMATCH_EN++#, [.monospaced]#++AOU_SLV_AXI_INFO++#) holds AW at [.monospaced]#++RPn_S_WR_MO_CNT++# and AR at [.monospaced]#++RPn_S_RD_MO_CNT++#; while it is off it sees no handshakes. <<aou-outstanding-counts-table>> relates the counters in each mode, using these names:
+
+* RP write count and RP read count: [.monospaced]#++r_slv_wr_pending_cnt++# and [.monospaced]#++r_slv_rd_pending_cnt++# in [.monospaced]#++AOU_CORE_RP++#, which give [.monospaced]#++AOU_INIT.SLV_TR_COMPLETE++#.
+* Controller write count: [.monospaced]#++r_aw_cnt++# in the early write response controller, from the AW handshake until the remote die's response leaves the two-entry register slice in front of the controller. It gives [.monospaced]#++WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE++# (also part of [.monospaced]#++SLV_TR_COMPLETE++#) and runs the write watchdog.
+* ID checker write count and read count: the counts in [.monospaced]#++AOU_SLV_AXI_INFO++#. The write count ends when the response enters that register slice.
+
+[[aou-outstanding-counts-table]]
+[width="100%",cols="<12%,<12%,<46%,<30%",options="header",]
+.Subordinate-side outstanding counts per mode
+|=======================================================================
+|Early response |Subordinate ID check |Writes |Reads
+|off |off |RP write count = controller write count, with no limit. ID checker write count = 0. |RP read count, with no limit. ID checker read count = 0.
+|on |off |RP write count at most controller write count, which is at most [.monospaced]#++RPn_S_WR_MO_CNT++#: a write answered early leaves the RP write count at its early response. ID checker write count = 0. |RP read count, with no limit. ID checker read count = 0.
+|off |on |RP write count = controller write count = ID checker write count + responses held in the register slice, at most [.monospaced]#++RPn_S_WR_MO_CNT + 2++#. |RP read count = ID checker read count, at most [.monospaced]#++RPn_S_RD_MO_CNT++#.
+|on |on |RP write count at most controller write count, which is at most [.monospaced]#++RPn_S_WR_MO_CNT++#; controller write count = ID checker write count + responses held in the register slice. |RP read count = ID checker read count, at most [.monospaced]#++RPn_S_RD_MO_CNT++#.
+|=======================================================================
+
+Where a parameter bounds the counts, it must keep them below 1024: [.monospaced]#++RPn_S_WR_MO_CNT++# must be at most 1021, since with early response off and the ID check on the write counts reach [.monospaced]#++RPn_S_WR_MO_CNT + 2++# ([.monospaced]#++2^10 >= RPn_S_WR_MO_CNT + 3++#), and [.monospaced]#++RPn_S_RD_MO_CNT++# at most 1023. With early response on, AW is held when the controller write count equals [.monospaced]#++RPn_S_WR_MO_CNT++#, a value a 10-bit count never reaches at 1024 or more.
+
+The RP's count of remote requests in service, which gives [.monospaced]#++AOU_INIT.MST_TR_COMPLETE++#, is also 10 bits wide. It runs from the request's handshake into the RP's receive path to its response's handshake toward the TX core, so it covers the manager pending tables (xref:aou-response-reassembly[]) and the register slices before and after them: at most [.monospaced]#++RPn_M_WR_MO_CNT++# + 6 writes and [.monospaced]#++RPn_M_RD_MO_CNT++# + 3 reads. It stays exact while [.monospaced]#++RPn_M_WR_MO_CNT++# and [.monospaced]#++RPn_M_RD_MO_CNT++# are at most 1000.
+
+*When the limit matters.* With an AoU peer at default parameters the credit loop keeps the subordinate-side count far below 1024: requests in flight from one RP are bounded by this RP's TX queues, the peer's RX request FIFO ([.monospaced]#++RPn_RX_AW_FIFO_DEPTH++# / [.monospaced]#++RPn_RX_AR_FIFO_DEPTH++#, 44 by default), the requests the peer's manager port keeps in service ([.monospaced]#++RPn_M_WR_MO_CNT++# / [.monospaced]#++RPn_M_RD_MO_CNT++#, 32 by default) and the responses queued on the way back. A non-AoU peer, or the fabric behind it, that accepts about a thousand requests from one RP without answering them can reach it, and so can an AoU peer built with much larger RX FIFO and outstanding-count parameters. The AXI ID width does not bound the count, since requests with the same ID may be outstanding together.
+
+*What goes wrong past it.* A count that reaches a multiple of 1024 reads as zero, so [.monospaced]#++SLV_TR_COMPLETE++# (and, for writes, [.monospaced]#++WRITE_RESP_DONE++#) can read 1 with requests outstanding. A DeactivateReq can then be sent before those requests are answered, and software that checks these flags before a configuration change, as the xref:aou-enabledisable-procedure[Enable/Disable Procedure] does, can make the change with traffic still pending, which is not supported. With early response off, a W can also stall until enough write responses return; the stall is temporary. The write watchdog counts only while the controller write count is non-zero, so it can miss a stall or a hang while that count reads zero. The wrap itself corrupts no data or response, and the counts are right again once fewer than 1024 requests are outstanding. Keeping each RP within the limits avoids all of this; the RP has no hardware that enforces them.
 
 [[aou-mixed-ordering----bufferable-before-non-bufferable-same-id]]
 ==== Mixed Ordering \-- Bufferable Before Non-Bufferable (Same ID)
@@ -494,7 +526,7 @@ controls.
 |WRITE_RESP_ERR_ID_INFO |[10:1] |RO |AXI ID of the transaction whose actual BRESP had an error.
 |WRITE_RESP_ERR_TYPE_INFO |[12:11] |RO |BRESP error type (2pass:[']b10 = SLVERR, 2pass:[']b11 = DECERR).
 |WRITE_RESP_ERR |[13] |W1C |Write 1 to clear the [.monospaced]#++INT_EARLY_RESP_ERR++# interrupt.
-|WRITE_RESP_DONE |[14] |RO |1 when no write transactions are pending ([.monospaced]#++r_aw_cnt == 0++#).
+|WRITE_RESP_DONE |[14] |RO |1 when no write transactions are pending ([.monospaced]#++r_aw_cnt == 0++#); exact only within xref:aou-outstanding-count-limits[].
 |EARLY_ALWAYS_EN |[15] |RW |Return the early B response for every write, regardless of [.monospaced]#++AWCACHE[0]++#.
 |WDT_EN |[16] |RW |Enable the write-transaction watchdog of this RP.
 |WDT_TRANS_TIMEOUT_ERR |[17] |W1C |Set by hardware when the watchdog expires; source of [.monospaced]#++INT_EARLY_WDT_ERR++#. Write 1 to clear.

@@ -342,6 +342,7 @@ The DISABLED signal is asserted to indicate that deactivation has been completed
 
 * This signal indicates that there are no pending transactions in both local die and remote die.
 * SLV_TR_COMPLETE additionally requires WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE = 1 on every RP: a write that received an early B response counts as pending until its actual B response has arrived from the remote die.
+* SLV_TR_COMPLETE is exact only while every RP keeps within the subordinate-side outstanding limits (at most 1023 writes with early response and the subordinate ID check both off, at most 1023 reads with the ID check off), and MST_TR_COMPLETE only while RPn_M_WR_MO_CNT and RPn_M_RD_MO_CNT are at most 1000; see xref:{aou-architecture-xref}#aou-outstanding-count-limits[Outstanding-Count Limits].
 
 *ACK_TIME_OUT_VALUE/MSG_CREDIT_TIME_OUT_VALUE*
 
@@ -356,7 +357,7 @@ The DISABLED signal is asserted to indicate that deactivation has been completed
 * EARLY_ALWAYS_EN: If this field is set(1) together with EARLY_RESPONSE_EN, every non-exclusive write receives the early response regardless of AWCACHE[0].
 * WDT_EN / WRITE_EARLY_RESPONSE_WDT_CTL.WDT_THRESHOLD: enable and threshold of the write-transaction watchdog; see xref:aou-write-transaction-watchdog[Write Transaction Watchdog].
 * WDT_TRANS_TIMEOUT_ERR: set when the watchdog of this RP expires; source of the INT_EARLY_WDT_ERR interrupt. Writing 1 clears it.
-* WRITE_RESP_DONE: It indicates that there are no pending write requests and all write responses have been received from the remote die.
+* WRITE_RESP_DONE: It indicates that there are no pending write requests and all write responses have been received from the remote die. It is exact only while the RP keeps within the outstanding-write limit (at most 1023 with early response and the subordinate ID check both off); see xref:{aou-architecture-xref}#aou-outstanding-count-limits[Outstanding-Count Limits].
 * WRITE_RESP_ERR: It indicated that although the early response feature was enabled and an early response has already been delivered to the local die, an error occurred later in the write response received from the remote die. The BRESP value of the error is stored in WRITE_RESP_ERR_TYPE_INFO, and the BID of the transaction that caused the error is stored in WRITE_RESP_ERR_ID_INFO SFR. When an error occurs, an interrupt is generated. Afterward, writing 1 to the WRITE_RESP_ERR SFR clears ERR_TYPE_INFO, ERR_ID_INFO, and RESP_ERR.
 
 *DEST_RP and ASYMMETRIC_RP_PROC_CON (RP mapping)*
@@ -608,6 +609,7 @@ This system provides a bus cleany mechanism, tracked inside AOU_CORE and reporte
 
 * SLV_TR_COMPLETE (subordinate bus cleanly) indicates whether the local die has received all responses to the requests it sent to the remote die. Writes that received an early B response count until their actual B response arrives (WRITE_EARLY_RESPONSE_RPn.WRITE_RESP_DONE = 1 on every RP), so deactivation waits for them.
 * MST_TR_COMPLETE (manager bus cleanly) indicates whether the remote die has received all responses to the requests it sent to the local die.
+* Both flags come from 10-bit counts and are exact only within the outstanding limits of xref:{aou-architecture-xref}#aou-outstanding-count-limits[Outstanding-Count Limits]; past them SLV_TR_COMPLETE can read 1 with requests unanswered, and a DeactivateReq can then go out early.
 
 Before sending a new ActivateReq, the Rx FIFO must be completely emptied - that is, all messages must be popped. After deactivation, the credit count is reset, and during the subsequent activation process, credits are advertised based on the RX FIFO depth. Therefore, before sending an ActivateReq, the local die must confirm that all messages in the RX FIFO have been popped. To satisfy that condition, no backpressure must occur on the local diepass:[']s MI AW/AR/W channels.
 
