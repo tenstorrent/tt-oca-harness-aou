@@ -1,0 +1,66 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%% MAS Figure 8: the receive path of one RP, from the FDI to the AXI ports.
+%% Lane counts and depths are the defaults at the 64 B and 128 B FDI widths.
+%%{init: {'theme': 'neutral', 'themeVariables': {'clusterBkg': '#fafafa', 'clusterBorder': '#707070'}, 'htmlLabels': false, 'flowchart': {'htmlLabels': false, 'wrappingWidth': 520, 'subGraphTitleMargin': {'top': 6, 'bottom': 14}}}}%%
+flowchart BT
+    FDI["UCIe D2D adapter (FDI)<br/>pl_valid, pl_data, pl_flit_cancel"]
+
+    subgraph RXCORE["AOU_RX_CORE"]
+        direction BT
+        FDIIF["AOU_RX_FDI_IF<br/>collects the beats of a half flit,<br/>drops a cancelled half flit"]
+        TAG["Half-flit tagger<br/>message extents from MsgStart,<br/>RP and class of every granule"]
+        LANES["Lane decode<br/>WriteReq, ReadReq,<br/>WriteResp, Misc"]
+        FDIIF -->|"half flit,<br/>24 granules"| TAG
+        TAG --> LANES
+    end
+
+    subgraph FIFORP["AOU_FIFO_RP (one per RP)"]
+        direction LR
+        BF["B FIFO<br/>24S1M, 44 entries"]
+        RST["R granule store<br/>600 granules"]
+        AWF["AW FIFO<br/>9S1M, 44 entries"]
+        WST["W granule store<br/>600 granules"]
+        ARF["AR FIFO<br/>9S1M, 44 entries"]
+    end
+
+    subgraph CORERP["AOU_CORE_RP (one per RP)"]
+        direction BT
+        EBR["Write early response<br/>controller"]
+        WLG["W_LAST generator<br/>regenerates WLAST from AWLEN"]
+        CONV["Data width converter<br/>upsizer, bypass or downsizer,<br/>3x1 mux, burst splitter, aggregator"]
+        WLG --> CONV
+    end
+
+    REMAP["AOU_ASYMMETRIC_RP_PROC<br/>returns B and R to the<br/>port that issued the request"]
+    CRD["AOU_CRD_CTRL"]
+    ACT["AOU_ACTIVATION_CTRL"]
+
+    AXISB["AXI S: B"]
+    AXISR["AXI S: R"]
+    AXIM["AXI M: AW, W, AR"]
+    AXIMRSP["AXI M: B, R"]
+    TX["AOU_TX_CORE"]
+
+    FDI --> FDIIF
+
+    LANES -->|"WriteResp lanes"| BF
+    TAG -->|"granules with ReadData<br/>cover and start tags"| RST
+    LANES -->|"WriteReq lanes"| AWF
+    TAG -->|"granules with WriteData<br/>cover and start tags"| WST
+    LANES -->|"ReadReq lanes"| ARF
+    RXCORE -->|"CrdtGrant, MsgCredit"| CRD
+    RXCORE -->|"Activation messages"| ACT
+
+    BF --> REMAP
+    RST --> REMAP
+    REMAP --> EBR
+    EBR --> AXISB
+    REMAP --> AXISR
+    AWF --> WLG
+    WST --> WLG
+    ARF --> CONV
+    CONV --> AXIM
+    AXIMRSP --> CONV
+    CONV -->|"B and R at the<br/>request's width"| TX
+
+    FIFORP -.->|"credit return on pop:<br/>1 per AW, AR or B,<br/>1 per granule of a W or R message"| CRD

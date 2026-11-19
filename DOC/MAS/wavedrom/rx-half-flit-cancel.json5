@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: CC-BY-4.0
+// MAS Figure 21: AOU_RX_FDI_IF at the 64 B FDI width, two beats per half flit.
+// A0 and A1 are the beats of half flit A. One character of a wave is one clock
+// cycle; the cycle numbers are on the top axis.
+//   cycles  1-5   flit 1 (half flits A, B) with a CRC error in its first half:
+//                 A is cancelled at cycle 3, B at cycle 5
+//   cycles  7-10  flit 1 replayed: A and B are presented at cycles 9 and 11
+//   cycles 11-15  flit 2 (half flits C, D) with a CRC error in its second half:
+//                 C is presented at cycle 13, D is cancelled at cycle 15
+//   cycles 17-20  flit 2 replayed: C, already delivered, is cancelled at cycle
+//                 19; D is presented at cycle 21
+{
+  signal: [
+    { name: 'clk',                wave: 'p.......................' },
+    {},
+    [ 'FDI',
+      { name: 'flit',             wave: 'x2....x2...2....x2...x..',
+        data: ['1: CRC error in first half', '1 replayed', '2: CRC error in second half', '2 replayed'] },
+      { name: 'pl_data',          wave: 'x3344x.33445566x.5566x..',
+        data: ['A0', 'A1', 'B0', 'B1', 'A0', 'A1', 'B0', 'B1', 'C0', 'C1', 'D0', 'D1', 'C0', 'C1', 'D0', 'D1'] },
+      { name: 'pl_valid',         wave: '01...0.1.......0.1...0..' },
+      { name: 'pl_flit_cancel',   wave: '0..1010........10..10...' }
+    ],
+    {},
+    [ 'RX_FDI_IF',
+      { name: 'r_data',           wave: 'x..3.4...3.4.5.6...5.6..',
+        data: ['A', 'B', 'A', 'B', 'C', 'D', 'C', 'D'] },
+      { name: 'r_valid',          wave: '0..1010..10101010..1010.' },
+      { name: 'O_AOU_RX_HF_VALID', wave: '0........101010......10.' }
+    ],
+    {},
+    { name: 'to RX_CORE',         wave: 'x........3x4x5x......6x.',
+      data: ['A', 'B', 'C', 'D'] }
+  ],
+  head: { tick: 0 },
+  config: { hscale: 1 }
+}

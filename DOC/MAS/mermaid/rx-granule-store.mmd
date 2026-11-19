@@ -1,0 +1,41 @@
+%% SPDX-License-Identifier: CC-BY-4.0
+%% MAS Figure 10: AOU_RX_GRANULE_STORE, one per RP for WriteData/WriteDataFull
+%% and one for ReadData. Counts are the defaults at the 64 B and 128 B FDI
+%% widths: 24 granules per cycle, WG = 8 granules per word, 600 granules deep.
+%%{init: {'theme': 'neutral', 'themeVariables': {'clusterBkg': '#fafafa', 'clusterBorder': '#707070'}, 'htmlLabels': false, 'flowchart': {'htmlLabels': false, 'wrappingWidth': 520, 'subGraphTitleMargin': {'top': 6, 'bottom': 14}}}}%%
+flowchart TB
+    IN["From AOU_RX_CORE, one cycle per half flit<br/>24 granules, cover tags, start tags"]
+
+    subgraph WR["Write side"]
+        direction TB
+        CMP["Compaction<br/>the covered granules, packed in arrival order"]
+        ASM["Word assembly<br/>the residue, then the new granules,<br/>cut into words of 8 granules (320 bits)"]
+        RES["Residue<br/>up to 7 granules of the partial word,<br/>rewritten when later granules complete it"]
+        CMP --> ASM
+        ASM --> RES
+        RES --> ASM
+    end
+
+    CTRL["Message control FIFO<br/>pushed at each start granule:<br/>word and offset of the start,<br/>running granule count,<br/>DLENGTH, WriteDataFull flag"]
+
+    RAM["Granule ring<br/>5 banks of AOU_TPSRAM, 16 words of 320 bits each.<br/>Consecutive words go to consecutive banks, so the<br/>words written in one cycle, and the words of one<br/>message, are each in different banks"]
+
+    subgraph RD["Read side"]
+        direction TB
+        HEAD["Head message complete<br/>the granules written since its start<br/>reach its length, and the output<br/>buffer has room"]
+        ALIGN["Align and decode<br/>shift to the start offset, then extract by DLENGTH:<br/>WDATA, WSTRB and FLEX (WriteDataFull: every strobe set),<br/>or RDATA, RID, RRESP, RLAST and FLEX (data narrower<br/>than 1024 bits is replicated across the bus)"]
+        OUT["Output buffer<br/>2 decoded messages"]
+        ALIGN --> OUT
+    end
+
+    DOWN["W_LAST generator (WriteData)<br/>or AXI S R path (ReadData)"]
+    CRD["AOU_CRD_CTRL"]
+
+    IN --> CMP
+    IN -->|"start tags"| CTRL
+    ASM -->|"up to 4 words<br/>per cycle"| RAM
+    CTRL --> HEAD
+    HEAD -->|"read 5 consecutive words,<br/>one per bank"| RAM
+    RAM -->|"one cycle later"| ALIGN
+    OUT -->|"valid / ready"| DOWN
+    OUT -.->|"on pop: one credit<br/>per granule of the message"| CRD

@@ -114,24 +114,24 @@ Within a merge group of the asymmetric RP mapping, each source port has an equiv
 === RX_CORE
 
 [caption=""]
-.Figure 8. Block Diagram of AOU_RX_CORE
+.Figure 8. Block Diagram of the RX path
 [[figure-8]]
-image::image8.png[Figure 8. Block Diagram of AOU_RX_CORE]
+image::rx-path-block-diagram.svg[Figure 8. Block Diagram of the RX path]
 
-xref:figure-8[] shows the simplified block diagram of AOU_RX_CORE. AOU_RX_CORE is a submodule that interfaces directly with the D2D adapter, receiving I_FDI_PL_VALID, I_FDI_PL_DATA, and I_FDI_PL_FLIT_CANCEL signals to determine the validity of incoming beats, and unpacking messages in accordance with the AOU specification. Within RX_CORE, there is a submodule called RX_FDI_IF, which collects the FDI beats of a half flit (a whole flit at the 256 B width) and presents the half flit to the decoder only once it is complete and has not been cancelled (xref:aou-ucie-flit-cancel-mechanism[]). The figure predates the granule stores of xref:aou-message-fifo[]: the "Data FIFO" it shows for W and R is now a granule store per RP and class, fed with tagged granules rather than decoded messages.
+xref:figure-8[] shows the simplified block diagram of the receive path of one RP: AOU_RX_CORE, the RP's message storage ([.monospaced]#++AOU_FIFO_RP++#, xref:aou-message-fifo[]) and the part of [.monospaced]#++AOU_CORE_RP++# that takes the stored messages to the AXI ports. The lane counts and depths in the figure are the defaults at the 64 B and 128 B FDI widths. AOU_RX_CORE is a submodule that interfaces directly with the D2D adapter, receiving I_FDI_PL_VALID, I_FDI_PL_DATA, and I_FDI_PL_FLIT_CANCEL signals to determine the validity of incoming beats, and unpacking messages in accordance with the AOU specification. Within RX_CORE, there is a submodule called RX_FDI_IF, which collects the FDI beats of a half flit (a whole flit at the 256 B width) and presents the half flit to the decoder only once it is complete and has not been cancelled (xref:aou-ucie-flit-cancel-mechanism[]).
 
-To ensure that the local die can support AXI transfers regardless of the AXI data width of the remote die, AOU_RX_CORE integrates both Downsizer and Upsizer modules internally.
+To ensure that the local die can support AXI transfers regardless of the AXI data width of the remote die, the receive path includes both Downsizer and Upsizer modules (xref:aou-data-width-converter[]).
 
-AOU_RX_CORE includes a splitter that can divide burst lengths so that AXI messages with any burst length from the remote die can be supported on the local bus. The AW, W, and AR messages received from the remote die are sent to the AXI Manager interface, while the B and R messages received from the remote die are directed to the AXI Subordinate interface. The R data may be smaller than the local die AXI data width depending on the ARSIZE of the corresponding AR requests; the ReadData granule store decodes the message at the length its DLENGTH gives and replicates a narrower beat across the [.monospaced]#++AXI_PEER_DIE_MAX_DATA_WD++# bus, so that it is delivered to the AXI Subordinate interface with the same width as the local die AXI data width. Furthermore, the B responses corresponding to the AW and W AXI transfers issued through the Manager interface are routed into the AXI_3X1_MUX before being sent to the AOU_TX_CORE.
+The receive path includes a splitter that can divide burst lengths so that AXI messages with any burst length from the remote die can be supported on the local bus. The AW, W, and AR messages received from the remote die are sent to the AXI Manager interface, while the B and R messages received from the remote die are directed to the AXI Subordinate interface. The R data may be smaller than the local die AXI data width depending on the ARSIZE of the corresponding AR requests; the ReadData granule store decodes the message at the length its DLENGTH gives and replicates a narrower beat across the [.monospaced]#++AXI_PEER_DIE_MAX_DATA_WD++# bus, so that it is delivered to the AXI Subordinate interface with the same width as the local die AXI data width. Furthermore, the B responses corresponding to the AW and W AXI transfers issued through the Manager interface are routed into the AXI_3X1_MUX before being sent to the AOU_TX_CORE.
 
 Credits are returned to AOU_CRD_CTRL as the FIFOs and stores release their storage: one credit per request or response popped from the AW, AR and B FIFOs, and one credit per granule freed when a WriteData or ReadData message is popped from its granule store (xref:aou-credit-controller[]).
 
 [caption=""]
-.Figure 9. Architecture of Chunk Decoder
+.Figure 9. Architecture of the half-flit decoder
 [[figure-9]]
-image::image9.png[Figure 9. Architecture of Chunk Decoder]
+image::rx-half-flit-decoder.svg[Figure 9. Architecture of the half-flit decoder]
 
-xref:figure-9[] shows the architecture of the Chunk Decoder which is central submodule of RX_CORE. RX_FDI_IF assembles the received chunks into half flits of 24 granules (a whole flit of 48 at the 256 B FDI width) and presents one per cycle, so the decoder works on the same quantum whatever the FDI width. From the half flit's MsgStart bits it determines where each message begins, and for each granule which RP and message class it belongs to. Requests (3 granules) and write responses (1 granule) are decoded in that cycle and written to their FIFOs; a request that straddles two half flits is completed in the next cycle. Data messages (8 to 30 granules) are not decoded here: their granules are tagged and handed to the RP's granule store (xref:aou-message-fifo[]), which decodes a message when it is popped.
+xref:figure-9[] shows the architecture of the half-flit decoder, which is the central part of RX_CORE. It has two stages: a tag stage that works on the half flit as RX_FDI_IF presents it, and a decode stage that works on the registered granules and tags one cycle later. RX_FDI_IF assembles the received chunks into half flits of 24 granules (a whole flit of 48 at the 256 B FDI width) and presents one per cycle, so the decoder works on the same quantum whatever the FDI width. From the half flit's MsgStart bits it determines where each message begins, and for each granule which RP and message class it belongs to. Requests (3 granules) and write responses (1 granule) are decoded in that cycle and written to their FIFOs; a request that straddles two half flits is completed in the next cycle. Data messages (8 to 30 granules) are not decoded here: their granules are tagged and handed to the RP's granule store (xref:aou-message-fifo[]), which decodes a message when it is popped.
 
 The uniform quantum has a latency cost at the 64 B FDI width: a half flit is two 64 B chunks, so a message that ends in the first chunk waits one cycle for the second before it is decoded. Measured on the bench (FDI beat of the message's last granule to the AXI handshake, FIFOs empty, AXI ready) this is +1 cycle for the classes that end in the first chunk (ReadData 256, WriteResp, WriteReq and WriteDataFull 256) and +0 for the 15-granule ones; at 128 B every class is +1 (the tagging register) or +2 (last granule in the second half flit). Throughput is unchanged at every width.
 
@@ -145,17 +145,19 @@ The Activation messages are decoded in the same cycle. An ActivateReq is four gr
 Each RP has two kinds of RX message storage, both in [.monospaced]#++AOU_FIFO_RP++#:
 
 * *Register FIFOs* for the AW, AR and B channels (xref:figure-11[]): the request or response is decoded by RX_CORE in the cycle it arrives and the FIFO holds the decoded AXI fields plus the 16-bit FLEX.
-* *Granule stores* ([.monospaced]#++AOU_RX_GRANULE_STORE++#) for the W and R channels: the store holds the message's raw granules in SRAM and decodes the message when it is popped. xref:figure-10[] shows the earlier register data FIFO these replaced; the store is described below.
+* *Granule stores* ([.monospaced]#++AOU_RX_GRANULE_STORE++#, xref:figure-10[]) for the W and R channels: the store holds the message's raw granules in SRAM and decodes the message when it is popped; it is described below.
+
+Both figures show the defaults at the 64 B and 128 B FDI widths.
 
 [caption=""]
-.Figure 10. Data FIFO (register implementation, replaced by the granule store)
+.Figure 10. Granule store
 [[figure-10]]
-image::image10.png["Figure 10. Data FIFO (register implementation, replaced by the granule store)"]
+image::rx-granule-store.svg[Figure 10. Granule store]
 
 [caption=""]
 .Figure 11. Req / Resp FIFO
 [[figure-11]]
-image::image11.png[Figure 11. Req / Resp FIFO]
+image::rx-req-resp-fifo.svg[Figure 11. Req / Resp FIFO]
 
 The Turn-Around-Time(TAT) of AOU_CORE, including the D2D adaptor, is approximately 40 ns (equivalent to 40 cycles at 1 GHz). Therefore, the depth of the AW, AR, and B FIFOs is set to 44 regarding the margin.
 
@@ -841,11 +843,14 @@ So a half flit is presented exactly once, in the cycle after its last beat, unle
 
 Cancel handling adds no pipeline stage beyond the single output register: the cancel gates the register's valid combinationally in the cycle it is asserted. The latency from the FDI beat carrying a granule to the half flit's presentation at RX_CORE is one cycle after the half flit's last beat, that is one cycle at 128 B and 256 B, and up to one or three further cycles of fill at 64 B and 32 B for a granule in the half flit's first beat.
 
-The figures below illustrate an example of how only valid data is delivered to RX_CORE. Within the design, [.monospaced]#++pl_data++#, [.monospaced]#++pl_valid++#, and [.monospaced]#++pl_flit_cancel++# are defined as part of the FDI interface. The figures were drawn for the earlier chunk-granular interface ([.monospaced]#++rx_chunk_data++#, [.monospaced]#++rx_chunk_data_valid++#); the current module presents whole half flits ([.monospaced]#++O_AOU_RX_HF_DATA++#, [.monospaced]#++O_AOU_RX_HF_VALID++#), but the selection of valid data they show is the same.
+<<figure-21>> shows how only valid half flits are delivered to RX_CORE. The example is at the 64 B FDI width, where a half flit takes two beats: A0 and A1 are the beats of half flit A. Cycle _n_ is the clock period that begins at tick _n_ of the figure. [.monospaced]#++pl_data++#, [.monospaced]#++pl_valid++# and [.monospaced]#++pl_flit_cancel++# are the FDI signals; [.monospaced]#++r_data++# and [.monospaced]#++r_valid++# are the output register of [.monospaced]#++AOU_RX_FDI_IF++#, and [.monospaced]#++r_data++# is [.monospaced]#++O_AOU_RX_HF_DATA++#.
 
-<<figure-21>> shows the selection of valid chunks for RX_CORE.
+* *Flit 1* (half flits A and B) has a CRC error in its first half. [.monospaced]#++pl_flit_cancel++# in cycle 3, together with beat B0, drops A; [.monospaced]#++pl_flit_cancel++# alone in cycle 5 drops B. The flit is replayed from cycle 7, and A and B are presented in cycles 9 and 11.
+* *Flit 2* (half flits C and D) follows without a gap and has a CRC error in its second half. C is presented in cycle 13; [.monospaced]#++pl_flit_cancel++# alone in cycle 15 drops D. The whole flit is replayed from cycle 17: C, which RX_CORE already has, is dropped by the cancel in cycle 19, and D is presented in cycle 21.
+
+Each half flit reaches RX_CORE exactly once, and every dropped half flit is one whose [.monospaced]#++r_valid++# cycle coincides with [.monospaced]#++pl_flit_cancel++#.
 
 [caption=""]
-.Figure 21. Example of selecting valid chunks for RX_CORE
+.Figure 21. Example of selecting valid half flits for RX_CORE
 [[figure-21]]
-image::image20.png[Figure 21. Example of selecting valid chunks for RX_CORE]
+image::rx-half-flit-cancel.svg[Figure 21. Example of selecting valid half flits for RX_CORE]
