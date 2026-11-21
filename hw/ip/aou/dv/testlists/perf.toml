@@ -116,6 +116,122 @@ tags = ["perf"]
 run_modes = ["perf"]
 args = ["+perf_scn=S1", "+active_phy=1", "+aou_config=2x512-tp32_64"]
 
+# S1 outstanding-depth sweep: how much concurrency the link needs before it
+# saturates. Each manager keeps +perf_slots transactions outstanding (the DUT's
+# S_*_MO_CNT default is 32); below the knee the link is limited by the round trip,
+# not by its packing. Report only (+perf_report_only): the windows are measured
+# and written to perf.json, and T1-P02..P04 judge none of them, because the point
+# of the sweep is the measured plateau, not a pass/fail bound. The gated S1 runs
+# above stay the regression gate at the default depth.
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-1.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=1", "+perf_report_only=1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-2.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=2", "+perf_report_only=1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-4.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=4", "+perf_report_only=1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-8.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=8", "+perf_report_only=1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-16.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=16", "+perf_report_only=1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-32.1x512-sp64"
+module = { uvm = "aou_perf_test" }
+target = "1x512-sp64"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=32", "+perf_report_only=1", "+aou_config=1x512-sp64"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-1.2xmix41-sp128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix41-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=1", "+perf_report_only=1", "+aou_config=2xmix41-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-2.2xmix41-sp128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix41-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=2", "+perf_report_only=1", "+aou_config=2xmix41-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-4.2xmix41-sp128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix41-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=4", "+perf_report_only=1", "+aou_config=2xmix41-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-8.2xmix41-sp128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix41-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=8", "+perf_report_only=1", "+aou_config=2xmix41-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-16.2xmix41-sp128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix41-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=16", "+perf_report_only=1", "+aou_config=2xmix41-sp128"]
+
+[[tests]]
+name = "aou_perf_test.perf_scn-S1.perf_slots-32.2xmix41-sp128"
+module = { uvm = "aou_perf_test" }
+target = "2xmix41-sp128"
+seed = 1
+tags = ["perf"]
+run_modes = ["perf"]
+args = ["+perf_scn=S1", "+perf_slots=32", "+perf_report_only=1", "+aou_config=2xmix41-sp128"]
+
 [[tests]]
 name = "aou_perf_test.perf_scn-S2.1x512-sp64"
 module = { uvm = "aou_perf_test" }
@@ -247,7 +363,7 @@ args = ["+perf_scn=S5", "+aou_config=3x512-sp64"]
 
 [[groups]]
 name = "perf"
-expected_count = 22
+expected_count = 34
 tests = [
   "aou_perf_test.perf_scn-S1.1x512-sp64",
   "aou_perf_test.perf_scn-S1.4x512-sp64",
@@ -260,6 +376,18 @@ tests = [
   "aou_perf_test.perf_scn-S1.active_phy-1.2xmix-tp64_128",
   "aou_perf_test.perf_scn-S1.active_phy-0.2x512-tp32_64",
   "aou_perf_test.perf_scn-S1.active_phy-1.2x512-tp32_64",
+"aou_perf_test.perf_scn-S1.perf_slots-1.1x512-sp64",
+"aou_perf_test.perf_scn-S1.perf_slots-2.1x512-sp64",
+"aou_perf_test.perf_scn-S1.perf_slots-4.1x512-sp64",
+"aou_perf_test.perf_scn-S1.perf_slots-8.1x512-sp64",
+"aou_perf_test.perf_scn-S1.perf_slots-16.1x512-sp64",
+"aou_perf_test.perf_scn-S1.perf_slots-32.1x512-sp64",
+"aou_perf_test.perf_scn-S1.perf_slots-1.2xmix41-sp128",
+"aou_perf_test.perf_scn-S1.perf_slots-2.2xmix41-sp128",
+"aou_perf_test.perf_scn-S1.perf_slots-4.2xmix41-sp128",
+"aou_perf_test.perf_scn-S1.perf_slots-8.2xmix41-sp128",
+"aou_perf_test.perf_scn-S1.perf_slots-16.2xmix41-sp128",
+"aou_perf_test.perf_scn-S1.perf_slots-32.2xmix41-sp128",
   "aou_perf_test.perf_scn-S2.1x512-sp64",
   "aou_perf_test.perf_scn-S2.1x256-sp32",
   "aou_perf_test.perf_scn-S2.4xmix4211-sp128",
