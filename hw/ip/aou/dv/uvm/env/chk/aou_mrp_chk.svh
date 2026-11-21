@@ -18,6 +18,15 @@
 //   credit and its one-at-a-time writes (MAS 3.10.4), so it may legally be
 //   held up with slow_rp: only its remote-die transactions, which the mapping
 //   does not move, are held to the rule.
+// Report only (plan 12.19): in the same arbitration window, over the common
+//   active service interval (the latest first service .. the earliest last
+//   service), the per-RP service count and share, bytes per cycle, the longest
+//   service gap, the longest stretch of other RPs served between two of its
+//   own, and the aggregate requests and bytes per cycle. The interval only
+//   trims the ramp-up and the drain; it is not a claim that a particular RP was
+//   eligible at every instant inside it. No pass bound: MAS 3.2.1 requires that
+//   no RP starve (T1-M02) and prescribes no share for equal RPs, so these lines
+//   measure the arbiter and leave judging it to the reader.
 class aou_mrp_chk extends uvm_component;
   `uvm_component_utils(aou_mrp_chk)
 
@@ -41,10 +50,24 @@ class aou_mrp_chk extends uvm_component;
   protected bit          arb_open;
   protected bit          ind_open;
   protected int unsigned arb_seq[$];         // wire RP of each DUT request in the window
+  // Report-only service metrics of the same window (plan 12.19): when each
+  // request left the DUT (fairness), and when each S-port transaction it serves
+  // completed and how many bytes it moved (throughput), parallel to arb_seq.
+  protected time         arb_t[$];
+  protected time         arb_ct[$];
+  protected int unsigned arb_crp[$];
+  protected longint      arb_cb[$];
   // Last completion per RP in the window, [rp][1: S port, 0: remote die].
   protected time         ind_last[4][2];
   protected int unsigned ind_n[4];
   protected int unsigned n_arb_windows;
+  // The figures arb_metrics() last computed, for the selftest below.
+  int unsigned m_cnt[4];
+  int unsigned m_gap[4];
+  int unsigned m_other[4];
+  int unsigned m_n;
+  int unsigned m_run_same;
+  int unsigned m_epoch;
   protected int unsigned n_ind_windows;
 
   function new(string name, uvm_component parent);
@@ -58,6 +81,11 @@ class aou_mrp_chk extends uvm_component;
     if (t.aborted || t.rp > 3) return;
     if (loc) n_loc[t.rp]++;
     else n_rem[t.rp]++;
+    if (arb_open && loc) begin
+      arb_ct.push_back(t.t_done);
+      arb_crp.push_back(t.rp);
+      arb_cb.push_back((longint'(t.len) + 1) << t.size);
+    end
     if (ind_open) begin
       ind_n[t.rp]++;
       if (t.t_done > ind_last[t.rp][loc]) ind_last[t.rp][loc] = t.t_done;
@@ -74,7 +102,10 @@ class aou_mrp_chk extends uvm_component;
         if (rp_map != null && $cast(q, m)) x = rp_map.req_port(int'(m.rp), q.id);
         if (x < 0) return;   // FEAT-R29 reports it
         n_req[x]++;
-        if (arb_open) arb_seq.push_back(32'(x));
+        if (arb_open) begin
+          arb_seq.push_back(32'(x));
+          arb_t.push_back($time);
+        end
       end
       AOU_MT_WDATA, AOU_MT_WDATAF: n_wdata[m.rp]++;
       AOU_MT_WRESP: n_rsp[m.rp]++;
@@ -105,10 +136,195 @@ class aou_mrp_chk extends uvm_component;
     join
   endtask
 
+  // Self-check for the interval arithmetic (report only, no DUT). Each case
+  // seeds the window's service sequence and asserts what arb_metrics() makes
+  // of it; a mismatch is an error, so `+mrp_arb_selftest=1` in a test either
+  // passes silently or shows exactly which figure moved.
+  protected function void arb_case(string name, time seq_t[$], int unsigned seq_rp[$],
+                                   int unsigned want_cnt0, int unsigned want_gap0,
+                                   int unsigned want_gap1 = 0);
+    arb_seq.delete();
+    arb_t.delete();
+    arb_ct.delete();
+    arb_crp.delete();
+    arb_cb.delete();
+    foreach (seq_t[i]) begin
+      arb_t.push_back(seq_t[i]);
+      arb_seq.push_back(seq_rp[i]);
+    end
+    arb_metrics();
+    if (m_cnt[0] != want_cnt0 || m_gap[0] != want_gap0 || m_gap[1] != want_gap1)
+      `uvm_error(get_type_name(), $sformatf(
+                 {"selftest %s: RP0 %0d services (want %0d), gap %0d (want %0d), ",
+                  "RP1 gap %0d (want %0d)"}, name, m_cnt[0], want_cnt0, m_gap[0], want_gap0,
+                 m_gap[1], want_gap1))
+    else
+      `uvm_info(get_type_name(), $sformatf("selftest %s: RP0 %0d services, gap %0d, RP1 gap %0d",
+                                           name, m_cnt[0], m_gap[0], m_gap[1]), UVM_LOW)
+  endfunction
+
+  function void arb_metrics_selftest();
+    time         t[$];
+    int unsigned rp[$];
+    // 1. A service before t0 must not become the first gap's origin.
+    //    RP0 90 130 150, RP1 100 160 -> t0 100, t1 150, RP0 gap 130->150 = 20.
+    t.delete();
+    rp.delete();
+    t = '{90, 100, 130, 150, 160};
+    rp = '{0, 1, 0, 0, 1};
+    arb_case("pre-window service", t, rp, 2, 20);
+    // 2. No pre-window service: the first in-window service initialises the state.
+    t = '{110, 100, 130, 150};
+    rp = '{0, 1, 0, 1};
+    arb_case("no pre-window service", t, rp, 2, 20);
+    // 3. Several pre-window services: none of them may contribute a gap.
+    t = '{50, 70, 90, 100, 130, 150, 160};
+    rp = '{0, 0, 0, 1, 0, 0, 1};
+    arb_case("several pre-window services", t, rp, 2, 20);
+    // 4. One in-window service for RP0: there is no gap to report for it. RP1
+    //    has two (100 and 150) and its own gap is real, so it is asserted too.
+    t = '{60, 100, 120, 150, 200};
+    rp = '{0, 1, 0, 1, 0};
+    arb_case("single in-window service", t, rp, 1, 0, 50);
+    // 5. A service after t1 is outside the interval and must not stretch a gap.
+    t = '{110, 100, 140, 150, 200};
+    rp = '{0, 1, 0, 1, 0};
+    arb_case("service after the interval", t, rp, 2, 30);
+    arb_seq.delete();
+    arb_t.delete();
+  endfunction
+
   function void arb_start();
     flush();
     arb_seq.delete();
+    arb_t.delete();
+    arb_ct.delete();
+    arb_crp.delete();
+    arb_cb.delete();
     arb_open = 1'b1;
+  endfunction
+
+  // Report-only service metrics of the window (plan 12.19), over the common
+  // active service interval: from the latest first service to the earliest last
+  // service among the busy RPs. It drops the ramp-up and the drain, where RPs
+  // are not all being served yet or any more, so the shares, gaps and rates
+  // describe concurrent service. The scenario that registers these metrics
+  // drives all four RP traffic sources at once for 500 transactions each, which
+  // is what puts them in contention; the interval itself only bounds the
+  // measurement and says nothing about an RP's eligibility at a given cycle.
+  // No pass bound: MAS 3.2.1 requires that no RP starve, which T1-M02 checks,
+  // and prescribes no share for equal RPs.
+  protected function void arb_metrics();
+    time         t0 = 0;
+    time         t1 = 0;
+    time         tf[4];
+    time         tl[4];
+    time         last[4];
+    int unsigned cnt[4];
+    int unsigned done[4];
+    longint      bytes[4];
+    int unsigned max_gap[4];
+    int unsigned run_other[4];
+    int          last_pos[4];
+    int unsigned in_rp[$];
+    int unsigned n;
+    int unsigned n_done = 0;
+    longint      n_bytes = 0;
+    int unsigned run_same = 0;
+    int unsigned run_len = 0;
+    int          run_rp = -1;
+    flush();
+    foreach (m_cnt[r]) begin
+      m_cnt[r] = 0;
+      m_gap[r] = 0;
+      m_other[r] = 0;
+    end
+    m_n = 0;
+    m_run_same = 0;
+    m_epoch++;
+    foreach (tf[r]) begin
+      tf[r] = 0;
+      tl[r] = 0;
+      last[r] = 0;
+      cnt[r] = 0;
+      done[r] = 0;
+      bytes[r] = 0;
+      max_gap[r] = 0;
+      run_other[r] = 0;
+      last_pos[r] = -1;
+    end
+    for (int unsigned i = 0; i < arb_seq.size(); i++) begin
+      int unsigned r = arb_seq[i];
+      if (tf[r] == 0) tf[r] = arb_t[i];
+      tl[r] = arb_t[i];
+    end
+    // Common active service interval.
+    foreach (tf[r]) if (tf[r] != 0) begin
+      if (t0 == 0 || tf[r] > t0) t0 = tf[r];
+      if (t1 == 0 || tl[r] < t1) t1 = tl[r];
+    end
+    if (t0 == 0 || t1 <= t0) return;
+    for (int unsigned i = 0; i < arb_seq.size(); i++) begin
+      int unsigned r = arb_seq[i];
+      time         t = arb_t[i];
+      // Outside the interval: no state. Seeding `last` from here would make the
+      // first in-window gap reach back through the ramp-up, which is not a gap
+      // between two services of this interval.
+      if (t < t0) continue;
+      if (t > t1) break;
+      cnt[r]++;
+      if (last[r] != 0 && int'(t - last[r]) > max_gap[r]) max_gap[r] = int'(t - last[r]);
+      last[r] = t;
+      in_rp.push_back(r);
+    end
+    n = in_rp.size();
+    if (n == 0) return;
+    // Services of other RPs between two consecutive services of r, inside the
+    // interval: a long stretch is time the arbiter spent elsewhere.
+    for (int unsigned i = 0; i < n; i++) begin
+      int unsigned r = in_rp[i];
+      if (last_pos[r] >= 0 && int'(i) - last_pos[r] - 1 > int'(run_other[r]))
+        run_other[r] = int'(i) - last_pos[r] - 1;
+      last_pos[r] = int'(i);
+    end
+    // Longest stretch of services to one RP without another RP in between.
+    foreach (in_rp[i]) begin
+      if (run_rp == int'(in_rp[i])) run_len++;
+      else begin
+        run_rp = int'(in_rp[i]);
+        run_len = 1;
+      end
+      if (run_len > run_same) run_same = run_len;
+    end
+    // Throughput: what the transactions served in this interval delivered.
+    for (int unsigned i = 0; i < arb_ct.size(); i++) begin
+      int unsigned r = arb_crp[i];
+      if (arb_ct[i] < t0 || arb_ct[i] > t1) continue;
+      done[r]++;
+      bytes[r] += arb_cb[i];
+      n_done++;
+      n_bytes += arb_cb[i];
+    end
+    foreach (cnt[r]) m_cnt[r] = cnt[r];
+    foreach (max_gap[r]) m_gap[r] = max_gap[r];
+    foreach (run_other[r]) m_other[r] = run_other[r];
+    m_n = n;
+    m_run_same = run_same;
+    `uvm_info(get_type_name(), $sformatf(
+              {"arbitration metrics: %0d requests in %0d cycles over the common ",
+               "active service interval, longest same-RP run %0d; %0d completions ",
+               "in it, %0.3f requests/cycle, %0.2f delivered bytes/cycle"}, n, t1 - t0,
+              run_same, n_done, real'(n) / real'(t1 - t0),
+              real'(n_bytes) / real'(t1 - t0)), UVM_LOW)
+    for (int unsigned r = 0; r < 4; r++) begin
+      if (cnt[r] == 0) continue;
+      `uvm_info(get_type_name(), $sformatf(
+                {"RP%0d: %0d services, share %0.4f, max service gap %0d cycles, ",
+                 "max %0d other services between two of its own; %0d completions, ",
+                 "%0.2f delivered bytes/cycle"}, r, cnt[r], real'(cnt[r]) / real'(n),
+                max_gap[r], run_other[r], done[r],
+                (t1 > t0) ? real'(bytes[r]) / real'(t1 - t0) : 0.0), UVM_LOW)
+    end
   endfunction
 
   function void arb_stop();
@@ -142,6 +358,7 @@ class aou_mrp_chk extends uvm_component;
                     "%0d (needs %0d%%)"}, r, cnt[r], total[r], first, total[first],
                    min_share_pct))
     end
+    arb_metrics();
   endfunction
 
   function void ind_start(int unsigned slow);
