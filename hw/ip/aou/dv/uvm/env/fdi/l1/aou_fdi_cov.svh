@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 
-// L1 functional coverage, sampled by aou_fdi_monitor. Values are clamped
+// L1 functional coverage, sampled by the UCIe model's ucie_fdi_monitor of
+// every PHY (aou_fdi_layer::attach sets it as the monitors' collector). Values are clamped
 // before sampling so every bin is a plain value or range.
-class aou_fdi_cov extends uvm_object;
+class aou_fdi_cov extends uvm_object implements ucie_fdi_cov;
   `uvm_object_utils(aou_fdi_cov)
 
   // cg_fdi_xfer
@@ -154,9 +155,9 @@ class aou_fdi_cov extends uvm_object;
     end
   endfunction
 
-  function void sample_xfer(aou_fdi_dir_e dir, int unsigned beat_bytes, int unsigned stall,
-                            int unsigned gap);
-    x_rx = dir == AOU_FDI_RX;
+  virtual function void sample_xfer(ucie_fdi_dir_e dir, int unsigned beat_bytes, int unsigned stall,
+                            int unsigned gap, ucie_flit_item f, int unsigned lane);
+    x_rx = dir == UCIE_FDI_RX;
     x_beat_bytes = beat_bytes;
     x_stall = stall > 5 ? 5 : stall;
     x_gap = gap > 4 ? 4 : gap;
@@ -164,7 +165,7 @@ class aou_fdi_cov extends uvm_object;
     fc_fdi_xfer.sample(int'(x_rx), int'(x_beat_bytes), int'(x_stall), int'(x_gap));
   endfunction
 
-  function void sample_cancel(int unsigned half, bit with_valid, int unsigned count,
+  virtual function void sample_cancel(int unsigned half, bit with_valid, int unsigned count,
                              bit stalled);
     c_half = half;
     c_valid = with_valid;
@@ -174,7 +175,7 @@ class aou_fdi_cov extends uvm_object;
     fc_fdi_cancel.sample(int'(c_half), int'(c_valid), int'(c_count), int'(c_stalled));
   endfunction
 
-  function void sample_stall(int unsigned lat, int unsigned hold, bit mid, bit trdy0);
+  virtual function void sample_stall(int unsigned lat, int unsigned hold, bit mid, bit trdy0);
     s_lat = lat > 7 ? 7 : lat;
     s_hold = hold > 5 ? 5 : hold;
     s_mid = mid;
@@ -183,7 +184,7 @@ class aou_fdi_cov extends uvm_object;
     fc_fdi_stall.sample(int'(s_lat), int'(s_hold), int'(s_mid), int'(s_trdy0));
   endfunction
 
-  function void sample_abandon(bit rx);
+  virtual function void sample_abandon(bit rx);
     a_rx = rx;
     cg_fdi_abandon.sample();
     fc_fdi_abandon.sample(int'(a_rx));

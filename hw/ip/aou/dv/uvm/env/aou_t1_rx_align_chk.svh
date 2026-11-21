@@ -19,10 +19,10 @@
 class aou_t1_rx_align_chk extends uvm_component;
   `uvm_component_utils(aou_t1_rx_align_chk)
 
-  uvm_analysis_imp #(aou_flit_item, aou_t1_rx_align_chk) rx_flit_imp;
+  uvm_analysis_imp #(ucie_flit_item, aou_t1_rx_align_chk) rx_flit_imp;
 
   virtual aou_rst_if                      rst_vif;
-  virtual aou_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif;   // the PHY feeding the RX path
+  virtual ucie_fdi_mb_if #(.DATA_W(BUS_W)) mb_vif;   // the PHY feeding the RX path
   longint      slack = 16;    // cycles between a delivered flit and its MsgCredit
 
   int unsigned n_ok;
@@ -41,7 +41,7 @@ class aou_t1_rx_align_chk extends uvm_component;
     rx_flit_imp = new("rx_flit_imp", this);
   endfunction
 
-  function void write(aou_flit_item it);
+  function void write(ucie_flit_item it);
     exp_mc.push_back({it.data[129], it.data[128]});
     exp_cyc.push_back(cyc);
   endfunction

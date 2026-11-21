@@ -205,7 +205,7 @@ class aou_link_base_vseq extends aou_base_test_seq;
   // Reset also starts a new epoch in AOU_FDI_CHECKER, which has no other way
   // to learn that both sides forgot their activation state.
   task recover(aou_t1_feature_cfg reprogram = null, bit reactivate = 1'b1,
-               aou_lsm_ev_e down = LSM_EV_LINKERROR, bit inband_drop = 1'b0);
+               ucie_lsm_ev_e down = LSM_EV_LINKERROR, bit inband_drop = 1'b0);
     bit keep = cfg.lsm_cfg.rebringup_after_down;
     cfg.lsm_cfg.rebringup_after_down = 1'b0;
     link_event(down);

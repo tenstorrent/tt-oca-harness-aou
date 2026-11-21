@@ -68,7 +68,7 @@ class aou_perf_test extends aou_dp_base_test;
     cfg.l1_bubble_pct = 0;
     cfg.l1_gap_pct = 0;
     foreach (cfg.fdi_cfg[p]) begin
-      cfg.fdi_cfg[p].trdy_policy = AOU_TRDY_ALWAYS;
+      cfg.fdi_cfg[p].trdy_policy = UCIE_TRDY_ALWAYS;
       cfg.fdi_cfg[p].stall_pct = 0;
     end
     // Long windows (768 KB per link at the slowest link) must not trip the
