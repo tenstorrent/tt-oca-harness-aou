@@ -327,7 +327,8 @@ import packet_def_pkg::*;
     output logic                                        INT_DEACTIVATE_START,  // Deactivation start interrupt from the AOU core.
     output logic                                        INT_FDI_LINK_DOWN,  // FDI link lost while AoU was in use.
 
-    input  logic                                        TIEL_DFT_MODESCAN  // DFT scan mode. Tie low for functional operation.
+    input  logic                                        TIEL_DFT_MODESCAN,  // DFT scan mode. Tie low for functional operation.
+    input  logic                                        TIEL_DFT_SCANEN  // DFT scan shift enable. Tie low for functional operation.
 );
 
     // ================================================================
@@ -612,7 +613,8 @@ import packet_def_pkg::*;
         .O_AOU_REQ_LINKRESET         ( w_aou_req_linkreset           ),
         .O_SW_RESET                  ( w_sw_reset                    ),
 
-        .TIEL_DFT_MODESCAN           ( TIEL_DFT_MODESCAN             )
+        .TIEL_DFT_MODESCAN           ( TIEL_DFT_MODESCAN             ),
+        .TIEL_DFT_SCANEN             ( TIEL_DFT_SCANEN               )
     );
 
     // ================================================================

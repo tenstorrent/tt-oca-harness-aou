@@ -2707,16 +2707,18 @@ Class `aou_dft_scan_test` extends `aou_base_test` (`uvm/tests/lifecycle/aou_dft_
 
 *Procedure.* Virtual sequence `aou_dft_scan_vseq` (`uvm/seq_lib/lifecycle/aou_dft_scan_vseq.svh`):
 
-DFT scan mode (plan 11.19). TIEL_DFT_MODESCAN=1 switches the core reset mux to
-its scan input, which the integration guide (3.13.1) says de-asserts the
-software reset so that scan shifting is not disturbed: the core comes out of
-any software reset and AOU_SW_RESET has no effect while scan mode lasts.
+DFT scan mode (plan 11.19). With TIEL_DFT_MODESCAN=1 the core reset mux takes
+I_RESETN alone while TIEL_DFT_SCANEN=1 (scan shift), so that no software reset
+disturbs shifting, and the functional reset (I_RESETN and the software reset)
+while TIEL_DFT_SCANEN=0 (capture), as the integration guide (3.13.1) says.
 Sequence: traffic; the link goes to Reset as for a software reset; a marker
-value goes into a configuration register; scan mode on; the marker must
-survive (T1-DFT02, register read-backs at the end of each step), also after an
-AOU_SW_RESET write; scan mode off, and the pending software reset takes effect
-(the marker reads its reset value); a hard reset and traffic again. The core
-reset itself is judged by aou_t1_sw_reset_chk (T1-DFT01) whenever scan mode is on.
+value goes into a configuration register; scan mode on, in shift; the marker
+must survive (T1-DFT02, register read-backs at the end of each step), also
+after an AOU_SW_RESET write; a capture window, in which the pending software
+reset resets the core (the marker and AOU_SW_RESET read their reset values);
+I_RESETN pulsed in a capture window, as a pattern that tests the reset does;
+scan mode off, a hard reset and traffic again. The core reset itself is judged
+by aou_t1_sw_reset_chk (T1-DFT01) whenever scan mode is on.
 
 *Rules named.* `T1-DFT01`, `T1-DFT02`
 

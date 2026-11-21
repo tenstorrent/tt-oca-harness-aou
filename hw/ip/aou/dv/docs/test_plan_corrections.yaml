@@ -387,7 +387,7 @@
 - id: '11.19'
   added: 'integration guide 8.7/3.13.1'
   priority: P2
-  title: 'DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path'
+  title: 'DFT scan mode: the software reset path is bypassed in scan shift and acts in capture'
   note: Added by the coverage-closure review (2026-10-14); priority to be reviewed.
 - id: '12.20'
   added: 'MAS 3.10.1; AoU 6.2'

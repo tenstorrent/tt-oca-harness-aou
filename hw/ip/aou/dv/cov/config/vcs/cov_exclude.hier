@@ -13,9 +13,6 @@
 // (u_sw_reset_mux), replaced by a library clock/reset mux cell; TIEL_DFT_MODESCAN is
 // held low in functional mode (aou_top.sdc set_case_analysis), so I_SEL=1 is scan-only.
 -moduletree AOU_SOC_GFMUX_LVT
-// Integration guide 8.7 and 3.13.1: dont_touch buffer driving the tied-off scan-reset
-// bypass value (dft_persistent_buf_scan_resetn_sw); a constant, so it has nothing to toggle.
--moduletree AOU_SOC_BUF
 
 // Behavioural two-port SRAM (CLKA/CENA/AA/QA, CLKB/CENB/AB/DB, active-low enables): a
 // generic memory-macro stand-in, not logic specific to this IP. AOU_FIFO_RP instantiates it

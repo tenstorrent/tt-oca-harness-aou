@@ -12,16 +12,20 @@
 // back at idle in both clock domains (both FSMs idle, req and done low, both
 // synchroniser outputs low); apb_quiet is the two together, the precondition
 // for asserting I_RESETN or I_PRESETN (integration guide 3.1.1). dft_modescan
-// drives TIEL_DFT_MODESCAN (0 outside the DFT test). rx_msgcrdt_valid and
+// and dft_scanen drive TIEL_DFT_MODESCAN and TIEL_DFT_SCANEN (0 outside the DFT
+// test); sw_reset is the core's O_SW_RESET, the software reset the core reset
+// mux takes outside scan shift. rx_msgcrdt_valid and
 // rx_msgcrdt tap the RX core's header MsgCredit output, one strobe per flit it
 // decodes (aou_t1_rx_align_chk).
 interface aou_rst_if (input logic clk, input logic pclk);
   logic resetn = 1'b1;
   logic presetn = 1'b1;
   logic dft_modescan = 1'b0;
+  logic dft_scanen = 1'b0;
   logic rst_n;
   logic prst_n;
   logic core_rst_n;
+  logic sw_reset;
   logic [7:0] rx_pend;
   logic [7:0] rx_w_pend;
   logic        rx_msgcrdt_valid;
@@ -31,7 +35,7 @@ interface aou_rst_if (input logic clk, input logic pclk);
   wire  apb_quiet = apb_psel === 1'b0 && apb_bridge_idle === 1'b1;
 
   clocking drv_cb @(posedge clk);
-    output resetn, dft_modescan;
+    output resetn, dft_modescan, dft_scanen;
     input  rst_n;
   endclocking
 
@@ -41,8 +45,8 @@ interface aou_rst_if (input logic clk, input logic pclk);
   endclocking
 
   clocking mon_cb @(posedge clk);
-    input rst_n, prst_n, core_rst_n, rx_pend, rx_w_pend, apb_quiet, dft_modescan,
-          rx_msgcrdt_valid, rx_msgcrdt;
+    input rst_n, prst_n, core_rst_n, sw_reset, rx_pend, rx_w_pend, apb_quiet, dft_modescan,
+          dft_scanen, rx_msgcrdt_valid, rx_msgcrdt;
   endclocking
 
   clocking pmon_cb @(posedge pclk);

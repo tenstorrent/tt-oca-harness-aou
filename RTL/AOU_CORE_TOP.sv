@@ -356,7 +356,8 @@ import packet_def_pkg::*;
     output                                          O_SW_RESET,
 
     //DFT signal
-    input                                           TIEL_DFT_MODESCAN
+    input                                           TIEL_DFT_MODESCAN,
+    input                                           TIEL_DFT_SCANEN
 );
 //----------------------------------------------------------------------------
     // FDI beat width the RX decode sees: with TWO_PHY the wider PHY (the
@@ -477,7 +478,6 @@ import packet_def_pkg::*;
     logic                                   w_sw_reset;
     logic                                   r_sw_reset;
     logic                                   w_DFTED_sw_resetn;
-    logic                                   w_aou_sw_reset_scan_buf;
 
     logic [RP_COUNT-1:0]                    w_aou_rx_fifo_rready;
     logic [RP_COUNT-1:0][AXI_ID_WD-1:0]     w_aou_rx_axi_s_rid;
@@ -488,16 +488,14 @@ import packet_def_pkg::*;
     logic [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    w_rd_data_fifo_mdata;
     logic [RP_COUNT-1:0][AXI_PEER_DIE_MAX_DATA_WD-1:0]    w_aou_rx_axi_s_rdata;
 
-    AOU_SOC_BUF dft_persistent_buf_scan_resetn_sw (
-        .I_A   ( 1'b1                       ),
-        .O_Y   ( w_aou_sw_reset_scan_buf    )
-    );
-
+    // Scan shift bypasses the software reset, a flop output: the core reset is
+    // I_RESETN, which the integrator controls in scan. Capture takes the
+    // functional reset (integration guide, TIEL_DFT_MODESCAN Usage).
     AOU_SOC_GFMUX_LVT u_sw_reset_mux (
-        .I_SEL ( TIEL_DFT_MODESCAN          ),
+        .I_SEL ( TIEL_DFT_MODESCAN & TIEL_DFT_SCANEN ),
 
         .I_A   ( ~r_sw_reset & I_RESETN     ),
-        .I_B   ( w_aou_sw_reset_scan_buf    ),
+        .I_B   ( I_RESETN                   ),
 
         .O_Y   ( w_DFTED_sw_resetn          )
     );

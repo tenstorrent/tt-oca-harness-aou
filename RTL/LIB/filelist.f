@@ -23,7 +23,6 @@
 //
 // *****************************************************************************
 
-${AOU_CORE_HOME}/RTL/LIB/AOU_SOC_BUF.v
 ${AOU_CORE_HOME}/RTL/LIB/AOU_SOC_GFMUX_LVT.v
 ${AOU_CORE_HOME}/RTL/LIB/AOU_SOC_SYNCHSR.v
 -f ${AOU_CORE_HOME}/RTL/LIB/ASYNC_APB_BRIDGE/filelist.f

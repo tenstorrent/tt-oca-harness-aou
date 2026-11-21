@@ -302,7 +302,8 @@ tags = ["lifecycle"]
 run_modes = ["lifecycle"]
 args = ["+reset=apb", "+when=traffic", "+pclk_ps=1013"]
 
-# DFT scan mode: TIEL_DFT_MODESCAN=1 neutralises the software reset path (plan 11.19).
+# DFT scan mode: the core reset is I_RESETN alone in scan shift and the functional
+# reset, software reset included, in capture (plan 11.19).
 [[tests]]
 name = "aou_dft_scan_test"
 module = { uvm = "aou_dft_scan_test" }

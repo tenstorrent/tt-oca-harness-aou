@@ -77,6 +77,7 @@ set_ideal_network -no_propagate [get_ports I_PRESETN]
 #  5. DFT -- static in functional mode
 # ------------------------------------------------------------------------------
 set_case_analysis 0 [get_ports TIEL_DFT_MODESCAN]
+set_case_analysis 0 [get_ports TIEL_DFT_SCANEN]
 
 # ------------------------------------------------------------------------------
 #  6. I/O delay budget variables
