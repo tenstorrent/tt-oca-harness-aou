@@ -513,7 +513,8 @@ def model_run(perf):
 def measured(win, d):
     """The gated figures of link d: steady-state bytes/cycle, the whole window's message
     counts (window_msgs; full.msgs_by_msg in older perf.json) and mix_cap, the link's
-    saturated capacity for the messages it carried in the steady state."""
+    saturated capacity for the messages it carried in the steady state. occupancy and
+    utilization are the reported flit-capacity figures, for the report only."""
     x = (win.get("dir") or {}).get(d) or {}
     if not x.get("cycles"):
         return None
@@ -521,6 +522,7 @@ def measured(win, d):
     cap = ss.get("mix_cap")
     return dict(bpc=x["app_bytes"] / x["cycles"], cycles=x["cycles"],
                 ss_ok=bool(ss.get("ss_ok")), duty=x.get("duty"), mix_cap=cap or 0.0,
+                occupancy=x.get("occupancy"), utilization=x.get("utilization"),
                 msgs=(win.get("window_msgs") or {}).get(d) or full.get("msgs_by_msg")
                 or ss.get("msgs_by_msg") or {})
 
@@ -602,7 +604,8 @@ def judge_runs(out_dir, table, live=False):
                 if meas is None or meas["bpc"] <= 0:
                     if tgt is None:
                         continue
-                    meas = dict(bpc=0.0, cycles=1.0, ss_ok=False, duty=0.0, msgs={})
+                    meas = dict(bpc=0.0, cycles=1.0, ss_ok=False, duty=0.0, msgs={},
+                                occupancy=0.0, utilization=0.0)
                 verdict, ratio = judge(meas, tgt)
                 r = dict(run=os.path.relpath(run_dir, out_dir), build=os.path.basename(
                     os.path.dirname(run_dir)), run_verdict=run_verdict(run_dir), key=k,
@@ -610,7 +613,8 @@ def judge_runs(out_dir, table, live=False):
                     sim=b.get("sim", ""), seed=b.get("seed"), scenario=w["scenario"],
                     window=w["name"], dir=d, measured=meas["bpc"],
                     model=tgt["model"] if tgt else None, tol=tgt["tol"] if tgt else None,
-                    ratio=ratio, verdict=verdict, duty=meas["duty"])
+                    ratio=ratio, verdict=verdict, duty=meas["duty"],
+                    occupancy=meas.get("occupancy"), utilization=meas.get("utilization"))
                 if tgt:
                     r["mix_err"] = mix_error(meas.get("msgs") or {}, tgt.get("mix") or {})[0]
                 if w["name"] in own:

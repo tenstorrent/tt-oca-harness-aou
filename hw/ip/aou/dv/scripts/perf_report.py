@@ -42,6 +42,8 @@ SUMMARY = [
     ("drain grant->last", "drain.grant_to_last", "10.7"),
     ("TX flits/cyc (peak)", "bw_wr.dut_tx_flits_per_cycle", "10.8"),
     ("TX gran/flit", "bw_mix.dut_tx_granules_per_flit", "10.8"),
+    ("TX occ wr", "bw_wr.link_l2r.occupancy", "10.8"),
+    ("TX util wr", "bw_wr.link_l2r.utilization", "10.8"),
     ("RTT AR->FDI/far/FDI->R", "lat_rd.l2r.rt", "10.9"),
 ]
 
@@ -104,16 +106,20 @@ def model_section(out_dir, rid=None):
              "from perf.json, against the committed d2d_model targets. Gate: PASS, or BELOW",
              "(T1-P02, under (1 - tol) x model), ABOVE (T1-P03), MIX (T1-P04), SHORT (steady",
              "state under min_ss_flits), NO_TARGET. Run: the run's verdict against",
-             "expected_fail.yaml.", "",
-             "| build | PHY | scenario | window | link | measured | model | ratio | gate | run |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+             "expected_fail.yaml. occ is the granules carried over the granule slots the flits",
+             "offered, util is duty x occ: the share of the link's granule capacity used. Both",
+             "are reported, not gated.", "",
+             "| build | PHY | scenario | window | link | measured | model | ratio | occ | util | gate | run |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["build"], r["active_phy"], r["scenario"], r["run"],
                                          r["window"], r["dir"])):
         model = "-" if r["model"] is None else f"{r['model']:.2f}"
         ratio = "-" if r["ratio"] is None else f"{r['ratio']:.3f}"
+        occ = "-" if r.get("occupancy") is None else f"{r['occupancy']:.3f}"
+        util = "-" if r.get("utilization") is None else f"{r['utilization']:.3f}"
         lines.append(f"| {r['build']} | {r['active_phy']} | {r['scenario']} | {r['window']} | "
-                     f"{r['dir']} | {r['measured']:.2f} | {model} | {ratio} | {r['verdict']} | "
-                     f"{r['run_verdict']} |")
+                     f"{r['dir']} | {r['measured']:.2f} | {model} | {ratio} | {occ} | {util} | "
+                     f"{r['verdict']} | {r['run_verdict']} |")
     return lines + [""]
 
 

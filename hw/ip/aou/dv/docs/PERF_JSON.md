@@ -9,7 +9,7 @@ SPDX-FileCopyrightText: © 2026 Tenstorrent USA Inc
 holds what ran (the build and the traffic issued) and what was measured, so a
 reference model can be rebuilt for exactly that run and compared with it.
 `perf.txt` (one `metric value` per line, read by `scripts/perf_report.py`) is
-unchanged. Schema version: 1.
+unchanged. Schema version: 2.
 
 ## Conventions
 
@@ -39,6 +39,20 @@ unchanged. Schema version: 1.
   with no data in the window has `"ss": null`. `full` counts transactions by
   completion, from `t_open` to the last completion of a transaction whose data
   cross the link.
+- **Flit capacity.** Each link interval also reports the granule capacity it
+  offered and used: `granule_slots` (`AOU_GRANULES`, 48, per flit), `used_granules`
+  (the `granules` of the messages in the interval), `empty_granules` (the
+  remainder `granule_slots - used_granules`), `occupancy`
+  (`used_granules / granule_slots`), `messages_per_flit`,
+  `granules_per_data_message` and `utilization` (`duty * occupancy`). `duty`
+  says a flit left at every slot the link offered; `occupancy` says how much of
+  each flit carried messages. They are reported, not judged: scaling the
+  numbers by `beat_bytes` and the cycle counts gives the delivered rate, and
+  no throughput or packing requirement exists to judge them against. A message
+  spanning the interval boundary is counted whole, so the measured granules can
+  exceed the `granule_slots` offered by up to one message; `used_granules` is
+  capped at `granule_slots`, which keeps `occupancy` within [0, 1] and
+  `empty_granules` equal to `granule_slots - used_granules`.
 - Message names are the AoU specification's (and `d2d_model.py`'s): `ReadReq`,
   `WriteReq`, `WriteResp`, `ReadData256|512|1024`, `WriteData256|512|1024`,
   `WriteDataFull256|512|1024`, plus `CrdtGrant` and the activation messages
@@ -89,16 +103,28 @@ unchanged. Schema version: 1.
       "dir": {
         "l2r": {
           "full": {"app_bytes": 32768, "cycles": 658, "flits": 164,
-                   "granules": 7296, "duty": 0.997},
+                   "granules": 7296, "granule_slots": 7872, "used_granules": 7296,
+                   "empty_granules": 576, "occupancy": 0.927, "messages_per_flit": 3.573,
+                   "granules_per_data_message": 14.000, "duty": 0.997, "utilization": 0.924},
           "ss": {"app_bytes": 26214, "cycles": 506, "t_start": 12400, "t_end": 12906,
-                 "flits": 126, "granules": 6000, "duty": 0.996, "ss_ok": false,
+                 "flits": 126, "granules": 6000, "granule_slots": 6048, "used_granules": 6000,
+                 "empty_granules": 48, "occupancy": 0.992, "messages_per_flit": 3.571,
+                 "granules_per_data_message": 14.000, "duty": 0.996, "utilization": 0.988,
+                 "ss_ok": false,
                  "granules_by_msg": {"WriteReq": 75, "WriteDataFull512": 5600, "WriteResp": 25},
                  "msgs_by_msg": {"WriteReq": 25, "WriteDataFull512": 400, "WriteResp": 25}},
           "app_bytes": 26214,
           "cycles": 506,
           "flits": 126,
           "granules_by_msg": {"WriteReq": 75, "WriteDataFull512": 5600, "WriteResp": 25},
-          "duty": 0.996
+          "granule_slots": 6048,
+          "used_granules": 6000,
+          "empty_granules": 48,
+          "occupancy": 0.992,
+          "messages_per_flit": 3.571,
+          "granules_per_data_message": 14.000,
+          "duty": 0.996,
+          "utilization": 0.988
         },
         "r2l": {"...": "same fields"}
       },
@@ -144,11 +170,16 @@ unchanged. Schema version: 1.
 | `traffic_dir` | `l2r`, `r2l` or `both`: which sides issue transactions. |
 | `wr_pct` | Write percentage of the traffic profile. |
 | `t_open`, `t_close` | Window open, and close (after the last completion). |
-| `dir.<d>.full` | The whole window: `app_bytes`, `cycles` (open to the last completion of a transaction whose data crosses this link), `flits`, `granules`, `duty`, `granules_by_msg`, `msgs_by_msg`. |
-| `dir.<d>.ss` | The steady-state sub-window (Conventions), with `granules_by_msg` and `msgs_by_msg`; `null` without data on this link. `mix_cap`: the bytes per cycle the link could carry saturated with the messages it carried in the sub-window (48 five-byte granules per 256-byte flit at `beat_bytes` per cycle, as d2d_model packs). |
+| `dir.<d>.full` | The whole window: `app_bytes`, `cycles` (open to the last completion of a transaction whose data crosses this link), `flits`, `granules`, the flit-capacity fields below, `duty`, `granules_by_msg`, `msgs_by_msg`. |
+| `dir.<d>.ss` | The steady-state sub-window (Conventions), with `granules_by_msg`, `msgs_by_msg` and the flit-capacity fields; `null` without data on this link. `mix_cap`: the bytes per cycle the link could carry saturated with the messages it carried in the sub-window (48 five-byte granules per 256-byte flit at `beat_bytes` per cycle, as d2d_model packs). |
 | `window_msgs.<d>` | Every message that crossed link `d` while the window was open, by type (the message-mix check, T1-P04). |
-| `dir.<d>.app_bytes`, `cycles`, `flits`, `granules_by_msg`, `duty` | Copies of the `ss` values (of `full` when `ss` is null), for consumers that only want the gated numbers. Delivered bandwidth is `app_bytes / cycles`. |
-| `duty` | `flits / (cycles * beat_bytes / 256)`: FDI flit-slot utilisation. |
+| `dir.<d>.app_bytes`, `cycles`, `flits`, `granules_by_msg`, `duty`, `granule_slots`, `used_granules`, `empty_granules`, `occupancy`, `messages_per_flit`, `granules_per_data_message`, `utilization` | Copies of the `ss` values (of `full` when `ss` is null), for consumers that only want the gated numbers. Delivered bandwidth is `app_bytes / cycles`. |
+| `duty` | `flits / (cycles * beat_bytes / 256)`: FDI flit-slot utilisation, i.e. whether a flit left at every slot the link offered. |
+| `granule_slots` | `AOU_GRANULES` (48) times `flits`: the granule capacity the link offered in the interval. |
+| `used_granules`, `empty_granules` | The `granules` the messages of the interval carried, capped at `granule_slots`, and the remainder `granule_slots - used_granules`. |
+| `occupancy` | `used_granules / granule_slots`, in [0, 1]: how much of each flit carried messages. A link can be busy at every flit slot (duty 1) and still transmit part-filled flits; occupancy is what tells the two apart. |
+| `messages_per_flit`, `granules_per_data_message` | Messages of any class per flit, and the mean granule count of the data messages (`WriteData*`/`ReadData*`) in the interval. Zero when the interval has no flit or no data message. |
+| `utilization` | `duty * occupancy`: the share of the link's granule capacity the interval used. Report only, like the rest: no throughput or packing requirement exists to judge it against. |
 | `init.<d>` | Transactions issued by side `d` in the window: count, AXI bytes, and cycles from open to that side's last completion. |
 | `dut_credit_low` | Lowest credit (granules) the DUT held from the remote die per class during the window, over the RPs. Near 0 means remote-die credit could have limited the DUT. |
 | `txn_hist[]` | The issued traffic, one entry per distinct (`init`, `kind`, `rp`, `bytes`, `beat_bytes`, `offset_mod_4k`, `full_strb`) with its `count`. `kind` is `W` or `R`; `beat_bytes` is `1 << AxSIZE`; `offset_mod_4k` is the start address modulo 4096. Aborted transactions are left out. |
