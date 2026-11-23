@@ -5,6 +5,11 @@
 // its scan input, which the integration guide (3.13.1) says de-asserts the
 // software reset so that scan shifting is not disturbed: the core comes out of
 // any software reset and AOU_SW_RESET has no effect while scan mode lasts.
+// An integrator may drive the pin from the scan-mode signal or from the scan
+// shift enable (integration guide 3.13.1). The pin behaves the same either way
+// and the test drives it directly: "scan mode" below is the time the pin is
+// high, and its falling edge is the end of scan mode with the first choice and
+// the start of a capture with the second.
 // Sequence: traffic; the link goes to Reset as for a software reset; a marker
 // value goes into a configuration register; scan mode on; the marker must
 // survive (T1-DFT02, register read-backs at the end of each step), also after an

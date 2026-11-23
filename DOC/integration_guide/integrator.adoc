@@ -1047,9 +1047,11 @@ it has been applied.
 [width="100%",cols="<25%,<25%,<25%,<25%",options="header",]
 |=======================================================================
 |Signal |Direction |Width |Description
-|TIEL_DFT_MODESCAN |input |1 |Scan-mode indicator. Tie low in functional
-operation; assert high from the SoC scan controller during scan shift
-and capture.
+|TIEL_DFT_MODESCAN |input |1 |Scan override of the core reset: while high,
+AOU_CORE and the RX FIFOs are held out of reset. Tie low in functional
+operation. In scan, drive it either from the scan-mode signal (override
+for the whole of scan) or from the scan shift enable (override in shift
+only); see xref:aou-ig-tiel_dft_modescan-usage[].
 |=======================================================================
 
 [[aou-ig-tiel_dft_modescan-usage]]
@@ -1057,7 +1059,7 @@ and capture.
 
 [.monospaced]#++TIEL_DFT_MODESCAN++# controls a glitch-free mux ([.monospaced]#++u_sw_reset_mux++#,
 instance of [.monospaced]#++AOU_SOC_GFMUX_LVT++#) that selects the reset source for
-[.monospaced]#++AOU_CORE++#:
+[.monospaced]#++AOU_CORE++# and the RX FIFOs ([.monospaced]#++AOU_FIFO_RP++#):
 
 [ditaa, target=gen_aou_modescan.png]
 ....
@@ -1070,50 +1072,121 @@ instance of [.monospaced]#++AOU_SOC_GFMUX_LVT++#) that selects the reset source 
                          |             |                            AOU_FIFO_RP.I_RESETN
                          |  I_B        |
   AOU_SOC_BUF(1'b1)      |             |
-  (scan bypass: high)    +-------------+
+  (scan override: high)  +-------------+
 ....
 
-* *Functional mode* ([.monospaced]#++TIEL_DFT_MODESCAN++# = 0): The mux selects [.monospaced]#++I_A++#,
+* *Pin low* ([.monospaced]#++TIEL_DFT_MODESCAN++# = 0): The mux selects [.monospaced]#++I_A++#,
 the functional software-controlled reset path
 ([.monospaced]#++~r_sw_reset & I_RESETN++#). This allows the CSR-writable SW reset to
 combine with the hardware reset.
-* *Scan mode* ([.monospaced]#++TIEL_DFT_MODESCAN++# = 1): The mux selects [.monospaced]#++I_B++#, a
+* *Pin high* ([.monospaced]#++TIEL_DFT_MODESCAN++# = 1): The mux selects [.monospaced]#++I_B++#, a
 constant [.monospaced]#++1'b1++# driven through [.monospaced]#++AOU_SOC_BUF++#
-([.monospaced]#++dft_persistent_buf_scan_resetn_sw++#). This value de-asserts the
-active-low SW reset, neutralizing it so that scan chains can shift
-freely without the software reset logic interfering with controllability
-or observability. [.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_FIFO_RP++# stay out of
-reset for as long as [.monospaced]#++TIEL_DFT_MODESCAN++# is high, in shift and in capture. A
-write to [.monospaced]#++AOU_SW_RESET++# in scan mode does not reset them: the bit stays set
-and [.monospaced]#++O_SW_RESET++# stays high until [.monospaced]#++TIEL_DFT_MODESCAN++# falls,
-and the software reset then takes effect.
+([.monospaced]#++dft_persistent_buf_scan_resetn_sw++#). [.monospaced]#++AOU_CORE++# and
+[.monospaced]#++AOU_FIFO_RP++# stay out of reset for as long as the pin is high, whatever
+[.monospaced]#++I_RESETN++# and the software reset flop ([.monospaced]#++r_sw_reset++#) do, so that the
+values shifted through the scan chains cannot reset the flops they are
+shifted through. A write to [.monospaced]#++AOU_SW_RESET++# while the pin is high does not
+reset them: the bit stays set and [.monospaced]#++O_SW_RESET++# stays high until the pin
+falls, and the software reset then takes effect.
+
+The flops outside the mux take [.monospaced]#++I_RESETN++# directly, whatever the pin
+does: [.monospaced]#++r_sw_reset++#, the [.monospaced]#++I_CLK++# side of the APB bridge and, on
+[.monospaced]#++AOU_TOP++#, the FDI bringup controller.
+
+*Driving the pin in scan.* Which scan signal drives
+[.monospaced]#++TIEL_DFT_MODESCAN++# is the integratorpass:[']s choice. The hardware is the
+same for both; they differ in when the override applies, and so in what ATPG
+can test:
+
+[width="100%",cols="<20%,<40%,<40%",options="header",]
+|=======================================================================
+| |Whole-scan override |Shift-only override
+|*Pin driven from* |The scan-mode signal: high for the whole of scan, in
+shift and in capture. |The scan shift enable of the scan chains: high in
+shift, low in capture.
+
+|*Core reset in shift* |Held de-asserted. |Held de-asserted.
+
+|*Core reset in capture* |Held de-asserted. |The functional reset,
+[.monospaced]#++~r_sw_reset & I_RESETN++#.
+
+|*Reset events in capture* |None in [.monospaced]#++AOU_CORE++# and
+[.monospaced]#++AOU_FIFO_RP++#: [.monospaced]#++I_RESETN++# does not reach them, and a 1 loaded
+into [.monospaced]#++r_sw_reset++# has no effect. |A pattern that drives
+[.monospaced]#++I_RESETN++# low, or that loads [.monospaced]#++r_sw_reset++# with 1, resets
+[.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_FIFO_RP++#. The ATPG tool must model the core
+reset in capture as driven by [.monospaced]#++I_RESETN++# and by that scan flop.
+
+|*A pending* [.monospaced]#++AOU_SW_RESET++# |Takes effect when scan mode ends.
+|Takes effect in the next capture.
+
+|*Reset coverage* |No pin controls the asynchronous reset of the flops in
+[.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_FIFO_RP++# during the test. ATPG cannot test
+their reset pins or the reset tree behind the mux, and the functional
+reset path ([.monospaced]#++r_sw_reset++# and the gate with [.monospaced]#++I_RESETN++#) is never
+selected, so it is not tested either. A DFT rule check can report those
+reset pins as not controllable from a primary input in test mode and the
+functional reset net as unobservable; both findings are expected with this
+choice. |ATPG controls and observes both sources of the core reset, and
+can test the reset pins and the reset tree.
+
+|*Mux select* |Static through the test; it switches only on entry to and
+exit from scan mode. |Switches at every boundary between shift and capture
+(xref:aou-ig-scan-friendly-cell-requirements[]).
+
+|*Declare the pin to the DFT tool as* |A test-mode signal, constant
+through the test. |The scan enable.
+
+|*Timing in the scan modes* |The pin is static. |The path from the pin
+through the mux to the reset pins of [.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_FIFO_RP++#
+is active, and is the integratorpass:[']s to constrain.
+|=======================================================================
+
+The whole-scan override is the simpler flow: nothing resets
+[.monospaced]#++AOU_CORE++# during the test and the mux select never moves, at the cost
+of the reset coverage above. The shift-only override gives ATPG the reset
+network: the override protects the shift, and capture sees the functional
+reset. In functional operation the pin is low with either choice.
 
 The [.monospaced]#++AOU_SOC_BUF++# instance exists solely to prevent the synthesis tool
 from optimizing away the tied-high constant; it must be preserved as a
 persistent buffer (see xref:aou-ig-library-cell-replacement[]).
 
-The SDC file ([.monospaced]#++INTEG/constraints/aou_core_top.sdc++#) constrains this pin
-with [.monospaced]#++set_case_analysis 0++# in functional timing mode.
+The SDC files ([.monospaced]#++INTEG/constraints/aou_top.sdc++#,
+[.monospaced]#++INTEG/constraints/aou_core_top.sdc++#) constrain this pin with
+[.monospaced]#++set_case_analysis 0++# in functional timing mode, which holds for either
+choice. They do not cover the scan timing modes.
 
 [[aou-ig-integrator-dft-responsibilities]]
 ==== Integrator DFT Responsibilities
 
 The design provides internal DFT muxing only for the software-controlled
-reset path ([.monospaced]#++w_DFTED_sw_resetn++#). The two primary hardware resets and
-all scan infrastructure are the integratorpass:[']s responsibility:
+reset path ([.monospaced]#++w_DFTED_sw_resetn++#). The signal that drives that mux, the
+two primary hardware resets and all scan infrastructure are the
+integratorpass:[']s responsibility:
 
 [width="100%",cols="<50%,<50%",options="header",]
 |=======================================================================
 |Responsibility |Detail
+|*Reset override select* |Drive [.monospaced]#++TIEL_DFT_MODESCAN++# from the scan-mode
+signal (whole-scan override) or from the scan shift enable of the scan
+chains (shift-only override), and declare it to the DFT tool to match
+(xref:aou-ig-tiel_dft_modescan-usage[]).
+
 |*HW reset DFT muxes* |[.monospaced]#++I_RESETN++# and [.monospaced]#++I_PRESETN++# have no internal
 scan-mode bypass. The integrator must add external DFT muxes (or
 equivalent) on both resets so they can be held inactive (high) during
 scan shift and capture. Without this, all flip-flops using these resets
-will be uncontrollable during ATPG.
+will be uncontrollable during ATPG. With the whole-scan override,
+[.monospaced]#++I_RESETN++# does not reach [.monospaced]#++AOU_CORE++# and [.monospaced]#++AOU_FIFO_RP++# in scan.
+With the shift-only override it reaches them in capture, where a pattern
+that tests the reset drives it low.
 
 |*Scan chain insertion* |The design has no [.monospaced]#++SCAN_EN++#, [.monospaced]#++SCAN_IN++#, or
 [.monospaced]#++SCAN_OUT++# ports. The integrator must insert scan chains via the
 synthesis toolpass:[']s DFT insertion flow or by adding scan ports manually.
+[.monospaced]#++TIEL_DFT_MODESCAN++# only controls the reset mux, also when the scan
+shift enable drives it.
 
 |*Multi-clock scan definition* |[.monospaced]#++I_CLK++# (1 GHz core) and [.monospaced]#++I_PCLK++# (100
 MHz APB) must be defined as separate scan clocks. The ATPG tool must not
@@ -2184,8 +2257,9 @@ group, and the former [.monospaced]#++I_*_BUS_CLEANY_COMPLETE++# inputs are gone
 
 Both resets ([.monospaced]#++I_RESETN++#, [.monospaced]#++I_PRESETN++#) are constrained with
 [.monospaced]#++set_false_path++# and should be synchronised externally or by the
-integrating design. The DFT scan-mode pin ([.monospaced]#++TIEL_DFT_MODESCAN++#) is held
-at 0 via [.monospaced]#++set_case_analysis++# in functional mode.
+integrating design. The DFT pin ([.monospaced]#++TIEL_DFT_MODESCAN++#) is held
+at 0 via [.monospaced]#++set_case_analysis++# in functional mode, whichever scan signal
+drives it (xref:aou-ig-tiel_dft_modescan-usage[]).
 
 [[aou-ig-io-delay-budgeting-strategy]]
 ==== I/O Delay Budgeting Strategy
@@ -2355,11 +2429,15 @@ are pre-characterized for both metastability MTBF and scan testability.
 
 *[.monospaced]#++AOU_SOC_GFMUX_LVT++# -- Clock/reset mux recognition*
 
-This cell sits on the scan-mode reset mux path (see
+This cell is the scan override mux of the core reset (see
 xref:aou-ig-tiel_dft_modescan-usage[]). The replacement
 must be recognized by the ATPG tool as a *clock or reset mux cell*, not
-a generic data mux. If the tool treats it as a regular mux, it may
-toggle [.monospaced]#++I_SEL++# during scan patterns, causing reset glitches that corrupt
+a generic data mux. What the tool is told about [.monospaced]#++I_SEL++# depends on which
+scan signal drives [.monospaced]#++TIEL_DFT_MODESCAN++#.
+
+_Whole-scan override_ ([.monospaced]#++I_SEL++# from the scan-mode signal). The select is
+constant through the test. If the tool treats the cell as a regular mux, it
+may toggle [.monospaced]#++I_SEL++# during scan patterns, causing reset glitches that corrupt
 shift-register state and invalidate test patterns.
 
 The integrator should:
@@ -2371,6 +2449,22 @@ during scan. For example, in Synopsys DFT Compiler:
 [.monospaced]#++set_dft_signal -view existing_dft -type ScanMux -port u_sw_reset_mux/I_SEL++#.
 * Verify in the ATPG toolpass:[']s DFT rule check that the mux select is
 classified as a test-mode signal, not a scannable data input.
+
+_Shift-only override_ ([.monospaced]#++I_SEL++# from the scan shift enable). The select
+switches at every boundary between shift and capture, by design. At most
+of those switches both mux inputs are high (the override constant and a
+de-asserted functional reset), and the output must stay high through the
+switch: a cell that glitches low there resets [.monospaced]#++AOU_CORE++# and
+[.monospaced]#++AOU_FIFO_RP++# at every capture.
+
+The integrator should:
+
+* Use a glitch-free clock/reset mux cell, as above.
+* Declare [.monospaced]#++I_SEL++# to the DFT tool as the scan enable, not as a test-mode
+constant.
+* Verify in the ATPG toolpass:[']s DFT rule check that the core reset is
+modelled in capture as the functional reset, driven by [.monospaced]#++I_RESETN++# and by
+the scan flop [.monospaced]#++r_sw_reset++#.
 
 *[.monospaced]#++AOU_SOC_BUF++# -- Optimization protection*
 
