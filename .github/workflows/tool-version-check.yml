@@ -3,9 +3,20 @@
 #
 # Weekly check for newer Verilator / Verible releases used by CI pins.
 # Dependabot does not track these binary pins. Pins live in
-# .github/tool-versions.env (not workflow YAML) so GITHUB_TOKEN can open
-# bump PRs without a PAT workflow scope.
-# Opens chore/verilator-<new> or chore/verible-<new> when updates exist.
+# .github/tool-versions.env (not workflow YAML), so the bump token needs no
+# workflows permission.
+# Opens chore/verilator-<new>-<run id>-<attempt> or chore/verible-<new>-<run id>-<attempt>
+# when updates exist. A person reviews and merges each bump PR. This workflow
+# does not approve and does not merge.
+#
+# Token: the built-in token cannot open pull requests in this organization. The
+# bump PR is opened with a short-lived GitHub token from the OSPO Vault, fetched
+# by the shared action tenstorrent/.github/actions/vault-secrets and revoked at
+# the end of the job. Nothing is stored in a secret.
+#   Role   tenstorrent--tt-oca-harness-aou--bump (main only, environment bump, schedule and manual runs)
+#   Token  tenstorrent--tt-oca-harness-aou--bump-pr: contents write and pull requests write on this repository only
+# The job must run on main and name `environment: bump`; otherwise the Vault step
+# fails. Changes to the role or the token go through an OSPO ticket (OSPO-1269).
 
 name: Tool Version Check
 
@@ -16,8 +27,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pull-requests: write
+  contents: read
 
 concurrency:
   group: tool-version-check
@@ -27,15 +37,87 @@ jobs:
   check:
     name: Check Verilator and Verible pins
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: bump
+    permissions:
+      contents: read
+      pull-requests: read
+      id-token: write
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Check pins and open update PRs
+      - name: Refuse a run outside main
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REF: ${{ github.ref }}
+        run: |
+          if [ "$REF" != "refs/heads/main" ]; then
+            echo "::error::this workflow runs only on main (got ${REF})"
+            exit 1
+          fi
+
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Reads only, with the built-in token. Exit 1 means an update exists.
+      - name: Check pins
+        id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set +e
+          bash scripts/check_tool_versions.sh
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "updates=false" >> "$GITHUB_OUTPUT" ;;
+            1) echo "updates=true" >> "$GITHUB_OUTPUT" ;;
+            *) exit "$rc" ;;
+          esac
+
+      - name: Get a short-lived token from the OSPO Vault
+        id: vault
+        if: ${{ steps.plan.outputs.updates == 'true' }}
+        uses: tenstorrent/.github/actions/vault-secrets@a697f1bb22ad8b488b0ac63f9a261e462179fe13 # vault-secrets-v1.0.0
+        with:
+          role: tenstorrent--tt-oca-harness-aou--bump
+          github-token: tenstorrent--tt-oca-harness-aou--bump-pr
+
+      # Reads still use the built-in token. PUSH_TOKEN is used only for the
+      # create-only push and for opening the PR.
+      - name: Open update PRs
+        if: ${{ steps.plan.outputs.updates == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUSH_TOKEN: ${{ steps.vault.outputs.token }}
           REPO: ${{ github.repository }}
         run: bash scripts/check_tool_versions.sh --apply
+
+      # The shared Vault action does not revoke the token. Always exits 0.
+      - name: Revoke the Vault token
+        if: ${{ always() }}
+        env:
+          PUSH_TOKEN: ${{ steps.vault.outputs.token }}
+        run: |
+          if [ -z "${PUSH_TOKEN:-}" ]; then
+            echo "no token to revoke"
+            exit 0
+          fi
+          code=$(printf 'header = "Authorization: Bearer %s"\nheader = "Accept: application/vnd.github+json"\n' "$PUSH_TOKEN" \
+            | curl -sS --max-time 10 -o /dev/null -w '%{http_code}' -K - -X DELETE \
+                https://api.github.com/installation/token 2>/dev/null) || code=000
+          case "$code" in
+            204) echo "revoked" ;;
+            401) echo "already invalid; nothing to revoke" ;;
+            *)   echo "revoke not confirmed (HTTP ${code}); it expires within 1 hour" ;;
+          esac
+
+      # The shared Vault action does not leave the tailnet.
+      - name: Leave tailnet
+        if: ${{ always() }}
+        run: |
+          if command -v tailscale >/dev/null 2>&1; then
+            sudo tailscale logout || { echo "::warning::tailscale logout failed; taking the interface down"; sudo tailscale down || true; }
+          else
+            echo "not on the tailnet"
+          fi

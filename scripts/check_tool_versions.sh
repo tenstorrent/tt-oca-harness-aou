@@ -3,10 +3,14 @@
 # Copyright (c) 2026 Tenstorrent USA Inc
 #
 # Compare pinned Verilator / Verible CI versions against GitHub releases and
-# open chore/verilator-<new> or chore/verible-<new> PRs when updates exist.
+# open chore/verilator-<new>-<run> or chore/verible-<new>-<run> PRs when updates
+# exist. Each run pushes a new branch; the push fails if the branch exists.
 #
-# Pins are stored in .github/tool-versions.env (not under workflows/) so
-# GITHUB_TOKEN can push bump commits without a PAT `workflow` scope.
+# Pins are stored in .github/tool-versions.env (not under workflows/) so the
+# bump token needs no workflows permission.
+#
+# Release tags come from outside this repository. They are accepted only in the
+# exact forms below, because CI jobs source the pin file.
 #
 # Usage:
 #   bash scripts/check_tool_versions.sh              # check only (exit 1 if updates available)
@@ -14,6 +18,8 @@
 #
 # Env:
 #   REPO            owner/name for PRs (default: tenstorrent/tt-oca-harness-aou)
+#   GH_TOKEN        token for the release and PR reads (gh)
+#   PUSH_TOKEN      with --apply: token for the push and for opening the PR
 #   DRY_RUN=1       with --apply, print actions without mutating git/gh
 
 set -euo pipefail
@@ -117,10 +123,26 @@ sys.exit(2)
 PY
 }
 
-pr_exists_for_branch() {
-  local branch="$1"
+# Exact forms only (for example 5.054 and v0.0-4298-g085eef05).
+valid_verilator() { [[ "$1" =~ ^v?[0-9]+(\.[0-9]+){1,2}$ ]]; }
+valid_verible() { [[ "$1" =~ ^v[0-9]+\.[0-9]+-[0-9]+-g[0-9a-f]{7,40}$ ]]; }
+
+require_valid() {
+  local kind="$1" value="$2"
+  if ! "valid_${kind}" "$value"; then
+    echo "error: unexpected ${kind} version form: ${value}" >&2
+    exit 2
+  fi
+}
+
+# An open PR for the same bump, from a branch of this repository made by an
+# earlier run (or of the old chore/<tool>-<new> form), means there is nothing
+# to do. PRs from forks do not count: anyone can open one.
+open_pr_exists_for_bump() {
+  local prefix="chore/$1-$2"
   local n
-  n="$(gh pr list --repo "$REPO" --head "$branch" --state open --json number --jq 'length')"
+  n="$(gh pr list --repo "$REPO" --state open --limit 200 --json headRefName,isCrossRepository \
+    --jq "[.[] | select(.isCrossRepository == false) | select(.headRefName == \"${prefix}\" or (.headRefName | startswith(\"${prefix}-\")))] | length")"
   [[ "$n" != "0" ]]
 }
 
@@ -129,14 +151,25 @@ open_tool_pr() {
   local key="$2"
   local old="$3"
   local new="$4"
-  local branch="chore/${tool}-${new}"
-  local title
-  title="$(python3 -c "t='${tool}'; print(f'ci: bump {t[0].upper()+t[1:]} pin ${old} → ${new}')")"
+  local run_id="${GITHUB_RUN_ID:-local$(date -u +%Y%m%d%H%M%S)}"
+  local attempt="${GITHUB_RUN_ATTEMPT:-1}"
+  if [[ ! "$run_id" =~ ^(local)?[0-9]+$ || ! "$attempt" =~ ^[0-9]+$ ]]; then
+    echo "error: unexpected run id or attempt" >&2
+    exit 2
+  fi
+  local branch="chore/${tool}-${new}-${run_id}-${attempt}"
+  local label
+  case "$tool" in
+    verilator) label=Verilator ;;
+    verible) label=Verible ;;
+    *) echo "error: unknown tool ${tool}" >&2; exit 2 ;;
+  esac
+  local title="ci: bump ${label} pin ${old} → ${new}"
 
   echo "==> ${tool}: ${old} -> ${new} (branch ${branch})"
 
-  if pr_exists_for_branch "$branch"; then
-    echo "    open PR already exists for ${branch}; skipping"
+  if open_pr_exists_for_bump "$tool" "$new"; then
+    echo "    open PR already exists for ${tool} ${new}; skipping"
     return 0
   fi
 
@@ -145,8 +178,8 @@ open_tool_pr() {
     return 0
   fi
 
-  if [[ -z "${GITHUB_TOKEN:-}" ]]; then
-    echo "error: GITHUB_TOKEN required for --apply" >&2
+  if [[ -z "${PUSH_TOKEN:-}" ]]; then
+    echo "error: PUSH_TOKEN required for --apply" >&2
     exit 2
   fi
 
@@ -166,13 +199,27 @@ open_tool_pr() {
     echo "    no file changes after patch; skipping"
     return 0
   fi
-  git commit -m "$(cat <<EOF
+  git commit --no-verify -m "$(cat <<EOF
 ${title}
 
 Automated bump from scripts/check_tool_versions.sh.
 EOF
 )"
-  git push -u "https://x-access-token:${GITHUB_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${branch}"
+  # Create only: the empty value after the colon makes the push fail if the
+  # branch exists, so the token never works on a branch a person made. The
+  # token reaches git only as an Authorization header in a GIT_CONFIG_*
+  # variable of this one push (the actions/checkout form): it is in no
+  # command line and in no config file. printf is a shell builtin. Hooks off.
+  local auth
+  auth="$(printf 'x-access-token:%s' "$PUSH_TOKEN" | base64 | tr -d '\n')"
+  GIT_CONFIG_COUNT=2 \
+    GIT_CONFIG_KEY_0="http.https://github.com/.extraheader" \
+    GIT_CONFIG_VALUE_0="AUTHORIZATION: basic ${auth}" \
+    GIT_CONFIG_KEY_1="core.hooksPath" GIT_CONFIG_VALUE_1="/dev/null" \
+    git push --force-with-lease="refs/heads/${branch}:" "https://github.com/${REPO}" "HEAD:refs/heads/${branch}"
+  auth=""
+  local pushed
+  pushed="$(git rev-parse HEAD)"
 
   local body
   if [[ "$tool" == "verilator" ]]; then
@@ -198,7 +245,27 @@ EOF
 )"
   fi
 
-  gh pr create --repo "$REPO" --base "$base" --head "$branch" --title "$title" --body "$body"
+  body="${body}
+
+This workflow opened this PR at commit ${pushed}. A later commit on ${branch} was not made by this workflow: review it as a commit by the person who pushed it."
+
+  # The branch is new, so no PR may exist for it, open or closed.
+  local existing
+  existing="$(gh api "repos/${REPO}/pulls?state=all&head=${REPO%%/*}:${branch}" --jq 'length')"
+  if [[ "$existing" != "0" ]]; then
+    echo "error: a PR from ${branch} already exists; no PR is opened" >&2
+    exit 1
+  fi
+
+  # Only a new PR. Nothing is approved, merged, closed or edited.
+  local url pr_head
+  url="$(GH_TOKEN="$PUSH_TOKEN" gh pr create --repo "$REPO" --base "$base" --head "$branch" --title "$title" --body "$body")"
+  echo "$url"
+  pr_head="$(GH_TOKEN="$PUSH_TOKEN" gh pr view "$url" --repo "$REPO" --json headRefOid --jq .headRefOid)"
+  if [[ "$pr_head" != "$pushed" ]]; then
+    echo "error: the PR head is ${pr_head:-unknown}, not ${pushed} that this job pushed: someone pushed to ${branch} in between. Review every commit after ${pushed} as a commit by its pusher." >&2
+    exit 1
+  fi
 }
 
 # --- main ---
@@ -211,6 +278,10 @@ PIN_VLOG="$(read_pin VERILATOR_VERSION)"
 PIN_VBLE="$(read_pin VERIBLE_VERSION)"
 LATEST_VLOG="$(latest_verilator)"
 LATEST_VBLE="$(latest_verible)"
+require_valid verilator "$PIN_VLOG"
+require_valid verilator "$LATEST_VLOG"
+require_valid verible "$PIN_VBLE"
+require_valid verible "$LATEST_VBLE"
 
 echo "Verilator pinned=${PIN_VLOG} latest=${LATEST_VLOG}"
 echo "Verible   pinned=${PIN_VBLE} latest=${LATEST_VBLE}"
