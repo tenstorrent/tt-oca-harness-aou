@@ -1,5 +1,5 @@
 peakrdl==1.5.0
-peakrdl-cheader==1.1.0
+peakrdl-cheader==1.2.0
 peakrdl-cli==1.5.0
 peakrdl-html==2.12.2
 peakrdl-ipxact==3.5.0
