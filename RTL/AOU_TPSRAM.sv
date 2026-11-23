@@ -26,7 +26,8 @@
 
 module AOU_TPSRAM #(
     parameter RAM_DATA_WIDTH = 32,
-    parameter RAM_ADDR_WIDTH = 16
+    parameter RAM_ADDR_WIDTH = 16,
+    parameter RAM_DEPTH      = 2**RAM_ADDR_WIDTH
 ) (
     // Read Port 
     input  wire                      CLKA,
@@ -41,7 +42,7 @@ module AOU_TPSRAM #(
     input  wire [RAM_DATA_WIDTH-1:0] DB
 );
 
-   reg [RAM_DATA_WIDTH-1:0] mem [(2**RAM_ADDR_WIDTH)-1:0];
+   reg [RAM_DATA_WIDTH-1:0] mem [RAM_DEPTH-1:0];
 
    always @(posedge CLKA) begin 
       if (!CENA) QA <= mem[AA];
