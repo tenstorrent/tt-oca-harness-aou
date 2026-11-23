@@ -2281,7 +2281,7 @@ as [.monospaced]#++u_sw_reset_mux++# (SW reset selection)
 buffer on scan reset)
 
 |[.monospaced]#++AOU_TPSRAM++# |[.monospaced]#++RTL/AOU_TPSRAM.sv++# |[.monospaced]#++RAM_DATA_WIDTH++#,
-[.monospaced]#++RAM_ADDR_WIDTH++# |Read port [.monospaced]#++CLKA++#, [.monospaced]#++CENA++# (active low), [.monospaced]#++AA++# ->
+[.monospaced]#++RAM_ADDR_WIDTH++#, [.monospaced]#++RAM_DEPTH++# (words) |Read port [.monospaced]#++CLKA++#, [.monospaced]#++CENA++# (active low), [.monospaced]#++AA++# ->
 [.monospaced]#++QA++# (one cycle later); write port [.monospaced]#++CLKB++#, [.monospaced]#++CENB++# (active low),
 [.monospaced]#++AB++#, [.monospaced]#++DB++# |Two-port (1R1W) synchronous SRAM, read data registered,
 whole-word writes, no reset. Flip-flops or a compiled macro; the
@@ -2395,8 +2395,9 @@ ensure it survives all optimization passes, including:
 port, written so that it can be synthesized as it is or swapped for a
 compiled SRAM. Either is a valid implementation; the choice is the
 integrator's, on area and power. Synthesized as written it becomes
-[.monospaced]#++2^RAM_ADDR_WIDTH x RAM_DATA_WIDTH++# flip-flops with a read mux and a
-registered output. A compiled SRAM must give [.monospaced]#++AOU_RX_GRANULE_STORE++#, the
+[.monospaced]#++RAM_DEPTH x RAM_DATA_WIDTH++# flip-flops with a read mux and a
+registered output. A compiled SRAM needs [.monospaced]#++RAM_DEPTH++# words of
+[.monospaced]#++RAM_DATA_WIDTH++# bits and must give [.monospaced]#++AOU_RX_GRANULE_STORE++#, the
 only user, the behaviour below; it is what the behavioral model does and
 all the design relies on. Anything the model does beyond this list (for
 example holding [.monospaced]#++QA++# while [.monospaced]#++CENA++# is high) is not required.
@@ -2453,10 +2454,11 @@ instance of [.monospaced]#++ROWS++# words of [.monospaced]#++WG x 40++# bits (32
 ([.monospaced]#++RPn_RX_W_FIFO_DEPTH++# / [.monospaced]#++RPn_RX_R_FIFO_DEPTH++#, xref:aou-ig-parameter-list[]):
 [.monospaced]#++WORDS = (DEPTH_G + 2 (WG - 1)) / WG++# rounded down, and
 [.monospaced]#++ROWS = WORDS / NBANK++# rounded up. With the defaults that is 16 rows per
-bank for a depth of 600 granules and 18 rows for 960. [.monospaced]#++RAM_ADDR_WIDTH++#
-is the width of a row address ([.monospaced]#++ceil(log2(ROWS))++#, at least 1), so the
-model allocates [.monospaced]#++2^RAM_ADDR_WIDTH++# words of which only the first [.monospaced]#++ROWS++#
-are addressed; a compiled macro needs [.monospaced]#++ROWS++# words or more. Per RP that is
+bank for a depth of 600 granules and 18 rows for 960. The store passes
+[.monospaced]#++ROWS++# as [.monospaced]#++RAM_DEPTH++# and the width of a row address
+([.monospaced]#++ceil(log2(ROWS))++#, at least 1) as [.monospaced]#++RAM_ADDR_WIDTH++#, and addresses
+every row from 0 to [.monospaced]#++ROWS - 1++#; the model holds [.monospaced]#++RAM_DEPTH++#
+words, and a compiled macro needs [.monospaced]#++RAM_DEPTH++# words or more. Per RP that is
 two stores (WriteData and ReadData), so with the defaults a four-RP
 instance holds 40 banks of 320 x 16 bits, or 56 banks of 320 x 18 bits at
 the 256 B width.

@@ -522,7 +522,8 @@ import packet_def_pkg::*;
         for (gb = 0; gb < NBANK; gb++) begin : gen_bank
             AOU_TPSRAM #(
                 .RAM_DATA_WIDTH ( WORD_WD   ),
-                .RAM_ADDR_WIDTH ( ROW_WD    )
+                .RAM_ADDR_WIDTH ( ROW_WD    ),
+                .RAM_DEPTH      ( ROWS      )
             ) u_tpsram
             (
                 .CLKA   ( I_CLK             ),
