@@ -29,7 +29,9 @@ class ucie_rule_log;
     string k = key(rule, who);
     if (fires.exists(k)) fires[k]++;
     else fires[k] = 1;
-    if (!checks.exists(k)) checks[k] = 1;
+    // Only creates the key so lines() prints it; evaluations come from check() alone, and
+    // a monitor counts the failing evaluation itself when it flushes its checks.
+    if (!checks.exists(k)) checks[k] = 0;
   endfunction
 
   static function void clear();
