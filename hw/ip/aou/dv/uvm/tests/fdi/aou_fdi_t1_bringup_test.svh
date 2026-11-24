@@ -4,7 +4,10 @@
 // FDI bringup on the real DUT, with UCIe state encodings:
 // 1. reset; the L2 agent runs the Adapter side of bringup (clk_req
 //    handshake, inband_pres) with pl_clk_req released, so the DUT waits in
-//    WAIT_PRESENCE until I_SW_ACTIVATE_START;
+//    WAIT_PRESENCE until I_SW_ACTIVATE_START; meanwhile pl_inband_pres drops
+//    for 30 clocks, with its pl_clk_req in the same clock or, in about one run
+//    in seven, 1 to clk_req_window clocks after the drop
+//    (+ucie_inband_drop_clk_lag=N forces it);
 // 2. the DUT reaches Active (O_FDI_LINK_UP); empty flits with cancels,
 //    poisoned cancelled halves and bubbles go to the DUT RX;
 // 3. APB AOU_INIT.activate_start (0x08 bit 0) makes the core send an
@@ -21,10 +24,11 @@ class aou_fdi_t1_bringup_test extends uvm_test;
 
   aou_fdi_t1_env  env;
   aou_fdi_msg_log msg_log;
-  uvm_tlm_analysis_fifo #(aou_flit_item) tx_fifo;
+  uvm_tlm_analysis_fifo #(ucie_flit_item) tx_fifo;
 
   virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)) apb_vif;
-  virtual aou_fdi_lsm_if lsm_vif;
+  virtual ucie_fdi_lsm_if lsm_vif;
+  virtual aou_bringup_if  brg_vif;
 
   int unsigned link_timeout = 20000;
   int unsigned sw_reset_delay_max = 300;
@@ -44,15 +48,41 @@ class aou_fdi_t1_bringup_test extends uvm_test;
     if (!uvm_config_db #(virtual aou_apb_if #(.ADDR_W(32), .DATA_W(32)))::get(
             this, "", "apb", apb_vif))
       `uvm_fatal(get_type_name(), "no apb in config_db")
-    if (!uvm_config_db #(virtual aou_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
+    if (!uvm_config_db #(virtual ucie_fdi_lsm_if)::get(this, "", "fdi_lsm", lsm_vif))
       `uvm_fatal(get_type_name(), "no fdi_lsm in config_db")
+    if (!uvm_config_db #(virtual aou_bringup_if)::get(this, "", "aou_bringup", brg_vif))
+      `uvm_fatal(get_type_name(), "no aou_bringup in config_db")
     void'($value$plusargs("sw_reset_delay_max=%d", sw_reset_delay_max));
     configure();
+    draw_drop_lag();
   endfunction
 
   virtual function void configure();
     env.lsm_cfg.clk_req_hold_bringup = 1'b0;
-    foreach (env.fdi_cfg[p]) env.fdi_cfg[p].trdy_policy = AOU_TRDY_HOLES;
+    foreach (env.fdi_cfg[p]) env.fdi_cfg[p].trdy_policy = UCIE_TRDY_HOLES;
+  endfunction
+
+  // The lag of the pl_inband_pres drop's pl_clk_req (see run_phase): in about
+  // one run in seven 1 to clk_req_window clocks, otherwise 0. Drawn here,
+  // after configure() and before the L2 agent's build_phase reads its
+  // plusargs and prints its configuration, so that print shows the value
+  // used. +ucie_inband_drop_clk_lag=N forces the lag (0: off).
+  function void draw_drop_lag();
+    string how = "drawn";
+    int unsigned forced;
+    if (env.lsm_cfg.clk_req_hold_bringup) return;
+    if (ucie_fdi_pkg::plusarg_int("ucie_inband_drop_clk_lag",
+                                   {env.get_full_name(), ".lsm"}, forced)) begin
+      how = "plusarg";
+      env.lsm_cfg.inband_drop_clk_lag = forced;
+    end else begin
+      env.lsm_cfg.inband_drop_clk_lag = $urandom_range(6) == 0 ?
+          $urandom_range(env.lsm_cfg.clk_req_window > 1 ? env.lsm_cfg.clk_req_window : 1, 1) :
+          0;
+    end
+    `uvm_info(get_type_name(), $sformatf({"pl_inband_pres drop in WAIT_PRESENCE: pl_clk_req ",
+              "%0d clocks after the drop (inband_drop_clk_lag, %s)"},
+              env.lsm_cfg.inband_drop_clk_lag, how), UVM_LOW)
   endfunction
 
   function void connect_phase(uvm_phase phase);
@@ -77,12 +107,27 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       @(lsm_vif.mon_cb);
     repeat (20) @(lsm_vif.mon_cb);
     if (!env.lsm_cfg.clk_req_hold_bringup) begin
-      // The DUT waits in WAIT_PRESENCE; losing presence sends it back to RESET.
+      // The DUT waits in WAIT_PRESENCE with pl_clk_req released; losing
+      // presence sends it back to RESET. Each drop has a pl_clk_req handshake
+      // (UCIe r3.0 §10.2.3.2 rule 5). Usually the model raises pl_clk_req in
+      // the clock of the drop: the DUT starts its wake on it and returns to
+      // RESET from there. When pl_wake_ack answers that wake before the drop
+      // reaches the DUT, the DUT requests Active for a clock and returns to
+      // NOP with pl_inband_pres low; the model takes that as no request
+      // (§10.3.3.8, §10.2.3.2 last paragraph). In about one run in seven the
+      // model drops pl_inband_pres first and raises pl_clk_req 1 to
+      // clk_req_window clocks later (inband_drop_clk_lag): rule 5 lets the
+      // level move without waiting for lp_clk_ack, and only names an order for
+      // assertion, so this order is legal by inference but uncommon (Figure
+      // 10-13 shows the request first). The DUT then goes from WAIT_PRESENCE
+      // straight to RESET. The lag is drawn in build_phase (draw_drop_lag()).
+      // When pl_inband_pres rises again pl_clk_req falls in that same clock,
+      // so the DUT waits for the software trigger again.
       env.lsm.drv.do_inband_drop(30);
       repeat (10) @(lsm_vif.mon_cb);
     end
     `uvm_info(get_type_name(), "pulsing I_SW_ACTIVATE_START", UVM_LOW)
-    env.lsm.drv.pulse_sw(LSM_SW_ACTIVATE, 2);
+    env.fdi_layer.pulse_sw(LSM_SW_ACTIVATE, 2);
     wait_link_up("bringup");
 
     send_flits(16, 50);
@@ -102,8 +147,8 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   endtask
 
   virtual task link_events();
-    aou_lsm_retrain_seq retrain = aou_lsm_retrain_seq::type_id::create("retrain");
-    aou_lsm_l1_seq l1 = aou_lsm_l1_seq::type_id::create("l1");
+    ucie_lsm_event_seq retrain = ucie_lsm_event_seq::of(LSM_EV_RETRAIN, "retrain");
+    ucie_lsm_l1_seq l1 = ucie_lsm_l1_seq::type_id::create("l1");
     `uvm_info(get_type_name(), "Adapter-initiated Retrain", UVM_LOW)
     retrain.start(env.lsm.sqr);
     wait_link_up("retrain");
@@ -114,7 +159,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   endtask
 
   task send_flits(int unsigned n, int unsigned cancel_pct);
-    aou_flit_seq seq = aou_flit_seq::type_id::create("flits");
+    ucie_flit_seq seq = ucie_flit_seq::type_id::create("flits");
     seq.n_flits = n;
     seq.cancel_pct = cancel_pct;
     seq.bubble_pct = 20;
@@ -124,7 +169,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
 
   task wait_link_up(string what);
     int unsigned n;
-    while (!(lsm_vif.mon_cb.fdi_link_up === 1'b1 && env.lsm.drv.link_active)) begin
+    while (!(brg_vif.mon_cb.fdi_link_up === 1'b1 && env.lsm.drv.link_active)) begin
       @(lsm_vif.mon_cb);
       if (++n == link_timeout) begin
         `uvm_error(get_type_name(), $sformatf("%s: link not up after %0d cycles", what, n))
@@ -173,7 +218,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
 
   local task collect_tx();
     forever begin
-      aou_flit_item f;
+      ucie_flit_item f;
       tx_fifo.get(f);
       msg_log.log_flit(f);
     end
@@ -182,7 +227,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
   local task watch_linkreset();
     forever begin
       @(lsm_vif.mon_cb);
-      if (lsm_vif.mon_cb.int_req_linkreset === 1'b1 && !saw_linkreset) begin
+      if (brg_vif.mon_cb.int_req_linkreset === 1'b1 && !saw_linkreset) begin
         saw_linkreset = 1'b1;
         `uvm_error(get_type_name(), "the DUT requested LinkReset (O_AOU_REQ_LINKRESET)")
       end
@@ -202,7 +247,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
     forever begin
       int unsigned delay;
       @(lsm_vif.mon_cb);
-      if (lsm_vif.mon_cb.fdi_fsm_state !== le) continue;
+      if (brg_vif.mon_cb.fdi_fsm_state !== le) continue;
       while (env.lsm.drv.state == LSM_ACTIVE) @(lsm_vif.mon_cb);
       delay = $urandom_range(sw_reset_delay_max);
       repeat (delay) @(lsm_vif.mon_cb);
@@ -216,7 +261,7 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       // take that next LinkError for this one and never answer it.
       fork
         apb_write(32'h0000_0004, 32'h0000_0010);
-        while (lsm_vif.mon_cb.fdi_fsm_state === le) @(lsm_vif.mon_cb);
+        while (brg_vif.mon_cb.fdi_fsm_state === le) @(lsm_vif.mon_cb);
       join
       n_sw_reset++;
     end
@@ -231,12 +276,14 @@ class aou_fdi_t1_bringup_test extends uvm_test;
                                             env.fdi[0].mon.n_rx_flits, n_flits_sent,
                                             env.fdi_cfg[0].gate.n_abandoned))
     // With checks on, the model has already reported each mismatch.
-    if (env.lsm.mon.model != null && env.lsm.mon.model.n_mismatch != 0 && !env.lsm_cfg.checks_en)
+    if (env.fdi_layer.model != null && env.fdi_layer.model.n_mismatch != 0 &&
+        !env.lsm_cfg.checks_en)
       `uvm_error(get_type_name(), $sformatf("bringup model: %0d mismatches",
-                                            env.lsm.mon.model.n_mismatch))
+                                            env.fdi_layer.model.n_mismatch))
   endfunction
 
-  // The rule ledger (checkers/aou_rule_log.svh) for scripts/rule_inventory.py.
+  // The rule ledgers (checkers/aou_rule_log.svh and the UCIe FDI model's) for
+  // scripts/rule_inventory.py.
   function void report_phase(uvm_phase phase);
     string q[$];
     super.report_phase(phase);
@@ -244,6 +291,9 @@ class aou_fdi_t1_bringup_test extends uvm_test;
       `uvm_info(get_type_name(), $sformatf("%0d AOU_SW_RESET writes after LinkError", n_sw_reset),
                 UVM_LOW)
     aou_rule_log::lines(q);
+    foreach (q[i]) `uvm_info(get_type_name(), q[i], UVM_NONE)
+    // The UCIe FDI model keeps its own ledger.
+    ucie_fdi_pkg::ucie_rule_log::lines(q);
     foreach (q[i]) `uvm_info(get_type_name(), q[i], UVM_NONE)
   endfunction
 endclass

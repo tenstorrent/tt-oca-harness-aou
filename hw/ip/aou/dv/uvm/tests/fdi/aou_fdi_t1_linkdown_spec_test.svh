@@ -48,9 +48,9 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     env.lsm_cfg.clk_req_hold_bringup = 1'b1;
   endfunction
 
-  local task adapter_event(aou_lsm_ev_e kind, aou_lsm_state_e to = LSM_UNKNOWN);
-    aou_lsm_event_seq s = aou_lsm_event_seq::type_id::create("ev");
-    bit in_use = lsm_vif.mon_cb.act_st_disabled !== 1'b1;
+  local task adapter_event(ucie_lsm_ev_e kind, ucie_lsm_state_e to = LSM_UNKNOWN);
+    ucie_lsm_event_seq s = ucie_lsm_event_seq::type_id::create("ev");
+    bit in_use = brg_vif.mon_cb.act_st_disabled !== 1'b1;
     string what = to == LSM_UNKNOWN ? kind.name() : {kind.name(), " ending in ", to.name()};
     s.ev_kind = kind;
     s.ev_to = to;
@@ -64,7 +64,7 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
   // also clears the interrupt: sw_reset_hold keeps it back until
   // adapter_event() has checked the interrupt, and the Adapter trains again
   // only after that.
-  local task down_event(aou_lsm_ev_e kind, aou_lsm_state_e to);
+  local task down_event(ucie_lsm_ev_e kind, ucie_lsm_state_e to);
     bit le = to == LSM_LINKERROR;
     if (le) begin
       sw_reset_hold = 1'b1;
@@ -82,24 +82,24 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
   // INT_FDI_LINK_DOWN after a link-down: set iff the core was in use, the
   // core DISABLED; software clears it with write 1 and the pin falls.
   local task check_link_down_irq(bit in_use, string what);
-    if ((lsm_vif.mon_cb.int_fdi_link_down === 1'b1) != in_use)
+    if ((brg_vif.mon_cb.int_fdi_link_down === 1'b1) != in_use)
       `uvm_error(get_type_name(), $sformatf("T1-L51: INT_FDI_LINK_DOWN %0b after %s, core %s",
-                 lsm_vif.mon_cb.int_fdi_link_down, what, in_use ? "in use" : "DISABLED"))
-    if (in_use && lsm_vif.mon_cb.act_st_disabled !== 1'b1)
+                 brg_vif.mon_cb.int_fdi_link_down, what, in_use ? "in use" : "DISABLED"))
+    if (in_use && brg_vif.mon_cb.act_st_disabled !== 1'b1)
       `uvm_error(get_type_name(), {"T1-L51: the core did not disable itself after ", what})
-    if (lsm_vif.mon_cb.int_fdi_link_down === 1'b1) begin
+    if (brg_vif.mon_cb.int_fdi_link_down === 1'b1) begin
       // Bit 12 set, ACTIVATE_START (bit 0) kept at the 1 this test's software wrote.
       `uvm_info(get_type_name(), "INT_FDI_LINK_DOWN: write 1 to clear", UVM_LOW)
       apb_write(32'h0000_0008, 32'h0000_1001);
       repeat (4) @(lsm_vif.mon_cb);
-      if (lsm_vif.mon_cb.int_fdi_link_down !== 1'b0)
+      if (brg_vif.mon_cb.int_fdi_link_down !== 1'b0)
         `uvm_error(get_type_name(), "T1-L51: INT_FDI_LINK_DOWN still set after write 1 to clear")
     end
   endtask
 
   // Waits up to `max` cycles until the Adapter is (in = 1) or is not
   // (in = 0) in state `s`; ok = 0 on time-out.
-  local task wait_adapter(aou_lsm_state_e s, bit in, int unsigned max, output bit ok);
+  local task wait_adapter(ucie_lsm_state_e s, bit in, int unsigned max, output bit ok);
     int unsigned n;
     ok = 1'b1;
     while ((env.lsm.drv.state == s) != in) begin
@@ -120,7 +120,7 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     bit watching = 1'b1;
     fork
       while (watching) begin
-        if (env.lsm.mon.model.st == BRG_LINKDOWN) down_seen = 1'b1;
+        if (env.fdi_layer.model.st == BRG_LINKDOWN) down_seen = 1'b1;
         @(lsm_vif.mon_cb);
       end
     join_none
@@ -147,15 +147,15 @@ class aou_fdi_t1_linkdown_spec_test extends aou_fdi_t1_bringup_test;
     // The Adapter reacts to lp_linkerror by itself (react_linkerror_en); the
     // event afterwards only runs the bringup.
     `uvm_info(get_type_name(), "pulsing I_SW_LINKERROR_INJECT", UVM_LOW)
-    in_use = lsm_vif.mon_cb.act_st_disabled !== 1'b1;
-    env.lsm.drv.pulse_sw(LSM_SW_LINKERROR, 2);
+    in_use = brg_vif.mon_cb.act_st_disabled !== 1'b1;
+    env.fdi_layer.pulse_sw(LSM_SW_LINKERROR, 2);
     // The software LinkError is a link loss too: the controller enters
     // LINKERROR on the pulse and the interrupt a few cycles later. The check
     // (and its write 1 to clear) comes before the base test's AOU_SW_RESET,
     // which clears the registers: sw_reset_hold keeps that write back until
     // the check is done, whatever +sw_reset_delay_max draws.
     sw_reset_hold = 1'b1;
-    for (int n = 0; n < 8 && lsm_vif.mon_cb.int_fdi_link_down !== 1'b1; n++) @(lsm_vif.mon_cb);
+    for (int n = 0; n < 8 && brg_vif.mon_cb.int_fdi_link_down !== 1'b1; n++) @(lsm_vif.mon_cb);
     check_link_down_irq(in_use, "I_SW_LINKERROR_INJECT");
     sw_reset_hold = 1'b0;
     wait_adapter(LSM_ACTIVE, 1'b0, down_wait, ok);

@@ -10,7 +10,7 @@
 //            a ReadData's beat
 //   T_g      the FDI beat carrying the message's first granule transfers at
 //            the DUT's TX pins (lp_valid & lp_irdy & pl_trdy; the L1 monitor's
-//            aou_flit_item::t_beat[b] for the beat holding the granule)
+//            ucie_flit_item::t_beat[b] for the beat holding the granule)
 //   T_flit   the first beat of the flit the message starts in (T_g when the
 //            message starts in the first beat)
 //   latency  T_g - T_axi, the figure reported; latency_flit T_flit - T_axi
@@ -36,7 +36,7 @@ class aou_tx_lat_mon extends uvm_component;
   `uvm_analysis_imp_decl(_dut_msg)
   `uvm_analysis_imp_decl(_m_txn)
   `uvm_analysis_imp_decl(_s_txn)
-  uvm_analysis_imp_tx_flit #(aou_flit_item, aou_tx_lat_mon) tx_flit_imp;  // fdi mon ap_tx
+  uvm_analysis_imp_tx_flit #(ucie_flit_item, aou_tx_lat_mon) tx_flit_imp;  // fdi mon ap_tx
   uvm_analysis_imp_dut_msg #(aou_msg, aou_tx_lat_mon)       dut_msg_imp;  // l3.ap_rx_msg
   uvm_analysis_imp_m_txn #(aou_axi_txn, aou_tx_lat_mon)     m_txn_imp;    // M-port monitors
   uvm_analysis_imp_s_txn #(aou_axi_txn, aou_tx_lat_mon)     s_txn_imp;    // S-port monitors
@@ -62,7 +62,7 @@ class aou_tx_lat_mon extends uvm_component;
     time         t_g;
   } msg_t;
 
-  protected aou_flit_item flits[int unsigned];          // by TX flit index
+  protected ucie_flit_item flits[int unsigned];          // by TX flit index
   protected int unsigned  n_flits;
   protected msg_t         req_q[AOU_RP_MAX][2][$];      // WriteReq (0) / ReadReq (1) per RP
   protected msg_t         wdata_q[AOU_RP_MAX][$];        // WriteData, in order per RP
@@ -99,20 +99,20 @@ class aou_tx_lat_mon extends uvm_component;
   endfunction
 
   // The transfer time of granule g of a sent flit.
-  function time t_granule(aou_flit_item f, int unsigned g);
+  function time t_granule(ucie_flit_item f, int unsigned g);
     int unsigned b = (aou_granule_byte(g) + 4) / beat_bytes;
     return (b < FLIT_BYTES/32) ? f.t_beat[b] : f.t_end;
   endfunction
 
   // ---- FDI side -----------------------------------------------------------
-  function void write_tx_flit(aou_flit_item it);
+  function void write_tx_flit(ucie_flit_item it);
     flits[n_flits] = it;
     n_flits++;
   endfunction
 
   function void write_dut_msg(aou_msg am);
     msg_t m;
-    aou_flit_item f;
+    ucie_flit_item f;
     if (am.cred_class() == AOU_CC_NONE || am.start_flit < 0 || am.start_granule < 0) return;
     m.kind = aou_rx_lat_mon::kind_of(am);
     if (m.kind == "" || int'(am.rp) >= n_rp || int'(am.rp) >= AOU_RP_MAX) return;

@@ -163,8 +163,7 @@ the `uvm-ieee-2020-2.0` pin below; the sweep on that library was not completed.
   that predates it: the decision record and the guidelines naming the
   commercial VIP vendors they rule out (D1, D13, AGENTS.md "Boundaries",
   CODING_GUIDELINES.md), a `synopsys translate_off` pragma pair in the vendored
-  FDI checker, a vendor document cited in `aou_flit_item.svh`, and a
-  dictionary key in `test_perf_model.py` that matches its licence-server
+  FDI checker, and a dictionary key in `test_perf_model.py` that matches its licence-server
   pattern. Each needs a wording decision by the owner or an allowed-context
   entry in the binding; none is a leak of site or licensed material
   (`check_public.py` is clean).

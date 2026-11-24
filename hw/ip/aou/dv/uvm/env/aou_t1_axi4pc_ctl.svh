@@ -24,18 +24,17 @@
 // the stale entry), and so is a checker still held with no link event behind it (the
 // bench side of the port never went idle after a port reset, so Axi4PC was off). Holds
 // a link event caused are logged as before.
-class aou_t1_axi4pc_ctl extends uvm_component;
+// It follows the link state as an observer of the UCIe model's link-state
+// monitor (the env registers it).
+class aou_t1_axi4pc_ctl extends uvm_component implements ucie_lsm_observer;
   `uvm_component_utils(aou_t1_axi4pc_ctl)
 
-  uvm_analysis_imp #(aou_lsm_obs, aou_t1_axi4pc_ctl) lsm_imp;
   virtual aou_axi4pc_ctl_if vif;
+  virtual aou_bringup_if    brg_vif;
   aou_axi_sub_driver m_drv[];
   int unsigned n_events;
 
   protected bit             pending;
-  protected bit             have_prev;
-  protected aou_lsm_state_e prev_sts;
-  protected bit             prev_rst_n;
   protected bit             off_s[8];
   protected bit             off_m[8];
   protected time            since_s[8];
@@ -51,28 +50,25 @@ class aou_t1_axi4pc_ctl extends uvm_component;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
-    lsm_imp = new("lsm_imp", this);
   endfunction
 
   function void build_phase(uvm_phase phase);
     super.build_phase(phase);
     void'(uvm_config_db #(virtual aou_axi4pc_ctl_if)::get(this, "", "axi4pc_ctl", vif));
+    void'(uvm_config_db #(virtual aou_bringup_if)::get(this, "", "aou_bringup", brg_vif));
   endfunction
 
-  function void write(aou_lsm_obs o);
-    bit lost = have_prev && o.rst_n && prev_rst_n &&
-               prev_sts inside {LSM_ACTIVE, LSM_RETRAIN} &&
-               o.sts inside {LSM_RESET, LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED} &&
-               !o.act_st_disabled;
-    have_prev = 1'b1;
-    prev_sts = o.sts;
-    prev_rst_n = o.rst_n;
+  // ucie_lsm_observer: every clock.
+  virtual function void observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
+    bit lost = cur.rst_n && prev.rst_n && prev.sts inside {LSM_ACTIVE, LSM_RETRAIN} &&
+               cur.sts inside {LSM_RESET, LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED} &&
+               !(brg_vif != null && brg_vif.mon_cb.act_st_disabled === 1'b1);
     if (!lost || vif == null || vif.present !== 1'b1) return;
     n_events++;
     pending = 1'b1;
     `uvm_info(get_type_name(), $sformatf({"Axi4PC held on every port: FDI link lost (%s) with ",
               "AoU not DISABLED; transactions in flight cannot complete until the ports' ",
-              "reset (MAS 7.3.6)"}, o.sts.name()), UVM_LOW)
+              "reset (MAS 7.3.6)"}, cur.sts.name()), UVM_LOW)
   endfunction
 
   task run_phase(uvm_phase phase);
