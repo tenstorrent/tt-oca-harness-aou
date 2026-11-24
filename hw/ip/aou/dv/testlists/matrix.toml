@@ -957,6 +957,45 @@ tags = ["matrix"]
 run_modes = ["matrix"]
 args = ["+pk=full"]
 
+# Credit returned as CrdtGrant messages rather than MsgCredit, at a 256 B FDI. AoU
+# v0.8 4.4 allows two non-Activation Misc messages per half flit, so one 256 B flit
+# may carry four CrdtGrants; #176 added the second pair of decode lanes for it,
+# because the DUT silently dropped a third or fourth grant and lost its credit.
+# The rest of the 256 B packing rows leave those lanes to the packer's zero-credit
+# filler (+pk=full sets no zero grants, +pk=mixed is sparse by construction), and a
+# zero-credit grant cannot show a lost credit. +pk=crdt returns every credit as a
+# grant, so the second half flit's lanes carry real credit and the run is
+# self-checking: a grant the DUT drops starves it, which stalls the scenario.
+[[tests]]
+name = "aou_pack_test.pk-crdt.1x1024-sp256"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=crdt"]
+
+[[tests]]
+name = "aou_pack_test.pk-crdt.1x1024-sp256-nxt"
+module = { uvm = "aou_pack_test" }
+target = "1x1024-sp256-nxt"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=crdt"]
+
+[[tests]]
+name = "aou_pack_test.pk-crdt.4xmix-sp256"
+module = { uvm = "aou_pack_test" }
+target = "4xmix-sp256"
+seed = 1
+reseed = 2
+tags = ["matrix"]
+run_modes = ["matrix"]
+args = ["+pk=crdt"]
+
 [[tests]]
 name = "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.1x1024-sp256"
 module = { uvm = "aou_dp_random_test" }
@@ -1411,7 +1450,7 @@ args = ["+attr_excl=1", "+remote_max_burst=1", "+remote_bytes=32"]
 
 [[groups]]
 name = "matrix"
-expected_count = 138
+expected_count = 141
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_dp_random_test.small_size_pct-5.remote_bytes-32_128_64_32",
@@ -1539,6 +1578,9 @@ tests = [
   "aou_pack_test.pk-crossflit.1x1024-sp256",
   "aou_pack_test.pk-mixed.1x1024-sp256",
   "aou_pack_test.pk-full.1x1024-sp256",
+  "aou_pack_test.pk-crdt.1x1024-sp256",
+  "aou_pack_test.pk-crdt.1x1024-sp256-nxt",
+  "aou_pack_test.pk-crdt.4xmix-sp256",
   "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.1x1024-sp256",
   "aou_stress_test.st_bp-all.1x1024-sp256",
   "aou_perf_test.perf_mode-lat.1x1024-sp256",

@@ -366,7 +366,7 @@ tests = [
 # Every runnable T1 scenario; run_list.py skips entries whose target differs
 [[groups]]
 name = "all"
-expected_count = 529
+expected_count = 532
 tests = [
   "aou_attr_test.attr_excl-1.remote_max_burst-1.4xmix4211-sp128",
   "aou_small_size_test",
@@ -882,6 +882,9 @@ tests = [
   "aou_pack_test.pk-crossflit.1x1024-sp256",
   "aou_pack_test.pk-mixed.1x1024-sp256",
   "aou_pack_test.pk-full.1x1024-sp256",
+  "aou_pack_test.pk-crdt.1x1024-sp256",
+  "aou_pack_test.pk-crdt.1x1024-sp256-nxt",
+  "aou_pack_test.pk-crdt.4xmix-sp256",
   "aou_dp_random_test.dp_dir-both.l1_cancel_pct-40.l1_cancel_mix-1.1x1024-sp256",
   "aou_stress_test.st_bp-all.1x1024-sp256",
   "aou_perf_test.perf_mode-lat.1x1024-sp256",

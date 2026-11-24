@@ -1378,6 +1378,9 @@ release sends a backlog of requests: up to 8 WriteReq starts per half flit.
 | `aou_pack_test.pk-crossflit.1x1024-sp256` | `+pk=crossflit` | 1-2 | `1x1024-sp256` | 6.5,6.7,6.9
 | `aou_pack_test.pk-mixed.1x1024-sp256` | `+pk=mixed` | 1-2 | `1x1024-sp256` | 6.3
 | `aou_pack_test.pk-full.1x1024-sp256` | `+pk=full` | 1-2 | `1x1024-sp256` | 6.18
+| `aou_pack_test.pk-crdt.1x1024-sp256` | `+pk=crdt` | 1-2 | `1x1024-sp256` | 11.5
+| `aou_pack_test.pk-crdt.1x1024-sp256-nxt` | `+pk=crdt` | 1-2 | `1x1024-sp256-nxt` | 11.5
+| `aou_pack_test.pk-crdt.4xmix-sp256` | `+pk=crdt` | 1-2 | `4xmix-sp256` | 11.5
 |===
 
 [[aou-proc-aou_pattern_test]]
