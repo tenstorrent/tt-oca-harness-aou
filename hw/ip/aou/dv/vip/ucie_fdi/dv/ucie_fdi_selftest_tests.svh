@@ -1686,7 +1686,12 @@ endclass
 // with +neg=wake_le raises lp_linkerror there with no lp_wake_req (FDI-R16,
 // r3.0 §10.2.3.1); with +neg=unanswered the Adapter answers nothing
 // (react_en 0), so the stub's own checks must report its LinkReset request
-// in Active and its lp_linkerror unanswered (req_bound 300 here). The
+// in Active and its lp_linkerror unanswered (req_bound 300 here). With
+// +neg=rx_drop the model loses one RX flit across a LinkReset and says
+// nothing: as the link leaves LinkReset the test bumps the gate's epoch, so
+// the PL driver drops the flit it fetched while the link was down, as it
+// would after a reset of the layers above. A LinkReset loses no flit in this
+// model, so the scoreboard must report that one flit missing, once. The
 // rule that must catch it has to fire, as often as the violation is made
 // (wake_held: the first bringup and the one after each of three LinkErrors);
 // its errors are expected and demoted. Any other error still fails the run.
@@ -1763,6 +1768,11 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
           `uvm_fatal(get_type_name(), "+neg=xfer needs an FDI of 256 B or more")
       end
       "trdy_down", "trdy_le": catcher.rule = "FDI-R43";
+      "rx_drop": begin
+        catcher.rule = "RX flit not the next one sent";
+        // Enough traffic that flits are still waiting when the link goes down.
+        n_flits = 300;
+      end
       default:   `uvm_fatal(get_type_name(), {"+neg: unknown violation ", neg})
     endcase
     uvm_report_cb::add(null, catcher);
@@ -1851,6 +1861,18 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
         while (catcher.n == n0 + 1 && env.pl.linkerror_req) @(env.pl.lsm.mon_cb);
         return;
       end
+      "rx_drop": begin
+        fork
+          begin
+            while (env.lsm.drv.state != LSM_LINKRESET) @(env.pl.lsm.mon_cb);
+            while (env.lsm.drv.state == LSM_LINKRESET) @(env.pl.lsm.mon_cb);
+            env.fdi_cfg.gate.epoch++;
+          end
+        join_none
+        wait_flit_queued(env);
+        nev(LSM_EV_LINK_RESET);
+        return;
+      end
       "le_after": begin
         // A LinkError from Reset reported before its pl_clk_req (rule 6's
         // second option), which the top cuts short with a Reset.
@@ -1877,6 +1899,9 @@ class ucie_fdi_neg_test extends ucie_fdi_smoke_test;
     if (catcher.n < min_n)
       `uvm_error(get_type_name(), $sformatf("the %s violation was not caught (%s, %0d of %0d)",
                                             neg, catcher.rule, catcher.n, min_n))
+    // One lost flit is one report: the scoreboard realigns on the next flit.
+    else if (neg == "rx_drop" && catcher.n != 1)
+      `uvm_error(get_type_name(), $sformatf("rx_drop: %0d reports of one lost flit", catcher.n))
     else
       `uvm_info(get_type_name(), $sformatf("%s caught the %s violation (%0d reports)",
                                            catcher.rule, neg, catcher.n), UVM_NONE)

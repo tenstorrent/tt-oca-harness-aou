@@ -7,12 +7,19 @@
 // End-to-end check of the self-test: every flit the test sends reaches the
 // Protocol Layer intact (ap_rx, after the cancels), and every delivered flit
 // comes back in order on the Protocol Layer's TX side (ap_tx). The model's
-// own monitors check the FDI rules on the way. An RX flit may be lost only
-// to a LinkError the Adapter entered mid-flit (UCIe r3.0 §10.3.3.7), so the
-// RX check skips ahead only after a link-down, which the scoreboard sees as an
-// observer of the link-state monitor. TX flits with an all-zero payload are
-// the stub's fillers of a wide transfer, or its NOP flits, and are skipped.
-// Every delivered flit must be a protocol flit (no NOP, Flit Type 00b).
+// own monitors check the FDI rules on the way. The model leaves Active at a
+// flit boundary on every exit but a LinkError it enters mid-flit, so an RX
+// flit may be lost only there: the PL driver abandons the transfer under way
+// (UCIe r3.0 §10.3.3.7) and counts its flits, NOPs not included, in
+// gate.n_abandoned. The RX check skips an expected flit only when the next
+// delivered flit shows it missing and an abandoned flit is still unaccounted
+// for, never more than that, and at the end of the test the flits skipped
+// must equal the flits abandoned. A link-down alone allows no skip: LinkReset,
+// Disabled, Retrain and a LinkError at a flit boundary lose nothing. TX flits
+// with an all-zero payload are the stub's fillers of a wide transfer, or its
+// NOP flits, and are skipped. Every delivered flit must be a protocol flit
+// (no NOP, Flit Type 00b). The scoreboard also follows the link state as an
+// observer of the link-state monitor, to count the link-downs it reports.
 class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   `uvm_component_utils(ucie_fdi_selftest_sb)
 
@@ -22,7 +29,7 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   ucie_flit_item rx_exp[$];   // sent by the test, not yet delivered
   ucie_flit_item lb_exp[$];   // delivered, not yet looped back
   int unsigned   n_rx, n_tx, n_rx_lost, n_link_down, n_tx_fill;
-  local bit      rx_resync;
+  ucie_fdi_gate  gate;  // this FDI's gate: n_abandoned, the RX flits the PL driver abandoned
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
@@ -35,26 +42,38 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   endfunction
 
   function void write_rx(ucie_flit_item t);
-    int unsigned skipped;
+    int pos = -1;
     // The model hands the Protocol Layer protocol flits only: no NOP, and a
     // Flit Type of 00b even with random Adapter bytes (r3.0 Table 3-5).
     if (t.is_nop() || t.data[1][7:6] != 2'b00)
       `uvm_error(get_type_name(), $sformatf("RX flit with Protocol ID %02b, Flit Type %02b: %s",
                                             t.data[0][7:6], t.data[1][7:6], t.convert2string()))
     lb_exp.push_back(t);
-    while (rx_exp.size() != 0 && rx_resync && !rx_exp[0].same_payload(t)) begin
-      void'(rx_exp.pop_front());
-      skipped++;
-    end
-    if (rx_exp.size() == 0 || !rx_exp[0].same_payload(t)) begin
-      `uvm_error(get_type_name(), {"RX flit not the next one sent: ", t.convert2string()})
-      if (rx_exp.size() != 0) void'(rx_exp.pop_front());
+    // Where the flit is among those sent and not yet delivered: normally at
+    // the head; further down only on the error path, so the search is rare.
+    if (rx_exp.size() != 0 && rx_exp[0].same_payload(t)) pos = 0;
+    else
+      foreach (rx_exp[i])
+        if (rx_exp[i].same_payload(t)) begin
+          pos = i;
+          break;
+        end
+    if (pos < 0) begin
+      `uvm_error(get_type_name(), {"RX flit not the next one sent (never sent, or delivered ",
+                                   "twice): ", t.convert2string()})
       return;
     end
-    void'(rx_exp.pop_front());
+    // The flits before it were sent and never delivered: legal only as flits
+    // a mid-flit LinkError abandoned and no earlier flit has accounted for.
+    if (pos > gate.n_abandoned - n_rx_lost)
+      `uvm_error(get_type_name(), $sformatf({"RX flit not the next one sent (%0d sent before it ",
+                 "never delivered, %0d abandoned flits unaccounted for): %s"},
+                 pos, gate.n_abandoned - n_rx_lost, t.convert2string()))
+    else
+      n_rx_lost += pos;
+    // Realign on the delivered flit either way, so one gap is one error.
+    repeat (pos + 1) void'(rx_exp.pop_front());
     n_rx++;
-    n_rx_lost += skipped;
-    rx_resync = 1'b0;
   endfunction
 
   function void write_tx(ucie_flit_item t);
@@ -77,15 +96,17 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   endfunction
 
   virtual function void observe(ucie_lsm_obs_t cur, ucie_lsm_obs_t prev);
-    if (cur.sts != prev.sts && cur.sts inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED} &&
-        !rx_resync) begin
-      rx_resync = 1'b1;
+    if (cur.sts != prev.sts && cur.sts inside {LSM_LINKERROR, LSM_LINKRESET, LSM_DISABLED})
       n_link_down++;
-    end
   endfunction
 
   function void check_phase(uvm_phase phase);
     super.check_phase(phase);
+    // An abandoned flit that was delivered after all, or one never followed
+    // by a delivery, leaves the two counts apart.
+    if (n_rx_lost != gate.n_abandoned)
+      `uvm_error(get_type_name(), $sformatf({"%0d RX flits skipped as abandoned, but the model ",
+                 "abandoned %0d on mid-flit LinkErrors"}, n_rx_lost, gate.n_abandoned))
     if (rx_exp.size() != 0)
       `uvm_error(get_type_name(), $sformatf("%0d flits sent but never delivered", rx_exp.size()))
     if (lb_exp.size() != 0)
@@ -94,9 +115,9 @@ class ucie_fdi_selftest_sb extends uvm_component implements ucie_lsm_observer;
   endfunction
 
   function void report_phase(uvm_phase phase);
-    `uvm_info(get_type_name(), $sformatf(
-              "%0d flits delivered, %0d looped back (and %0d fillers), %0d lost to %0d link-downs",
-              n_rx, n_tx, n_tx_fill, n_rx_lost, n_link_down), UVM_LOW)
+    `uvm_info(get_type_name(), $sformatf({"%0d flits delivered, %0d looped back (and %0d ",
+              "fillers), %0d lost to mid-flit LinkErrors (%0d abandoned), %0d link-downs"},
+              n_rx, n_tx, n_tx_fill, n_rx_lost, gate.n_abandoned, n_link_down), UVM_LOW)
   endfunction
 endclass
 
@@ -159,6 +180,7 @@ class ucie_fdi_selftest_env extends uvm_env;
   function void connect_phase(uvm_phase phase);
     super.connect_phase(phase);
     pl.mb = fdi.vif;
+    sb.gate = fdi_cfg.gate;
     fdi.mon.ap_rx.connect(pl.rx_imp);
     fdi.mon.ap_rx.connect(sb.rx_imp);
     fdi.mon.ap_tx.connect(sb.tx_imp);
