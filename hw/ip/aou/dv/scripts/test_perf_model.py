@@ -16,6 +16,7 @@ import unittest
 sys.dont_write_bytecode = True
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import perf_model as pm  # noqa: E402
+import perf_report as pr  # noqa: E402
 
 HAVE_MODEL = bool(os.environ.get("D2D_COMPARE"))
 needs_model = unittest.skipUnless(HAVE_MODEL, "D2D_COMPARE not set")
@@ -280,6 +281,69 @@ class TableTest(unittest.TestCase):
         self.assertEqual(rows["l2r"]["verdict"], "PASS")
         self.assertEqual(rows["r2l"]["verdict"], "BELOW+SHORT")
         self.assertEqual(rows["l2r"]["build"], "vcs-t1-1x512-sp64")
+
+
+def perf_json(report_only, bpc, ss_ok=True):
+    """One bw_wr window for 1x512-sp64 whose l2r steady state carries bpc B/cycle."""
+    return {
+        "build": {"config": "1x512-sp64", "active_phy": 0, "sim": "verilator", "seed": 1,
+                  "perf_mode": "bw", "perf_slots": 32, "report_only": report_only},
+        "windows": [{
+            "name": "bw_wr", "scenario": "S1", "dir": {
+                "l2r": {"app_bytes": int(bpc * 1000), "cycles": 1000, "duty": 1.0,
+                        "ss": {"ss_ok": ss_ok, "msgs_by_msg": {}}},
+                "r2l": None}}]}
+
+
+class ReportOnlyTest(unittest.TestCase):
+    """A report-only run compares with the model but never fails the gate."""
+
+    def rows(self, perf):
+        with tempfile.TemporaryDirectory() as d:
+            run = os.path.join(d, "verilator-t1-1x512-sp64", "aou_perf_test.rid.r")
+            os.makedirs(run)
+            with open(os.path.join(run, "perf.json"), "w", encoding="utf-8") as fh:
+                json.dump(perf, fh)
+            return pm.judge_runs(d, pm.read_svh())
+
+    def test_report_only_below(self):
+        """Half the model, recorded report-only: REPORT_ONLY, BELOW kept as the comparison."""
+        r = self.rows(perf_json(True, 27.0))[0]
+        self.assertTrue(r["report_only"])
+        self.assertEqual(r["verdict"], "REPORT_ONLY")
+        self.assertEqual(r["model_verdict"], "BELOW")
+        self.assertAlmostEqual(r["ratio"], 27.0 / 53.8947, places=3)
+
+    def test_report_only_short(self):
+        """A short steady state is not a gate either when the run is report-only."""
+        r = self.rows(perf_json(True, 53.9, ss_ok=False))[0]
+        self.assertEqual(r["verdict"], "REPORT_ONLY")
+        self.assertEqual(r["model_verdict"], "SHORT")
+
+    def test_normal_below_control(self):
+        """The same data without report_only still fails as BELOW."""
+        r = self.rows(perf_json(False, 27.0))[0]
+        self.assertFalse(r["report_only"])
+        self.assertEqual(r["verdict"], "BELOW")
+
+    def test_normal_pass_control(self):
+        r = self.rows(perf_json(False, 53.9))[0]
+        self.assertEqual(r["verdict"], "PASS")
+
+    def test_report_render(self):
+        """perf_report shows REPORT_ONLY for a report-only row and keeps normal verdicts."""
+        with tempfile.TemporaryDirectory() as d:
+            for tag, ro, bpc in (("ro", True, 27.0), ("nr", False, 27.0)):
+                run = os.path.join(d, f"verilator-t1-1x512-sp64-{tag}", "aou_perf_test.rid.1")
+                os.makedirs(run)
+                with open(os.path.join(run, "perf.json"), "w", encoding="utf-8") as fh:
+                    json.dump(perf_json(ro, bpc), fh)
+            text = "\n".join(pr.model_section(d))
+        ro_row = [l for l in text.splitlines() if "-ro |" in l and "| l2r |" in l][0]
+        nr_row = [l for l in text.splitlines() if "-nr |" in l and "| l2r |" in l][0]
+        self.assertIn("| REPORT_ONLY |", ro_row)
+        self.assertNotIn("| BELOW |", ro_row)
+        self.assertIn("| BELOW |", nr_row)
 
 
 if __name__ == "__main__":

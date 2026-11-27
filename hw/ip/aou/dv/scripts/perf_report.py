@@ -103,15 +103,18 @@ def model_section(out_dir, rid=None):
              "Steady-state application bytes per cycle on each link (l2r: DUT TX, r2l: DUT RX)",
              "from perf.json, against the committed d2d_model targets. Gate: PASS, or BELOW",
              "(T1-P02, under (1 - tol) x model), ABOVE (T1-P03), MIX (T1-P04), SHORT (steady",
-             "state under min_ss_flits), NO_TARGET. Run: the run's verdict against",
+             "state under min_ss_flits), NO_TARGET; REPORT_ONLY for a run started with",
+             "+perf_report_only, whose checker gates nothing (the model comparison in that",
+             "row is characterization, not a verdict). Run: the run's verdict against",
              "expected_fail.yaml.", "",
-             "| build | PHY | scenario | window | link | measured | model | ratio | gate | run |",
-             "|---|---|---|---|---|---|---|---|---|---|"]
+             "| build | PHY | slots | scenario | window | link | measured | model | ratio | gate | run |",
+             "|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in sorted(rows, key=lambda r: (r["build"], r["active_phy"], r["scenario"], r["run"],
                                          r["window"], r["dir"])):
         model = "-" if r["model"] is None else f"{r['model']:.2f}"
         ratio = "-" if r["ratio"] is None else f"{r['ratio']:.3f}"
-        lines.append(f"| {r['build']} | {r['active_phy']} | {r['scenario']} | {r['window']} | "
+        lines.append(f"| {r['build']} | {r['active_phy']} | {r.get('perf_slots', '')} | "
+                     f"{r['scenario']} | {r['window']} | "
                      f"{r['dir']} | {r['measured']:.2f} | {model} | {ratio} | {r['verdict']} | "
                      f"{r['run_verdict']} |")
     return lines + [""]

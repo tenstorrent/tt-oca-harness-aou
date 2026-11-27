@@ -581,11 +581,25 @@ def run_verdict(run_dir):
         return "?"
 
 
+def report_only_of(perf):
+    """Whether the run recorded itself as report-only (build.report_only)."""
+    v = (perf.get("build") or {}).get("report_only", False)
+    if isinstance(v, str):
+        return v.strip().lower() in ("true", "1")
+    return bool(v)
+
+
 def judge_runs(out_dir, table, live=False):
-    """Rows: one per (run, bandwidth window, link with data or a target)."""
+    """Rows: one per (run, bandwidth window, link with data or a target).
+
+    A run that recorded itself as report-only (+perf_report_only) keeps its
+    comparison with the model in `model_verdict`, but it is not a gate: the UVM
+    checker performs no T1-P0x check for those runs, so `verdict` is
+    REPORT_ONLY and cmd_check does not count the row as a failure."""
     rows = []
     for run_dir, perf in collect(out_dir):
         b = perf.get("build", {})
+        report_only = report_only_of(perf)
         own = {}
         if live:
             try:
@@ -603,14 +617,17 @@ def judge_runs(out_dir, table, live=False):
                     if tgt is None:
                         continue
                     meas = dict(bpc=0.0, cycles=1.0, ss_ok=False, duty=0.0, msgs={})
-                verdict, ratio = judge(meas, tgt)
+                model_verdict, ratio = judge(meas, tgt)
                 r = dict(run=os.path.relpath(run_dir, out_dir), build=os.path.basename(
                     os.path.dirname(run_dir)), run_verdict=run_verdict(run_dir), key=k,
                     config=b.get("config", ""), active_phy=b.get("active_phy", 0),
                     sim=b.get("sim", ""), seed=b.get("seed"), scenario=w["scenario"],
+                    perf_slots=b.get("perf_slots", ""),
                     window=w["name"], dir=d, measured=meas["bpc"],
                     model=tgt["model"] if tgt else None, tol=tgt["tol"] if tgt else None,
-                    ratio=ratio, verdict=verdict, duty=meas["duty"])
+                    ratio=ratio, report_only=report_only, model_verdict=model_verdict,
+                    verdict="REPORT_ONLY" if report_only else model_verdict,
+                    duty=meas["duty"])
                 if tgt:
                     r["mix_err"] = mix_error(meas.get("msgs") or {}, tgt.get("mix") or {})[0]
                 if w["name"] in own:
@@ -657,7 +674,8 @@ def cmd_check(args):
         lines.append(f"| {r['run']} | {r['run_verdict']} | {r['window']} | {r['dir']} | "
                      f"{_f(r['measured'])} | {_f(r['model'])} | {_f(r['ratio'], '{:.3f}')} | "
                      f"{r['verdict']} | {_f(r.get('run_model'))} | {_f(r.get('mix_err'), '{:.1f}')} |")
-        bad += not r["verdict"].startswith("PASS")
+        if not r.get("report_only") and not r["verdict"].startswith("PASS"):
+            bad += 1
     text = "\n".join(lines) + "\n"
     if args.output:
         os.makedirs(os.path.dirname(os.path.abspath(args.output)), exist_ok=True)
